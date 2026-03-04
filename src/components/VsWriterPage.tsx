@@ -38,7 +38,7 @@ const testimonials = [
         index: 0,
     },
     {
-        quote: "Writer helped us generate copy, but Optimizely Opal lets us generate, test, personalize, and publish \u2014 all in one workflow. The ROI difference is night and day.",
+        quote: "Writer helped us generate copy, but Optimizely Opal lets us generate, test, personalize, and publish - all in one workflow. The ROI difference is night and day.",
         spokesperson: 'Marcus Rivera',
         jobTitle: 'Director of Content Operations',
         company: 'Enterprise Electronics Inc.',
@@ -66,14 +66,14 @@ const testimonials = [
 // --- FAQ Data ---
 const faqItems = [
     {
-        title: 'We already use Writer AI at Logitech \u2014 why switch?',
+        title: 'We already use Writer AI at Logitech - why switch?',
         defaultOpen: true,
         children: (
             <div>
                 <p className="mb-4">Writer is a capable AI writing assistant, but it operates in isolation from your content delivery, experimentation, and commerce workflows. Here's what changes with Opal:</p>
                 <ul className="list-disc pl-6 space-y-2">
-                    <li>Your gaming, video collaboration, and productivity teams get a unified content platform \u2014 no more siloed tools</li>
-                    <li>AI-generated content feeds directly into A/B tests and personalization \u2014 no manual handoff</li>
+                    <li>Your gaming, video collaboration, and productivity teams get a unified content platform - no more siloed tools</li>
+                    <li>AI-generated content feeds directly into A/B tests and personalization - no manual handoff</li>
                     <li>Opal connects natively to your DAM, PIM, and ecommerce stack, so product launches move faster</li>
                     <li>You get measurable ROI through built-in experimentation, not just content output metrics</li>
                 </ul>
@@ -87,10 +87,10 @@ const faqItems = [
             <div>
                 <p className="mb-4">Not at all. While Writer focuses on AI content generation, Opal is an AI orchestration layer across your entire digital experience stack:</p>
                 <ul className="list-disc pl-6 space-y-2">
-                    <li><strong>Content creation</strong> \u2014 yes, Opal generates on-brand copy, but it also manages the full content supply chain from ideation to publishing</li>
-                    <li><strong>Experimentation</strong> \u2014 Opal runs AI-powered A/B tests to optimize every piece of content for conversion</li>
-                    <li><strong>Personalization</strong> \u2014 deliver different product messaging to gamers vs. enterprise IT buyers vs. home office users automatically</li>
-                    <li><strong>Commerce</strong> \u2014 optimize product descriptions, search results, and recommendations across your entire catalog</li>
+                    <li><strong>Content creation</strong> - yes, Opal generates on-brand copy, but it also manages the full content supply chain from ideation to publishing</li>
+                    <li><strong>Experimentation</strong> - Opal runs AI-powered A/B tests to optimize every piece of content for conversion</li>
+                    <li><strong>Personalization</strong> - deliver different product messaging to gamers vs. enterprise IT buyers vs. home office users automatically</li>
+                    <li><strong>Commerce</strong> - optimize product descriptions, search results, and recommendations across your entire catalog</li>
                 </ul>
             </div>
         ),
@@ -102,8 +102,8 @@ const faqItems = [
             <div>
                 <p className="mb-4">Optimizely has migrated hundreds of enterprise teams from standalone AI tools. For a company like Logitech:</p>
                 <ul className="list-disc pl-6 space-y-2">
-                    <li>Typical migration timeline is 6\u20138 weeks, with parallel running so there's zero downtime</li>
-                    <li>Opal's interface is designed for marketers \u2014 your content team will be productive in days, not months</li>
+                    <li>Typical migration timeline is 6-8 weeks, with parallel running so there's zero downtime</li>
+                    <li>Opal's interface is designed for marketers - your content team will be productive in days, not months</li>
                     <li>Free access to Opal University, a 5-day AI training course customized for your workflows</li>
                     <li>Dedicated customer success team for enterprise onboarding, including brand voice configuration for each product line</li>
                 </ul>
@@ -131,7 +131,7 @@ const VsWriterPage = () => {
                     Optimizely Opal: The smarter AI alternative to Writer for <em className="not-italic text-optimizely-blue">Logitech</em>
                 </h1>
                 <p className="mb-8 text-xl text-gray-300">
-                    Writer generates content. Opal orchestrates your entire digital experience \u2014 from AI-powered content creation to experimentation, personalization, and commerce \u2014 all in one platform built for multi-product enterprises.
+                    Writer generates content. Opal orchestrates your entire digital experience - from AI-powered content creation to experimentation, personalization, and commerce - all in one platform built for multi-product enterprises.
                 </p>
                 <Button href="#demo" buttonStyle="primary" icon="arrowRight">
                     See Opal in action
@@ -167,11 +167,11 @@ const VsWriterPage = () => {
                             <div className="grid gap-6 md:grid-cols-2">
                                 <div className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-6">
                                     <h3 className="mb-2 text-xl font-medium text-white">Unified Multi-Product Content</h3>
-                                    <p className="text-base text-gray-300">One AI platform for Logi G (gaming), Logitech for Business, and consumer lines \u2014 with brand guardrails per product family.</p>
+                                    <p className="text-base text-gray-300">One AI platform for Logi G (gaming), Logitech for Business, and consumer lines - with brand guardrails per product family.</p>
                                 </div>
                                 <div className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-6">
                                     <h3 className="mb-2 text-xl font-medium text-white">AI-Powered Experimentation</h3>
-                                    <p className="text-base text-gray-300">Don't just create content \u2014 test it. Opal runs automatic A/B tests on product pages, landing pages, and campaigns.</p>
+                                    <p className="text-base text-gray-300">Don't just create content - test it. Opal runs automatic A/B tests on product pages, landing pages, and campaigns.</p>
                                 </div>
                                 <div className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-6">
                                     <h3 className="mb-2 text-xl font-medium text-white">Commerce-Native Intelligence</h3>
@@ -210,7 +210,7 @@ const VsWriterPage = () => {
                     Recognized by Gartner as a <em className="not-italic text-optimizely-blue">Leader</em>
                 </h2>
                 <p className="t-subtitle mb-6">
-                    Optimizely named a Leader in the 2025 Gartner Magic Quadrant for Digital Experience Platforms \u2014 for the strength of its AI orchestration, composable architecture, and enterprise-grade security.
+                    Optimizely named a Leader in the 2025 Gartner Magic Quadrant for Digital Experience Platforms - for the strength of its AI orchestration, composable architecture, and enterprise-grade security.
                 </p>
                 <Button href="#report" buttonStyle="secondary" icon="arrowRight">
                     Download the full report
