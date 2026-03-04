@@ -162,7 +162,8 @@
     color: var(--color-heading);
 }
 
-.rte p {
+.rte p,
+.rte li {
     font-size: 1.6rem;
     font-weight: 300;
     line-height: 1.7778;
