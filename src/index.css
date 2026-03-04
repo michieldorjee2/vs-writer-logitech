@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, html {
+    --announcement-height: 0px;
+    --header-height: 77px;
+    --vulcan: #10141d;
+    --vulcan-95: #191e28;
+    --vulcan-90: #232834;
+    --vulcan-85: #2c313f;
+    --green: #3be081;
+    --orange: #ff8110;
+    --gray-300: #ced2dc;
+    --theme-color: #0037ff;
+    --theme-color-dark: #002ccc;
+    --theme-color-contrast: #fff;
+    --theme-button-hover: #194bff;
+
+    /* Dark theme type colors */
+    --color-primary: #194bff;
+    --color-heading-large: #fff;
+    --color-heading: #e9ebf1;
+    --color-overline: #ccd7ff;
+    --color-subtitle: #fff;
+    --color-text-body: #e9ebf1;
+    --color-link-body: #fff;
+    --color-link-body-hover: #ced2dc;
+
+    /* Quote theme border colors */
+    --blue-60-shade: #002199;
+    --light-blue-60-shade: #007a99;
+    --purple-60-shade: #510f99;
+    --purple-80-shade: #6b17cc;
+    --green-60-shade: #238a4d;
+    --orange-60-shade: #994d0a;
+}
+
+@layer base {
+    svg,
+    img {
+        display: inline-block;
+        vertical-align: baseline;
+    }
+
+    body {
+        background-color: #10141d;
+        color: #e9ebf1;
+        margin: 0;
+        font-family: 'Figtree', Arial, sans-serif;
+    }
+}
+
+@layer utilities {
+    .mask-logo-grid {
+        -webkit-mask-image: linear-gradient(
+            90deg,
+            rgba(16, 20, 29, 0) 4.33%,
+            #10141d 52.87%,
+            rgba(16, 20, 29, 0) 95.42%
+        );
+        mask-image: linear-gradient(
+            90deg,
+            rgba(16, 20, 29, 0) 4.33%,
+            #10141d 52.87%,
+            rgba(16, 20, 29, 0) 95.42%
+        );
+    }
+
+    .outer-padding {
+        padding-left: 1.6rem;
+        padding-right: 1.6rem;
+    }
+
+    @media (min-width: 992px) {
+        .outer-padding {
+            padding-left: 4.8rem;
+            padding-right: 4.8rem;
+        }
+    }
+
+    .arrow-animated {
+        display: inline-block;
+        width: 1.6rem;
+        height: 1.6rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3E%3Cpath stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M3.333 8h9.334M8.667 4l4 4-4 4'/%3E%3C/svg%3E");
+        background-size: contain;
+        background-repeat: no-repeat;
+        filter: brightness(0) invert(1);
+        transition: transform 0.3s ease;
+    }
+
+    a:hover .arrow-animated,
+    .group:hover .arrow-animated {
+        transform: translateX(4px);
+    }
+
+    .design-grid-overlay {
+        pointer-events: none;
+    }
+
+    .design-grid-overlay:after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+        mix-blend-mode: soft-light;
+        background-image: repeating-linear-gradient(
+            90deg,
+            rgba(255,255,255,0.03) 0px,
+            rgba(255,255,255,0.03) 1px,
+            transparent 1px,
+            transparent 80px
+        );
+    }
+}
+
+/* Typography classes */
+.rte .t-overline,
+.t-overline {
+    display: block;
+    font-family: 'NBI Pro Mono', Arial, sans-serif;
+    font-size: 1.2rem;
+    font-weight: 400;
+    line-height: 2rem;
+    color: var(--color-overline);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.rte .t-subtitle,
+.t-subtitle {
+    font-size: clamp(2rem, 0.417vw + 1.867rem, 2.4rem);
+    font-weight: 300;
+    line-height: clamp(2.8rem, 0.208vw + 2.733rem, 3rem);
+    color: var(--color-subtitle);
+}
+
+.rte h1, .t-heading-1 {
+    font-size: clamp(3.6rem, 1.25vw + 3.2rem, 4.8rem);
+    font-weight: 620;
+    line-height: 1.1;
+    color: var(--color-heading-large);
+}
+
+.rte h2, .t-heading-2 {
+    font-size: clamp(3rem, 0.625vw + 2.8rem, 3.6rem);
+    font-weight: 450;
+    line-height: 1.15;
+    color: var(--color-heading-large);
+}
+
+.rte h3, .t-heading-3 {
+    font-size: clamp(2.4rem, 0.417vw + 2.267rem, 2.8rem);
+    font-weight: 450;
+    line-height: 1.2;
+    color: var(--color-heading);
+}
+
+.rte p {
+    font-size: 1.6rem;
+    font-weight: 300;
+    line-height: 1.7778;
+    color: var(--color-text-body);
+}
+
+.rte a {
+    color: var(--color-link-body);
+    text-decoration: underline;
+}
+
+/* Theme color classes */
+.theme--blue { --theme-color: #194bff; --theme-color-dark: #002ccc; --theme-button-hover: #5176fe; }
+.theme--purple { --theme-color: #861dff; --theme-color-dark: #6b17cc; --theme-button-hover: #a254fe; }
+.theme--green { --theme-color: #3be081; --theme-color-dark: #2fb367; --theme-button-hover: #37cb77; }
+.theme--orange { --theme-color: #ff8110; --theme-color-dark: #cc670d; --theme-button-hover: #e67611; }
+
+/* No-op marker class used by components */
+.no-toc { display: block; }
