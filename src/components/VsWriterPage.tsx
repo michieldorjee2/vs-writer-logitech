@@ -112,14 +112,14 @@ const faqItems = [
     },
 ];
 
-// --- Logo Grid Data (local SVGs in /public/logos/) ---
+// --- Logo Grid Data ---
 const logoMedia = [
-    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/salesforce.svg', alt: 'Salesforce' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/nike.svg', alt: 'Nike' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/zoom.svg', alt: 'Zoom' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/dolby.svg', alt: 'Dolby' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/shell.svg', alt: 'Shell' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/newera.svg', alt: 'New Era' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/f58ea35175bd4e25bf399e36d284d6f9/logo_salesforce_white_100x300.svg', alt: 'Salesforce', linkUrl: '/salesforce/' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/854ad08b9a5642f1bbda87fdfe6b81d4/nike-logo-icon_light.svg', alt: 'Nike' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/638fd78be5cc45978c7d8b42bf0d31eb/zoom-logo-white.svg', alt: 'Zoom' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/04dd25ba79f04298a76e1fb50742a117/shell-logo-light.svg', alt: 'Shell' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/71dcdc4b907a414ba7057d2624c2883b/dolby-logo-white.svg', alt: 'Dolby' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/c3fc7cbd589947cbb8579ce42d6bf8ec/logo_new-era_white_100x300.svg', alt: 'NEW ERA', linkUrl: '/insights/new-era-cap/' } } },
 ];
 
 const VsWriterPage = () => {
