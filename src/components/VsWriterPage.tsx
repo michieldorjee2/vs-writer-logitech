@@ -114,12 +114,12 @@ const faqItems = [
 
 // --- Logo Grid Data (local SVGs in /public/logos/) ---
 const logoMedia = [
-    { asset: { type: 'image' as const, assetAttributes: { url: '/vs-writer-logitech/logos/salesforce.svg', alt: 'Salesforce' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/vs-writer-logitech/logos/nike.svg', alt: 'Nike' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/vs-writer-logitech/logos/zoom.svg', alt: 'Zoom' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/vs-writer-logitech/logos/dolby.svg', alt: 'Dolby' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/vs-writer-logitech/logos/shell.svg', alt: 'Shell' } } },
-    { asset: { type: 'image' as const, assetAttributes: { url: '/vs-writer-logitech/logos/newera.svg', alt: 'New Era' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/salesforce.svg', alt: 'Salesforce' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/nike.svg', alt: 'Nike' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/zoom.svg', alt: 'Zoom' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/dolby.svg', alt: 'Dolby' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/shell.svg', alt: 'Shell' } } },
+    { asset: { type: 'image' as const, assetAttributes: { url: '/logos/newera.svg', alt: 'New Era' } } },
 ];
 
 const VsWriterPage = () => {
