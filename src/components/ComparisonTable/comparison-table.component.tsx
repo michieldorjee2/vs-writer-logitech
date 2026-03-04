@@ -24,17 +24,17 @@ const Cross = () => (
 
 const renderCell = (value: boolean | string) => {
     if (typeof value === 'boolean') return value ? <Check /> : <Cross />;
-    return <span className="text-gray-300 text-sm">{value}</span>;
+    return <span className="text-gray-300 text-[1.4rem]">{value}</span>;
 };
 
 const ComparisonTable = ({ rows, opalLabel = 'Optimizely Opal', writerLabel = 'Writer AI' }: ComparisonTableProps) => (
     <div className="overflow-x-auto rounded-lg border border-vulcan-85">
-        <table className="w-full border-collapse text-left">
+        <table className="w-full border-collapse text-left text-[1.6rem]">
             <thead>
                 <tr className="border-b border-vulcan-85 bg-vulcan-95">
-                    <th className="py-5 px-6 text-lg font-medium text-gray-200 w-1/2">Feature</th>
-                    <th className="py-5 px-6 text-lg font-medium text-center text-optimizely-blue w-1/4">{opalLabel}</th>
-                    <th className="py-5 px-6 text-lg font-medium text-center text-gray-400 w-1/4">{writerLabel}</th>
+                    <th className="py-5 px-6 text-[1.8rem] font-medium text-gray-200 w-1/2">Feature</th>
+                    <th className="py-5 px-6 text-[1.8rem] font-medium text-center text-optimizely-blue w-1/4">{opalLabel}</th>
+                    <th className="py-5 px-6 text-[1.8rem] font-medium text-center text-gray-400 w-1/4">{writerLabel}</th>
                 </tr>
             </thead>
             <tbody>
