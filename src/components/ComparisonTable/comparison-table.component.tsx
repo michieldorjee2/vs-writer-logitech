@@ -33,7 +33,7 @@ const ComparisonTable = ({ rows, opalLabel = 'Optimizely Opal', writerLabel = 'W
             <thead>
                 <tr className="border-b border-vulcan-85 bg-vulcan-95">
                     <th className="py-5 px-6 text-[1.8rem] font-medium text-gray-200 w-1/2">Feature</th>
-                    <th className="py-5 px-6 text-[1.8rem] font-medium text-center text-optimizely-blue w-1/4">{opalLabel}</th>
+                    <th className="py-5 px-6 text-[1.8rem] font-medium text-center text-optimizely-blue-60-tint w-1/4">{opalLabel}</th>
                     <th className="py-5 px-6 text-[1.8rem] font-medium text-center text-gray-400 w-1/4">{writerLabel}</th>
                 </tr>
             </thead>

@@ -1,7 +1,11 @@
 import VsWriterPage from './components/VsWriterPage';
 
 function App() {
-    return <VsWriterPage />;
+    return (
+        <main>
+            <VsWriterPage />
+        </main>
+    );
 }
 
 export default App;

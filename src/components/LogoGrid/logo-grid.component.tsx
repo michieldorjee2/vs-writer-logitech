@@ -180,6 +180,9 @@ const LogoGrid = (props: LogoGridProps) => {
                                                         mediaItem.asset.assetAttributes
                                                             .alt
                                                     }
+                                                    width={!nonLogos ? 96 : 120}
+                                                    height={!nonLogos ? 32 : 200}
+                                                    loading="lazy"
                                                     key={
                                                         'logo-grid-image-' + index
                                                     }
@@ -200,6 +203,9 @@ const LogoGrid = (props: LogoGridProps) => {
                                                         mediaItem.asset.assetAttributes
                                                             .url
                                                     }
+                                                    width={!nonLogos ? 96 : 120}
+                                                    height={!nonLogos ? 32 : 200}
+                                                    loading="lazy"
                                                     key={
                                                         'logo-grid-image-' + index
                                                     }
@@ -309,6 +315,9 @@ const LogoGrid = (props: LogoGridProps) => {
                                                             mediaItem.asset
                                                                 .assetAttributes.alt
                                                         }
+                                                        width={!nonLogos ? 96 : 120}
+                                                        height={!nonLogos ? 32 : 200}
+                                                        loading="lazy"
                                                         key={
                                                             'logo-grid-image-' + index
                                                         }
@@ -330,6 +339,9 @@ const LogoGrid = (props: LogoGridProps) => {
                                                             mediaItem.asset
                                                                 .assetAttributes.alt
                                                         }
+                                                        width={!nonLogos ? 96 : 120}
+                                                        height={!nonLogos ? 32 : 200}
+                                                        loading="lazy"
                                                         key={
                                                             'logo-grid-image-' + index
                                                         }

@@ -1,11 +1,14 @@
+import { lazy, Suspense } from 'react';
 import HeroGradient from './HeroGradient/hero-gradient.component';
 import { Button } from './Button/button-block.component';
 import LogoGrid from './LogoGrid/logo-grid.component';
-import ComparisonTable from './ComparisonTable/comparison-table.component';
-import QuoteList from './QuoteList/quote-list.component';
-import Accordion from './Accordion/accordion.component';
-import HighlightSection from './Highlight/highlight.component';
-import GridOverlay from './GridOverlay/_grid-overlay';
+
+// Lazy-load below-fold components to reduce initial bundle size
+const ComparisonTable = lazy(() => import('./ComparisonTable/comparison-table.component'));
+const QuoteList = lazy(() => import('./QuoteList/quote-list.component'));
+const Accordion = lazy(() => import('./Accordion/accordion.component'));
+const HighlightSection = lazy(() => import('./Highlight/highlight.component'));
+const GridOverlay = lazy(() => import('./GridOverlay/_grid-overlay'));
 
 // --- Comparison Table Data ---
 const comparisonRows = [
@@ -124,7 +127,7 @@ const logoMedia = [
 
 const VsWriterPage = () => {
     return (
-        <>
+        <Suspense fallback={null}>
             {/* ========== SECTION 1: Hero ========== */}
             <HeroGradient>
                 <h1 className="mb-6">
@@ -282,7 +285,7 @@ const VsWriterPage = () => {
                     See Opal in action
                 </Button>
             </HighlightSection>
-        </>
+        </Suspense>
     );
 };
 
