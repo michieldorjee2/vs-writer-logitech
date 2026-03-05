@@ -23,6 +23,8 @@ jobs:
           node-version: 20
       - run: npm install --legacy-peer-deps
       - run: npm run build
+        env:
+          GRAPH_AUTH_KEY: ${{ secrets.GRAPH_AUTH_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

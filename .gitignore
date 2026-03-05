@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+
+# Pre-fetched content (generated at build time)
+public/content/*.json
 
 # Editor directories and files
 .vscode/*
