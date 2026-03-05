@@ -14,5 +14,17 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {}
     }
-  }
+  },
+  build: {
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-utils': ['react-use', 'react-use-measure'],
+        },
+      },
+    },
+  },
 })

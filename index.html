@@ -12,8 +12,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://www.optimizely.com" />
 
-    <!-- Google Fonts - loaded as <link> instead of CSS @import to avoid render-blocking chain -->
-    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Google Fonts - async loaded to avoid render-blocking -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&display=swap" /></noscript>
+
+    <!-- Inline critical CSS to prevent FOUC and speed up FCP -->
+    <style>
+      body{background-color:#10141d;color:#e9ebf1;margin:0;font-family:'Figtree',Arial,sans-serif}
+      #root{min-height:100vh}
+    </style>
   </head>
   <body>
     <div id="root"></div>

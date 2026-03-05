@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef } from 'react';
 import MediaBlock from '../Media/media.component';
-import { useWindowSize, useRafLoop } from 'react-use';
+import useWindowSize from 'react-use/lib/useWindowSize';
+import useRafLoop from 'react-use/lib/useRafLoop';
 import { motion, useMotionValue } from 'framer-motion';
 import { LogoGridProps } from './types/LogoGridProps';
 
@@ -203,9 +204,6 @@ const LogoGrid = (props: LogoGridProps) => {
                                                         mediaItem.asset.assetAttributes
                                                             .url
                                                     }
-                                                    width={!nonLogos ? 96 : 120}
-                                                    height={!nonLogos ? 32 : 200}
-                                                    loading="lazy"
                                                     key={
                                                         'logo-grid-image-' + index
                                                     }
@@ -315,9 +313,6 @@ const LogoGrid = (props: LogoGridProps) => {
                                                             mediaItem.asset
                                                                 .assetAttributes.alt
                                                         }
-                                                        width={!nonLogos ? 96 : 120}
-                                                        height={!nonLogos ? 32 : 200}
-                                                        loading="lazy"
                                                         key={
                                                             'logo-grid-image-' + index
                                                         }
@@ -339,9 +334,6 @@ const LogoGrid = (props: LogoGridProps) => {
                                                             mediaItem.asset
                                                                 .assetAttributes.alt
                                                         }
-                                                        width={!nonLogos ? 96 : 120}
-                                                        height={!nonLogos ? 32 : 200}
-                                                        loading="lazy"
                                                         key={
                                                             'logo-grid-image-' + index
                                                         }

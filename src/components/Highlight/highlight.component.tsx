@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from 'react';
-import { useMouseHovered } from 'react-use';
+import useMouseHovered from 'react-use/lib/useMouseHovered';
 
 interface GlowProps {
     elX: number;

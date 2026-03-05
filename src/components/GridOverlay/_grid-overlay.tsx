@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { useMouseHovered } from 'react-use';
+import useMouseHovered from 'react-use/lib/useMouseHovered';
 
 const GridOverlay = ({
     fade = false,
