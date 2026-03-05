@@ -3,6 +3,45 @@ import { BrowserRouter, Routes, Route, useParams, Navigate } from 'react-router-
 import { usePageContent } from './hooks/usePageContent';
 import DynamicComparisonPage from './components/DynamicComparisonPage';
 
+/** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
+function extractCompanyName(slug: string): string {
+    const stripped = slug
+        .replace(/^vs-writer-ai-/, '')
+        .replace(/^vs-writer-/, '')
+        .replace(/-/g, ' ');
+    return stripped
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+}
+
+function NotFound({ slug }: { slug: string }) {
+    const companyName = extractCompanyName(slug);
+
+    // Fire-and-forget: track the miss server-side
+    useEffect(() => {
+        if (slug) {
+            fetch('/api/track-miss', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slug: slug.replace(/^\/|\/$/g, '') }),
+            }).catch(() => {});
+        }
+    }, [slug]);
+
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
+            <h1 className="text-4xl font-medium text-white">
+                We're not quite ready for {companyName} yet
+            </h1>
+            <p className="max-w-md text-lg text-gray-400">
+                We don't have a comparison page for this company yet, but we're
+                working on it — check back soon!
+            </p>
+        </div>
+    );
+}
+
 function PageLoader() {
     const { '*': slug } = useParams();
     const { data, isLoading, error } = usePageContent(slug || '');
@@ -25,12 +64,7 @@ function PageLoader() {
     }
 
     if (error || !data) {
-        return (
-            <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-center">
-                <h1 className="text-4xl font-medium text-white">Page not found</h1>
-                <p className="text-lg text-gray-400">The page you're looking for doesn't exist.</p>
-            </div>
-        );
+        return <NotFound slug={slug || ''} />;
     }
 
     return <DynamicComparisonPage page={data} />;
