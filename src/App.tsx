@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useParams, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import { usePageContent } from './hooks/usePageContent';
 import DynamicComparisonPage from './components/DynamicComparisonPage';
 
@@ -42,6 +42,17 @@ function NotFound({ slug }: { slug: string }) {
     );
 }
 
+function HomePage() {
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
+            <h1 className="text-4xl font-medium text-white">Page not found</h1>
+            <p className="max-w-md text-lg text-gray-400">
+                The page you're looking for doesn't exist.
+            </p>
+        </div>
+    );
+}
+
 function PageLoader() {
     const { '*': slug } = useParams();
     const { data, isLoading, error } = usePageContent(slug || '');
@@ -75,8 +86,7 @@ function App() {
         <BrowserRouter>
             <main>
                 <Routes>
-                    {/* Default redirect to the first known page */}
-                    <Route path="/" element={<Navigate to="/vs-writer-ai-logitech" replace />} />
+                    <Route path="/" element={<HomePage />} />
                     {/* Dynamic catch-all: any slug resolves to Graph content */}
                     <Route path="/*" element={<PageLoader />} />
                 </Routes>
