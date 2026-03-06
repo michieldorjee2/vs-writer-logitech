@@ -26,7 +26,7 @@ query GetCompetitorComparisonPage($slug: String!) {
       }
       AnalystSection { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
       Testimonials { ... on TestimonialBlock { Quote AuthorName AuthorTitle } }
-      FaqSection { key item { ... on AccordionBlock { Heading Items { ... on AccordionEntryBlock { Heading MainContent { html } OpenedByDefault } } } } }
+      FaqSection { key item { ... on AccordionBlock { Heading } } }
       PromoCard { Eyebrow Heading Description CtaText CtaUrl { default } }
       ClosingCta { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } BackgroundStyle }
     }
@@ -35,7 +35,7 @@ query GetCompetitorComparisonPage($slug: String!) {
 `
 
 /**
- * Vite plugin that serves Graph content at /api/content/:slug during dev.
+ * Vite plugin that serves Graph content at /api/content?slug=:slug during dev.
  * The auth key stays server-side — never shipped to the browser.
  */
 function graphDevProxy(authKey: string): Plugin {
@@ -43,11 +43,18 @@ function graphDevProxy(authKey: string): Plugin {
     name: 'graph-dev-proxy',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const match = req.url?.match(/^\/api\/content(\/[^?]+)/)
-        if (!match) return next()
+        if (!req.url?.startsWith('/api/content')) return next()
+        const url = new URL(req.url, 'http://localhost')
+        if (url.pathname !== '/api/content') return next()
 
-        const slug = decodeURIComponent(match[1]).replace(/\/$/, '/') // ensure trailing slash
-        const normalizedSlug = slug.endsWith('/') ? slug : slug + '/'
+        const slug = url.searchParams.get('slug')
+        if (!slug) {
+          res.statusCode = 400
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Missing slug parameter' }))
+          return
+        }
+        const normalizedSlug = `/${slug}/`
 
         try {
           const graphRes = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {

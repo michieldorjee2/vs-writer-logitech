@@ -23,7 +23,7 @@ export function usePageContent(slug: string): PageContentState {
             try {
                 // Strip leading/trailing slashes for a clean slug
                 const cleanSlug = slug.replace(/^\/|\/$/g, '');
-                const res = await fetch(`/api/content/${cleanSlug}`);
+                const res = await fetch(`/api/content?slug=${encodeURIComponent(cleanSlug)}`);
 
                 if (!res.ok) {
                     throw new Error(res.status === 404 ? 'Page not found' : `Failed to load (${res.status})`);
