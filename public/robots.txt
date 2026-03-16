@@ -1,0 +1,18 @@
+# Allow only Claude and Gemini AI crawlers
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: claude-web
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+# Block everything else
+User-agent: *
+Disallow: /
+
+# No sitemap — content is dynamically generated

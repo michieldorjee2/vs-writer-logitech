@@ -94,6 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     return res.status(200).json(items[0]);
   } catch (err) {
     console.error('[api/content] Graph fetch failed:', err);
