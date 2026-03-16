@@ -4,6 +4,8 @@ import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
 import DynamicComparisonPage from './components/DynamicComparisonPage';
+import BlockPreview from './components/BlockPreview';
+import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 
 /** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
 function extractCompanyName(slug: string): string {
@@ -83,8 +85,9 @@ function PreviewLoader() {
     const [searchParams] = useSearchParams();
     const { data, isLoading, error } = usePreviewContent(searchParams);
 
-    // Inject title, canonical, JSON-LD (same as published, for consistency)
-    useHeadMeta(data);
+    // Only inject head meta for full page previews
+    const isPage = data?.__typename === 'CompetitorComparisonPage' || (data && !data.__typename);
+    useHeadMeta(isPage ? (data as CompetitorComparisonPage) : null);
 
     // Load the CMS communication injector script dynamically
     // (JSX <script> tags don't execute in React)
@@ -122,7 +125,12 @@ function PreviewLoader() {
         );
     }
 
-    return <DynamicComparisonPage page={data} />;
+    // Dispatch: full page vs individual block
+    if (data.__typename === 'CompetitorComparisonPage' || !data.__typename) {
+        return <DynamicComparisonPage page={data as CompetitorComparisonPage} />;
+    }
+
+    return <BlockPreview block={data as PreviewBlock} />;
 }
 
 function App() {

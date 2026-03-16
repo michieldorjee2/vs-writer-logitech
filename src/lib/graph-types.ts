@@ -21,7 +21,99 @@ export interface TestimonialRef {
     } | null;
 }
 
+// --- Standalone block types (for block-level preview) ---
+
+export interface HeroSectionBlock {
+    __typename: 'HeroSectionBlock';
+    _metadata: { key: string; url: { default: string } };
+    Eyebrow: string | null;
+    Headline: RichText | null;
+    Subheadline: string | null;
+    PrimaryCtaText: string | null;
+    PrimaryCtaUrl: { default: string } | null;
+}
+
+export interface LogoBarBlock {
+    __typename: 'LogoBarBlock';
+    _metadata: { key: string; url: { default: string } };
+    Heading: string | null;
+    Logos: ImageRef[];
+}
+
+export interface FeatureSectionBlock {
+    __typename: 'FeatureSectionBlock';
+    _metadata: { key: string; url: { default: string } };
+    Headline: RichText | null;
+    Features: Array<{ Title: string; Description: RichText | null }>;
+}
+
+export interface ComparisonTableBlock {
+    __typename: 'ComparisonTableBlock';
+    _metadata: { key: string; url: { default: string } };
+    OurLabel: string;
+    CompetitorLabel: string;
+    Rows: Array<{
+        Category: string;
+        OurValue: RichText | null;
+        OurHighlight: boolean;
+        CompetitorValue: RichText | null;
+        CompetitorHighlight: boolean;
+    }>;
+}
+
+export interface AnalystSectionBlock {
+    __typename: 'AnalystSectionBlock';
+    _metadata: { key: string; url: { default: string } };
+    SectionHeading: RichText | null;
+    Quote: string;
+    AnalystSource: string;
+    CtaText: string | null;
+    CtaUrl: { default: string } | null;
+}
+
+export interface StandaloneTestimonialBlock {
+    __typename: 'TestimonialBlock';
+    _metadata: { key: string; url: { default: string } };
+    Quote: string;
+    AuthorName: string;
+    AuthorTitle: string | null;
+}
+
+export interface PromoCardBlock {
+    __typename: 'PromoCardBlock';
+    _metadata: { key: string; url: { default: string } };
+    Eyebrow: string | null;
+    Heading: string;
+    Description: string | null;
+    CtaText: string | null;
+    CtaUrl: { default: string } | null;
+}
+
+export interface ClosingCtaBlock {
+    __typename: 'ClosingCtaBlock';
+    _metadata: { key: string; url: { default: string } };
+    Headline: RichText | null;
+    Subheadline: string | null;
+    PrimaryCtaText: string | null;
+    PrimaryCtaUrl: { default: string } | null;
+}
+
+export type PreviewBlock =
+    | HeroSectionBlock
+    | LogoBarBlock
+    | FeatureSectionBlock
+    | ComparisonTableBlock
+    | AnalystSectionBlock
+    | StandaloneTestimonialBlock
+    | PromoCardBlock
+    | ClosingCtaBlock;
+
+export type PreviewContent = CompetitorComparisonPage | PreviewBlock;
+
+// --- Page type ---
+
 export interface CompetitorComparisonPage {
+    __typename?: 'CompetitorComparisonPage';
     _metadata: {
         key: string;
         url: { default: string; hierarchical: string };

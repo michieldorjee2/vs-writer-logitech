@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CompetitorComparisonPage } from '../lib/graph-types';
+import type { PreviewContent } from '../lib/graph-types';
 
 interface PreviewContentState {
-    data: CompetitorComparisonPage | null;
+    data: PreviewContent | null;
     isLoading: boolean;
     error: string | null;
 }
@@ -37,8 +37,8 @@ export function usePreviewContent(params: URLSearchParams): PreviewContentState 
                 throw new Error(res.status === 404 ? 'Content not found' : `Failed to load (${res.status})`);
             }
 
-            const page: CompetitorComparisonPage = await res.json();
-            setState({ data: page, isLoading: false, error: null });
+            const content: PreviewContent = await res.json();
+            setState({ data: content, isLoading: false, error: null });
         } catch (err) {
             setState({ data: null, isLoading: false, error: (err as Error).message });
         }

@@ -4,50 +4,13 @@ import HeroGradient from './HeroGradient/hero-gradient.component';
 import { Button } from './Button/button-block.component';
 import LogoGrid from './LogoGrid/logo-grid.component';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
+import { richTextAsTag, mapComparisonRows } from '../lib/content-mappers';
 
 const ComparisonTable = lazy(() => import('./ComparisonTable/comparison-table.component'));
 const QuoteList = lazy(() => import('./QuoteList/quote-list.component'));
 const Accordion = lazy(() => import('./Accordion/accordion.component'));
 const HighlightSection = lazy(() => import('./Highlight/highlight.component'));
 const GridOverlay = lazy(() => import('./GridOverlay/_grid-overlay'));
-
-// --- Data mappers ---
-
-/**
- * Graph rich text comes as <p>…</p>. Promote to the given heading tag
- * and style <em> with the brand blue color (matching the hardcoded original).
- */
-function richTextAsTag(html: string, tag: 'h1' | 'h2' | 'p' = 'p'): string {
-    return html
-        .replace(/<p>/g, `<${tag}>`)
-        .replace(/<\/p>/g, `</${tag}>`)
-        .replace(/<em>/g, '<em class="not-italic text-optimizely-blue">');
-}
-
-/** Strip wrapping <p> tags and extract inner text */
-function stripHtml(html: string): string {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return div.textContent?.trim() ?? '';
-}
-
-/** Parse a rich-text html value into a boolean or string for the comparison table */
-function parseComparisonValue(html: string): boolean | string {
-    const text = stripHtml(html).toLowerCase();
-    if (text === 'yes' || text === '✓' || text === 'true') return true;
-    if (text === 'no' || text === '✗' || text === 'false' || text === '') return false;
-    // Return the original text (capitalized) for "Limited", "Partial", etc.
-    return stripHtml(html);
-}
-
-function mapComparisonRows(page: CompetitorComparisonPage) {
-    if (!page.ComparisonTable?.Rows) return [];
-    return page.ComparisonTable.Rows.map((row) => ({
-        feature: row.Category,
-        opal: parseComparisonValue(row.OurValue?.html ?? ''),
-        writer: parseComparisonValue(row.CompetitorValue?.html ?? ''),
-    }));
-}
 
 const quoteThemes = ['blue', 'light-blue', 'purple', 'green', 'orange'] as const;
 const quoteMarkColors: Record<string, string> = {
@@ -121,7 +84,7 @@ interface Props {
 const DynamicComparisonPage = ({ page }: Props) => {
     const hero = page.HeroSection;
     const logoMedia = mapLogoMedia(page) ?? fallbackLogos;
-    const comparisonRows = mapComparisonRows(page);
+    const comparisonRows = page.ComparisonTable?.Rows ? mapComparisonRows(page.ComparisonTable.Rows) : [];
     const testimonials = mapTestimonials(page);
     const faqItems = mapFaqItems(page);
     const analyst = page.AnalystSection;
