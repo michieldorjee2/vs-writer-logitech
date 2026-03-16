@@ -60,6 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const json = await graphRes.json();
     const items = (json as any)?.data?.CompetitorComparisonPage?.items;
 
+    // Temporary debug: return the raw Graph response when ?debug=1
+    if (req.query.debug === '1') {
+      return res.status(200).json({ normalizedSlug, graphStatus: graphRes.status, json });
+    }
+
     if (!items || items.length === 0) {
       return res.status(404).json({ error: 'Page not found' });
     }
