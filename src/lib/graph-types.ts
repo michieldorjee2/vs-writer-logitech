@@ -23,21 +23,21 @@ export interface CompetitorComparisonPage {
     CanonicalUrl: { default: string } | null;
     HeroSection: {
         Eyebrow: string | null;
-        Headline: RichText;
+        Headline: RichText | null;
         Subheadline: string | null;
-        PrimaryCtaText: string;
-        PrimaryCtaUrl: { default: string };
+        PrimaryCtaText: string | null;
+        PrimaryCtaUrl: { default: string } | null;
         BackgroundStyle: string | null;
-    };
+    } | null;
     LogoBar: {
         Heading: string | null;
         Logos: ImageRef[];
     } | null;
     FeatureSection: {
-        Headline: RichText;
+        Headline: RichText | null;
         Features: Array<{
             Title: string;
-            Description: RichText;
+            Description: RichText | null;
             Icon?: ImageRef | null;
         }>;
     } | null;
@@ -46,12 +46,12 @@ export interface CompetitorComparisonPage {
         CompetitorLabel: string;
         Rows: Array<{
             Category: string;
-            OurValue: RichText;
+            OurValue: RichText | null;
             OurHighlight: boolean;
-            CompetitorValue: RichText;
+            CompetitorValue: RichText | null;
             CompetitorHighlight: boolean;
         }>;
-    };
+    } | null;
     AnalystSection: {
         SectionHeading: RichText | null;
         Quote: string;
@@ -63,14 +63,16 @@ export interface CompetitorComparisonPage {
         Quote: string;
         AuthorName: string;
         AuthorTitle: string | null;
-    }>;
+    }> | null;
     FaqSection: {
         key: string | null;
         item: {
+            __typename?: string;
+            _json?: unknown;
             Heading?: string | null;
             Items?: Array<{
                 Heading: string;
-                MainContent: RichText;
+                MainContent: RichText | null;
                 OpenedByDefault: boolean;
             }>;
         } | null;
@@ -83,10 +85,10 @@ export interface CompetitorComparisonPage {
         CtaUrl: { default: string } | null;
     } | null;
     ClosingCta: {
-        Headline: RichText;
+        Headline: RichText | null;
         Subheadline: string | null;
-        PrimaryCtaText: string;
-        PrimaryCtaUrl: { default: string };
+        PrimaryCtaText: string | null;
+        PrimaryCtaUrl: { default: string } | null;
         BackgroundStyle: string | null;
-    };
+    } | null;
 }
