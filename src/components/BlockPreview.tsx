@@ -42,6 +42,11 @@ function mapLogos(logos: ImageRef[]) {
 function HeroPreview({ block }: { block: HeroSectionBlock }) {
     return (
         <HeroGradient>
+            <img
+                src="/optimizely-logo.svg"
+                alt="Optimizely"
+                className="mb-6 h-8"
+            />
             {block.Eyebrow && <p className="t-overline mb-4">{block.Eyebrow}</p>}
             {block.Headline?.html && (
                 <div className="rte mb-6">{parse(richTextAsTag(block.Headline.html, 'h1'))}</div>

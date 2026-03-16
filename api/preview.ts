@@ -64,7 +64,7 @@ async function resolveTestimonials(authKey: string, refs: Array<{ key: string }>
   const items = (json as any)?.data?.TestimonialBlock?.items ?? [];
   const byKey = new Map(items.map((t: any) => [t._metadata.key, t]));
   return refs.map((ref) => {
-    const t = byKey.get(ref.key);
+    const t = byKey.get(ref.key) as any;
     return {
       key: ref.key,
       item: t ? { Quote: t.Quote, AuthorName: t.AuthorName, AuthorTitle: t.AuthorTitle } : null,

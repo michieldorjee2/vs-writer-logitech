@@ -98,6 +98,11 @@ const DynamicComparisonPage = ({ page }: Props) => {
             {/* ========== SECTION 1: Hero ========== */}
             {hero && (
                 <HeroGradient>
+                    <img
+                        src="/optimizely-logo.svg"
+                        alt="Optimizely"
+                        className="mb-6 h-8"
+                    />
                     {hero.Eyebrow && <p className="t-overline mb-4">{hero.Eyebrow}</p>}
                     {hero.Headline?.html && (
                         <div className="rte mb-6">{parse(richTextAsTag(hero.Headline.html, 'h1'))}</div>
