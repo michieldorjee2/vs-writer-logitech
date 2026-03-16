@@ -12,6 +12,15 @@ export interface ImageRef {
     } | null;
 }
 
+export interface TestimonialRef {
+    key: string;
+    item: {
+        Quote: string;
+        AuthorName: string;
+        AuthorTitle: string | null;
+    } | null;
+}
+
 export interface CompetitorComparisonPage {
     _metadata: {
         key: string;
@@ -27,7 +36,6 @@ export interface CompetitorComparisonPage {
         Subheadline: string | null;
         PrimaryCtaText: string | null;
         PrimaryCtaUrl: { default: string } | null;
-        BackgroundStyle: string | null;
     } | null;
     LogoBar: {
         Heading: string | null;
@@ -38,7 +46,6 @@ export interface CompetitorComparisonPage {
         Features: Array<{
             Title: string;
             Description: RichText | null;
-            Icon?: ImageRef | null;
         }>;
     } | null;
     ComparisonTable: {
@@ -59,22 +66,12 @@ export interface CompetitorComparisonPage {
         CtaText: string | null;
         CtaUrl: { default: string } | null;
     } | null;
-    Testimonials: Array<{
-        Quote: string;
-        AuthorName: string;
-        AuthorTitle: string | null;
-    }> | null;
+    Testimonials: TestimonialRef[] | null;
     FaqSection: {
         key: string | null;
         item: {
             __typename?: string;
             _json?: unknown;
-            Heading?: string | null;
-            Items?: Array<{
-                Heading: string;
-                MainContent: RichText | null;
-                OpenedByDefault: boolean;
-            }>;
         } | null;
     } | null;
     PromoCard: {
@@ -89,6 +86,5 @@ export interface CompetitorComparisonPage {
         Subheadline: string | null;
         PrimaryCtaText: string | null;
         PrimaryCtaUrl: { default: string } | null;
-        BackgroundStyle: string | null;
     } | null;
 }

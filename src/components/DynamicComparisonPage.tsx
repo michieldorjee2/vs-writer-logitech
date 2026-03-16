@@ -36,6 +36,7 @@ function parseComparisonValue(html: string): boolean | string {
     const text = stripHtml(html).toLowerCase();
     if (text === 'yes' || text === '✓' || text === 'true') return true;
     if (text === 'no' || text === '✗' || text === 'false' || text === '') return false;
+    // Return the original text (capitalized) for "Limited", "Partial", etc.
     return stripHtml(html);
 }
 
@@ -59,26 +60,28 @@ const quoteMarkColors: Record<string, string> = {
 
 function mapTestimonials(page: CompetitorComparisonPage) {
     if (!page.Testimonials?.length) return [];
-    return page.Testimonials.map((t, i) => ({
-        quote: t.Quote,
-        spokesperson: t.AuthorName,
-        jobTitle: t.AuthorTitle ?? '',
+    const resolved = page.Testimonials.filter((t) => t.item != null);
+    return resolved.map((t, i) => ({
+        quote: t.item!.Quote,
+        spokesperson: t.item!.AuthorName,
+        jobTitle: t.item!.AuthorTitle ?? '',
         company: '',
         gradientColor: '',
         quoteMarksColor: quoteMarkColors[quoteThemes[i % quoteThemes.length]],
         theme: quoteThemes[i % quoteThemes.length],
         size: 'default' as const,
-        quotesLength: page.Testimonials!.length,
+        quotesLength: resolved.length,
         index: i,
     }));
 }
 
 function mapFaqItems(page: CompetitorComparisonPage) {
-    const items = page.FaqSection?.item?.Items;
-    if (!items || items.length === 0) return null;
-    return items.map((item) => ({
-        title: item.Heading,
-        defaultOpen: item.OpenedByDefault,
+    // FAQ data comes as _json from the Graph since nested refs aren't supported
+    const faqJson = page.FaqSection?.item?._json as any;
+    if (!faqJson?.Items?.length) return null;
+    return faqJson.Items.map((item: any) => ({
+        title: item.Heading ?? '',
+        defaultOpen: item.OpenedByDefault ?? false,
         children: <div className="rte">{parse(item.MainContent?.html ?? '')}</div>,
     }));
 }
@@ -238,11 +241,6 @@ const DynamicComparisonPage = ({ page }: Props) => {
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-8 lg:offset-2">
-                                {page.FaqSection?.item?.Heading && (
-                                    <h2 className="mb-8 text-center text-4xl font-medium text-white">
-                                        {page.FaqSection.item.Heading}
-                                    </h2>
-                                )}
                                 <Accordion accordionItems={faqItems} backgroundStyle={true} />
                             </div>
                         </div>

@@ -2,31 +2,61 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
-const COMPETITOR_PAGE_QUERY = `
-query GetCompetitorComparisonPage($slug: String!) {
+const PAGE_QUERY = `
+query GetPage($slug: String!) {
   CompetitorComparisonPage(
     where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
     locale: en
   ) {
     items {
       _metadata { key url { default hierarchical } published }
-      PageTitle MetaDescription
+      PageTitle
+      MetaDescription
       CanonicalUrl { default }
       HeroSection {
-        Eyebrow Headline { html } Subheadline
-        PrimaryCtaText PrimaryCtaUrl { default } BackgroundStyle
+        ... on HeroSectionBlock {
+          Eyebrow Headline { html } Subheadline
+          PrimaryCtaText PrimaryCtaUrl { default }
+        }
       }
-      LogoBar { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } }
-      FeatureSection { Headline { html } Features { Title Description { html } } }
+      LogoBar {
+        ... on LogoBarBlock {
+          Heading
+          Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } }
+        }
+      }
+      FeatureSection {
+        ... on FeatureSectionBlock {
+          Headline { html }
+          Features { Title Description { html } }
+        }
+      }
       ComparisonTable {
-        OurLabel CompetitorLabel
-        Rows { Category OurValue { html } OurHighlight CompetitorValue { html } CompetitorHighlight }
+        ... on ComparisonTableBlock {
+          OurLabel CompetitorLabel
+          Rows { Category OurValue { html } OurHighlight CompetitorValue { html } CompetitorHighlight }
+        }
       }
-      AnalystSection { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
-      Testimonials { ... on TestimonialBlock { Quote AuthorName AuthorTitle } }
+      AnalystSection {
+        ... on AnalystSectionBlock {
+          SectionHeading { html } Quote AnalystSource
+          CtaText CtaUrl { default }
+        }
+      }
+      Testimonials { key item { ... on TestimonialBlock { Quote AuthorName AuthorTitle } } }
       FaqSection { key item { __typename _json } }
-      PromoCard { Eyebrow Heading Description CtaText CtaUrl { default } }
-      ClosingCta { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } BackgroundStyle }
+      PromoCard {
+        ... on PromoCardBlock {
+          Eyebrow Heading Description
+          CtaText CtaUrl { default }
+        }
+      }
+      ClosingCta {
+        ... on ClosingCtaBlock {
+          Headline { html } Subheadline
+          PrimaryCtaText PrimaryCtaUrl { default }
+        }
+      }
     }
   }
 }
@@ -44,7 +74,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Missing slug parameter' });
   }
 
-  // Graph stores hierarchical URLs with leading/trailing slashes
   const normalizedSlug = `/${slug}/`;
 
   try {
@@ -52,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        query: COMPETITOR_PAGE_QUERY,
+        query: PAGE_QUERY,
         variables: { slug: normalizedSlug },
       }),
     });
@@ -64,7 +93,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Page not found' });
     }
 
-    // Cache for 60s, stale-while-revalidate for 5min
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     return res.status(200).json(items[0]);
   } catch (err) {

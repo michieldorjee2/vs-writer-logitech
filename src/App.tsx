@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import { usePageContent } from './hooks/usePageContent';
+import { usePreviewContent } from './hooks/usePreviewContent';
 import DynamicComparisonPage from './components/DynamicComparisonPage';
 
 /** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
@@ -81,12 +82,52 @@ function PageLoader() {
     return <DynamicComparisonPage page={data} />;
 }
 
+const CMS_URL = import.meta.env.VITE_CMS_URL || '';
+
+function PreviewLoader() {
+    const [searchParams] = useSearchParams();
+    const { data, isLoading, error } = usePreviewContent(searchParams);
+
+    useEffect(() => {
+        if (data) {
+            document.title = `[Preview] ${data.PageTitle}`;
+        }
+    }, [data]);
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-optimizely-blue" />
+            </div>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
+                <h1 className="text-4xl font-medium text-white">Preview unavailable</h1>
+                <p className="max-w-md text-lg text-gray-400">{error || 'Content not found'}</p>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            {CMS_URL && (
+                <script src={`${CMS_URL}/util/javascript/communicationinjector.js`} />
+            )}
+            <DynamicComparisonPage page={data} />
+        </>
+    );
+}
+
 function App() {
     return (
         <BrowserRouter>
             <main>
                 <Routes>
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/preview" element={<PreviewLoader />} />
                     {/* Dynamic catch-all: any slug resolves to Graph content */}
                     <Route path="/*" element={<PageLoader />} />
                 </Routes>
