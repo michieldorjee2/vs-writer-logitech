@@ -24,7 +24,7 @@ query GetCompetitorComparisonPage($slug: String!) {
       }
       AnalystSection { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
       Testimonials { ... on TestimonialBlock { Quote AuthorName AuthorTitle } }
-      FaqSection { key item { ... on AccordionBlock { Items { ... on AccordionEntryBlock { Heading MainContent { html } OpenedByDefault } } } } }
+      FaqSection { key item { __typename _json } }
       PromoCard { Eyebrow Heading Description CtaText CtaUrl { default } }
       ClosingCta { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } BackgroundStyle }
     }
