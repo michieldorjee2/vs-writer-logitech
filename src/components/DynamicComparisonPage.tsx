@@ -36,15 +36,15 @@ function parseComparisonValue(html: string): boolean | string {
     const text = stripHtml(html).toLowerCase();
     if (text === 'yes' || text === '✓' || text === 'true') return true;
     if (text === 'no' || text === '✗' || text === 'false' || text === '') return false;
-    // Return the original text (capitalized) for "Limited", "Partial", etc.
     return stripHtml(html);
 }
 
 function mapComparisonRows(page: CompetitorComparisonPage) {
+    if (!page.ComparisonTable?.Rows) return [];
     return page.ComparisonTable.Rows.map((row) => ({
         feature: row.Category,
-        opal: parseComparisonValue(row.OurValue.html),
-        writer: parseComparisonValue(row.CompetitorValue.html),
+        opal: parseComparisonValue(row.OurValue?.html ?? ''),
+        writer: parseComparisonValue(row.CompetitorValue?.html ?? ''),
     }));
 }
 
@@ -58,6 +58,7 @@ const quoteMarkColors: Record<string, string> = {
 };
 
 function mapTestimonials(page: CompetitorComparisonPage) {
+    if (!page.Testimonials?.length) return [];
     return page.Testimonials.map((t, i) => ({
         quote: t.Quote,
         spokesperson: t.AuthorName,
@@ -67,7 +68,7 @@ function mapTestimonials(page: CompetitorComparisonPage) {
         quoteMarksColor: quoteMarkColors[quoteThemes[i % quoteThemes.length]],
         theme: quoteThemes[i % quoteThemes.length],
         size: 'default' as const,
-        quotesLength: page.Testimonials.length,
+        quotesLength: page.Testimonials!.length,
         index: i,
     }));
 }
@@ -78,7 +79,7 @@ function mapFaqItems(page: CompetitorComparisonPage) {
     return items.map((item) => ({
         title: item.Heading,
         defaultOpen: item.OpenedByDefault,
-        children: <div className="rte">{parse(item.MainContent.html)}</div>,
+        children: <div className="rte">{parse(item.MainContent?.html ?? '')}</div>,
     }));
 }
 
@@ -124,20 +125,27 @@ const DynamicComparisonPage = ({ page }: Props) => {
     const promo = page.PromoCard;
     const closing = page.ClosingCta;
     const features = page.FeatureSection;
+    const comparison = page.ComparisonTable;
 
     return (
         <Suspense fallback={null}>
             {/* ========== SECTION 1: Hero ========== */}
-            <HeroGradient>
-                {hero.Eyebrow && <p className="t-overline mb-4">{hero.Eyebrow}</p>}
-                <div className="rte mb-6">{parse(richTextAsTag(hero.Headline.html, 'h1'))}</div>
-                {hero.Subheadline && (
-                    <p className="mb-8 text-xl text-gray-300">{hero.Subheadline}</p>
-                )}
-                <Button href={hero.PrimaryCtaUrl.default} buttonStyle="primary" icon="arrowRight">
-                    {hero.PrimaryCtaText}
-                </Button>
-            </HeroGradient>
+            {hero && (
+                <HeroGradient>
+                    {hero.Eyebrow && <p className="t-overline mb-4">{hero.Eyebrow}</p>}
+                    {hero.Headline?.html && (
+                        <div className="rte mb-6">{parse(richTextAsTag(hero.Headline.html, 'h1'))}</div>
+                    )}
+                    {hero.Subheadline && (
+                        <p className="mb-8 text-xl text-gray-300">{hero.Subheadline}</p>
+                    )}
+                    {hero.PrimaryCtaText && hero.PrimaryCtaUrl?.default && (
+                        <Button href={hero.PrimaryCtaUrl.default} buttonStyle="primary" icon="arrowRight">
+                            {hero.PrimaryCtaText}
+                        </Button>
+                    )}
+                </HeroGradient>
+            )}
 
             {/* ========== SECTION 2: Logo Grid ========== */}
             <section className="outer-padding py-12">
@@ -156,7 +164,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
             </section>
 
             {/* ========== SECTION 3: Value Proposition / Features ========== */}
-            {features && (
+            {features?.Headline?.html && features.Features?.length > 0 && (
                 <section className="outer-padding relative py-16 lg:py-24">
                     <GridOverlay opacity={0} highlightOpacity={0.08} fade />
                     <div className="container relative z-10">
@@ -167,7 +175,9 @@ const DynamicComparisonPage = ({ page }: Props) => {
                                     {features.Features.map((feat, i) => (
                                         <div key={i} className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-6">
                                             <h3 className="mb-2 text-xl font-medium text-white">{feat.Title}</h3>
-                                            <div className="rte text-base text-gray-300">{parse(feat.Description.html)}</div>
+                                            {feat.Description?.html && (
+                                                <div className="rte text-base text-gray-300">{parse(feat.Description.html)}</div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -178,34 +188,36 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 4: Comparison Table ========== */}
-            <section className="outer-padding py-16 lg:py-24">
-                <div className="container">
-                    <div className="row">
-                        <div className="col-12 lg:col-10 lg:offset-1">
-                            <h2 className="mb-3 text-center text-4xl font-medium text-white">
-                                Side-by-side: {page.ComparisonTable.OurLabel} vs {page.ComparisonTable.CompetitorLabel}
-                            </h2>
-                            <ComparisonTable
-                                rows={comparisonRows}
-                                opalLabel={page.ComparisonTable.OurLabel}
-                                writerLabel={page.ComparisonTable.CompetitorLabel}
-                            />
+            {comparison && comparisonRows.length > 0 && (
+                <section className="outer-padding py-16 lg:py-24">
+                    <div className="container">
+                        <div className="row">
+                            <div className="col-12 lg:col-10 lg:offset-1">
+                                <h2 className="mb-3 text-center text-4xl font-medium text-white">
+                                    Side-by-side: {comparison.OurLabel} vs {comparison.CompetitorLabel}
+                                </h2>
+                                <ComparisonTable
+                                    rows={comparisonRows}
+                                    opalLabel={comparison.OurLabel}
+                                    writerLabel={comparison.CompetitorLabel}
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* ========== SECTION 5: Analyst Recognition ========== */}
-            {analyst && (
+            {analyst?.Quote && (
                 <HighlightSection>
-                    {analyst.SectionHeading && (
+                    {analyst.SectionHeading?.html && (
                         <div className="rte mb-4">{parse(richTextAsTag(analyst.SectionHeading.html, 'h2'))}</div>
                     )}
                     <p className="t-subtitle mb-6">{analyst.Quote}</p>
                     {analyst.AnalystSource && (
                         <p className="mb-6 text-sm text-gray-400">&mdash; {analyst.AnalystSource}</p>
                     )}
-                    {analyst.CtaText && analyst.CtaUrl && (
+                    {analyst.CtaText && analyst.CtaUrl?.default && (
                         <Button href={analyst.CtaUrl.default} buttonStyle="secondary" icon="arrowRight">
                             {analyst.CtaText}
                         </Button>
@@ -239,7 +251,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 8: Promo Card ========== */}
-            {promo && (
+            {promo?.Heading && (
                 <section className="outer-padding py-16 lg:py-24">
                     <div className="container">
                         <div className="row">
@@ -250,7 +262,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
                                     {promo.Description && (
                                         <p className="mb-6 text-lg text-gray-300">{promo.Description}</p>
                                     )}
-                                    {promo.CtaText && promo.CtaUrl && (
+                                    {promo.CtaText && promo.CtaUrl?.default && (
                                         <Button href={promo.CtaUrl.default} buttonStyle="emphasized" icon="arrowRight">
                                             {promo.CtaText}
                                         </Button>
@@ -263,15 +275,19 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 9: Final CTA ========== */}
-            <HighlightSection>
-                <div className="rte mb-4">{parse(richTextAsTag(closing.Headline.html, 'h2'))}</div>
-                {closing.Subheadline && (
-                    <p className="t-subtitle mb-8">{closing.Subheadline}</p>
-                )}
-                <Button href={closing.PrimaryCtaUrl.default} buttonStyle="primary" icon="arrowRight">
-                    {closing.PrimaryCtaText}
-                </Button>
-            </HighlightSection>
+            {closing?.Headline?.html && (
+                <HighlightSection>
+                    <div className="rte mb-4">{parse(richTextAsTag(closing.Headline.html, 'h2'))}</div>
+                    {closing.Subheadline && (
+                        <p className="t-subtitle mb-8">{closing.Subheadline}</p>
+                    )}
+                    {closing.PrimaryCtaText && closing.PrimaryCtaUrl?.default && (
+                        <Button href={closing.PrimaryCtaUrl.default} buttonStyle="primary" icon="arrowRight">
+                            {closing.PrimaryCtaText}
+                        </Button>
+                    )}
+                </HighlightSection>
+            )}
         </Suspense>
     );
 };
