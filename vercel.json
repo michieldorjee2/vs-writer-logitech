@@ -14,7 +14,7 @@
     { "source": "/((?!api/|_vercel/).*)", "destination": "/api/ssr" }
   ],
   "functions": {
-    "api/ssr.tsx": {
+    "api/ssr.ts": {
       "includeFiles": "dist/index.html"
     }
   }
