@@ -12,5 +12,10 @@
     { "source": "/preview", "destination": "/index.html" },
     { "source": "/assets/:path*", "destination": "/assets/:path*" },
     { "source": "/((?!api/|_vercel/).*)", "destination": "/api/ssr" }
-  ]
+  ],
+  "functions": {
+    "api/ssr.tsx": {
+      "includeFiles": "dist/index.html"
+    }
+  }
 }
