@@ -24,7 +24,7 @@ try {
 
 await esbuild.build({
   entryPoints: ['server/ssr-handler.tsx'],
-  outfile: 'api/ssr.js',
+  outfile: 'api/_ssr-bundle.mjs',
   bundle: true,
   format: 'esm',
   platform: 'node',
@@ -70,4 +70,4 @@ await esbuild.build({
   },
 });
 
-console.log('✓ SSR handler bundled → api/ssr.js');
+console.log('✓ SSR handler bundled → api/_ssr-bundle.mjs');

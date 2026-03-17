@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/ssr.ts": {
+      "includeFiles": "api/_ssr-bundle.mjs"
+    }
+  },
   "headers": [
     {
       "source": "/((?!api/).*)",
