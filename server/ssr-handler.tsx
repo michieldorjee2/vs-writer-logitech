@@ -1,6 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { renderToString } from 'react-dom/server';
 import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
 
@@ -164,21 +162,11 @@ function buildHeadHtml(page: any): string {
 }
 
 // ---------------------------------------------------------------------------
-// HTML template – read built dist/index.html at cold-start
+// HTML template – baked in at build time by esbuild (see scripts/build-ssr.mjs)
 // ---------------------------------------------------------------------------
 
-let _htmlTemplate: string | null = null;
-
-function getHtmlTemplate(): string {
-  if (_htmlTemplate) return _htmlTemplate;
-  try {
-    _htmlTemplate = readFileSync(join(process.cwd(), 'dist/index.html'), 'utf-8');
-  } catch {
-    _htmlTemplate =
-      '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><div id="root"></div></body></html>';
-  }
-  return _htmlTemplate;
-}
+declare const __HTML_TEMPLATE__: string;
+const htmlTemplate: string = __HTML_TEMPLATE__;
 
 // ---------------------------------------------------------------------------
 // Vercel handler
@@ -187,19 +175,19 @@ function getHtmlTemplate(): string {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const slug = url.pathname.replace(/^\/|\/$/g, '');
-  const htmlTemplate = getHtmlTemplate();
+  const template = htmlTemplate;
 
   // Home + preview → SPA shell (no SSR needed)
   if (!slug || slug === 'preview') {
     res.setHeader('Content-Type', 'text/html');
-    return res.status(200).send(htmlTemplate);
+    return res.status(200).send(template);
   }
 
   const authKey = process.env.GRAPH_AUTH_KEY;
   if (!authKey) {
     console.warn('[ssr] GRAPH_AUTH_KEY not set, serving SPA shell');
     res.setHeader('Content-Type', 'text/html');
-    return res.status(200).send(htmlTemplate);
+    return res.status(200).send(template);
   }
 
   try {
@@ -209,7 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Unknown slug → SPA shell (client renders NotFound component)
       res.setHeader('Content-Type', 'text/html');
       res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      return res.status(200).send(htmlTemplate);
+      return res.status(200).send(template);
     }
 
     // ---- Render React component tree to HTML ----
@@ -222,7 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(page).replace(/</g, '\\u003c')}</script>`;
 
     // ---- Assemble final HTML ----
-    let html = htmlTemplate;
+    let html = template;
 
     // Replace default title/description with page-specific ones
     html = html.replace(/<title>[^<]*<\/title>/, '');
@@ -244,6 +232,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     console.error('[ssr] handler error:', err);
     res.setHeader('Content-Type', 'text/html');
-    return res.status(200).send(htmlTemplate);
+    return res.status(200).send(template);
   }
 }

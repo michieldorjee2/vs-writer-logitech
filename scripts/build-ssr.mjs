@@ -10,6 +10,17 @@
  * is external ESM). Only Node.js builtins are external.
  */
 import * as esbuild from 'esbuild';
+import { readFileSync } from 'fs';
+
+// Read the Vite-built HTML template and bake it into the bundle.
+// This eliminates the need for Vercel's includeFiles + fs.readFileSync at runtime.
+let htmlTemplate;
+try {
+  htmlTemplate = readFileSync('dist/index.html', 'utf-8');
+} catch {
+  htmlTemplate = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><div id="root"></div></body></html>';
+  console.warn('⚠ dist/index.html not found, using fallback shell');
+}
 
 await esbuild.build({
   entryPoints: ['server/ssr-handler.tsx'],
@@ -35,6 +46,12 @@ await esbuild.build({
   // JSX transform (matches tsconfig jsx: react-jsx)
   jsx: 'automatic',
   jsxImportSource: 'react',
+
+  // Inline the HTML template as a compile-time constant.
+  // Avoids needing fs.readFileSync + includeFiles at runtime.
+  define: {
+    '__HTML_TEMPLATE__': JSON.stringify(htmlTemplate),
+  },
 
   // Source maps for Vercel runtime error traces
   sourcemap: true,
