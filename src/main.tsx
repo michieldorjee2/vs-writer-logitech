@@ -1,10 +1,14 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { hydrateRoot, createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+const root = document.getElementById('root')!;
+
+if (root.innerHTML.trim().length > 0) {
+  // Server-rendered HTML present — hydrate instead of full render
+  hydrateRoot(root, <StrictMode><App /></StrictMode>);
+} else {
+  // SPA mode (home page, preview, or dev without SSR)
+  createRoot(root).render(<StrictMode><App /></StrictMode>);
+}

@@ -16,6 +16,9 @@ dist-ssr
 # Pre-fetched content (generated at build time)
 public/content/*.json
 
+# Auto-generated SSR template (created by postbuild script)
+api/_lib/html-template.ts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

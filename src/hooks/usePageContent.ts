@@ -7,14 +7,29 @@ interface PageContentState {
     error: string | null;
 }
 
+function consumeSSRData(): CompetitorComparisonPage | null {
+    if (typeof window === 'undefined') return null;
+    const data = (window as any).__SSR_DATA__ as CompetitorComparisonPage | undefined;
+    if (data) {
+        delete (window as any).__SSR_DATA__;
+        return data;
+    }
+    return null;
+}
+
 export function usePageContent(slug: string): PageContentState {
+    const [ssrData] = useState(consumeSSRData);
+
     const [state, setState] = useState<PageContentState>({
-        data: null,
-        isLoading: true,
+        data: ssrData,
+        isLoading: !ssrData,
         error: null,
     });
 
     useEffect(() => {
+        // If we got SSR data, skip the fetch
+        if (ssrData) return;
+
         let cancelled = false;
 
         async function load() {
@@ -42,7 +57,7 @@ export function usePageContent(slug: string): PageContentState {
 
         load();
         return () => { cancelled = true; };
-    }, [slug]);
+    }, [slug, ssrData]);
 
     return state;
 }

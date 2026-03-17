@@ -11,11 +11,9 @@ export function richTextAsTag(html: string, tag: 'h1' | 'h2' | 'p' = 'p'): strin
         .replace(/<em>/g, '<em class="not-italic text-optimizely-blue">');
 }
 
-/** Strip wrapping <p> tags and extract inner text */
+/** Strip HTML tags and extract inner text (works in Node.js and browser) */
 export function stripHtml(html: string): string {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return div.textContent?.trim() ?? '';
+    return html.replace(/<[^>]*>/g, '').trim();
 }
 
 /** Parse a rich-text html value into a boolean or string for the comparison table */
