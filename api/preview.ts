@@ -14,35 +14,27 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
       __typename
       _metadata { key version url { default hierarchical } published }
       ... on CompetitorComparisonPage {
-        PageTitle MetaDescription
-        CanonicalUrl { default }
-        HeroSection { ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } } }
-        LogoBar { ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } } }
+        PageTitle MetaDescription CanonicalUrl { default }
+        eyebrow headline subheadline cta link { default }
+        comparisonHeadline
+        comparisonTableRows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight }
+        analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
+        promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
+        endHeadline endSubheadline endCTA endCTALink { default }
+        testimonial1 testimonial1JobTitle testimonial1Company
+        testimonial2 testimonial2JobTitle testimonial2Company
         FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
-        ComparisonTable { ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue { html } OurHighlight CompetitorValue { html } CompetitorHighlight } } }
-        AnalystSection { ... on AnalystSectionBlock { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } } }
-        Testimonials { key }
-        FaqSection { key item { __typename _json } }
-        PromoCard { ... on PromoCardBlock { Eyebrow Heading Description CtaText CtaUrl { default } } }
-        ClosingCta { ... on ClosingCtaBlock { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } } }
+        FaqSection { __typename _json }
       }
       ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
       ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } }
       ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } }
-      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue { html } OurHighlight CompetitorValue { html } CompetitorHighlight } }
+      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight } }
       ... on AnalystSectionBlock { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
       ... on TestimonialBlock { Quote AuthorName AuthorTitle }
       ... on PromoCardBlock { Eyebrow Heading Description CtaText CtaUrl { default } }
       ... on ClosingCtaBlock { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
     }
-  }
-}
-`;
-
-const TESTIMONIALS_QUERY = `
-query GetTestimonials($keys: [String!]) {
-  TestimonialBlock(where: { _metadata: { key: { in: $keys } } }) {
-    items { _metadata { key } Quote AuthorName AuthorTitle }
   }
 }
 `;
@@ -54,22 +46,6 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
     body: JSON.stringify({ query, variables }),
   });
   return res.json();
-}
-
-/** Resolve testimonial content references by fetching their actual data */
-async function resolveTestimonials(authKey: string, refs: Array<{ key: string }>) {
-  if (!refs?.length) return [];
-  const keys = refs.map((r) => r.key);
-  const json = await queryGraph(authKey, TESTIMONIALS_QUERY, { keys });
-  const items = (json as any)?.data?.TestimonialBlock?.items ?? [];
-  const byKey = new Map(items.map((t: any) => [t._metadata.key, t]));
-  return refs.map((ref) => {
-    const t = byKey.get(ref.key) as any;
-    return {
-      key: ref.key,
-      item: t ? { Quote: t.Quote, AuthorName: t.AuthorName, AuthorTitle: t.AuthorTitle } : null,
-    };
-  });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -99,11 +75,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const content = items[0];
-
-    // Resolve testimonial content references for page-level preview
-    if (content.__typename === 'CompetitorComparisonPage' && content.Testimonials?.length) {
-      content.Testimonials = await resolveTestimonials(singleKey, content.Testimonials);
-    }
 
     // Never cache preview content
     res.setHeader('Cache-Control', 'no-store');

@@ -22,50 +22,70 @@ const quoteMarkColors: Record<string, string> = {
 };
 
 function mapTestimonials(page: CompetitorComparisonPage) {
-    if (!page.Testimonials?.length) return [];
-    const resolved = page.Testimonials.filter((t) => t.item != null);
-    return resolved.map((t, i) => ({
-        quote: t.item!.Quote,
-        spokesperson: t.item!.AuthorName,
-        jobTitle: t.item!.AuthorTitle ?? '',
-        company: '',
+    const testimonials: Array<{
+        quote: string;
+        spokesperson: string;
+        jobTitle: string;
+        company: string;
+    }> = [];
+
+    if (page.testimonial1) {
+        testimonials.push({
+            quote: page.testimonial1,
+            spokesperson: page.testimonial1JobTitle ?? '',
+            jobTitle: page.testimonial1Company ?? '',
+            company: '',
+        });
+    }
+    if (page.testimonial2) {
+        testimonials.push({
+            quote: page.testimonial2,
+            spokesperson: page.testimonial2JobTitle ?? '',
+            jobTitle: page.testimonial2Company ?? '',
+            company: '',
+        });
+    }
+
+    // Fallback to legacy Testimonials refs if flat fields are empty
+    if (testimonials.length === 0 && page.Testimonials?.length) {
+        const resolved = page.Testimonials.filter((t) => t.item != null);
+        resolved.forEach((t) => {
+            testimonials.push({
+                quote: t.item!.Quote,
+                spokesperson: t.item!.AuthorName,
+                jobTitle: t.item!.AuthorTitle ?? '',
+                company: '',
+            });
+        });
+    }
+
+    return testimonials.map((t, i) => ({
+        ...t,
         gradientColor: '',
         quoteMarksColor: quoteMarkColors[quoteThemes[i % quoteThemes.length]],
         theme: quoteThemes[i % quoteThemes.length],
         size: 'default' as const,
-        quotesLength: resolved.length,
+        quotesLength: testimonials.length,
         index: i,
     }));
 }
 
 function mapFaqItems(page: CompetitorComparisonPage) {
-    // FAQ data comes as _json from the Graph since nested refs aren't supported
-    const faqJson = page.FaqSection?.item?._json as any;
-    if (!faqJson?.Items?.length) return null;
-    return faqJson.Items.map((item: any) => ({
-        title: item.Heading ?? '',
-        defaultOpen: item.OpenedByDefault ?? false,
-        children: <div className="rte">{parse(item.MainContent?.html ?? '')}</div>,
-    }));
+    if (!page.FaqSection?.length) return null;
+    for (const entry of page.FaqSection) {
+        const faqJson = (entry as any)?._json;
+        if (faqJson?.Items?.length) {
+            return faqJson.Items.map((item: any) => ({
+                title: item.Heading ?? '',
+                defaultOpen: item.OpenedByDefault ?? false,
+                children: <div className="rte">{parse(item.MainContent?.html ?? '')}</div>,
+            }));
+        }
+    }
+    return null;
 }
 
-function mapLogoMedia(page: CompetitorComparisonPage) {
-    const logos = page.LogoBar?.Logos;
-    if (!logos || logos.length === 0) return null;
-    return logos
-        .filter((l) => l.item != null)
-        .map((l) => ({
-            asset: {
-                type: 'image' as const,
-                assetAttributes: {
-                    url: l.item!._metadata.url.default,
-                    alt: l.item!._metadata.displayName ?? '',
-                },
-            },
-        }));
-}
-
-// --- Default fallback logos (same as original hardcoded page) ---
+// --- Default fallback logos ---
 const fallbackLogos = [
     { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/f58ea35175bd4e25bf399e36d284d6f9/logo_salesforce_white_100x300.svg', alt: 'Salesforce' } } },
     { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/854ad08b9a5642f1bbda87fdfe6b81d4/nike-logo-icon_light.svg', alt: 'Nike' } } },
@@ -75,44 +95,30 @@ const fallbackLogos = [
     { asset: { type: 'image' as const, assetAttributes: { url: 'https://www.optimizely.com/contentassets/c3fc7cbd589947cbb8579ce42d6bf8ec/logo_new-era_white_100x300.svg', alt: 'NEW ERA' } } },
 ];
 
-// --- Page Component ---
-
 interface Props {
     page: CompetitorComparisonPage;
 }
 
 const DynamicComparisonPage = ({ page }: Props) => {
-    const hero = page.HeroSection;
-    const logoMedia = mapLogoMedia(page) ?? fallbackLogos;
-    const comparisonRows = page.ComparisonTable?.Rows ? mapComparisonRows(page.ComparisonTable.Rows) : [];
+    const comparisonRows = page.comparisonTableRows ? mapComparisonRows(page.comparisonTableRows) : [];
     const testimonials = mapTestimonials(page);
     const faqItems = mapFaqItems(page);
-    const analyst = page.AnalystSection;
-    const promo = page.PromoCard;
-    const closing = page.ClosingCta;
     const features = page.FeatureSection;
-    const comparison = page.ComparisonTable;
 
     return (
         <Suspense fallback={null}>
             {/* ========== SECTION 1: Hero ========== */}
-            {hero && (
+            {page.headline && (
                 <HeroGradient>
-                    <img
-                        src="/optimizely-logo.svg"
-                        alt="Optimizely"
-                        className="mb-6 h-8"
-                    />
-                    {hero.Eyebrow && <p className="t-overline mb-4">{hero.Eyebrow}</p>}
-                    {hero.Headline?.html && (
-                        <div className="rte mb-6">{parse(richTextAsTag(hero.Headline.html, 'h1'))}</div>
+                    <img src="/optimizely-logo.svg" alt="Optimizely" className="mb-6 h-8" />
+                    {page.eyebrow && <p className="t-overline mb-4">{page.eyebrow}</p>}
+                    <div className="rte mb-6"><h1>{page.headline}</h1></div>
+                    {page.subheadline && (
+                        <p className="mb-8 text-xl text-gray-300">{page.subheadline}</p>
                     )}
-                    {hero.Subheadline && (
-                        <p className="mb-8 text-xl text-gray-300">{hero.Subheadline}</p>
-                    )}
-                    {hero.PrimaryCtaText && hero.PrimaryCtaUrl?.default && (
-                        <Button href={hero.PrimaryCtaUrl.default} buttonStyle="primary" icon="arrowRight">
-                            {hero.PrimaryCtaText}
+                    {page.cta && page.link?.default && (
+                        <Button href={page.link.default} buttonStyle="primary" icon="arrowRight">
+                            {page.cta}
                         </Button>
                     )}
                 </HeroGradient>
@@ -123,12 +129,10 @@ const DynamicComparisonPage = ({ page }: Props) => {
                 <div className="container">
                     <div className="row">
                         <div className="col-12">
-                            {page.LogoBar?.Heading && (
-                                <p className="mb-6 text-center text-sm uppercase tracking-widest text-gray-400">
-                                    {page.LogoBar.Heading}
-                                </p>
-                            )}
-                            <LogoGrid nonLogos={false} logoMedia={logoMedia} />
+                            <p className="mb-6 text-center text-sm uppercase tracking-widest text-gray-400">
+                                Trusted by leading brands
+                            </p>
+                            <LogoGrid nonLogos={false} logoMedia={fallbackLogos} />
                         </div>
                     </div>
                 </div>
@@ -159,18 +163,20 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 4: Comparison Table ========== */}
-            {comparison && comparisonRows.length > 0 && (
+            {comparisonRows.length > 0 && (
                 <section className="outer-padding py-16 lg:py-24">
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-10 lg:offset-1">
-                                <h2 className="mb-3 text-center text-4xl font-medium text-white">
-                                    Side-by-side: {comparison.OurLabel} vs {comparison.CompetitorLabel}
-                                </h2>
+                                {page.comparisonHeadline && (
+                                    <h2 className="mb-3 text-center text-4xl font-medium text-white">
+                                        {page.comparisonHeadline}
+                                    </h2>
+                                )}
                                 <ComparisonTable
                                     rows={comparisonRows}
-                                    opalLabel={comparison.OurLabel}
-                                    writerLabel={comparison.CompetitorLabel}
+                                    opalLabel="Optimizely"
+                                    writerLabel="Competitor"
                                 />
                             </div>
                         </div>
@@ -179,18 +185,18 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 5: Analyst Recognition ========== */}
-            {analyst?.Quote && (
+            {page.analystQuote && (
                 <HighlightSection>
-                    {analyst.SectionHeading?.html && (
-                        <div className="rte mb-4">{parse(richTextAsTag(analyst.SectionHeading.html, 'h2'))}</div>
+                    {page.analystHeadline && (
+                        <div className="rte mb-4"><h3>{page.analystHeadline}</h3></div>
                     )}
-                    <p className="t-subtitle mb-6">{analyst.Quote}</p>
-                    {analyst.AnalystSource && (
-                        <p className="mb-6 text-sm text-gray-400">&mdash; {analyst.AnalystSource}</p>
+                    <p className="t-subtitle mb-6">{page.analystQuote}</p>
+                    {page.analystSource && (
+                        <p className="mb-6 text-sm text-gray-400">&mdash; {page.analystSource}</p>
                     )}
-                    {analyst.CtaText && analyst.CtaUrl?.default && (
-                        <Button href={analyst.CtaUrl.default} buttonStyle="secondary" icon="arrowRight">
-                            {analyst.CtaText}
+                    {page.analystCTA && page.analystCTALink?.default && (
+                        <Button href={page.analystCTALink.default} buttonStyle="secondary" icon="arrowRight">
+                            {page.analystCTA}
                         </Button>
                     )}
                 </HighlightSection>
@@ -217,20 +223,20 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 8: Promo Card ========== */}
-            {promo?.Heading && (
+            {page.promoHeading && (
                 <section className="outer-padding py-16 lg:py-24">
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-8 lg:offset-2">
                                 <div className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-8 lg:p-12">
-                                    {promo.Eyebrow && <p className="t-overline mb-4">{promo.Eyebrow}</p>}
-                                    <h2 className="mb-4 text-3xl font-medium text-white">{promo.Heading}</h2>
-                                    {promo.Description && (
-                                        <p className="mb-6 text-lg text-gray-300">{promo.Description}</p>
+                                    {page.promoEyebrow && <p className="t-overline mb-4">{page.promoEyebrow}</p>}
+                                    <h2 className="mb-4 text-3xl font-medium text-white">{page.promoHeading}</h2>
+                                    {page.promoDescription && (
+                                        <p className="mb-6 text-lg text-gray-300">{page.promoDescription}</p>
                                     )}
-                                    {promo.CtaText && promo.CtaUrl?.default && (
-                                        <Button href={promo.CtaUrl.default} buttonStyle="emphasized" icon="arrowRight">
-                                            {promo.CtaText}
+                                    {page.promoCTA && page.promoCTALink?.default && (
+                                        <Button href={page.promoCTALink.default} buttonStyle="emphasized" icon="arrowRight">
+                                            {page.promoCTA}
                                         </Button>
                                     )}
                                 </div>
@@ -241,15 +247,15 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 9: Final CTA ========== */}
-            {closing?.Headline?.html && (
+            {page.endHeadline && (
                 <HighlightSection>
-                    <div className="rte mb-4">{parse(richTextAsTag(closing.Headline.html, 'h2'))}</div>
-                    {closing.Subheadline && (
-                        <p className="t-subtitle mb-8">{closing.Subheadline}</p>
+                    <div className="rte mb-4"><h2>{page.endHeadline}</h2></div>
+                    {page.endSubheadline && (
+                        <p className="t-subtitle mb-8">{page.endSubheadline}</p>
                     )}
-                    {closing.PrimaryCtaText && closing.PrimaryCtaUrl?.default && (
-                        <Button href={closing.PrimaryCtaUrl.default} buttonStyle="primary" icon="arrowRight">
-                            {closing.PrimaryCtaText}
+                    {page.endCTA && page.endCTALink?.default && (
+                        <Button href={page.endCTALink.default} buttonStyle="primary" icon="arrowRight">
+                            {page.endCTA}
                         </Button>
                     )}
                 </HighlightSection>

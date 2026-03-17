@@ -17,24 +17,17 @@ query GetPage($slug: String!) {
     items {
       _metadata { key url { default hierarchical } published }
       PageTitle MetaDescription CanonicalUrl { default }
-      HeroSection { ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } } }
-      LogoBar { ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } } }
+      eyebrow headline subheadline cta link { default }
+      comparisonHeadline
+      comparisonTableRows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight }
+      analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
+      promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
+      endHeadline endSubheadline endCTA endCTALink { default }
+      testimonial1 testimonial1JobTitle testimonial1Company
+      testimonial2 testimonial2JobTitle testimonial2Company
       FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
-      ComparisonTable { ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue { html } OurHighlight CompetitorValue { html } CompetitorHighlight } } }
-      AnalystSection { ... on AnalystSectionBlock { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } } }
-      Testimonials { key }
-      FaqSection { key item { __typename _json } }
-      PromoCard { ... on PromoCardBlock { Eyebrow Heading Description CtaText CtaUrl { default } } }
-      ClosingCta { ... on ClosingCtaBlock { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } } }
+      FaqSection { __typename _json }
     }
-  }
-}
-`;
-
-const TESTIMONIALS_QUERY = `
-query GetTestimonials($keys: [String!]) {
-  TestimonialBlock(where: { _metadata: { key: { in: $keys } } }) {
-    items { _metadata { key } Quote AuthorName AuthorTitle }
   }
 }
 `;
@@ -48,31 +41,12 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return res.json();
 }
 
-async function resolveTestimonials(authKey: string, refs: Array<{ key: string }>) {
-  if (!refs?.length) return [];
-  const keys = refs.map((r) => r.key);
-  const json = await queryGraph(authKey, TESTIMONIALS_QUERY, { keys });
-  const items = (json as any)?.data?.TestimonialBlock?.items ?? [];
-  const byKey = new Map(items.map((t: any) => [t._metadata.key, t]));
-  return refs.map((ref) => {
-    const t = byKey.get(ref.key) as any;
-    return {
-      key: ref.key,
-      item: t ? { Quote: t.Quote, AuthorName: t.AuthorName, AuthorTitle: t.AuthorTitle } : null,
-    };
-  });
-}
-
 async function fetchPageContent(authKey: string, slug: string) {
   const normalizedSlug = `/${slug}/`;
   const json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
   const items = (json as any)?.data?.CompetitorComparisonPage?.items;
   if (!items || items.length === 0) return null;
-  const page = items[0];
-  if (page.Testimonials?.length) {
-    page.Testimonials = await resolveTestimonials(authKey, page.Testimonials);
-  }
-  return page;
+  return items[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -123,37 +97,56 @@ function buildHeadHtml(page: any): string {
   }
   parts.push(`<script type="application/ld+json">${JSON.stringify(webPageLd)}</script>`);
 
-  const faqJson = page.FaqSection?.item?._json as any;
-  if (faqJson?.Items?.length) {
-    const faqLd = {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: faqJson.Items.map((item: any) => ({
-        '@type': 'Question',
-        name: item.Heading ?? '',
-        acceptedAnswer: { '@type': 'Answer', text: item.MainContent?.html ?? '' },
-      })),
-    };
-    parts.push(`<script type="application/ld+json">${JSON.stringify(faqLd)}</script>`);
+  // FAQ JSON-LD (FaqSection is now a list)
+  if (Array.isArray(page.FaqSection)) {
+    for (const entry of page.FaqSection) {
+      const faqJson = (entry as any)?._json;
+      if (faqJson?.Items?.length) {
+        const faqLd = {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: faqJson.Items.map((item: any) => ({
+            '@type': 'Question',
+            name: item.Heading ?? '',
+            acceptedAnswer: { '@type': 'Answer', text: item.MainContent?.html ?? '' },
+          })),
+        };
+        parts.push(`<script type="application/ld+json">${JSON.stringify(faqLd)}</script>`);
+        break;
+      }
+    }
   }
 
-  const resolved = (page.Testimonials ?? []).filter(
-    (t: any) => t.item?.Quote && t.item?.AuthorName,
-  );
-  if (resolved.length > 0) {
+  // Testimonial review JSON-LD (flat fields)
+  const reviews: Array<Record<string, unknown>> = [];
+  if (page.testimonial1 && page.testimonial1JobTitle) {
+    reviews.push({
+      '@type': 'Review',
+      reviewBody: page.testimonial1,
+      author: {
+        '@type': 'Person',
+        name: page.testimonial1JobTitle,
+        ...(page.testimonial1Company ? { jobTitle: page.testimonial1Company } : {}),
+      },
+    });
+  }
+  if (page.testimonial2 && page.testimonial2JobTitle) {
+    reviews.push({
+      '@type': 'Review',
+      reviewBody: page.testimonial2,
+      author: {
+        '@type': 'Person',
+        name: page.testimonial2JobTitle,
+        ...(page.testimonial2Company ? { jobTitle: page.testimonial2Company } : {}),
+      },
+    });
+  }
+  if (reviews.length > 0) {
     const reviewLd = {
       '@context': 'https://schema.org',
       '@type': 'Product',
-      name: page.ComparisonTable?.OurLabel ?? 'Optimizely',
-      review: resolved.map((t: any) => ({
-        '@type': 'Review',
-        reviewBody: t.item.Quote,
-        author: {
-          '@type': 'Person',
-          name: t.item.AuthorName,
-          ...(t.item.AuthorTitle ? { jobTitle: t.item.AuthorTitle } : {}),
-        },
-      })),
+      name: 'Optimizely',
+      review: reviews,
     };
     parts.push(`<script type="application/ld+json">${JSON.stringify(reviewLd)}</script>`);
   }

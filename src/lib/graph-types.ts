@@ -54,10 +54,10 @@ export interface ComparisonTableBlock {
     CompetitorLabel: string;
     Rows: Array<{
         Category: string;
-        OurValue: RichText | null;
-        OurHighlight: boolean;
-        CompetitorValue: RichText | null;
-        CompetitorHighlight: boolean;
+        OurValue: string | null;
+        OurHighlight: boolean | null;
+        CompetitorValue: string | null;
+        CompetitorHighlight: boolean | null;
     }>;
 }
 
@@ -110,7 +110,17 @@ export type PreviewBlock =
 
 export type PreviewContent = CompetitorComparisonPage | PreviewBlock;
 
-// --- Page type ---
+// --- Comparison row (flat on the page type) ---
+
+export interface ComparisonRow {
+    Category: string;
+    OurValue: string | null;
+    OurHighlight: boolean | null;
+    CompetitorValue: string | null;
+    CompetitorHighlight: boolean | null;
+}
+
+// --- Page type (flat content model) ---
 
 export interface CompetitorComparisonPage {
     __typename?: 'CompetitorComparisonPage';
@@ -122,17 +132,50 @@ export interface CompetitorComparisonPage {
     PageTitle: string;
     MetaDescription: string;
     CanonicalUrl: { default: string } | null;
-    HeroSection: {
-        Eyebrow: string | null;
-        Headline: RichText | null;
-        Subheadline: string | null;
-        PrimaryCtaText: string | null;
-        PrimaryCtaUrl: { default: string } | null;
-    } | null;
-    LogoBar: {
-        Heading: string | null;
-        Logos: ImageRef[];
-    } | null;
+
+    // Hero section (flat fields)
+    eyebrow: string | null;
+    headline: string | null;
+    subheadline: string | null;
+    cta: string | null;
+    link: { default: string } | null;
+
+    // Comparison table (flat fields)
+    comparisonHeadline: string | null;
+    comparisonTableRows: ComparisonRow[] | null;
+
+    // Analyst section (flat fields)
+    analystHeadline: string | null;
+    analystQuote: string | null;
+    analystSource: string | null;
+    analystCTA: string | null;
+    analystCTALink: { default: string } | null;
+
+    // Promo card (flat fields)
+    promoEyebrow: string | null;
+    promoHeading: string | null;
+    promoDescription: string | null;
+    promoCTA: string | null;
+    promoCTALink: { default: string } | null;
+
+    // Closing CTA (flat fields)
+    endHeadline: string | null;
+    endSubheadline: string | null;
+    endCTA: string | null;
+    endCTALink: { default: string } | null;
+
+    // Testimonials (flat fields)
+    testimonial1: string | null;
+    testimonial1JobTitle: string | null;
+    testimonial1Company: string | null;
+    testimonial2: string | null;
+    testimonial2JobTitle: string | null;
+    testimonial2Company: string | null;
+
+    // Logos (single content reference)
+    Logos: { _metadata: { url: { default: string }; displayName?: string } } | null;
+
+    // Feature section (still block-based)
     FeatureSection: {
         Headline: RichText | null;
         Features: Array<{
@@ -140,43 +183,14 @@ export interface CompetitorComparisonPage {
             Description: RichText | null;
         }>;
     } | null;
-    ComparisonTable: {
-        OurLabel: string;
-        CompetitorLabel: string;
-        Rows: Array<{
-            Category: string;
-            OurValue: RichText | null;
-            OurHighlight: boolean;
-            CompetitorValue: RichText | null;
-            CompetitorHighlight: boolean;
-        }>;
-    } | null;
-    AnalystSection: {
-        SectionHeading: RichText | null;
-        Quote: string;
-        AnalystSource: string;
-        CtaText: string | null;
-        CtaUrl: { default: string } | null;
-    } | null;
-    Testimonials: TestimonialRef[] | null;
-    FaqSection: {
-        key: string | null;
-        item: {
-            __typename?: string;
-            _json?: unknown;
-        } | null;
-    } | null;
-    PromoCard: {
-        Eyebrow: string | null;
-        Heading: string;
-        Description: string | null;
-        CtaText: string | null;
-        CtaUrl: { default: string } | null;
-    } | null;
-    ClosingCta: {
-        Headline: RichText | null;
-        Subheadline: string | null;
-        PrimaryCtaText: string | null;
-        PrimaryCtaUrl: { default: string } | null;
-    } | null;
+
+    // FAQ section (still block-based list)
+    FaqSection: Array<{
+        _metadata?: { key: string };
+        __typename?: string;
+        _json?: unknown;
+    }> | null;
+
+    // Legacy block fields (may be empty objects from old content)
+    Testimonials?: TestimonialRef[] | null;
 }
