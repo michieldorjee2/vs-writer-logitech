@@ -1,0 +1,64 @@
+/* ===== Buttons — Optimizely Style ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-out);
+  border: none;
+  position: relative;
+  overflow: hidden;
+  min-height: 36px;
+}
+
+/* Primary: light on dark (Optimizely pattern) */
+.btn--primary {
+  background: var(--bright-gray);
+  color: var(--vulcan);
+}
+
+.btn--primary:hover {
+  background: var(--mischka);
+  transform: translateY(-1px);
+}
+
+.btn--primary:active {
+  background: var(--mischka);
+  transform: translateY(0);
+}
+
+.btn__icon {
+  display: flex;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.btn--primary:hover .btn__icon {
+  transform: translateX(4px);
+}
+
+/* Secondary: outlined */
+.btn--secondary {
+  background: var(--vulcan-90);
+  color: var(--bright-gray);
+  border: 1px solid var(--border-medium);
+}
+
+.btn--secondary:hover {
+  background: var(--vulcan-85);
+  border-color: var(--bright-gray);
+}
+
+/* Emphasized: theme-color fill */
+.btn--emphasized {
+  background: var(--optimizely-blue);
+  color: var(--bright-gray);
+}
+
+.btn--emphasized:hover {
+  background: var(--optimizely-blue-80);
+}
