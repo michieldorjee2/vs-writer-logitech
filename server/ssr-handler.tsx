@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { renderToString } from 'react-dom/server';
 import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
+import ABMHyperPageServer from '../src/components/ABMHyperPage.server';
 
 // ---------------------------------------------------------------------------
 // Content Graph – fetch page data
@@ -27,6 +28,24 @@ query GetPage($slug: String!) {
       testimonial2 testimonial2JobTitle testimonial2Company
       FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
       FaqSection { __typename _json }
+      customerLogo intelEyebrow intelHeadline competitorName
+      challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
+      comparisonDescription logoWallCustomerSlot
+      roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
+      migrationTitle migrationDescription stickyCTAText
+      ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
+      footerTagline footerLegal
+      intelStats { Value Label }
+      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor }
+      techStack { Name ColorTag }
+      investments { Name IsPrimary }
+      newsItems { Date Headline Url { default } }
+      painPoints { Title Description }
+      roiCards { Metric Unit Label CitationText }
+      timelinePhases { Weeks Title Description MarkerColor }
+      teamMembers { Initials Name Role Email }
+      footerLinks { Text Url { default } }
+      analystCards { Badge Source Category Url { default } }
     }
   }
 }
@@ -145,10 +164,27 @@ function buildHeadHtml(page: any): string {
     const reviewLd = {
       '@context': 'https://schema.org',
       '@type': 'Product',
-      name: 'Optimizely',
+      name: page.ctaTitle || 'Optimizely',
       review: reviews,
     };
     parts.push(`<script type="application/ld+json">${JSON.stringify(reviewLd)}</script>`);
+  }
+
+  // Analyst cards JSON-LD (ABM pages)
+  if (Array.isArray(page.analystCards) && page.analystCards.length > 0) {
+    const analystLd = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Analyst Research',
+      itemListElement: page.analystCards.map((card: any, idx: number) => ({
+        '@type': 'ListItem',
+        position: idx + 1,
+        name: card.Source ?? '',
+        description: card.Category ?? '',
+        url: card.Url?.default ?? '',
+      })),
+    };
+    parts.push(`<script type="application/ld+json">${JSON.stringify(analystLd)}</script>`);
   }
 
   return parts.join('\n    ');
@@ -194,7 +230,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- Render React component tree to HTML ----
-    const appHtml = renderToString(<DynamicComparisonPageServer page={page} />);
+    // Detect ABM template
+    const isABM = !!(page.intelEyebrow || page.customerLogo);
+
+    const appHtml = isABM
+      ? renderToString(<ABMHyperPageServer page={page} />)
+      : renderToString(<DynamicComparisonPageServer page={page} />);
 
     // ---- Build SEO head tags ----
     const headHtml = buildHeadHtml(page);

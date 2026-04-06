@@ -4,8 +4,13 @@ import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
 import DynamicComparisonPage from './components/DynamicComparisonPage';
+import ABMHyperPage from './components/ABMHyperPage';
 import BlockPreview from './components/BlockPreview';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
+
+function isABMPage(page: CompetitorComparisonPage): boolean {
+    return !!(page.intelEyebrow || page.customerLogo);
+}
 
 /** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
 function extractCompanyName(slug: string): string {
@@ -76,7 +81,9 @@ function PageLoader() {
         return <NotFound slug={slug || ''} />;
     }
 
-    return <DynamicComparisonPage page={data} />;
+    return isABMPage(data)
+        ? <ABMHyperPage page={data} />
+        : <DynamicComparisonPage page={data} />;
 }
 
 const CMS_URL = import.meta.env.VITE_CMS_URL || '';
@@ -127,7 +134,10 @@ function PreviewLoader() {
 
     // Dispatch: full page vs individual block
     if (data.__typename === 'CompetitorComparisonPage' || !data.__typename) {
-        return <DynamicComparisonPage page={data as CompetitorComparisonPage} />;
+        const page = data as CompetitorComparisonPage;
+        return isABMPage(page)
+            ? <ABMHyperPage page={page} />
+            : <DynamicComparisonPage page={page} />;
     }
 
     return <BlockPreview block={data as PreviewBlock} />;

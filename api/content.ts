@@ -21,6 +21,24 @@ query GetPage($slug: String!) {
       testimonial2 testimonial2JobTitle testimonial2Company
       FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
       FaqSection { __typename _json }
+      customerLogo intelEyebrow intelHeadline competitorName
+      challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
+      comparisonDescription logoWallCustomerSlot
+      roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
+      migrationTitle migrationDescription stickyCTAText
+      ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
+      footerTagline footerLegal
+      intelStats { Value Label }
+      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor }
+      techStack { Name ColorTag }
+      investments { Name IsPrimary }
+      newsItems { Date Headline Url { default } }
+      painPoints { Title Description }
+      roiCards { Metric Unit Label CitationText }
+      timelinePhases { Weeks Title Description MarkerColor }
+      teamMembers { Initials Name Role Email }
+      footerLinks { Text Url { default } }
+      analystCards { Badge Source Category Url { default } }
     }
   }
 }

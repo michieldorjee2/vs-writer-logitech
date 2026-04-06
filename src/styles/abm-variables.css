@@ -62,7 +62,6 @@
   --border-accent: rgba(0, 55, 255, 0.3);
 
   --gradient-hero: linear-gradient(180deg, var(--vulcan) 55%, var(--vulcan-95) 100%);
-  --gradient-card: linear-gradient(135deg, var(--vulcan-95) 0%, rgba(25, 30, 40, 0.5) 100%);
   --gradient-accent: linear-gradient(135deg, var(--optimizely-blue), var(--optimizely-blue-40));
 
   /* ===== Typography — Figtree ===== */
@@ -116,7 +115,7 @@
   --space-32: 8rem;
   --space-40: 10rem;
 
-  --section-padding: clamp(5rem, 12vh, 10rem);
+  --section-padding: clamp(5rem, 12svh, 10rem);
 
   /* ===== Layout ===== */
   --max-width: 1200px;

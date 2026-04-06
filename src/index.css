@@ -1,5 +1,10 @@
 /* Google Fonts loaded via <link> in index.html for faster discovery (avoids render-blocking CSS @import chain) */
 
+@import './styles/abm-variables.css';
+@import './styles/abm-layout.css';
+@import './styles/abm-components.css';
+@import './styles/abm-animations.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -191,6 +191,78 @@ export interface CompetitorComparisonPage {
         _json?: unknown;
     }> | null;
 
+    // ABM Hyper fields
+    customerLogo: string | null;
+    intelEyebrow: string | null;
+    intelHeadline: string | null;
+    competitorName: string | null;
+    challengeHeadline: string | null;
+    challengeScreenshotUrl: { default: string } | null;
+    challengeScreenshotAlt: string | null;
+    challengeBrowserUrl: string | null;
+    comparisonDescription: string | null;
+    logoWallCustomerSlot: string | null;
+    roiTitle: string | null;
+    roiDescription: string | null;
+    roiProjectionValue: string | null;
+    roiProjectionLabel: string | null;
+    roiProjectionDetail: string | null;
+    migrationTitle: string | null;
+    migrationDescription: string | null;
+    stickyCTAText: string | null;
+    ctaTitle: string | null;
+    ctaDescription: string | null;
+    ctaButtonText: string | null;
+    modalScheduleUrl: { default: string } | null;
+    footerTagline: string | null;
+    footerLegal: string | null;
+
+    // ABM arrays
+    intelStats: Array<{ Value: string; Label: string }> | null;
+    stakeholders: Array<{
+        Initials: string;
+        Name: string;
+        Role: string;
+        LinkedInUrl: { default: string | null } | null;
+        AvatarColor: string | null;
+    }> | null;
+    techStack: Array<{ Name: string; ColorTag: string | null }> | null;
+    investments: Array<{ Name: string; IsPrimary: boolean | null }> | null;
+    newsItems: Array<{
+        Date: string;
+        Headline: string;
+        Url: { default: string | null } | null;
+    }> | null;
+    painPoints: Array<{ Title: string; Description: string }> | null;
+    roiCards: Array<{
+        Metric: string;
+        Unit: string;
+        Label: string;
+        CitationText: string | null;
+    }> | null;
+    timelinePhases: Array<{
+        Weeks: string;
+        Title: string;
+        Description: string;
+        MarkerColor: string | null;
+    }> | null;
+    teamMembers: Array<{
+        Initials: string;
+        Name: string;
+        Role: string;
+        Email: string | null;
+    }> | null;
+    footerLinks: Array<{
+        Text: string;
+        Url: { default: string } | null;
+    }> | null;
+    analystCards: Array<{
+        Badge: string;
+        Source: string;
+        Category: string;
+        Url: { default: string | null } | null;
+    }> | null;
+
     // Legacy block fields (may be empty objects from old content)
     Testimonials?: TestimonialRef[] | null;
 }
