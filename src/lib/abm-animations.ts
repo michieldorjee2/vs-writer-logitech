@@ -26,16 +26,19 @@ function initHeroAnimations(): void {
     },
   });
 
-  // Fade the light sweep
-  gsap.to('.hero__light-sweep', {
-    opacity: 0,
-    scrollTrigger: {
-      trigger: '#hero',
-      start: '30% top',
-      end: '70% top',
-      scrub: 1,
-    },
-  });
+  // Fade the light sweep (fromTo ensures it reverses properly on scroll-up)
+  gsap.fromTo('.hero__light-sweep',
+    { opacity: 1 },
+    {
+      opacity: 0,
+      scrollTrigger: {
+        trigger: '#hero',
+        start: '30% top',
+        end: '70% top',
+        scrub: 1,
+      },
+    }
+  );
 }
 
 // ===== Generic Scroll-In Animation =====

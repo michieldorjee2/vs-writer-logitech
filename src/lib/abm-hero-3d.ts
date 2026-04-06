@@ -223,10 +223,13 @@ export function initHero3D(): void {
   setRes();
 
   let lastWidth = window.innerWidth;
+  let lastHeight = window.innerHeight;
   resizeHandler = () => {
     const newW = window.innerWidth;
-    if (newW === lastWidth) return;
+    const newH = window.innerHeight;
+    if (newW === lastWidth && newH === lastHeight) return;
     lastWidth = newW;
+    lastHeight = newH;
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(setRes, 200);
   };
