@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { initABMAnimations, cleanupABMAnimations } from '../lib/abm-animations';
 import { initABMInteractions, cleanupABMInteractions } from '../lib/abm-interactions';
@@ -134,13 +134,13 @@ const ABMHyperPage = ({ page }: Props) => {
           {page.intelStats && page.intelStats.length > 0 && (
             <div className="intel__stats" data-animate="fade-up" data-delay="0.1">
               {page.intelStats.map((stat, i) => (
-                <span key={i}>
+                <React.Fragment key={i}>
                   {i > 0 && <div className="intel__stat-divider" />}
                   <div className="intel__stat-item">
                     <span className="intel__stat-number">{stat.Value}</span>
                     <span className="intel__stat-label">{stat.Label}</span>
                   </div>
-                </span>
+                </React.Fragment>
               ))}
             </div>
           )}
@@ -151,7 +151,7 @@ const ABMHyperPage = ({ page }: Props) => {
               <h3 className="intel__section-label">Key Stakeholders</h3>
               <div className="intel__people-cards">
                 {page.stakeholders.map((person, i) => (
-                  <span key={i}>
+                  <React.Fragment key={i}>
                     {i === 1 && (
                       <span className="intel__fan-emoji intel__fan-emoji--highfive" aria-hidden="true">
                         &#x1F64C;
@@ -193,7 +193,7 @@ const ABMHyperPage = ({ page }: Props) => {
                         <span className="intel__person-role">{person.Role}</span>
                       </div>
                     </div>
-                  </span>
+                  </React.Fragment>
                 ))}
               </div>
             </div>

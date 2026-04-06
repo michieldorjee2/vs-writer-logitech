@@ -8,6 +8,11 @@ html {
   overflow-x: clip;
 }
 
+/* Reset base font size for ABM pages (Tailwind base-font-size plugin sets 10px) */
+.abm-page {
+  font-size: 16px;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);
@@ -1077,9 +1082,10 @@ body {
 }
 
 .proof__analysts {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  justify-content: center;
   gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .proof__analyst-card {
@@ -1092,6 +1098,8 @@ body {
   color: inherit;
   display: block;
   transition: background 0.2s, border-color 0.2s;
+  flex: 0 1 320px;
+  max-width: 380px;
 }
 
 .proof__analyst-card:hover {
