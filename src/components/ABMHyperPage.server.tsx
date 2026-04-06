@@ -55,7 +55,8 @@ const ABMHyperPageServer = ({ page }: Props) => {
   const rightLogos = fallbackLogos.slice(3);
 
   return (
-    <div className="abm-page">
+    <main className="abm-page" id="main-content">
+      <a href="#main-content" className="abm-skip-link">Skip to main content</a>
       {/* ======== HERO (no canvas) ======== */}
       <section id="hero" className="section section--hero">
         <div className="hero__light-sweep" />
@@ -157,11 +158,12 @@ const ABMHyperPageServer = ({ page }: Props) => {
                             <a
                               href={person.LinkedInUrl.default}
                               target="_blank"
-                              rel="noopener"
+                              rel="noopener noreferrer"
                               className="intel__linkedin-icon"
                               aria-label={`${person.Name} on LinkedIn`}
                             >
                               <LinkedInIcon />
+                              <span className="sr-only">(opens in new tab)</span>
                             </a>
                           )}
                         </div>
@@ -213,8 +215,9 @@ const ABMHyperPageServer = ({ page }: Props) => {
                     <div key={i} className="intel__news-row">
                       <time>{news.Date}</time>
                       {news.Url?.default ? (
-                        <a href={news.Url.default} target="_blank" rel="noopener">
+                        <a href={news.Url.default} target="_blank" rel="noopener noreferrer">
                           {news.Headline} <span className="intel__news-arrow">&rarr;</span>
+                          <span className="sr-only"> (opens in new tab)</span>
                         </a>
                       ) : (
                         <span>{news.Headline}</span>
@@ -253,6 +256,8 @@ const ABMHyperPageServer = ({ page }: Props) => {
                       <img
                         src={page.challengeScreenshotUrl.default}
                         alt={page.challengeScreenshotAlt || 'Current website screenshot'}
+                        width={560}
+                        height={340}
                       />
                     </div>
                   </div>
@@ -411,13 +416,14 @@ const ABMHyperPageServer = ({ page }: Props) => {
                   key={i}
                   href={card.Url?.default || '#'}
                   target="_blank"
-                  rel="noopener"
+                  rel="noopener noreferrer"
                   className="proof__analyst-card"
                 >
                   <div className="proof__analyst-badge">{card.Badge}</div>
                   <div className="proof__analyst-source">{card.Source}</div>
                   <div className="proof__analyst-category">{card.Category}</div>
                   <div className="proof__analyst-link">Read report &rarr;</div>
+                  <span className="sr-only"> (opens in new tab)</span>
                 </a>
               ))}
             </div>
@@ -681,13 +687,13 @@ const ABMHyperPageServer = ({ page }: Props) => {
             {page.footerTagline && <span>{page.footerTagline}</span>}
           </div>
           {page.footerLinks && page.footerLinks.length > 0 && (
-            <div className="footer__links">
+            <nav aria-label="Footer" className="footer__links">
               {page.footerLinks.map((link, i) => (
                 <a key={i} href={link.Url?.default || '#'}>
                   {link.Text}
                 </a>
               ))}
-            </div>
+            </nav>
           )}
           {page.footerLegal && (
             <div className="footer__legal">
@@ -696,7 +702,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
           )}
         </div>
       </footer>
-    </div>
+    </main>
   );
 };
 

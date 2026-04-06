@@ -262,6 +262,37 @@ export function initWarpCTA(): void {
             innerModal.classList.add('modal--floating');
         }, lastDelay * 1000);
       }
+
+      // Focus trap
+      const modalTrap = document.querySelector('.modal') as HTMLElement;
+      if (modalTrap) {
+        const focusableEls = modalTrap.querySelectorAll<HTMLElement>(
+          'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstFocusable = focusableEls[0];
+        const lastFocusable = focusableEls[focusableEls.length - 1];
+
+        firstFocusable?.focus();
+
+        const trapFocus = (e: KeyboardEvent) => {
+          if (e.key !== 'Tab') return;
+          if (e.shiftKey) {
+            if (document.activeElement === firstFocusable) {
+              e.preventDefault();
+              lastFocusable?.focus();
+            }
+          } else {
+            if (document.activeElement === lastFocusable) {
+              e.preventDefault();
+              firstFocusable?.focus();
+            }
+          }
+        };
+
+        modalTrap.addEventListener('keydown', trapFocus);
+        // Store for cleanup
+        (modalTrap as any).__trapFocus = trapFocus;
+      }
     });
   }
 
@@ -272,6 +303,13 @@ export function initWarpCTA(): void {
     if (state !== 'open' && state !== 'warp') return;
     state = 'closing';
     closeT = 0;
+
+    // Remove focus trap
+    const modalTrap = document.querySelector('.modal') as HTMLElement;
+    if (modalTrap && (modalTrap as any).__trapFocus) {
+      modalTrap.removeEventListener('keydown', (modalTrap as any).__trapFocus);
+      delete (modalTrap as any).__trapFocus;
+    }
 
     // Snapshot laser lengths for retract animation
     closingLengths = lasers.map((l) => l.length);
@@ -551,7 +589,9 @@ export function initWarpCTA(): void {
         // NOW hide the modal overlay (animation is done)
         modal!.classList.remove('modal-overlay--active');
         modal!.setAttribute('aria-hidden', 'true');
-        btn!.focus({ preventScroll: true });
+        // Restore focus to trigger button
+        const triggerBtn = document.getElementById('cta-connect-btn') || document.getElementById('sticky-connect-btn');
+        triggerBtn?.focus({ preventScroll: true });
         // Clean up GSAP transforms on tiles
         const tiles = modal!.querySelectorAll('.bento');
         gsap.set(tiles, { clearProps: 'all' });
