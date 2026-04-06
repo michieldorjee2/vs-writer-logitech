@@ -8,6 +8,7 @@ import { initHero3D, cleanupHero3D } from '../lib/abm-hero-3d';
 
 interface Props {
   page: CompetitorComparisonPage;
+  editMode?: boolean;
 }
 
 const fallbackLogos = [
@@ -46,7 +47,9 @@ function ratingClass(value: string | null): string {
   return 'comparison__rating comparison__rating--full';
 }
 
-const ABMHyperPage = ({ page }: Props) => {
+const ABMHyperPage = ({ page, editMode }: Props) => {
+  // Helper: returns data-epi-edit attribute only in edit mode
+  const epi = (propName: string) => editMode ? { 'data-epi-edit': propName } : {};
   useEffect(() => {
     const timer = setTimeout(() => {
       initHero3D(page.customerLogo);
@@ -86,12 +89,12 @@ const ABMHyperPage = ({ page }: Props) => {
 
         <div className="hero__content">
           {page.eyebrow && (
-            <div className="hero__badge hero__badge--hidden">
+            <div className="hero__badge hero__badge--hidden" {...epi('eyebrow')}>
               <span className="hero__badge-dot" />
               {page.eyebrow}
             </div>
           )}
-          <h1 className="hero__title" data-split-text>
+          <h1 className="hero__title" data-split-text {...epi('headline')}>
             <span className="hero__title-line">{heroLine1}</span>
             {heroLine2 && (
               <span className="hero__title-line hero__title-line--accent">
@@ -100,7 +103,7 @@ const ABMHyperPage = ({ page }: Props) => {
             )}
           </h1>
           {page.subheadline && (
-            <p className="hero__subtitle hero__subtitle--hidden">
+            <p className="hero__subtitle hero__subtitle--hidden" {...epi('subheadline')}>
               {page.subheadline}
             </p>
           )}
@@ -121,11 +124,12 @@ const ABMHyperPage = ({ page }: Props) => {
         <div className="section__inner">
           <div className="intel__hero" data-animate="fade-up">
             {page.intelEyebrow && (
-              <span className="intel__eyebrow">{page.intelEyebrow}</span>
+              <span className="intel__eyebrow" {...epi('intelEyebrow')}>{page.intelEyebrow}</span>
             )}
             {page.intelHeadline && (
               <h2
                 className="intel__headline"
+                {...epi('intelHeadline')}
                 dangerouslySetInnerHTML={{ __html: page.intelHeadline }}
               />
             )}
@@ -268,7 +272,7 @@ const ABMHyperPage = ({ page }: Props) => {
               <div className="challenge__left" data-animate="fade-right">
                 <span className="section__label">The challenge</span>
                 <h2
-                  className="challenge__headline"
+                  className="challenge__headline" {...epi('challengeHeadline')}
                   dangerouslySetInnerHTML={{ __html: page.challengeHeadline }}
                 />
                 {page.challengeScreenshotUrl && (
@@ -470,7 +474,7 @@ const ABMHyperPage = ({ page }: Props) => {
           <div className="section__inner">
             <div className="section__header" data-animate="fade-up">
               <span className="section__label">Your team&apos;s impact</span>
-              {page.roiTitle && <h2 className="section__title">{page.roiTitle}</h2>}
+              {page.roiTitle && <h2 className="section__title" {...epi('roiTitle')}>{page.roiTitle}</h2>}
               {page.roiDescription && (
                 <p className="section__description">{page.roiDescription}</p>
               )}
@@ -533,7 +537,7 @@ const ABMHyperPage = ({ page }: Props) => {
           <div className="section__inner">
             <div className="section__header" data-animate="fade-up">
               <span className="section__label">The path forward</span>
-              {page.migrationTitle && <h2 className="section__title">{page.migrationTitle}</h2>}
+              {page.migrationTitle && <h2 className="section__title" {...epi('migrationTitle')}>{page.migrationTitle}</h2>}
               {page.migrationDescription && (
                 <p className="section__description">{page.migrationDescription}</p>
               )}
@@ -609,11 +613,11 @@ const ABMHyperPage = ({ page }: Props) => {
         <div className="section__inner">
           <div className="cta__content" data-animate="fade-up">
             {page.ctaTitle ? (
-              <h2 className="cta__title" dangerouslySetInnerHTML={{ __html: page.ctaTitle }} />
+              <h2 className="cta__title" {...epi('ctaTitle')} dangerouslySetInnerHTML={{ __html: page.ctaTitle }} />
             ) : (
               <h2 className="cta__title">Let&apos;s build the next chapter together</h2>
             )}
-            {page.ctaDescription && <p className="cta__description">{page.ctaDescription}</p>}
+            {page.ctaDescription && <p className="cta__description" {...epi('ctaDescription')}>{page.ctaDescription}</p>}
             <div className="warp-btn-wrap">
               <button className="warp-btn" id="cta-connect-btn">
                 <span className="warp-btn__content">

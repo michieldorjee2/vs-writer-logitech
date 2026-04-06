@@ -132,11 +132,13 @@ function PreviewLoader() {
         );
     }
 
+    const isEditMode = searchParams.get('ctx') === 'edit';
+
     // Dispatch: full page vs individual block
     if (data.__typename === 'CompetitorComparisonPage' || !data.__typename) {
         const page = data as CompetitorComparisonPage;
         return isABMPage(page)
-            ? <ABMHyperPage page={page} />
+            ? <ABMHyperPage page={page} editMode={isEditMode} />
             : <DynamicComparisonPage page={page} />;
     }
 

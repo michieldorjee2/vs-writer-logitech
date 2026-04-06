@@ -66,18 +66,31 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return res.json();
 }
 
+async function queryGraphWithToken(token: string, query: string, variables: Record<string, unknown>) {
+  const res = await fetch(GRAPH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  return res.json();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { key, ver, loc } = req.query;
-
-  // Preview uses the single key (HMAC) which has access to draft content
-  const singleKey = process.env.GRAPH_SINGLE_KEY || process.env.GRAPH_AUTH_KEY;
-
-  if (!singleKey) {
-    return res.status(500).json({ error: 'GRAPH_SINGLE_KEY not configured' });
-  }
+  const { key, ver, loc, preview_token } = req.query;
 
   if (!key || typeof key !== 'string') {
     return res.status(400).json({ error: 'Missing key parameter' });
+  }
+
+  // Prefer preview_token (Bearer auth from CMS live preview) over HMAC key
+  const previewToken = typeof preview_token === 'string' ? preview_token : null;
+  const singleKey = process.env.GRAPH_SINGLE_KEY || process.env.GRAPH_AUTH_KEY;
+
+  if (!previewToken && !singleKey) {
+    return res.status(500).json({ error: 'No auth configured for preview' });
   }
 
   try {
@@ -85,7 +98,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (ver && typeof ver === 'string') variables.ver = ver;
     if (loc && typeof loc === 'string') variables.loc = [loc];
 
-    const json = await queryGraph(singleKey, PREVIEW_QUERY, variables);
+    // Use Bearer token auth if preview_token is provided, otherwise HMAC key
+    const json = previewToken
+      ? await queryGraphWithToken(previewToken, PREVIEW_QUERY, variables)
+      : await queryGraph(singleKey!, PREVIEW_QUERY, variables);
+
     const items = (json as any)?.data?._Content?.items;
 
     if (!items || items.length === 0) {
