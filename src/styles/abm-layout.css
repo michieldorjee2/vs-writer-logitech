@@ -1,28 +1,24 @@
-/* ===== Base ===== */
-:focus-visible {
+/* ===== Base (scoped to ABM pages) ===== */
+.abm-page :focus-visible {
   outline: 2px solid var(--optimizely-blue);
   outline-offset: 2px;
-}
-
-html {
-  overflow-x: clip;
 }
 
 /* Reset base font size for ABM pages (Tailwind base-font-size plugin sets 10px,
    but ABM CSS variables use rem based on 16px root) */
 html:has(.abm-page) {
   font-size: 16px !important;
+  overflow-x: clip;
 }
 
-body {
+/* Scoped to .abm-page so it doesn't override Tailwind's body on old pages */
+.abm-page {
   font-family: var(--font-sans);
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: var(--text-base);
   font-weight: var(--font-weight-regular);
   line-height: var(--leading-normal);
-  /* overflow-x handled by html { overflow-x: clip } — don't set it here
-     or body becomes the scroll container and GSAP ScrollTrigger breaks */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
