@@ -1397,10 +1397,10 @@ html:has(.abm-page) {
   color: #fff;
   z-index: 1;
 }
-.timeline__marker--blue   { background: var(--optimizely-blue) !important; }
-.timeline__marker--purple { background: var(--purple) !important; }
-.timeline__marker--cyan   { background: #0099bb !important; }
-.timeline__marker--green  { background: #1aaa55 !important; }
+.timeline__marker--blue   { background-color: #0037ff !important; }
+.timeline__marker--purple { background-color: #861dff !important; }
+.timeline__marker--cyan   { background-color: #0099bb !important; }
+.timeline__marker--green  { background-color: #1aaa55 !important; }
 
 .timeline__card {
   background: var(--bg-card);

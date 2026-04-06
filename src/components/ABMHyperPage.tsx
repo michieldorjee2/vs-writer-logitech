@@ -49,7 +49,7 @@ function ratingClass(value: string | null): string {
 const ABMHyperPage = ({ page }: Props) => {
   useEffect(() => {
     const timer = setTimeout(() => {
-      initHero3D();
+      initHero3D(page.customerLogo);
       initABMAnimations();
       initABMInteractions();
       initStickyCTA();
@@ -85,14 +85,6 @@ const ABMHyperPage = ({ page }: Props) => {
         <div className="hero__light-sweep" />
 
         <div className="hero__content">
-          {page.customerLogo && (
-            <img
-              src={page.customerLogo}
-              alt=""
-              className="hero__customer-logo"
-              style={{ maxHeight: '48px', marginBottom: '1.5rem', filter: 'brightness(0) invert(1)', opacity: 0.85 }}
-            />
-          )}
           {page.eyebrow && (
             <div className="hero__badge hero__badge--hidden">
               <span className="hero__badge-dot" />
@@ -565,7 +557,6 @@ const ABMHyperPage = ({ page }: Props) => {
                       {i + 1}
                     </div>
                     <div className="timeline__card">
-                      <span className="timeline__weeks">{phase.Weeks}</span>
                       <h3 className="timeline__title">{phase.Title}</h3>
                       <p className="timeline__desc">{phase.Description}</p>
                     </div>

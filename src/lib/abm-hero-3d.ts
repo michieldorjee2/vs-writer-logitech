@@ -19,7 +19,7 @@ let resizeHandler: (() => void) | null = null;
 let scrollHandler: (() => void) | null = null;
 let starEl: HTMLCanvasElement | null = null;
 
-export function initHero3D(): void {
+export function initHero3D(customerLogoUrl?: string | null): void {
   const canvas = document.getElementById('hero-canvas') as HTMLCanvasElement | null;
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -62,13 +62,28 @@ export function initHero3D(): void {
       </svg>`,
     },
     {
-      // -- CUSTOMER LOGO -- replace for each ABM account --
-      label: 'NovaTech',
+      // -- CUSTOMER LOGO -- replaced dynamically from CMS --
+      label: 'Customer',
       color: '#00ccff',
       glowColor: 'rgba(0,204,255,0.5)',
-      svgMarkup: null, // paste customer SVG here (white fill)
+      svgMarkup: null, // will be loaded below if customerLogoUrl is provided
     },
   ];
+
+  // Attempt to fetch customer SVG logo for 3D rendering
+  if (customerLogoUrl && customerLogoUrl.endsWith('.svg')) {
+    fetch(customerLogoUrl)
+      .then(r => r.ok ? r.text() : null)
+      .then(svg => {
+        if (svg && svg.includes('<svg')) {
+          // Ensure white fill for dark canvas
+          const whiteSvg = svg.replace(/fill="[^"]*"/g, 'fill="white"')
+                               .replace(/fill:[^;"']*/g, 'fill:white');
+          ORBIT_ITEMS[1].svgMarkup = whiteSvg;
+        }
+      })
+      .catch(() => {}); // fallback cube is fine
+  }
 
   // -- State --
   let angle = -Math.PI / 2;
