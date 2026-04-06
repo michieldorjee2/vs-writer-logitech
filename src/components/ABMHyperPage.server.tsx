@@ -7,6 +7,7 @@
  */
 import React from 'react';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
+import { brandLogoUrl } from '../lib/brand-logo';
 
 interface Props {
   page: CompetitorComparisonPage;
@@ -54,6 +55,8 @@ const ABMHyperPageServer = ({ page }: Props) => {
   const leftLogos = fallbackLogos.slice(0, 3);
   const rightLogos = fallbackLogos.slice(3);
 
+  const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
+
   return (
     <main className="abm-page" id="main-content">
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
@@ -62,6 +65,14 @@ const ABMHyperPageServer = ({ page }: Props) => {
         <div className="hero__light-sweep" />
 
         <div className="hero__content">
+          {resolvedLogoUrl && (
+            <img
+              src={resolvedLogoUrl}
+              alt=""
+              className="hero__customer-logo"
+              style={{ maxHeight: '48px', maxWidth: '200px', marginBottom: '1.5rem', objectFit: 'contain' }}
+            />
+          )}
           {page.eyebrow && (
             <div className="hero__badge hero__badge--hidden">
               <span className="hero__badge-dot" />

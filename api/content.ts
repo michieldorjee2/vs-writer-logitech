@@ -21,7 +21,7 @@ query GetPage($slug: String!) {
       testimonial2 testimonial2JobTitle testimonial2Company
       FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
       FaqSection { __typename _json }
-      customerLogo intelEyebrow intelHeadline competitorName
+      customerLogo brandDomain intelEyebrow intelHeadline competitorName
       challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
       comparisonDescription logoWallCustomerSlot
       roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail

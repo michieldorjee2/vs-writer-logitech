@@ -5,6 +5,8 @@ import { initABMInteractions, cleanupABMInteractions } from '../lib/abm-interact
 import { initStickyCTA, cleanupStickyCTA } from '../lib/abm-sticky-cta';
 import { initWarpCTA, cleanupWarpCTA } from '../lib/abm-warp-cta';
 import { initHero3D, cleanupHero3D } from '../lib/abm-hero-3d';
+import GravatarAvatar from './GravatarAvatar';
+import { brandLogoUrl } from '../lib/brand-logo';
 
 interface Props {
   page: CompetitorComparisonPage;
@@ -50,6 +52,10 @@ function ratingClass(value: string | null): string {
 const ABMHyperPage = ({ page, editMode }: Props) => {
   // Helper: returns data-epi-edit attribute only in edit mode
   const epi = (propName: string) => editMode ? { 'data-epi-edit': propName } : {};
+
+  // Resolve brand logo: prefer customerLogo (SVG URL), fall back to Brandfetch CDN
+  const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       initHero3D(page.customerLogo);
@@ -88,6 +94,14 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
         <div className="hero__light-sweep" />
 
         <div className="hero__content">
+          {resolvedLogoUrl && (
+            <img
+              src={resolvedLogoUrl}
+              alt=""
+              className="hero__customer-logo"
+              style={{ maxHeight: '48px', maxWidth: '200px', marginBottom: '1.5rem', objectFit: 'contain' }}
+            />
+          )}
           {page.eyebrow && (
             <div className="hero__badge hero__badge--hidden" {...epi('eyebrow')}>
               <span className="hero__badge-dot" />
@@ -576,11 +590,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                 <div className="migration-team__grid">
                   {page.teamMembers.map((member, i) => (
                     <div key={i} className="migration-team__member">
-                      <div
+                      <GravatarAvatar
+                        email={member.Email}
+                        initials={member.Initials}
                         className={`migration-team__avatar${i === 1 ? ' migration-team__avatar--blue' : ''}${i === 2 ? ' migration-team__avatar--green' : ''}`}
-                      >
-                        {member.Initials}
-                      </div>
+                      />
                       <strong>{member.Name}</strong>
                       <span>{member.Role}</span>
                     </div>
@@ -697,11 +711,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                 href={member.Email ? `mailto:${member.Email}` : '#'}
                 className="bento bento--person"
               >
-                <div
+                <GravatarAvatar
+                  email={member.Email}
+                  initials={member.Initials}
                   className={`bento__avatar${i === 1 ? ' bento__avatar--blue' : ''}${i === 2 ? ' bento__avatar--green' : ''}`}
-                >
-                  {member.Initials}
-                </div>
+                />
                 <strong>{member.Name}</strong>
                 <span className="bento__role">{member.Role}</span>
                 <span className="bento__email-action">

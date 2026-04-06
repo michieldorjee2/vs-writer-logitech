@@ -193,6 +193,7 @@ export interface CompetitorComparisonPage {
 
     // ABM Hyper fields
     customerLogo: string | null;
+    brandDomain: string | null;
     intelEyebrow: string | null;
     intelHeadline: string | null;
     competitorName: string | null;
