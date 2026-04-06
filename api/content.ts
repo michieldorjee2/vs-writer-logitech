@@ -68,8 +68,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const normalizedSlug = `/${slug}/`;
 
   try {
-    const json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
-    const items = (json as any)?.data?.CompetitorComparisonPage?.items;
+    let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
+    let items = (json as any)?.data?.CompetitorComparisonPage?.items;
+
+    // Fallback: try with /en/ prefix (Graph stores locale-prefixed URLs)
+    if ((!items || items.length === 0) && !slug.startsWith('en/')) {
+      const enSlug = `/en/${slug}/`;
+      json = await queryGraph(authKey, PAGE_QUERY, { slug: enSlug });
+      items = (json as any)?.data?.CompetitorComparisonPage?.items;
+    }
 
     if (!items || items.length === 0) {
       return res.status(404).json({ error: 'Page not found' });

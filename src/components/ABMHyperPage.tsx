@@ -47,6 +47,14 @@ function ratingClass(value: string | null): string {
 }
 
 const ABMHyperPage = ({ page }: Props) => {
+  // Override html font-size from Tailwind's 10px to 16px so ABM rem values render correctly
+  useEffect(() => {
+    const html = document.documentElement;
+    const prev = html.style.fontSize;
+    html.style.fontSize = '16px';
+    return () => { html.style.fontSize = prev; };
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       initHero3D();
