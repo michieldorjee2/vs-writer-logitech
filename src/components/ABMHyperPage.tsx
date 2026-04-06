@@ -47,14 +47,6 @@ function ratingClass(value: string | null): string {
 }
 
 const ABMHyperPage = ({ page }: Props) => {
-  // Override html font-size from Tailwind's 10px to 16px so ABM rem values render correctly
-  useEffect(() => {
-    const html = document.documentElement;
-    const prev = html.style.fontSize;
-    html.style.fontSize = '16px';
-    return () => { html.style.fontSize = prev; };
-  }, []);
-
   useEffect(() => {
     const timer = setTimeout(() => {
       initHero3D();
@@ -597,7 +589,7 @@ const ABMHyperPage = ({ page }: Props) => {
       )}
 
       {/* ======== STICKY CTA ======== */}
-      <div className="sticky-cta" id="sticky-cta" aria-hidden="true">
+      <div className="sticky-cta" id="sticky-cta">
         <span className="sticky-cta__text" id="sticky-cta-text">
           {page.stickyCTAText || 'Explore what Optimizely can do'}
         </span>

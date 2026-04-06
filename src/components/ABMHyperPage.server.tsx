@@ -56,8 +56,6 @@ const ABMHyperPageServer = ({ page }: Props) => {
 
   return (
     <main className="abm-page" id="main-content">
-      {/* Override Tailwind's 10px base to 16px for ABM rem values */}
-      <style dangerouslySetInnerHTML={{ __html: 'html{font-size:16px!important}' }} />
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
       {/* ======== HERO (no canvas) ======== */}
       <section id="hero" className="section section--hero">
@@ -558,7 +556,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
       )}
 
       {/* ======== STICKY CTA ======== */}
-      <div className="sticky-cta" id="sticky-cta" aria-hidden="true">
+      <div className="sticky-cta" id="sticky-cta">
         <span className="sticky-cta__text" id="sticky-cta-text">
           {page.stickyCTAText || 'Explore what Optimizely can do'}
         </span>

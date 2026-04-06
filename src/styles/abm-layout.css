@@ -8,9 +8,10 @@ html {
   overflow-x: clip;
 }
 
-/* Reset base font size for ABM pages (Tailwind base-font-size plugin sets 10px) */
-.abm-page {
-  font-size: 16px;
+/* Reset base font size for ABM pages (Tailwind base-font-size plugin sets 10px,
+   but ABM CSS variables use rem based on 16px root) */
+html:has(.abm-page) {
+  font-size: 16px !important;
 }
 
 body {
