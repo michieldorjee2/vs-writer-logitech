@@ -155,8 +155,9 @@ html:has(.abm-page) {
   font-size: var(--text-hero);
   font-weight: var(--font-weight-bold);
   letter-spacing: -0.03em;
-  line-height: 1;
+  line-height: 1.1;
   margin-bottom: var(--space-6);
+  padding-bottom: 0.05em;
 }
 
 .hero__title-line {
@@ -1396,10 +1397,10 @@ html:has(.abm-page) {
   color: #fff;
   z-index: 1;
 }
-.timeline__marker--blue   { background: var(--optimizely-blue); }
-.timeline__marker--purple { background: var(--purple); }
-.timeline__marker--cyan   { background: #0099bb; }
-.timeline__marker--green  { background: #1aaa55; }
+.timeline__marker--blue   { background: var(--optimizely-blue) !important; }
+.timeline__marker--purple { background: var(--purple) !important; }
+.timeline__marker--cyan   { background: #0099bb !important; }
+.timeline__marker--green  { background: #1aaa55 !important; }
 
 .timeline__card {
   background: var(--bg-card);
