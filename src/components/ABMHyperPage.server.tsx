@@ -519,7 +519,8 @@ const ABMHyperPageServer = ({ page }: Props) => {
                     data-delay={String(i)}
                   >
                     <div
-                      className={`timeline__marker${phase.MarkerColor ? ` timeline__marker--${phase.MarkerColor}` : ''}`}
+                      className="timeline__marker"
+                      style={{ backgroundColor: { blue: '#0037ff', purple: '#861dff', cyan: '#0099bb', green: '#1aaa55' }[phase.MarkerColor || 'blue'] || '#0037ff' }}
                     >
                       {i + 1}
                     </div>
