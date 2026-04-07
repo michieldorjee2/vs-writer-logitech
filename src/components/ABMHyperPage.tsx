@@ -58,7 +58,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      initHero3D(resolvedLogoUrl);
+      initHero3D(page.customerLogo, page.brandDomain);
       initABMAnimations();
       initABMInteractions();
       initStickyCTA();
