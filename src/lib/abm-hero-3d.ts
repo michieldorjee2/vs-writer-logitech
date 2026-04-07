@@ -870,21 +870,37 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
           imgW = Math.max(baseDim * aspect, 70 * item.p.scale);
         }
 
-        // Create white-tinted version of the image (for transparent logos on dark canvas)
-        if (!cfg._whitened) {
-          const oc = document.createElement('canvas');
-          oc.width = nw;
-          oc.height = nh;
-          const octx = oc.getContext('2d')!;
-          // Draw original
-          octx.drawImage(cfg.imageEl, 0, 0);
-          // Tint to white: fill white using source-in composite (preserves alpha)
-          octx.globalCompositeOperation = 'source-in';
-          octx.fillStyle = 'white';
-          octx.fillRect(0, 0, nw, nh);
-          cfg._whitened = oc;
+        // For transparent logos: tint to white so they're visible on dark canvas
+        // For opaque logos (with backgrounds): use as-is
+        if (cfg._whitened === undefined) {
+          try {
+            const oc = document.createElement('canvas');
+            oc.width = nw;
+            oc.height = nh;
+            const octx = oc.getContext('2d')!;
+            octx.drawImage(cfg.imageEl, 0, 0);
+            // Check corners for transparency
+            const samples = [
+              octx.getImageData(0, 0, 1, 1).data[3],
+              octx.getImageData(nw - 1, 0, 1, 1).data[3],
+              octx.getImageData(0, nh - 1, 1, 1).data[3],
+              octx.getImageData(nw - 1, nh - 1, 1, 1).data[3],
+            ];
+            const hasTransparency = samples.some(a => a < 240);
+            if (hasTransparency) {
+              // Tint to white (preserves alpha channel)
+              octx.globalCompositeOperation = 'source-in';
+              octx.fillStyle = 'white';
+              octx.fillRect(0, 0, nw, nh);
+              cfg._whitened = oc;
+            } else {
+              cfg._whitened = null; // opaque — use original
+            }
+          } catch {
+            cfg._whitened = null; // CORS — can't read pixels, use original
+          }
         }
-        const logoImg = cfg._whitened as HTMLCanvasElement;
+        const logoImg: CanvasImageSource = cfg._whitened || cfg.imageEl;
 
         const cx = item.p.x;
         const cy = item.p.y;
