@@ -844,19 +844,64 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
           fadeIn
         );
       } else if (cfg.imageEl) {
-        // Draw loaded brand image (PNG/SVG) as a flat sprite
-        const imgSize = 100 * item.p.scale;
+        // Faux-3D extruded image: stacked layers with depth offset + neon glow
+        const imgSize = 110 * item.p.scale;
+        const cx = item.p.x;
+        const cy = item.p.y;
+        const depthLayers = 16;
+        const depthStep = 1.8;
+        // Depth direction based on orbit angle (gives parallax as it moves)
+        const dx = Math.cos(item.orbitAngle + Math.PI * 0.3) * depthStep;
+        const dy = Math.sin(item.orbitAngle + Math.PI * 0.3) * depthStep * 0.5;
+
         ctx!.save();
-        ctx!.globalAlpha = fadeIn * 0.9;
-        ctx!.filter = 'brightness(2)';
+
+        // 1. Radial glow behind the logo
+        const glowR = imgSize * 0.9;
+        const grd = ctx!.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+        grd.addColorStop(0, `rgba(0, 204, 255, ${0.25 * fadeIn})`);
+        grd.addColorStop(0.5, `rgba(0, 120, 255, ${0.1 * fadeIn})`);
+        grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx!.fillStyle = grd;
+        ctx!.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+
+        // 2. Back extrusion layers (dark tinted, offset)
+        for (let d = depthLayers; d >= 1; d--) {
+          const ox = cx + dx * d;
+          const oy = cy + dy * d;
+          const layerAlpha = fadeIn * (0.04 + 0.02 * (depthLayers - d) / depthLayers);
+          ctx!.globalAlpha = layerAlpha;
+          ctx!.drawImage(
+            cfg.imageEl,
+            ox - imgSize / 2,
+            oy - imgSize / 2,
+            imgSize,
+            imgSize
+          );
+        }
+
+        // 3. Colored edge glow (slightly larger, tinted)
+        ctx!.globalAlpha = fadeIn * 0.3;
+        ctx!.filter = 'blur(4px) brightness(1.5)';
         ctx!.drawImage(
           cfg.imageEl,
-          item.p.x - imgSize / 2,
-          item.p.y - imgSize / 2,
+          cx - imgSize * 0.52,
+          cy - imgSize * 0.52,
+          imgSize * 1.04,
+          imgSize * 1.04
+        );
+        ctx!.filter = 'none';
+
+        // 4. Front face (full brightness)
+        ctx!.globalAlpha = fadeIn * 0.95;
+        ctx!.drawImage(
+          cfg.imageEl,
+          cx - imgSize / 2,
+          cy - imgSize / 2,
           imgSize,
           imgSize
         );
-        ctx!.filter = 'none';
+
         ctx!.restore();
       } else {
         drawCube(
