@@ -65,14 +65,6 @@ const ABMHyperPageServer = ({ page }: Props) => {
         <div className="hero__light-sweep" />
 
         <div className="hero__content">
-          {resolvedLogoUrl && (
-            <img
-              src={resolvedLogoUrl}
-              alt=""
-              className="hero__customer-logo"
-              style={{ maxHeight: '48px', maxWidth: '200px', marginBottom: '1.5rem', objectFit: 'contain' }}
-            />
-          )}
           {page.eyebrow && (
             <div className="hero__badge hero__badge--hidden">
               <span className="hero__badge-dot" />

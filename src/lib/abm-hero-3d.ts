@@ -46,6 +46,7 @@ export function initHero3D(customerLogoUrl?: string | null): void {
     color: string;
     glowColor: string;
     svgMarkup: string | null;
+    imageEl: HTMLImageElement | null; // loaded brand logo (PNG/SVG as image)
   }
 
   const ORBIT_ITEMS: OrbitItem[] = [
@@ -53,6 +54,7 @@ export function initHero3D(customerLogoUrl?: string | null): void {
       label: 'Optimizely',
       color: '#194bff',
       glowColor: 'rgba(25,75,255,0.5)',
+      imageEl: null,
       svgMarkup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 139" fill="white">
         <path d="M48.4 76V92.7c12.7 0 24.9-4.9 33.9-13.6 9-8.7 14.1-20.6 14.1-32.9H79.2c0 7.9-3.3 15.5-9 21.1-5.8 5.5-13.6 8.7-21.8 8.7z"/>
         <path d="M48.4 122c-8.1 0-15.9-3.1-21.6-8.7-5.7-5.6-9-13.1-9-21s3.2-15.4 9-21c5.7-5.6 13.5-8.7 21.6-8.7V46c-6.3 0-12.5 1.2-18.2 3.5-5.8 2.3-11 5.7-15.5 10s-8 8.9-10.4 14.5C1.9 80.1.7 86.1.6 92.2c0 6.1 1.2 12.1 3.6 17.7s6.5 10.6 10.9 14.9c4.4 4.3 9.7 7.7 15.5 10 5.8 2.3 12 3.5 18.2 3.5h.1V122h.5z"/>
@@ -66,23 +68,17 @@ export function initHero3D(customerLogoUrl?: string | null): void {
       label: 'Customer',
       color: '#00ccff',
       glowColor: 'rgba(0,204,255,0.5)',
+      imageEl: null,
       svgMarkup: null, // will be loaded below if customerLogoUrl is provided
     },
   ];
 
-  // Attempt to fetch customer SVG logo for 3D rendering
-  if (customerLogoUrl && customerLogoUrl.endsWith('.svg')) {
-    fetch(customerLogoUrl)
-      .then(r => r.ok ? r.text() : null)
-      .then(svg => {
-        if (svg && svg.includes('<svg')) {
-          // Ensure white fill for dark canvas
-          const whiteSvg = svg.replace(/fill="[^"]*"/g, 'fill="white"')
-                               .replace(/fill:[^;"']*/g, 'fill:white');
-          ORBIT_ITEMS[1].svgMarkup = whiteSvg;
-        }
-      })
-      .catch(() => {}); // fallback cube is fine
+  // Load customer logo as an Image for canvas rendering
+  if (customerLogoUrl) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { ORBIT_ITEMS[1].imageEl = img; };
+    img.src = customerLogoUrl;
   }
 
   // -- State --
@@ -769,6 +765,21 @@ export function initHero3D(customerLogoUrl?: string | null): void {
           cfg.color,
           fadeIn
         );
+      } else if (cfg.imageEl) {
+        // Draw loaded brand image (PNG/SVG) as a flat sprite
+        const imgSize = 100 * item.p.scale;
+        ctx!.save();
+        ctx!.globalAlpha = fadeIn * 0.9;
+        ctx!.filter = 'brightness(2)';
+        ctx!.drawImage(
+          cfg.imageEl,
+          item.p.x - imgSize / 2,
+          item.p.y - imgSize / 2,
+          imgSize,
+          imgSize
+        );
+        ctx!.filter = 'none';
+        ctx!.restore();
       } else {
         drawCube(
           item.p.x,

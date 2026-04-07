@@ -58,7 +58,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      initHero3D(page.customerLogo);
+      initHero3D(resolvedLogoUrl);
       initABMAnimations();
       initABMInteractions();
       initStickyCTA();
@@ -94,14 +94,6 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
         <div className="hero__light-sweep" />
 
         <div className="hero__content">
-          {resolvedLogoUrl && (
-            <img
-              src={resolvedLogoUrl}
-              alt=""
-              className="hero__customer-logo"
-              style={{ maxHeight: '48px', maxWidth: '200px', marginBottom: '1.5rem', objectFit: 'contain' }}
-            />
-          )}
           {page.eyebrow && (
             <div className="hero__badge hero__badge--hidden" {...epi('eyebrow')}>
               <span className="hero__badge-dot" />
