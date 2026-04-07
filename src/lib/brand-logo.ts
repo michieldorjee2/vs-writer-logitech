@@ -11,8 +11,19 @@ function cleanDomain(rawDomain: string): string {
   return domain;
 }
 
-/** Brandfetch icon URL (returns SVG when available, PNG fallback) */
-export function brandLogoUrl(rawDomain: string, type: 'icon' | 'logo' | 'symbol' = 'icon'): string {
+/**
+ * Brandfetch Logo Link CDN URL.
+ * Works in <img> tags (browser referrer auth). Does NOT work with server-side fetch().
+ * The ?c= param is the Logo Link client ID (free tier).
+ */
+const BRANDFETCH_CLIENT_ID = '1id3sONkMfoRECy0vYF';
+
+export function brandLogoUrl(rawDomain: string): string {
   const domain = cleanDomain(rawDomain);
-  return `https://cdn.brandfetch.io/${domain}/${type}`;
+  return `https://cdn.brandfetch.io/domain/${domain}?c=${BRANDFETCH_CLIENT_ID}`;
+}
+
+export function brandLogoTypeUrl(rawDomain: string, type: 'icon' | 'logo' | 'symbol' = 'icon'): string {
+  const domain = cleanDomain(rawDomain);
+  return `https://cdn.brandfetch.io/domain/${domain}/type/${type}?c=${BRANDFETCH_CLIENT_ID}`;
 }

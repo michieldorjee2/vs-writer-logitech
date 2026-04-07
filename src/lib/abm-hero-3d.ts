@@ -89,7 +89,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
       })
       .then(svgText => {
         if (!svgText || !svgText.includes('<svg')) {
-          if (customerLogoUrl) loadLogoAsImage(customerLogoUrl);
+          loadLogoAsImage(customerLogoUrl || brandLogoFallback);
           return;
         }
 
@@ -104,12 +104,12 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         const parser = new DOMParser();
         const doc = parser.parseFromString(svgText, 'image/svg+xml');
         if (doc.querySelector('parsererror')) {
-          if (customerLogoUrl) loadLogoAsImage(customerLogoUrl);
+          loadLogoAsImage(customerLogoUrl || brandLogoFallback);
           return;
         }
 
         const svg = doc.querySelector('svg');
-        if (!svg) { if (customerLogoUrl) loadLogoAsImage(customerLogoUrl); return; }
+        if (!svg) { loadLogoAsImage(customerLogoUrl || brandLogoFallback); return; }
 
         // Remove background shapes (rects, circles with fills)
         svg.querySelectorAll('rect, circle, ellipse').forEach(el => {
@@ -121,7 +121,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
 
         const paths = svg.querySelectorAll('path');
         if (paths.length === 0) {
-          if (customerLogoUrl) loadLogoAsImage(customerLogoUrl);
+          loadLogoAsImage(customerLogoUrl || brandLogoFallback);
           return;
         }
 
@@ -136,16 +136,28 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         logoGeometry[1] = buildLogoGeometry(ORBIT_ITEMS[1]);
       })
       .catch(() => {
-        if (customerLogoUrl) loadLogoAsImage(customerLogoUrl);
+        loadLogoAsImage(customerLogoUrl || brandLogoFallback);
       });
   }
 
   function loadLogoAsImage(url: string) {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // Don't set crossOrigin — Brandfetch CDN doesn't send CORS headers,
+    // but drawImage still works (we just can't read pixels, which we don't need)
     img.onload = () => { ORBIT_ITEMS[1].imageEl = img; };
+    img.onerror = () => {
+      // If customerLogo URL failed and we have brandDomain, try Brandfetch CDN
+      if (brandDomain && url !== brandLogoFallback) {
+        loadLogoAsImage(brandLogoFallback);
+      }
+    };
     img.src = url;
   }
+
+  // Brandfetch CDN URL for image fallback (works in <img> tags via referrer auth)
+  const brandLogoFallback = brandDomain
+    ? `https://cdn.brandfetch.io/domain/${brandDomain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]}?c=1id3sONkMfoRECy0vYF`
+    : '';
 
   // -- State --
   let angle = -Math.PI / 2;
