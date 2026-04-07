@@ -56,7 +56,8 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     color: string;
     glowColor: string;
     svgMarkup: string | null;
-    imageEl: HTMLImageElement | null; // loaded brand logo (PNG/SVG as image)
+    imageEl: HTMLImageElement | null;
+    _whitened?: HTMLCanvasElement | null; // cached white-tinted version
   }
 
   const ORBIT_ITEMS: OrbitItem[] = [
@@ -855,10 +856,36 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         );
       } else if (cfg.imageEl) {
         // Faux-3D extruded image: stacked layers with depth offset + neon glow
-        const maxDim = 110 * item.p.scale;
-        const aspect = cfg.imageEl.naturalWidth / (cfg.imageEl.naturalHeight || 1);
-        const imgW = aspect >= 1 ? maxDim : maxDim * aspect;
-        const imgH = aspect >= 1 ? maxDim / aspect : maxDim;
+        const baseDim = 140 * item.p.scale;
+        const nw = cfg.imageEl.naturalWidth || 1;
+        const nh = cfg.imageEl.naturalHeight || 1;
+        const aspect = nw / nh;
+        // Scale so the LARGER dimension fits baseDim, but ensure min 70px for the smaller
+        let imgW: number, imgH: number;
+        if (aspect >= 1) {
+          imgW = baseDim;
+          imgH = Math.max(baseDim / aspect, 70 * item.p.scale);
+        } else {
+          imgH = baseDim;
+          imgW = Math.max(baseDim * aspect, 70 * item.p.scale);
+        }
+
+        // Create white-tinted version of the image (for transparent logos on dark canvas)
+        if (!cfg._whitened) {
+          const oc = document.createElement('canvas');
+          oc.width = nw;
+          oc.height = nh;
+          const octx = oc.getContext('2d')!;
+          // Draw original
+          octx.drawImage(cfg.imageEl, 0, 0);
+          // Tint to white: fill white using source-in composite (preserves alpha)
+          octx.globalCompositeOperation = 'source-in';
+          octx.fillStyle = 'white';
+          octx.fillRect(0, 0, nw, nh);
+          cfg._whitened = oc;
+        }
+        const logoImg = cfg._whitened as HTMLCanvasElement;
+
         const cx = item.p.x;
         const cy = item.p.y;
         const depthLayers = 16;
@@ -884,18 +911,18 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
           const oy = cy + dy * d;
           const layerAlpha = fadeIn * (0.04 + 0.02 * (depthLayers - d) / depthLayers);
           ctx!.globalAlpha = layerAlpha;
-          ctx!.drawImage(cfg.imageEl, ox - imgW / 2, oy - imgH / 2, imgW, imgH);
+          ctx!.drawImage(logoImg, ox - imgW / 2, oy - imgH / 2, imgW, imgH);
         }
 
         // 3. Colored edge glow (slightly larger, tinted)
         ctx!.globalAlpha = fadeIn * 0.3;
         ctx!.filter = 'blur(4px) brightness(1.5)';
-        ctx!.drawImage(cfg.imageEl, cx - imgW * 0.52, cy - imgH * 0.52, imgW * 1.04, imgH * 1.04);
+        ctx!.drawImage(logoImg, cx - imgW * 0.52, cy - imgH * 0.52, imgW * 1.04, imgH * 1.04);
         ctx!.filter = 'none';
 
         // 4. Front face (full brightness)
         ctx!.globalAlpha = fadeIn * 0.95;
-        ctx!.drawImage(cfg.imageEl, cx - imgW / 2, cy - imgH / 2, imgW, imgH);
+        ctx!.drawImage(logoImg, cx - imgW / 2, cy - imgH / 2, imgW, imgH);
 
         ctx!.restore();
       } else {
