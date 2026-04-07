@@ -124,9 +124,20 @@ function initPainPointEffects(): void {
   const pains = document.querySelectorAll('.challenge__pain');
   if (pains.length === 0) return;
 
-  // Read brand accent from CSS variable (set on .abm-page by React)
-  const accentColor = getComputedStyle(document.querySelector('.abm-page') || document.documentElement)
-    .getPropertyValue('--brand-accent').trim() || '#6366f1';
+  // Read brand accent from CSS variable, lighten for accessibility on dark bg
+  const rawAccent = getComputedStyle(document.querySelector('.abm-page') || document.documentElement)
+    .getPropertyValue('--brand-accent').trim();
+  const accentColor = rawAccent ? lightenHex(rawAccent, 0.4) : '#6366f1';
+
+  function lightenHex(hex: string, amount: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const lr = Math.min(255, Math.round(r + (255 - r) * amount));
+    const lg = Math.min(255, Math.round(g + (255 - g) * amount));
+    const lb = Math.min(255, Math.round(b + (255 - b) * amount));
+    return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+  }
 
   pains.forEach((pain) => {
     const number = pain.querySelector('.challenge__pain-number');

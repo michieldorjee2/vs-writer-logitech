@@ -130,7 +130,7 @@ html:has(.abm-page) {
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--brand-accent, var(--accent-secondary));
+  color: color-mix(in srgb, var(--brand-accent, var(--accent-secondary)) 70%, white);
   background: color-mix(in srgb, var(--brand-accent, #0037ff) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--brand-accent, var(--optimizely-blue)) 30%, transparent);
   padding: var(--space-2) var(--space-4);
@@ -803,7 +803,7 @@ html:has(.abm-page) {
 .challenge__pain-number {
   font-size: var(--text-3xl);
   font-weight: var(--font-weight-bold);
-  color: var(--brand-accent, var(--text-tertiary));
+  color: color-mix(in srgb, var(--brand-accent, var(--text-tertiary)) 70%, white);
   opacity: 0.7;
   flex-shrink: 0;
   line-height: 1;
@@ -1007,18 +1007,18 @@ html:has(.abm-page) {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 72px;
+  min-height: 72px;
   border-radius: var(--radius-md);
   background: linear-gradient(135deg, color-mix(in srgb, var(--brand-accent, #194bff) 12%, transparent), color-mix(in srgb, var(--brand-accent, #00ccff) 8%, transparent));
   border: 2px dashed color-mix(in srgb, var(--brand-accent, #194bff) 50%, transparent);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: var(--font-weight-bold);
-  color: var(--brand-accent, var(--light-blue));
-  white-space: nowrap;
-  overflow: visible;
+  /* Lighten dark accent colors for readability on dark bg */
+  color: color-mix(in srgb, var(--brand-accent, var(--light-blue)) 70%, white);
+  text-align: center;
   flex-shrink: 0;
   min-width: 80px;
-  padding: 0 var(--space-4);
+  padding: var(--space-2) var(--space-4);
 }
 
 .proof__testimonials {
