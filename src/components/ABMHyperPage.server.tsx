@@ -130,17 +130,21 @@ const ABMHyperPageServer = ({ page }: Props) => {
           )}
 
           {page.stakeholders && page.stakeholders.length > 0 && (
-            <div className="intel__people-row" data-animate="fan-out" data-delay="0.15">
+            <div
+              className="intel__people-row"
+              data-animate={page.stakeholders.length >= 3 ? 'fan-out' : 'fade-up'}
+              data-delay="0.15"
+            >
               <h3 className="intel__section-label">Key Stakeholders</h3>
-              <div className="intel__people-cards">
+              <div className="intel__people-cards" style={page.stakeholders.length < 3 ? { justifyContent: 'center' } : undefined}>
                 {page.stakeholders.map((person, i) => (
                   <React.Fragment key={i}>
-                    {i === 1 && (
+                    {page.stakeholders!.length >= 3 && i === 1 && (
                       <span className="intel__fan-emoji intel__fan-emoji--highfive" aria-hidden="true">
                         &#x1F64C;
                       </span>
                     )}
-                    {i === 2 && (
+                    {page.stakeholders!.length >= 3 && i === 2 && (
                       <span className="intel__fan-emoji intel__fan-emoji--confetti" aria-hidden="true">
                         &#x1F389;
                         <span className="intel__confetti-piece" style={{ '--c': '#ff6b6b' } as React.CSSProperties}>&#x25CF;</span>
