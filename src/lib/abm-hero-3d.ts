@@ -57,7 +57,6 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     glowColor: string;
     svgMarkup: string | null;
     imageEl: HTMLImageElement | null;
-    _whitened?: HTMLCanvasElement | null; // cached white-tinted version
   }
 
   const ORBIT_ITEMS: OrbitItem[] = [
@@ -870,37 +869,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
           imgW = Math.max(baseDim * aspect, 70 * item.p.scale);
         }
 
-        // For transparent logos: tint to white so they're visible on dark canvas
-        // For opaque logos (with backgrounds): use as-is
-        if (cfg._whitened === undefined) {
-          try {
-            const oc = document.createElement('canvas');
-            oc.width = nw;
-            oc.height = nh;
-            const octx = oc.getContext('2d')!;
-            octx.drawImage(cfg.imageEl, 0, 0);
-            // Check corners for transparency
-            const samples = [
-              octx.getImageData(0, 0, 1, 1).data[3],
-              octx.getImageData(nw - 1, 0, 1, 1).data[3],
-              octx.getImageData(0, nh - 1, 1, 1).data[3],
-              octx.getImageData(nw - 1, nh - 1, 1, 1).data[3],
-            ];
-            const hasTransparency = samples.some(a => a < 240);
-            if (hasTransparency) {
-              // Tint to white (preserves alpha channel)
-              octx.globalCompositeOperation = 'source-in';
-              octx.fillStyle = 'white';
-              octx.fillRect(0, 0, nw, nh);
-              cfg._whitened = oc;
-            } else {
-              cfg._whitened = null; // opaque — use original
-            }
-          } catch {
-            cfg._whitened = null; // CORS — can't read pixels, use original
-          }
-        }
-        const logoImg: CanvasImageSource = cfg._whitened || cfg.imageEl;
+        const logoImg: CanvasImageSource = cfg.imageEl;
 
         const cx = item.p.x;
         const cy = item.p.y;
@@ -930,13 +899,29 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
           ctx!.drawImage(logoImg, ox - imgW / 2, oy - imgH / 2, imgW, imgH);
         }
 
-        // 3. Colored edge glow (slightly larger, tinted)
-        ctx!.globalAlpha = fadeIn * 0.3;
-        ctx!.filter = 'blur(4px) brightness(1.5)';
-        ctx!.drawImage(logoImg, cx - imgW * 0.52, cy - imgH * 0.52, imgW * 1.04, imgH * 1.04);
-        ctx!.filter = 'none';
+        // 3. Translucent dark backdrop with neon squircle border
+        const padX = imgW * 0.18;
+        const padY = imgH * 0.18;
+        const bw = imgW + padX * 2;
+        const bh = imgH + padY * 2;
+        const br = Math.min(bw, bh) * 0.22; // squircle radius
 
-        // 4. Front face (full brightness)
+        ctx!.globalAlpha = fadeIn * 0.6;
+        ctx!.fillStyle = 'rgba(10, 14, 30, 0.75)';
+        ctx!.beginPath();
+        ctx!.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, br);
+        ctx!.fill();
+
+        // Neon border glow
+        ctx!.globalAlpha = fadeIn * 0.5;
+        ctx!.strokeStyle = accentHex;
+        ctx!.lineWidth = 1.5;
+        ctx!.shadowColor = accentHex;
+        ctx!.shadowBlur = 12;
+        ctx!.stroke();
+        ctx!.shadowBlur = 0;
+
+        // 4. Logo image on top of backdrop
         ctx!.globalAlpha = fadeIn * 0.95;
         ctx!.drawImage(logoImg, cx - imgW / 2, cy - imgH / 2, imgW, imgH);
 
