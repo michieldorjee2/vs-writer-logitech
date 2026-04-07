@@ -13,6 +13,16 @@ interface Props {
   page: CompetitorComparisonPage;
 }
 
+function formatStatValue(val: string): string {
+  if (/[^0-9.]/.test(val.replace(/^-/, ''))) return val;
+  const n = parseFloat(val);
+  if (isNaN(n)) return val;
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1) + 'M';
+  if (n >= 10_000) return (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1) + 'K';
+  if (n >= 1_000) return n.toLocaleString();
+  return val;
+}
+
 const fallbackLogos = [
   { url: 'https://www.optimizely.com/contentassets/f58ea35175bd4e25bf399e36d284d6f9/logo_salesforce_white_100x300.svg', alt: 'Salesforce' },
   { url: 'https://www.optimizely.com/contentassets/854ad08b9a5642f1bbda87fdfe6b81d4/nike-logo-icon_light.svg', alt: 'Nike' },
@@ -121,7 +131,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
                 <React.Fragment key={i}>
                   {i > 0 && <div className="intel__stat-divider" />}
                   <div className="intel__stat-item">
-                    <span className="intel__stat-number">{stat.Value}</span>
+                    <span className="intel__stat-number">{formatStatValue(stat.Value)}</span>
                     <span className="intel__stat-label">{stat.Label}</span>
                   </div>
                 </React.Fragment>
@@ -136,7 +146,13 @@ const ABMHyperPageServer = ({ page }: Props) => {
               data-delay="0.15"
             >
               <h3 className="intel__section-label">Key Stakeholders</h3>
-              <div className="intel__people-cards" style={page.stakeholders.length < 3 ? { justifyContent: 'center' } : undefined}>
+              <div
+                className="intel__people-cards"
+                style={page.stakeholders.length < 3 ? {
+                  gridTemplateColumns: `repeat(${page.stakeholders.length}, minmax(0, 360px))`,
+                  justifyContent: 'center',
+                } : undefined}
+              >
                 {page.stakeholders.map((person, i) => (
                   <React.Fragment key={i}>
                     {page.stakeholders!.length >= 3 && i === 1 && (

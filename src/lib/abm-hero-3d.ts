@@ -890,40 +890,65 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         ctx!.fillStyle = grd;
         ctx!.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
 
-        // 2. Back extrusion layers (dark tinted, offset)
+        // 2. Squircle dimensions — tight to logo with small padding
+        const pad = 8 * item.p.scale;
+        const bw = imgW + pad * 2;
+        const bh = imgH + pad * 2;
+        const br = Math.min(bw, bh) * 0.18;
+
+        // 3. Back extrusion layers (neon-tinted squircle outlines for depth)
         for (let d = depthLayers; d >= 1; d--) {
           const ox = cx + dx * d;
           const oy = cy + dy * d;
-          const layerAlpha = fadeIn * (0.04 + 0.02 * (depthLayers - d) / depthLayers);
-          ctx!.globalAlpha = layerAlpha;
-          ctx!.drawImage(logoImg, ox - imgW / 2, oy - imgH / 2, imgW, imgH);
+          ctx!.globalAlpha = fadeIn * (0.03 + 0.015 * (depthLayers - d) / depthLayers);
+          ctx!.strokeStyle = accentHex;
+          ctx!.lineWidth = 2;
+          ctx!.beginPath();
+          ctx!.roundRect(ox - bw / 2, oy - bh / 2, bw, bh, br);
+          ctx!.stroke();
         }
 
-        // 3. Translucent dark backdrop with neon squircle border
-        const padX = imgW * 0.18;
-        const padY = imgH * 0.18;
-        const bw = imgW + padX * 2;
-        const bh = imgH + padY * 2;
-        const br = Math.min(bw, bh) * 0.22; // squircle radius
+        // 4. Outer neon glow (blurred border, like Optimizely logo)
+        ctx!.globalAlpha = fadeIn * 0.4;
+        ctx!.strokeStyle = accentHex;
+        ctx!.lineWidth = 2;
+        ctx!.shadowColor = accentHex;
+        ctx!.shadowBlur = 20;
+        ctx!.beginPath();
+        ctx!.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, br);
+        ctx!.stroke();
+        // Double-stroke for stronger glow
+        ctx!.stroke();
+        ctx!.shadowBlur = 0;
 
-        ctx!.globalAlpha = fadeIn * 0.6;
-        ctx!.fillStyle = 'rgba(10, 14, 30, 0.75)';
+        // 5. Dark backdrop fill inside the squircle
+        ctx!.globalAlpha = fadeIn * 0.85;
+        ctx!.fillStyle = 'rgba(10, 14, 30, 0.88)';
         ctx!.beginPath();
         ctx!.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, br);
         ctx!.fill();
 
-        // Neon border glow
-        ctx!.globalAlpha = fadeIn * 0.5;
+        // 6. Inner neon border (sharp, on top of fill)
+        ctx!.globalAlpha = fadeIn * 0.6;
         ctx!.strokeStyle = accentHex;
         ctx!.lineWidth = 1.5;
         ctx!.shadowColor = accentHex;
-        ctx!.shadowBlur = 12;
+        ctx!.shadowBlur = 8;
+        ctx!.beginPath();
+        ctx!.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, br);
         ctx!.stroke();
         ctx!.shadowBlur = 0;
 
-        // 4. Logo image on top of backdrop
+        // 7. Clip logo to the squircle shape (cuts corners)
+        ctx!.save();
+        ctx!.beginPath();
+        ctx!.roundRect(cx - bw / 2 + 1, cy - bh / 2 + 1, bw - 2, bh - 2, Math.max(0, br - 1));
+        ctx!.clip();
+
+        // 8. Logo image
         ctx!.globalAlpha = fadeIn * 0.95;
         ctx!.drawImage(logoImg, cx - imgW / 2, cy - imgH / 2, imgW, imgH);
+        ctx!.restore();
 
         ctx!.restore();
       } else {
