@@ -3,68 +3,29 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 /**
  * GET /api/brand-logo?domain=logitech.com
  *
- * Server-side proxy that fetches a brand's SVG logo via the Optimizely CMS
- * get_logo_svg tool pattern (Brandfetch). Returns clean SVG with backgrounds
- * stripped and fills set to white, ready for 3D canvas rendering.
- *
- * Falls back to Brandfetch CDN icon endpoint.
+ * Server-side proxy that fetches a brand's SVG logo via the Brandfetch API.
+ * Returns clean SVG (paths only, white fill) for 3D canvas rendering.
+ * Tries: symbol SVG → icon SVG → logo SVG → any SVG available.
  */
 
+const BRANDFETCH_API = 'https://api.brandfetch.io/v2/brands/';
 const BRANDFETCH_KEY = process.env.BRANDFETCH_KEY || '';
 
 function cleanDomain(raw: string): string {
   let d = raw.trim().replace(/^https?:\/\//, '').replace(/^www\./, '');
-  d = d.split('/')[0].split('?')[0];
-  return d;
+  return d.split('/')[0].split('?')[0];
 }
 
-async function fetchSvgFromBrandfetch(domain: string): Promise<string | null> {
-  // Try the Brandfetch API to get logo data
-  const url = `https://api.brandfetch.io/v2/brands/${domain}`;
-  try {
-    const res = await fetch(url, {
-      headers: BRANDFETCH_KEY ? { 'Authorization': `Bearer ${BRANDFETCH_KEY}` } : {},
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-
-    // Find an SVG logo (prefer icon type)
-    const logos = data?.logos || [];
-    for (const logo of logos) {
-      if (logo.type === 'icon' || logo.type === 'symbol') {
-        for (const fmt of (logo.formats || [])) {
-          if (fmt.format === 'svg' && fmt.src) {
-            const svgRes = await fetch(fmt.src);
-            if (svgRes.ok) return svgRes.text();
-          }
-        }
-      }
-    }
-    // Fallback: try any SVG format
-    for (const logo of logos) {
-      for (const fmt of (logo.formats || [])) {
-        if (fmt.format === 'svg' && fmt.src) {
-          const svgRes = await fetch(fmt.src);
-          if (svgRes.ok) return svgRes.text();
-        }
-      }
-    }
-  } catch {
-    // API not available or no key
-  }
-  return null;
-}
-
-function cleanSvg(svgText: string): string | null {
-  // Simple regex-based cleaning (no DOMParser on server)
+function extractCleanSvg(svgText: string): string | null {
   if (!svgText.includes('<svg')) return null;
 
-  // Extract viewBox
   const vbMatch = svgText.match(/viewBox="([^"]+)"/);
-  const viewBox = vbMatch ? vbMatch[1] : '0 0 100 100';
+  const wMatch = svgText.match(/\bwidth="([^"]+)"/);
+  const hMatch = svgText.match(/\bheight="([^"]+)"/);
+  const viewBox = vbMatch ? vbMatch[1] : `0 0 ${wMatch?.[1] || 100} ${hMatch?.[1] || 100}`;
 
-  // Extract all <path d="...">
-  const pathRegex = /<path[^>]*\bd="([^"]+)"[^>]*\/?>/g;
+  // Extract all <path d="..."> elements
+  const pathRegex = /<path[^>]*?\bd="([^"]+)"[^>]*?\/?>/g;
   const paths: string[] = [];
   let m;
   while ((m = pathRegex.exec(svgText)) !== null) {
@@ -89,25 +50,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const cleaned = cleanDomain(domain);
 
-  // Try Brandfetch API
-  const rawSvg = await fetchSvgFromBrandfetch(cleaned);
-  if (rawSvg) {
-    const clean = cleanSvg(rawSvg);
-    if (clean) {
-      res.setHeader('Content-Type', 'image/svg+xml');
-      res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
-      return res.status(200).send(clean);
-    }
+  if (!BRANDFETCH_KEY) {
+    return res.status(500).json({ error: 'BRANDFETCH_KEY not configured' });
   }
 
-  // Fallback: try fetching the favicon/logo directly from the domain
-  for (const path of ['/favicon.svg', '/logo.svg']) {
-    try {
-      const r = await fetch(`https://${cleaned}${path}`);
-      if (r.ok) {
-        const text = await r.text();
-        if (text.includes('<svg')) {
-          const clean = cleanSvg(text);
+  try {
+    const apiRes = await fetch(`${BRANDFETCH_API}${cleaned}`, {
+      headers: { 'Authorization': `Bearer ${BRANDFETCH_KEY}` },
+    });
+
+    if (!apiRes.ok) {
+      return res.status(404).json({ error: 'Brand not found' });
+    }
+
+    const data = await apiRes.json() as any;
+    const logos = data?.logos || [];
+
+    // Priority order: symbol, icon, logo — prefer SVG format
+    const typeOrder = ['symbol', 'icon', 'logo'];
+    for (const targetType of typeOrder) {
+      for (const logo of logos) {
+        if (logo.type !== targetType) continue;
+        for (const fmt of (logo.formats || [])) {
+          if (fmt.format === 'svg' && fmt.src) {
+            const svgRes = await fetch(fmt.src);
+            if (!svgRes.ok) continue;
+            const svgText = await svgRes.text();
+            const clean = extractCleanSvg(svgText);
+            if (clean) {
+              res.setHeader('Content-Type', 'image/svg+xml');
+              res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+              return res.status(200).send(clean);
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback: any SVG from any logo type
+    for (const logo of logos) {
+      for (const fmt of (logo.formats || [])) {
+        if (fmt.format === 'svg' && fmt.src) {
+          const svgRes = await fetch(fmt.src);
+          if (!svgRes.ok) continue;
+          const svgText = await svgRes.text();
+          const clean = extractCleanSvg(svgText);
           if (clean) {
             res.setHeader('Content-Type', 'image/svg+xml');
             res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
@@ -115,8 +102,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
       }
-    } catch { /* skip */ }
-  }
+    }
 
-  return res.status(404).json({ error: 'No SVG logo found' });
+    return res.status(404).json({ error: 'No SVG logo found for this brand' });
+  } catch (err) {
+    console.error('[api/brand-logo]', err);
+    return res.status(500).json({ error: 'Failed to fetch brand logo' });
+  }
 }
