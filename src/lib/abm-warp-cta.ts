@@ -21,7 +21,8 @@ const hoverHandlers: Array<{
   leave: () => void;
 }> = [];
 
-export function initWarpCTA(): void {
+export function initWarpCTA(brandAccentColor?: string | null): void {
+  const accentHex = brandAccentColor || null;
   const btn = document.getElementById('cta-connect-btn') as HTMLElement | null;
   const stickyBtn = document.getElementById(
     'sticky-connect-btn'
@@ -106,6 +107,18 @@ export function initWarpCTA(): void {
     'color(display-p3 0.3 0.05 1)',
     'color(display-p3 0 0.7 1)',
   ];
+
+  // Inject brand accent color into ~30% of lasers
+  if (accentHex && accentHex.length === 7) {
+    const r = parseInt(accentHex.slice(1, 3), 16) / 255;
+    const g = parseInt(accentHex.slice(3, 5), 16) / 255;
+    const b = parseInt(accentHex.slice(5, 7), 16) / 255;
+    const brandP3 = `color(display-p3 ${r.toFixed(2)} ${g.toFixed(2)} ${b.toFixed(2)})`;
+    // Replace every 3rd color with the brand color
+    for (let i = 0; i < COLORS.length; i += 3) {
+      COLORS[i] = brandP3;
+    }
+  }
 
   // ---- Warp tunnel particles ----
   const WARP_COUNT = 700;

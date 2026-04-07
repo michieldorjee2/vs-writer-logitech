@@ -19,11 +19,21 @@ let resizeHandler: (() => void) | null = null;
 let scrollHandler: (() => void) | null = null;
 let starEl: HTMLCanvasElement | null = null;
 
-export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string | null): void {
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string | null, brandAccentColor?: string | null): void {
   const canvas = document.getElementById('hero-canvas') as HTMLCanvasElement | null;
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+
+  // Brand accent color for logo glow (falls back to cyan)
+  const accentHex = brandAccentColor || '#00ccff';
 
   // -- Fixed star-field canvas -- lives on <body>, stays in viewport while scrolling --
   starEl = document.createElement('canvas');
@@ -66,8 +76,8 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     {
       // -- CUSTOMER LOGO -- replaced dynamically from CMS --
       label: 'Customer',
-      color: '#00ccff',
-      glowColor: 'rgba(0,204,255,0.5)',
+      color: brandAccentColor || '#00ccff',
+      glowColor: brandAccentColor ? `${brandAccentColor}80` : 'rgba(0,204,255,0.5)',
       imageEl: null,
       svgMarkup: null, // will be loaded below if customerLogoUrl is provided
     },
@@ -859,8 +869,8 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         // 1. Radial glow behind the logo
         const glowR = imgSize * 0.9;
         const grd = ctx!.createRadialGradient(cx, cy, 0, cx, cy, glowR);
-        grd.addColorStop(0, `rgba(0, 204, 255, ${0.25 * fadeIn})`);
-        grd.addColorStop(0.5, `rgba(0, 120, 255, ${0.1 * fadeIn})`);
+        grd.addColorStop(0, hexToRgba(accentHex, 0.25 * fadeIn));
+        grd.addColorStop(0.5, hexToRgba(accentHex, 0.1 * fadeIn));
         grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx!.fillStyle = grd;
         ctx!.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);

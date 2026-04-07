@@ -244,7 +244,7 @@ html:has(.abm-page) {
 
 .intel__headline em {
   font-style: normal;
-  background: var(--gradient-accent);
+  background: linear-gradient(135deg, var(--brand-accent, var(--optimizely-blue-80)), var(--brand-accent, var(--light-blue)));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -740,8 +740,8 @@ html:has(.abm-page) {
   align-items: center;
   gap: 6px;
   padding: 10px 14px;
-  background: var(--vulcan-90);
-  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--brand-accent, var(--vulcan-90)) 15%, var(--vulcan-90));
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-accent, var(--border-subtle)) 20%, var(--border-subtle));
 }
 
 .challenge__browser-dot {
@@ -795,8 +795,8 @@ html:has(.abm-page) {
 .challenge__pain-number {
   font-size: var(--text-3xl);
   font-weight: var(--font-weight-bold);
-  color: var(--text-tertiary);
-  opacity: 0.4;
+  color: var(--brand-accent, var(--text-tertiary));
+  opacity: 0.5;
   flex-shrink: 0;
   line-height: 1;
 }
@@ -1001,11 +1001,11 @@ html:has(.abm-page) {
   justify-content: center;
   height: 72px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, rgba(25, 75, 255, 0.12), rgba(0, 204, 255, 0.08));
-  border: 2px dashed rgba(25, 75, 255, 0.5);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-accent, #194bff) 12%, transparent), color-mix(in srgb, var(--brand-accent, #00ccff) 8%, transparent));
+  border: 2px dashed color-mix(in srgb, var(--brand-accent, #194bff) 50%, transparent);
   font-size: var(--text-xl);
   font-weight: var(--font-weight-bold);
-  color: var(--light-blue);
+  color: var(--brand-accent, var(--light-blue));
   white-space: nowrap;
   overflow: hidden;
   flex-shrink: 0;

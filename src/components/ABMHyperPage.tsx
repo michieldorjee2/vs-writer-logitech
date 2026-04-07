@@ -58,11 +58,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      initHero3D(page.customerLogo, page.brandDomain);
+      initHero3D(page.customerLogo, page.brandDomain, page.brandAccentColor);
       initABMAnimations();
       initABMInteractions();
       initStickyCTA();
-      initWarpCTA();
+      initWarpCTA(page.brandAccentColor);
     }, 100);
 
     return () => {
@@ -86,7 +86,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
   const rightLogos = fallbackLogos.slice(3);
 
   return (
-    <main className="abm-page" id="main-content">
+    <main
+      className="abm-page"
+      id="main-content"
+      style={page.brandAccentColor ? { '--brand-accent': page.brandAccentColor } as React.CSSProperties : undefined}
+    >
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
       {/* ======== HERO ======== */}
       <section id="hero" className="section section--hero">

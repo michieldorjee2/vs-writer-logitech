@@ -58,7 +58,11 @@ const ABMHyperPageServer = ({ page }: Props) => {
   const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
 
   return (
-    <main className="abm-page" id="main-content">
+    <main
+      className="abm-page"
+      id="main-content"
+      style={page.brandAccentColor ? { '--brand-accent': page.brandAccentColor } as React.CSSProperties : undefined}
+    >
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
       {/* ======== HERO (no canvas) ======== */}
       <section id="hero" className="section section--hero">
