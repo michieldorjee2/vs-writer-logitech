@@ -855,7 +855,10 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         );
       } else if (cfg.imageEl) {
         // Faux-3D extruded image: stacked layers with depth offset + neon glow
-        const imgSize = 110 * item.p.scale;
+        const maxDim = 110 * item.p.scale;
+        const aspect = cfg.imageEl.naturalWidth / (cfg.imageEl.naturalHeight || 1);
+        const imgW = aspect >= 1 ? maxDim : maxDim * aspect;
+        const imgH = aspect >= 1 ? maxDim / aspect : maxDim;
         const cx = item.p.x;
         const cy = item.p.y;
         const depthLayers = 16;
@@ -867,7 +870,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         ctx!.save();
 
         // 1. Radial glow behind the logo
-        const glowR = imgSize * 0.9;
+        const glowR = Math.max(imgW, imgH) * 0.9;
         const grd = ctx!.createRadialGradient(cx, cy, 0, cx, cy, glowR);
         grd.addColorStop(0, hexToRgba(accentHex, 0.25 * fadeIn));
         grd.addColorStop(0.5, hexToRgba(accentHex, 0.1 * fadeIn));
@@ -881,36 +884,18 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
           const oy = cy + dy * d;
           const layerAlpha = fadeIn * (0.04 + 0.02 * (depthLayers - d) / depthLayers);
           ctx!.globalAlpha = layerAlpha;
-          ctx!.drawImage(
-            cfg.imageEl,
-            ox - imgSize / 2,
-            oy - imgSize / 2,
-            imgSize,
-            imgSize
-          );
+          ctx!.drawImage(cfg.imageEl, ox - imgW / 2, oy - imgH / 2, imgW, imgH);
         }
 
         // 3. Colored edge glow (slightly larger, tinted)
         ctx!.globalAlpha = fadeIn * 0.3;
         ctx!.filter = 'blur(4px) brightness(1.5)';
-        ctx!.drawImage(
-          cfg.imageEl,
-          cx - imgSize * 0.52,
-          cy - imgSize * 0.52,
-          imgSize * 1.04,
-          imgSize * 1.04
-        );
+        ctx!.drawImage(cfg.imageEl, cx - imgW * 0.52, cy - imgH * 0.52, imgW * 1.04, imgH * 1.04);
         ctx!.filter = 'none';
 
         // 4. Front face (full brightness)
         ctx!.globalAlpha = fadeIn * 0.95;
-        ctx!.drawImage(
-          cfg.imageEl,
-          cx - imgSize / 2,
-          cy - imgSize / 2,
-          imgSize,
-          imgSize
-        );
+        ctx!.drawImage(cfg.imageEl, cx - imgW / 2, cy - imgH / 2, imgW, imgH);
 
         ctx!.restore();
       } else {
