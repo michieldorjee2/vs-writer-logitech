@@ -124,6 +124,10 @@ function initPainPointEffects(): void {
   const pains = document.querySelectorAll('.challenge__pain');
   if (pains.length === 0) return;
 
+  // Read brand accent from CSS variable (set on .abm-page by React)
+  const accentColor = getComputedStyle(document.querySelector('.abm-page') || document.documentElement)
+    .getPropertyValue('--brand-accent').trim() || '#6366f1';
+
   pains.forEach((pain) => {
     const number = pain.querySelector('.challenge__pain-number');
     if (!number) return;
@@ -133,13 +137,13 @@ function initPainPointEffects(): void {
       start: 'top 70%',
       end: 'bottom 30%',
       onEnter: () => {
-        gsap.to(number, { opacity: 1, color: '#6366f1', duration: 0.5 });
+        gsap.to(number, { opacity: 1, color: accentColor, duration: 0.5 });
       },
       onLeave: () => {
         gsap.to(number, { opacity: 0.4, color: '#5a5a70', duration: 0.5 });
       },
       onEnterBack: () => {
-        gsap.to(number, { opacity: 1, color: '#6366f1', duration: 0.5 });
+        gsap.to(number, { opacity: 1, color: accentColor, duration: 0.5 });
       },
       onLeaveBack: () => {
         gsap.to(number, { opacity: 0.4, color: '#5a5a70', duration: 0.5 });
