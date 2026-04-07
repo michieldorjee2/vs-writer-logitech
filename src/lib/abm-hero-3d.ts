@@ -939,10 +939,12 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
         ctx!.stroke();
         ctx!.shadowBlur = 0;
 
-        // 7. Clip logo to the squircle shape (cuts corners)
+        // 7. Clip logo with inner radius (outer radius minus padding)
+        // This rounds the logo corners to match the squircle container
+        const innerR = Math.max(0, br - pad);
         ctx!.save();
         ctx!.beginPath();
-        ctx!.roundRect(cx - bw / 2 + 1, cy - bh / 2 + 1, bw - 2, bh - 2, Math.max(0, br - 1));
+        ctx!.roundRect(cx - imgW / 2, cy - imgH / 2, imgW, imgH, innerR);
         ctx!.clip();
 
         // 8. Logo image

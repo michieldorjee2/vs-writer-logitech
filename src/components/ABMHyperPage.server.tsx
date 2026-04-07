@@ -14,13 +14,26 @@ interface Props {
 }
 
 function formatStatValue(val: string): string {
-  if (/[^0-9.]/.test(val.replace(/^-/, ''))) return val;
-  const n = parseFloat(val);
+  if (/[KMBTkmbt]\+?$/.test(val.replace(/[,$\s]/g, ''))) return val;
+  if (val.includes('$')) return val;
+  const match = val.match(/^([^0-9]*?)([\d,]+(?:\.\d+)?)\s*([^0-9,.]*)$/);
+  if (!match) return val;
+  const prefix = match[1];
+  const numStr = match[2].replace(/,/g, '');
+  const suffix = match[3];
+  const n = parseFloat(numStr);
   if (isNaN(n)) return val;
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1) + 'M';
-  if (n >= 10_000) return (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1) + 'K';
-  if (n >= 1_000) return n.toLocaleString();
-  return val;
+  let formatted: string;
+  if (n >= 1_000_000_000) {
+    formatted = (n / 1_000_000_000).toFixed(n % 1_000_000_000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'B';
+  } else if (n >= 1_000_000) {
+    formatted = (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  } else if (n >= 1_000) {
+    formatted = (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  } else {
+    formatted = String(n);
+  }
+  return prefix + formatted + suffix;
 }
 
 const fallbackLogos = [

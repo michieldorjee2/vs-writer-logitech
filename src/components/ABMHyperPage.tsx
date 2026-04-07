@@ -13,16 +13,41 @@ interface Props {
   editMode?: boolean;
 }
 
-/** Format stat values: 104000 → "104K", 1500000 → "1.5M", "30+" → "30+" */
+/**
+ * Format stat values for display:
+ *   104000 → "104K"    325,000+ → "325K+"    1500000 → "1.5M"
+ *   1,300 → "1.3K"     2,273 → "2.3K"        5B+ → "5B+" (already formatted)
+ *   $380M → "$380M"    30+ → "30+"           46 → "46"
+ */
 function formatStatValue(val: string): string {
-  // If it already has non-numeric chars (K, M, $, +, etc.), return as-is
-  if (/[^0-9.]/.test(val.replace(/^-/, ''))) return val;
-  const n = parseFloat(val);
+  // Already has K/M/B/T suffix — leave it alone
+  if (/[KMBTkmbt]\+?$/.test(val.replace(/[,$\s]/g, ''))) return val;
+  // Has $ prefix — leave it alone
+  if (val.includes('$')) return val;
+
+  // Extract prefix ($), numeric core, and suffix (+, etc.)
+  const match = val.match(/^([^0-9]*?)([\d,]+(?:\.\d+)?)\s*([^0-9,.]*)$/);
+  if (!match) return val;
+
+  const prefix = match[1];  // e.g. "$" or ""
+  const numStr = match[2].replace(/,/g, '');  // strip commas
+  const suffix = match[3];  // e.g. "+" or ""
+
+  const n = parseFloat(numStr);
   if (isNaN(n)) return val;
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1) + 'M';
-  if (n >= 10_000) return (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1) + 'K';
-  if (n >= 1_000) return n.toLocaleString();
-  return val;
+
+  let formatted: string;
+  if (n >= 1_000_000_000) {
+    formatted = (n / 1_000_000_000).toFixed(n % 1_000_000_000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'B';
+  } else if (n >= 1_000_000) {
+    formatted = (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  } else if (n >= 1_000) {
+    formatted = (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  } else {
+    formatted = String(n);
+  }
+
+  return prefix + formatted + suffix;
 }
 
 const fallbackLogos = [
