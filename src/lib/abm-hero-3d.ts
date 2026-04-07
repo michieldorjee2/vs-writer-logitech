@@ -200,7 +200,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     };
   });
   let starBitmap: HTMLCanvasElement | null = null;
-  const starColors = ['#aaaacc', '#6687ff', '#00ccff'];
+  const starColors = ['#aaaacc', '#6687ff', accentHex];
 
   // Twinkle subset
   const TWINKLE_COUNT = 50;

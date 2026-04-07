@@ -130,9 +130,9 @@ html:has(.abm-page) {
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--accent-secondary);
-  background: rgba(0, 55, 255, 0.08);
-  border: 1px solid var(--border-accent);
+  color: var(--brand-accent, var(--accent-secondary));
+  background: color-mix(in srgb, var(--brand-accent, #0037ff) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-accent, var(--optimizely-blue)) 30%, transparent);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-lg);
   margin-bottom: var(--space-8);
@@ -147,7 +147,8 @@ html:has(.abm-page) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: var(--brand-accent, var(--accent-primary));
+  box-shadow: 0 0 6px var(--brand-accent, var(--accent-primary));
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
@@ -740,8 +741,11 @@ html:has(.abm-page) {
   align-items: center;
   gap: 6px;
   padding: 10px 14px;
-  background: color-mix(in srgb, var(--brand-accent, var(--vulcan-90)) 15%, var(--vulcan-90));
-  border-bottom: 1px solid color-mix(in srgb, var(--brand-accent, var(--border-subtle)) 20%, var(--border-subtle));
+  background:
+    linear-gradient(var(--brand-accent, transparent), var(--brand-accent, transparent)),
+    var(--vulcan-90);
+  background-blend-mode: soft-light;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .challenge__browser-dot {
@@ -756,7 +760,7 @@ html:has(.abm-page) {
   font-family: var(--font-mono);
   color: var(--text-tertiary);
   margin-left: var(--space-3);
-  background: var(--vulcan-85);
+  background: rgba(0, 0, 0, 0.25);
   padding: 3px 10px;
   border-radius: var(--radius-sm);
   flex: 1;
@@ -796,7 +800,7 @@ html:has(.abm-page) {
   font-size: var(--text-3xl);
   font-weight: var(--font-weight-bold);
   color: var(--brand-accent, var(--text-tertiary));
-  opacity: 0.5;
+  opacity: 0.7;
   flex-shrink: 0;
   line-height: 1;
 }
