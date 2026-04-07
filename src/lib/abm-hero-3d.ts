@@ -73,12 +73,74 @@ export function initHero3D(customerLogoUrl?: string | null): void {
     },
   ];
 
-  // Load customer logo as an Image for canvas rendering
+  // Load customer logo — try SVG extrusion first, fall back to image sprite
   if (customerLogoUrl) {
+    // 1. Try fetching as SVG text for 3D extrusion (same rendering as Optimizely logo)
+    fetch(customerLogoUrl)
+      .then(r => {
+        const ct = r.headers.get('content-type') || '';
+        if (r.ok && (ct.includes('svg') || customerLogoUrl.endsWith('.svg'))) return r.text();
+        return null;
+      })
+      .then(svgText => {
+        if (!svgText || !svgText.includes('<svg')) {
+          // Not SVG — fall back to image sprite
+          loadLogoAsImage(customerLogoUrl);
+          return;
+        }
+
+        // Parse, strip backgrounds, extract only path shapes
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, 'image/svg+xml');
+        if (doc.querySelector('parsererror')) {
+          loadLogoAsImage(customerLogoUrl);
+          return;
+        }
+
+        const svg = doc.querySelector('svg');
+        if (!svg) { loadLogoAsImage(customerLogoUrl); return; }
+
+        // Remove background rectangles and circles (full-size fills)
+        svg.querySelectorAll('rect, circle, ellipse').forEach(el => {
+          // Remove if it looks like a background (large, filled, first child)
+          const fill = el.getAttribute('fill') || '';
+          if (fill && fill !== 'none' && fill !== 'white' && fill !== '#fff' && fill !== '#ffffff') {
+            el.remove();
+          }
+        });
+
+        // Remove any clipPath/mask definitions that reference removed elements
+        // Keep only path elements with actual shape data
+        const paths = svg.querySelectorAll('path');
+        if (paths.length === 0) {
+          loadLogoAsImage(customerLogoUrl);
+          return;
+        }
+
+        // Set all fills to white for the dark canvas
+        paths.forEach(p => { p.setAttribute('fill', 'white'); p.removeAttribute('stroke'); });
+
+        // Reconstruct clean SVG
+        const vb = svg.getAttribute('viewBox') || `0 0 ${svg.getAttribute('width') || 100} ${svg.getAttribute('height') || 100}`;
+        let cleanSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" fill="white">`;
+        paths.forEach(p => { cleanSvg += p.outerHTML; });
+        cleanSvg += '</svg>';
+
+        ORBIT_ITEMS[1].svgMarkup = cleanSvg;
+        // Rebuild geometry for the updated item
+        logoGeometry[1] = buildLogoGeometry(ORBIT_ITEMS[1]);
+      })
+      .catch(() => {
+        // CORS or network error — fall back to image sprite
+        loadLogoAsImage(customerLogoUrl);
+      });
+  }
+
+  function loadLogoAsImage(url: string) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => { ORBIT_ITEMS[1].imageEl = img; };
-    img.src = customerLogoUrl;
+    img.src = url;
   }
 
   // -- State --
