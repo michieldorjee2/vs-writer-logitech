@@ -17,24 +17,24 @@ const ABM_SECTIONS = [
   'hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta',
 ];
 
-/** Get or create a anonymous visitor ID persisted in localStorage */
-function getVuid(): string {
-  const key = 'odp_vuid';
-  let vuid = localStorage.getItem(key);
-  if (!vuid) {
-    vuid = 'vuid-' + crypto.randomUUID();
-    localStorage.setItem(key, vuid);
+/** Get or create an anonymous visitor ID persisted in localStorage */
+function getVisitorId(): string {
+  const key = 'odp_vid';
+  let vid = localStorage.getItem(key);
+  if (!vid) {
+    vid = crypto.randomUUID().replace(/-/g, '');
+    localStorage.setItem(key, vid);
   }
-  return vuid;
+  return vid;
 }
 
 /** Fire-and-forget: send an ODP event via the server-side proxy */
 function odpEvent(type: string, action: string, data: Record<string, string | number>) {
-  const vuid = getVuid();
+  const vid = getVisitorId();
   const event = {
     type,
     action,
-    identifiers: { vuid },
+    identifiers: { anonymous_id: vid },
     data: { ...data, url: window.location.href },
   };
 
