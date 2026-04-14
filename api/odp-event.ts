@@ -21,15 +21,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       body = JSON.parse(body);
     } catch {
+      console.error('JSON parse failed, raw body:', typeof req.body, String(req.body).slice(0, 500));
       return res.status(400).json({ error: 'invalid JSON' });
     }
   }
 
   const events = body?.events;
   if (!Array.isArray(events) || events.length === 0) {
-    console.error('Bad payload:', JSON.stringify(body).slice(0, 500));
+    console.error('Bad payload, body type:', typeof body, 'body:', JSON.stringify(body).slice(0, 500));
     return res.status(400).json({ error: 'events array required' });
   }
+
+  const odpPayload = JSON.stringify(events);
+  console.log('ODP request payload:', odpPayload.slice(0, 1000));
 
   try {
     const odpRes = await fetch(ODP_API, {
@@ -38,13 +42,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Content-Type': 'application/json',
         'x-api-key': ODP_TRACKER_ID,
       },
-      body: JSON.stringify(events),
+      body: odpPayload,
     });
 
     const text = await odpRes.text();
+    console.log('ODP response:', odpRes.status, text.slice(0, 1000));
+
     if (!odpRes.ok) {
-      console.error('ODP API error:', odpRes.status, text);
-      return res.status(502).json({ error: 'ODP upstream error', status: odpRes.status });
+      return res.status(502).json({ error: 'ODP upstream error', status: odpRes.status, detail: text.slice(0, 200) });
     }
 
     return res.status(202).json({ ok: true });
