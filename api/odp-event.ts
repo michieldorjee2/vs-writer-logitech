@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const ODP_API = 'https://unification.optimizely.com/v3/events';
+const ODP_API = 'https://api.zaius.com/v3/events';
 const ODP_TRACKER_ID = '8yoUTdBkNwpVOLCXeZpKdw';
 
 /**
