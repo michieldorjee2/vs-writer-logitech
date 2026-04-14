@@ -6,6 +6,8 @@ const ODP_TRACKER_ID = '8yoUTdBkNwpVOLCXeZpKdw';
 /**
  * Proxies client-side tracking events to the ODP Events API.
  * POST /api/odp-event  { events: [{ type, action, identifiers, data }] }
+ *
+ * Handles both fetch (application/json) and sendBeacon (text/plain) bodies.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -13,8 +15,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).end();
   }
 
-  const { events } = req.body ?? {};
+  // sendBeacon sends text/plain — Vercel won't auto-parse it
+  let body = req.body;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      return res.status(400).json({ error: 'invalid JSON' });
+    }
+  }
+
+  const events = body?.events;
   if (!Array.isArray(events) || events.length === 0) {
+    console.error('Bad payload:', JSON.stringify(body).slice(0, 500));
     return res.status(400).json({ error: 'events array required' });
   }
 
@@ -28,8 +41,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify(events),
     });
 
+    const text = await odpRes.text();
     if (!odpRes.ok) {
-      const text = await odpRes.text();
       console.error('ODP API error:', odpRes.status, text);
       return res.status(502).json({ error: 'ODP upstream error', status: odpRes.status });
     }
