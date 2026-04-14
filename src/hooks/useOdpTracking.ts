@@ -17,24 +17,25 @@ const ABM_SECTIONS = [
   'hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta',
 ];
 
-/** Get or create an anonymous visitor ID persisted in localStorage */
-function getVisitorId(): string {
-  const key = 'odp_vid';
-  let vid = localStorage.getItem(key);
-  if (!vid) {
-    vid = crypto.randomUUID().replace(/-/g, '');
-    localStorage.setItem(key, vid);
+/** Get or create a vuid (32-char hex) persisted in localStorage */
+function getVuid(): string {
+  const key = 'odp_vuid';
+  let vuid = localStorage.getItem(key);
+  // Migrate or create: must be exactly 32 hex chars, no prefix/hyphens
+  if (!vuid || !/^[0-9a-f]{32}$/.test(vuid)) {
+    vuid = crypto.randomUUID().replace(/-/g, '');
+    localStorage.setItem(key, vuid);
   }
-  return vid;
+  return vuid;
 }
 
 /** Fire-and-forget: send an ODP event via the server-side proxy */
 function odpEvent(type: string, action: string, data: Record<string, string | number>) {
-  const vid = getVisitorId();
+  const vuid = getVuid();
   const event = {
     type,
     action,
-    identifiers: { anonymous_id: vid },
+    identifiers: { vuid },
     data: { ...data, url: window.location.href },
   };
 
