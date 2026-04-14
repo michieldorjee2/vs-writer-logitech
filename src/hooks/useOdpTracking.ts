@@ -3,13 +3,13 @@ import { useEffect, useRef } from 'react';
 /**
  * ODP tracking hook for VS Writer pages.
  *
- * Uses the ODP client SDK (loaded in index.html) via window.odp.event().
+ * Uses the ODP client SDK (loaded in index.html as zaius-min.js).
  * Tracks: page view, section visibility, CTA clicks, engagement on exit.
  */
 
 declare global {
   interface Window {
-    odp: {
+    zaius: {
       event: (name: string, props?: Record<string, string | number>) => void;
       [key: string]: unknown;
     };
@@ -26,9 +26,14 @@ const ABM_SECTIONS = [
   'hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta',
 ];
 
+/** Send an ODP event via the client SDK (queued if SDK still loading) */
 function odpEvent(name: string, props?: Record<string, string | number>) {
-  if (typeof window !== 'undefined' && window.odp) {
-    window.odp.event(name, props);
+  try {
+    if (typeof window !== 'undefined' && window.zaius) {
+      window.zaius.event(name, props);
+    }
+  } catch {
+    // Silently ignore — SDK may not be loaded yet
   }
 }
 
