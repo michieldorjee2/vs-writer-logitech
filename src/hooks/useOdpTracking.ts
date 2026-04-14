@@ -3,18 +3,9 @@ import { useEffect, useRef } from 'react';
 /**
  * ODP tracking hook for VS Writer pages.
  *
- * Calls window.zaius.event() directly (SDK loaded in index.html).
+ * Sends events to /api/odp-event which proxies them to the ODP Events API.
  * Tracks: page view, section visibility, CTA clicks, engagement on exit.
  */
-
-declare global {
-  interface Window {
-    zaius: {
-      event: (name: string, props?: Record<string, string | number>) => void;
-      [key: string]: unknown;
-    };
-  }
-}
 
 /** Sections tracked on DynamicComparisonPage */
 const COMPARISON_SECTIONS = [
@@ -26,9 +17,37 @@ const ABM_SECTIONS = [
   'hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta',
 ];
 
-function odpEvent(name: string, props?: Record<string, string | number>) {
-  if (typeof window !== 'undefined' && window.zaius) {
-    window.zaius.event(name, props);
+/** Get or create a anonymous visitor ID persisted in localStorage */
+function getVuid(): string {
+  const key = 'odp_vuid';
+  let vuid = localStorage.getItem(key);
+  if (!vuid) {
+    vuid = 'vuid-' + crypto.randomUUID();
+    localStorage.setItem(key, vuid);
+  }
+  return vuid;
+}
+
+/** Fire-and-forget: send an ODP event via the server-side proxy */
+function odpEvent(type: string, action: string, data: Record<string, string | number>) {
+  const vuid = getVuid();
+  const event = {
+    type,
+    action,
+    identifiers: { vuid },
+    data: { ...data, url: window.location.href },
+  };
+
+  // Use sendBeacon for exit events, fetch for everything else
+  if (action === 'engagement') {
+    navigator.sendBeacon('/api/odp-event', JSON.stringify({ events: [event] }));
+  } else {
+    fetch('/api/odp-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events: [event] }),
+      keepalive: true,
+    }).catch(() => {});
   }
 }
 
@@ -45,10 +64,12 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
     maxScrollPct.current = 0;
     engagementSent.current = false;
 
+    const pageSlug = slug || window.location.pathname;
+
     // ── Page view ──────────────────────────────────────────────────
-    odpEvent('vswriter_pageview', {
+    odpEvent('vswriter', 'pageview', {
       page_type: pageType,
-      slug: slug || window.location.pathname,
+      slug: pageSlug,
     });
 
     // ── Section visibility ─────────────────────────────────────────
@@ -61,7 +82,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
           const id = entry.target.id;
           if (!id || viewedSections.current.has(id)) return;
           viewedSections.current.add(id);
-          odpEvent('vswriter_navigation', { section: id });
+          odpEvent('vswriter', 'navigation', { section: id });
           observer.unobserve(entry.target);
         });
       },
@@ -85,14 +106,14 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
       if (btn) {
         const label = btn.textContent?.trim() || '';
         const href = (btn as HTMLAnchorElement).href || '';
-        odpEvent('vswriter_click', { element: 'cta', label, href });
+        odpEvent('vswriter', 'click', { element: 'cta', label, href });
         return;
       }
 
       // Comparison table tab
       const tab = target.closest('[data-product]') as HTMLElement | null;
       if (tab) {
-        odpEvent('vswriter_click', {
+        odpEvent('vswriter', 'click', {
           element: 'comparison_tab',
           tab: tab.dataset.product || tab.textContent?.trim() || '',
         });
@@ -103,7 +124,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
       const faqTrigger = target.closest('[class*="accordion"]') as HTMLElement | null;
       if (faqTrigger) {
         const title = faqTrigger.textContent?.trim().slice(0, 80) || '';
-        odpEvent('vswriter_click', { element: 'faq', title });
+        odpEvent('vswriter', 'click', { element: 'faq', title });
       }
     }
 
@@ -127,9 +148,9 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
       if (engagementSent.current) return;
       engagementSent.current = true;
       updateScroll();
-      odpEvent('vswriter_engagement', {
+      odpEvent('vswriter', 'engagement', {
         page_type: pageType,
-        slug: slug || window.location.pathname,
+        slug: pageSlug,
         time_on_page_sec: Math.round((Date.now() - startTime.current) / 1000),
         max_scroll_pct: maxScrollPct.current,
         sections_viewed: Array.from(viewedSections.current).join(','),
