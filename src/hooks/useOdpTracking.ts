@@ -27,10 +27,10 @@ const ABM_SECTIONS = [
 ];
 
 /** Send an ODP event via the client SDK (queued if SDK still loading) */
-function odpEvent(name: string, props?: Record<string, string | number>) {
+function odpEvent(eventType: string, action: string, data?: Record<string, string | number>) {
   try {
     if (typeof window !== 'undefined' && window.zaius) {
-      window.zaius.event(name, props);
+      window.zaius.event(eventType, { action, ...data });
     }
   } catch {
     // Silently ignore — SDK may not be loaded yet
@@ -53,7 +53,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
     const pageSlug = slug || window.location.pathname;
 
     // ── Page view ──────────────────────────────────────────────────
-    odpEvent('pageview', {
+    odpEvent('pageview', 'pageview', {
       page_type: pageType,
       slug: pageSlug,
     });
@@ -68,7 +68,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
           const id = entry.target.id;
           if (!id || viewedSections.current.has(id)) return;
           viewedSections.current.add(id);
-          odpEvent('navigation', { section: id });
+          odpEvent('navigation', 'section_view', { section: id });
           observer.unobserve(entry.target);
         });
       },
@@ -92,14 +92,14 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
       if (btn) {
         const label = btn.textContent?.trim() || '';
         const href = (btn as HTMLAnchorElement).href || '';
-        odpEvent('click', { element: 'cta', label, href });
+        odpEvent('click', 'cta_click', { element: 'cta', label, href });
         return;
       }
 
       // Comparison table tab
       const tab = target.closest('[data-product]') as HTMLElement | null;
       if (tab) {
-        odpEvent('click', {
+        odpEvent('click', 'tab_click', {
           element: 'comparison_tab',
           tab: tab.dataset.product || tab.textContent?.trim() || '',
         });
@@ -110,7 +110,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
       const faqTrigger = target.closest('[class*="accordion"]') as HTMLElement | null;
       if (faqTrigger) {
         const title = faqTrigger.textContent?.trim().slice(0, 80) || '';
-        odpEvent('click', { element: 'faq', title });
+        odpEvent('click', 'faq_click', { element: 'faq', title });
       }
     }
 
@@ -134,7 +134,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
       if (engagementSent.current) return;
       engagementSent.current = true;
       updateScroll();
-      odpEvent('engagement', {
+      odpEvent('engagement', 'page_exit', {
         page_type: pageType,
         slug: pageSlug,
         time_on_page_sec: Math.round((Date.now() - startTime.current) / 1000),
