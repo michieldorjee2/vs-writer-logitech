@@ -7,6 +7,7 @@ import { initWarpCTA, cleanupWarpCTA } from '../lib/abm-warp-cta';
 import { initHero3D, cleanupHero3D } from '../lib/abm-hero-3d';
 import GravatarAvatar from './GravatarAvatar';
 import { brandLogoUrl } from '../lib/brand-logo';
+import { useOdpTracking } from '../hooks/useOdpTracking';
 
 interface Props {
   page: CompetitorComparisonPage;
@@ -87,6 +88,8 @@ function ratingClass(value: string | null): string {
 }
 
 const ABMHyperPage = ({ page, editMode }: Props) => {
+  useOdpTracking('abm');
+
   // Helper: returns data-epi-edit attribute only in edit mode
   const epi = (propName: string) => editMode ? { 'data-epi-edit': propName } : {};
 

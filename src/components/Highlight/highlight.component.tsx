@@ -21,10 +21,11 @@ const Glow = ({ elX, elY }: GlowProps) => {
 };
 
 interface HighlightSectionProps {
+    id?: string;
     children: ReactNode;
 }
 
-export const HighlightSection = ({ children }: HighlightSectionProps) => {
+export const HighlightSection = ({ id, children }: HighlightSectionProps) => {
     const ref = useRef<HTMLElement>(null);
     const { elX, elY, elH } = useMouseHovered(ref, {
         bound: true,
@@ -33,6 +34,7 @@ export const HighlightSection = ({ children }: HighlightSectionProps) => {
 
     return (
         <section
+            id={id}
             ref={ref}
             className="group relative select-none overflow-hidden bg-gradient-to-b from-vulcan via-ebony to-vulcan py-20 before:absolute before:inset-0 before:bg-[radial-gradient(300px_100.04%_at_50%_0%,rgba(0,55,255,0.3)_0%,rgba(80,17,153,0)_100%)] hover:after:opacity-100"
         >

@@ -1,12 +1,13 @@
 import { type ReactNode } from 'react';
 
 interface HeroGradientProps {
+    id?: string;
     children: ReactNode;
 }
 
-const HeroGradient: React.FC<HeroGradientProps> = ({ children }) => {
+const HeroGradient: React.FC<HeroGradientProps> = ({ id, children }) => {
     return (
-        <div className="relative overflow-hidden">
+        <div id={id} className="relative overflow-hidden">
             {/* Content layer */}
             <div className="outer-padding relative z-[3] flex min-h-[600px] items-center py-32 lg:min-h-[700px]">
                 <div className="container">

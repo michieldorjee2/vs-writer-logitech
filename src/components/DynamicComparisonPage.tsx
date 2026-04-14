@@ -5,6 +5,7 @@ import { Button } from './Button/button-block.component';
 import LogoGrid from './LogoGrid/logo-grid.component';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { richTextAsTag, mapComparisonRows } from '../lib/content-mappers';
+import { useOdpTracking } from '../hooks/useOdpTracking';
 
 const ComparisonTable = lazy(() => import('./ComparisonTable/comparison-table.component'));
 const QuoteList = lazy(() => import('./QuoteList/quote-list.component'));
@@ -100,6 +101,8 @@ interface Props {
 }
 
 const DynamicComparisonPage = ({ page }: Props) => {
+    useOdpTracking('comparison');
+
     const comparisonRows = page.comparisonTableRows ? mapComparisonRows(page.comparisonTableRows) : [];
     const testimonials = mapTestimonials(page);
     const faqItems = mapFaqItems(page);
@@ -109,7 +112,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
         <Suspense fallback={null}>
             {/* ========== SECTION 1: Hero ========== */}
             {page.headline && (
-                <HeroGradient>
+                <HeroGradient id="hero">
                     <img src="/optimizely-logo.svg" alt="Optimizely" className="mb-6 h-8" />
                     {page.eyebrow && <p className="t-overline mb-4">{page.eyebrow}</p>}
                     <div className="rte mb-6"><h1>{page.headline}</h1></div>
@@ -125,7 +128,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
             )}
 
             {/* ========== SECTION 2: Logo Grid ========== */}
-            <section className="outer-padding py-12">
+            <section id="logos" className="outer-padding py-12">
                 <div className="container">
                     <div className="row">
                         <div className="col-12">
@@ -140,7 +143,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
             {/* ========== SECTION 3: Value Proposition / Features ========== */}
             {features?.Headline?.html && features.Features?.length > 0 && (
-                <section className="outer-padding relative py-16 lg:py-24">
+                <section id="features" className="outer-padding relative py-16 lg:py-24">
                     <GridOverlay opacity={0} highlightOpacity={0.08} fade />
                     <div className="container relative z-10">
                         <div className="row">
@@ -164,7 +167,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
             {/* ========== SECTION 4: Comparison Table ========== */}
             {comparisonRows.length > 0 && (
-                <section className="outer-padding py-16 lg:py-24">
+                <section id="comparison" className="outer-padding py-16 lg:py-24">
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-10 lg:offset-1">
@@ -186,7 +189,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
             {/* ========== SECTION 5: Analyst Recognition ========== */}
             {page.analystQuote && (
-                <HighlightSection>
+                <HighlightSection id="analyst">
                     {page.analystHeadline && (
                         <div className="rte mb-4"><h3>{page.analystHeadline}</h3></div>
                     )}
@@ -204,14 +207,14 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
             {/* ========== SECTION 6: Testimonials ========== */}
             {testimonials.length > 0 && (
-                <section className="outer-padding py-16 lg:py-24">
+                <section id="testimonials" className="outer-padding py-16 lg:py-24">
                     <QuoteList quotes={testimonials} />
                 </section>
             )}
 
             {/* ========== SECTION 7: FAQ ========== */}
             {faqItems && faqItems.length > 0 && (
-                <section className="outer-padding py-16 lg:py-24">
+                <section id="faq" className="outer-padding py-16 lg:py-24">
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-8 lg:offset-2">
@@ -224,7 +227,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
             {/* ========== SECTION 8: Promo Card ========== */}
             {page.promoHeading && (
-                <section className="outer-padding py-16 lg:py-24">
+                <section id="promo" className="outer-padding py-16 lg:py-24">
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-8 lg:offset-2">
@@ -248,7 +251,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
             {/* ========== SECTION 9: Final CTA ========== */}
             {page.endHeadline && (
-                <HighlightSection>
+                <HighlightSection id="final-cta">
                     <div className="rte mb-4"><h2>{page.endHeadline}</h2></div>
                     {page.endSubheadline && (
                         <p className="t-subtitle mb-8">{page.endSubheadline}</p>
