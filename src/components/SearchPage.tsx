@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { startSearchStarfield } from '../lib/search-starfield';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
 import '../styles/search.css';
@@ -147,10 +146,13 @@ function PillLogo({ entry }: { entry: Entry }) {
 }
 
 function SearchPage() {
-  const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const starRef = useRef<{ destroy: () => void; setAccent: (rgb: [number, number, number]) => void } | null>(null);
+  const starRef = useRef<{
+    destroy: () => void;
+    setPalette: (rgbs: [number, number, number][]) => void;
+    setBoost: (target: number) => void;
+  } | null>(null);
 
   const [entries, setEntries] = useState<Entry[]>([]);
   const [query, setQuery] = useState('');
@@ -168,11 +170,14 @@ function SearchPage() {
         const mapped = (json.items || [])
           .map(toEntry)
           .filter((e) => e.slug); // skip anything without a URL
-        // Deduplicate on slug
+        // Dedupe by company name (case-insensitive). Multiple comparison
+        // pages can exist per company (e.g. vs-Sitecore / vs-Adobe) — keep
+        // the first and hide the rest so the dropdown isn't noisy.
         const seen = new Set<string>();
         const deduped = mapped.filter((e) => {
-          if (seen.has(e.slug)) return false;
-          seen.add(e.slug);
+          const key = e.name.trim().toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
           return true;
         });
         setEntries(deduped);
@@ -186,7 +191,7 @@ function SearchPage() {
   /* Starfield lifecycle. */
   useEffect(() => {
     if (!canvasRef.current) return;
-    const ctrl = startSearchStarfield(canvasRef.current, [0, 55, 255]);
+    const ctrl = startSearchStarfield(canvasRef.current, [[0, 55, 255]]);
     starRef.current = ctrl;
     return () => {
       ctrl.destroy();
@@ -194,30 +199,49 @@ function SearchPage() {
     };
   }, []);
 
-  /* Keep the canvas accent in sync with the active result. */
-  const activeEntry = useMemo(() => {
-    const results = computeResults(entries, query, recentSlugs);
-    return results[activeIdx] || null;
-  }, [entries, query, recentSlugs, activeIdx]);
-
-  useEffect(() => {
-    if (activeEntry && starRef.current) {
-      starRef.current.setAccent(hexToRgb(activeEntry.color));
-    }
-  }, [activeEntry]);
-
   const results = useMemo(
     () => computeResults(entries, query, recentSlugs),
     [entries, query, recentSlugs],
   );
+
+  /* Build the accent palette from the user's recent picks. The default
+   * Aldus blue anchors the palette so the field doesn't lose its identity
+   * before anyone has searched. */
+  const palette = useMemo<[number, number, number][]>(() => {
+    const byId = new Map(entries.map((e) => [e.slug, e]));
+    const recentColors = recentSlugs
+      .map((s) => byId.get(s))
+      .filter((e): e is Entry => !!e)
+      .map((e) => hexToRgb(e.color));
+    // Dedupe exact colour matches so accent distribution stays even.
+    const seen = new Set<string>();
+    const combined: [number, number, number][] = [[0, 55, 255], ...recentColors];
+    return combined.filter((rgb) => {
+      const key = rgb.join(',');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [entries, recentSlugs]);
+
+  useEffect(() => {
+    starRef.current?.setPalette(palette);
+  }, [palette]);
+
+  /* Boost the starfield while the user is interacting with search. */
+  useEffect(() => {
+    starRef.current?.setBoost(focused ? 1 : 0);
+  }, [focused]);
 
   const select = useCallback((entry: Entry) => {
     // Persist recent
     const next = [entry.slug, ...recentSlugs.filter((s) => s !== entry.slug)].slice(0, MAX_RECENT);
     setRecentSlugs(next);
     writeRecent(next);
-    navigate(`/${entry.slug}`);
-  }, [navigate, recentSlugs]);
+    // Always open in a new tab — booth iPads keep /search as the "home"
+    // surface so attendees can run more searches without a back-button trip.
+    window.open(`/${entry.slug}`, '_blank', 'noopener,noreferrer');
+  }, [recentSlugs]);
 
   const ghostText = useMemo(() => {
     if (!query) return null;

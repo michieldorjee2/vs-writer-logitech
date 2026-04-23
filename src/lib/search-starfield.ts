@@ -28,10 +28,15 @@ type Star = {
   /** Twinkle phase. */
   phase: number;
   tint: 'white' | 'accent' | 'warm';
+  /** Index into the accent palette (for tint==='accent'). */
+  accentIdx: number;
 };
 
 type Controller = {
-  setAccent: (rgb: RGB) => void;
+  /** Supply a palette of brand accents. Accent stars spread across it. */
+  setPalette: (rgbs: RGB[]) => void;
+  /** 0 = idle, 1 = searching. Drives a tween toward a punchier field. */
+  setBoost: (target: number) => void;
   destroy: () => void;
 };
 
@@ -41,11 +46,11 @@ const HDR_CANVAS_OPTS: CanvasRenderingContext2DSettings & { colorSpace?: 'displa
   desynchronized: false,
 };
 
-export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: RGB): Controller {
+export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: RGB[]): Controller {
   const ctx = (canvas.getContext('2d', HDR_CANVAS_OPTS) ||
     canvas.getContext('2d')) as CanvasRenderingContext2D;
 
-  let accent: RGB = initialAccent;
+  let palette: RGB[] = initialPalette.length ? initialPalette : [[0, 55, 255]];
   let w = 0;
   let h = 0;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -53,6 +58,14 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
   let stars: Star[] = [];
   let raf = 0;
   let mouseX = 0, mouseY = 0, tMouseX = 0, tMouseY = 0;
+
+  // Boost 0..1 tween. Target is set externally; we ease toward it each frame.
+  let boost = 0;
+  let boostTarget = 0;
+  // Idle density vs. boosted: we seed the larger count and draw fewer
+  // when boost is low — avoids re-seeding mid-animation.
+  const BASE_COUNT = 340;
+  const BOOST_COUNT = 640;
 
   function resize() {
     w = window.innerWidth;
@@ -65,7 +78,7 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
   }
 
   function seed(n: number) {
-    stars = Array.from({ length: n }, () => {
+    stars = Array.from({ length: n }, (_, i) => {
       const z = Math.random() * 0.92 + 0.08;
       return {
         x: (Math.random() - 0.5) * w * 1.4,
@@ -80,17 +93,19 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
               ? 'accent'
               : 'warm'
             : 'white',
+        accentIdx: i, // modulo-indexed into palette at draw time
       };
     });
   }
 
   resize();
-  // Booth: iPads are wide. Bump density for screen-real-estate parity.
-  seed(340);
+  // Booth: iPads are wide. Seed the larger count so we have headroom for
+  // the focus-boost without re-allocating mid-animation.
+  seed(BOOST_COUNT);
 
   function onResize() {
     resize();
-    seed(340);
+    seed(BOOST_COUNT);
   }
   window.addEventListener('resize', onResize);
 
@@ -126,11 +141,17 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
   }
 
   function tick() {
+    // Tween boost toward its target. Asymmetric easing: ramp in fast
+    // (focus should feel snappy) and decay slower (graceful exit).
+    const ease = boostTarget > boost ? 0.08 : 0.04;
+    boost += (boostTarget - boost) * ease;
+
     // Fade the previous frame — `destination-out` subtracts alpha from
-    // existing pixels without tinting them. That gives real motion trails
-    // (the old template's bg-coloured fillRect caused the ghost haze).
+    // existing pixels without tinting them. Slightly lighter fade when
+    // boosting so trails extend further.
+    const fadeAlpha = 0.18 - boost * 0.06;
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha.toFixed(3)})`;
     ctx.fillRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'source-over';
 
@@ -140,14 +161,19 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
 
     const cx = w / 2;
     const cy = h / 2;
-    const speed = 0.0035;
+    // Speed ramps ~7x when fully boosted — reads as "engaging warp" without
+    // being nauseating on an iPad at arm's length.
+    const speed = 0.0035 * (1 + boost * 6);
     const parallaxX = mouseX * 24;
     const parallaxY = mouseY * 18;
+    const brightness = 1 + boost * 0.55;
+    // Active star count scales with boost
+    const activeCount = Math.round(BASE_COUNT + boost * (BOOST_COUNT - BASE_COUNT));
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    for (let i = 0; i < stars.length; i++) {
+    for (let i = 0; i < activeCount; i++) {
       const s = stars[i];
       s.z -= speed;
       let recycled = false;
@@ -165,12 +191,12 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
 
       s.phase += 0.02 + depth * 0.02;
       const twinkle = 0.55 + Math.sin(s.phase) * 0.45;
-      const alpha = Math.min(1, (0.3 + twinkle * 0.7) * depth * 0.98 + 0.18);
-      const r = depth * 3.2 + 0.6;
+      const alpha = Math.min(1, ((0.3 + twinkle * 0.7) * depth * 0.98 + 0.18) * brightness);
+      const r = (depth * 3.2 + 0.6) * (1 + boost * 0.25);
 
       const rgb: RGB =
         s.tint === 'accent'
-          ? accent
+          ? palette[s.accentIdx % palette.length]
           : s.tint === 'warm'
             ? [255, 220, 180]
             : [255, 255, 255];
@@ -240,7 +266,8 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialAccent: R
   raf = requestAnimationFrame(tick);
 
   return {
-    setAccent: (rgb) => { accent = rgb; },
+    setPalette: (rgbs) => { palette = rgbs.length ? rgbs : [[0, 55, 255]]; },
+    setBoost: (target) => { boostTarget = Math.max(0, Math.min(1, target)); },
     destroy: () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);

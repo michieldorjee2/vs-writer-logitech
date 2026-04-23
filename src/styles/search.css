@@ -144,26 +144,9 @@
   animation: sp-rise 1s var(--sp-ease-out) 0.3s forwards;
   z-index: 5;
 }
-.search-page__searchwrap::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 999px;
-  background: conic-gradient(from 0deg,
-    transparent 0deg,
-    color-mix(in oklch, var(--sp-accent) 70%, transparent) 80deg,
-    var(--sp-accent) 120deg,
-    color-mix(in oklch, var(--sp-accent) 70%, transparent) 160deg,
-    transparent 240deg,
-    transparent 360deg);
-  opacity: 0;
-  filter: blur(12px);
-  animation: sp-spin 8s linear infinite;
-  transition: opacity 400ms var(--sp-ease-out);
-  z-index: -1;
-}
-.search-page__searchwrap--focused::before { opacity: 0.55; }
-@keyframes sp-spin { to { transform: rotate(360deg); } }
+/* Halo intentionally disabled — focus is signalled by the starfield
+   ramping up (see setBoost in search-starfield.ts). A rotating blue
+   conic overlay was distracting next to the motion of the stars. */
 
 .search-page__search {
   position: relative;
