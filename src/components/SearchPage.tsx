@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { startSearchStarfield } from '../lib/search-starfield';
-import { brandLogoUrl } from '../lib/brand-logo';
+import { brandLogoTypeUrl } from '../lib/brand-logo';
 import '../styles/search.css';
 
 type IndexItem = {
@@ -77,7 +77,11 @@ function toEntry(item: IndexItem): Entry {
     ? `vs ${item.competitorName}`
     : item.eyebrow || 'Comparison page';
   const color = item.brandAccentColor || '#0037ff';
-  const logoUrl = item.customerLogo || (item.brandDomain ? brandLogoUrl(item.brandDomain) : null);
+  // Prefer the square brand *icon* over the wordmark — fills the circular/
+  // squircle chip without leaving whitespace bars around it.
+  const logoUrl =
+    item.customerLogo ||
+    (item.brandDomain ? brandLogoTypeUrl(item.brandDomain, 'icon') : null);
   return { slug, name, domain, industry, color, logoUrl };
 }
 
