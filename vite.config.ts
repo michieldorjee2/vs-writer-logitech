@@ -46,6 +46,26 @@ query GetPage($slug: String!) {
 }
 `
 
+const SEARCH_INDEX_QUERY = `
+query SearchIndex($limit: Int!, $skip: Int!) {
+  CompetitorComparisonPage(locale: en, limit: $limit, skip: $skip) {
+    total
+    items {
+      _metadata { url { default hierarchical } published }
+      headline
+      eyebrow
+      competitorName
+      brandDomain
+      brandAccentColor
+      customerLogo
+      intelHeadline
+    }
+  }
+}
+`
+const SEARCH_INDEX_PAGE_SIZE = 100
+const SEARCH_INDEX_MAX = 1500
+
 const PREVIEW_QUERY = `
 query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
   _Content(
@@ -141,6 +161,37 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
             const item = await queryGraph(authKey, PAGE_QUERY, { slug: `/${slug}/` }, 'CompetitorComparisonPage')
             if (!item) return jsonResponse(res, 404, { error: 'Page not found' })
             jsonResponse(res, 200, item)
+          } catch (err) {
+            console.error('[graph-dev-proxy]', err)
+            jsonResponse(res, 500, { error: 'Graph fetch failed' })
+          }
+          return
+        }
+
+        if (url.pathname === '/api/search-index') {
+          try {
+            const first = await fetchGraph(authKey, SEARCH_INDEX_QUERY, {
+              limit: SEARCH_INDEX_PAGE_SIZE,
+              skip: 0,
+            })
+            const total: number = first?.data?.CompetitorComparisonPage?.total ?? 0
+            const items: unknown[] = [...(first?.data?.CompetitorComparisonPage?.items ?? [])]
+
+            const target = Math.min(total, SEARCH_INDEX_MAX)
+            const fetches: Promise<any>[] = []
+            for (let skip = SEARCH_INDEX_PAGE_SIZE; skip < target; skip += SEARCH_INDEX_PAGE_SIZE) {
+              fetches.push(fetchGraph(authKey, SEARCH_INDEX_QUERY, {
+                limit: SEARCH_INDEX_PAGE_SIZE,
+                skip,
+              }))
+            }
+            const rest = await Promise.all(fetches)
+            for (const chunk of rest) {
+              items.push(...(chunk?.data?.CompetitorComparisonPage?.items ?? []))
+            }
+
+            res.setHeader('Cache-Control', 'no-store')
+            jsonResponse(res, 200, { items, total })
           } catch (err) {
             console.error('[graph-dev-proxy]', err)
             jsonResponse(res, 500, { error: 'Graph fetch failed' })

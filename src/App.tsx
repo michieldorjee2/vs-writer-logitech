@@ -6,6 +6,7 @@ import { useHeadMeta } from './hooks/useHeadMeta';
 import DynamicComparisonPage from './components/DynamicComparisonPage';
 import ABMHyperPage from './components/ABMHyperPage';
 import BlockPreview from './components/BlockPreview';
+import SearchPage from './components/SearchPage';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 
 function isABMPage(page: CompetitorComparisonPage): boolean {
@@ -151,6 +152,7 @@ function App() {
             <main>
                 <Routes>
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/search" element={<SearchPage />} />
                     <Route path="/preview" element={<PreviewLoader />} />
                     {/* Dynamic catch-all: any slug resolves to Graph content */}
                     <Route path="/*" element={<PageLoader />} />

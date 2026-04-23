@@ -214,8 +214,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const slug = url.pathname.replace(/^\/|\/$/g, '');
   const template = htmlTemplate;
 
-  // Home + preview → SPA shell (no SSR needed)
-  if (!slug || slug === 'preview') {
+  // Home + preview + search → SPA shell (no SSR needed)
+  if (!slug || slug === 'preview' || slug === 'search') {
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(template);
   }

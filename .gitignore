@@ -30,3 +30,5 @@ api/_ssr-bundle.mjs.map
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*.local
