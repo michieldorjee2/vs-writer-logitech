@@ -65,7 +65,7 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
   // Idle density vs. boosted: we seed the larger count and draw fewer
   // when boost is low — avoids re-seeding mid-animation.
   const BASE_COUNT = 340;
-  const BOOST_COUNT = 640;
+  const BOOST_COUNT = 460;
 
   function resize() {
     w = window.innerWidth;
@@ -161,12 +161,12 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
 
     const cx = w / 2;
     const cy = h / 2;
-    // Speed ramps ~7x when fully boosted — reads as "engaging warp" without
-    // being nauseating on an iPad at arm's length.
-    const speed = 0.0035 * (1 + boost * 6);
+    // Speed ramps ~4.5x when fully boosted — enough to read as a warp
+    // without shattering into a dotted queue.
+    const speed = 0.0035 * (1 + boost * 3.5);
     const parallaxX = mouseX * 24;
     const parallaxY = mouseY * 18;
-    const brightness = 1 + boost * 0.55;
+    const brightness = 1 + boost * 0.35;
     // Active star count scales with boost
     const activeCount = Math.round(BASE_COUNT + boost * (BOOST_COUNT - BASE_COUNT));
 
@@ -201,28 +201,40 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
             ? [255, 220, 180]
             : [255, 255, 255];
 
-      // --- Continuous trail: stroke from prev → current so the fade
-      // layer above has something unbroken to decay. Paint a short
-      // "tail" past the previous position too, so slow-moving far stars
-      // still look like streaks rather than dots.
+      // --- Continuous trail. The segment extends BACKWARD past the
+      // previous projected position by at least this frame's own step
+      // (plus a boost-scaled pad). That guarantees the new segment
+      // overlaps the one drawn last frame, so the eye reads a seamless
+      // streak rather than a string of beads. The gradient is mostly
+      // flat — only the leading edge fades, to avoid the "dot ladder"
+      // banding that shows when every segment has the same dark→bright
+      // gradient per frame.
       if (!recycled && (s.px !== 0 || s.py !== 0) && depth > 0.04) {
         const dx = sx - s.px;
         const dy = sy - s.py;
         const mag = Math.hypot(dx, dy) || 1;
-        // Extend the trail backward proportional to depth — near stars
-        // get a longer visible streak.
-        const extend = 2 + depth * 16;
-        const tx = s.px - (dx / mag) * extend;
-        const ty = s.py - (dy / mag) * extend;
+        // Overlap previous frame's segment: reach back the full step
+        // plus a depth-scaled tail. At boost the frame step is large
+        // so this is what makes the streak read as one continuous line.
+        const overlap = mag * (1.2 + boost * 0.6);
+        const tailLen = overlap + depth * 6;
+        const tx = s.px - (dx / mag) * tailLen;
+        const ty = s.py - (dy / mag) * tailLen;
         const grd = ctx.createLinearGradient(tx, ty, sx, sy);
         // Sub-pixel stop jitter blurs the quantization threshold so
         // gradient banding disappears on wide-gamut displays.
         const jitter = (Math.random() - 0.5) * 0.03;
+        // Hold a mostly-flat body so the segment reads as a streak, then
+        // taper only the last stretch toward the bright head.
+        const bodyAlpha = alpha * (0.55 + boost * 0.2);
         grd.addColorStop(0, col(rgb, 0));
-        grd.addColorStop(0.6 + jitter, col(rgb, alpha * 0.35));
-        grd.addColorStop(1, col(rgb, alpha * 0.85));
+        grd.addColorStop(0.18 + jitter, col(rgb, bodyAlpha));
+        grd.addColorStop(0.92, col(rgb, bodyAlpha));
+        grd.addColorStop(1, col(rgb, alpha * 0.95));
         ctx.strokeStyle = grd;
-        ctx.lineWidth = Math.max(0.9, depth * 2.4);
+        // Widen the stroke when boosting so it merges with the core dot
+        // instead of painting a visible "dot + tail" pair.
+        ctx.lineWidth = Math.max(0.9, depth * (2.4 + boost * 1.2));
         ctx.beginPath();
         ctx.moveTo(tx, ty);
         ctx.lineTo(sx, sy);
@@ -250,11 +262,16 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
         }
       }
 
-      // Core dot
-      ctx.fillStyle = col(rgb, alpha);
-      ctx.beginPath();
-      ctx.arc(sx, sy, r, 0, Math.PI * 2);
-      ctx.fill();
+      // Core dot. At boost we let the streak carry the star's presence,
+      // so the dot shrinks — keeps the field from reading as "dots with
+      // tails" (which is what busy/beaded looks like).
+      const coreR = r * (1 - boost * 0.6);
+      if (coreR > 0.2) {
+        ctx.fillStyle = col(rgb, alpha);
+        ctx.beginPath();
+        ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       s.px = sx;
       s.py = sy;
