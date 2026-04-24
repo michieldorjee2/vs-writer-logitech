@@ -155,6 +155,8 @@ function SearchPage() {
   } | null>(null);
 
   const [entries, setEntries] = useState<Entry[]>([]);
+  /** Raw page count from Graph (pre-dedupe). Used as a marketing metric. */
+  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -165,8 +167,10 @@ function SearchPage() {
     let cancelled = false;
     fetch('/api/search-index')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((json: { items: IndexItem[] }) => {
+      .then((json: { items: IndexItem[]; total?: number }) => {
         if (cancelled) return;
+        if (typeof json.total === 'number') setTotalPages(json.total);
+        else if (Array.isArray(json.items)) setTotalPages(json.items.length);
         const mapped = (json.items || [])
           .map(toEntry)
           .filter((e) => e.slug); // skip anything without a URL
@@ -297,6 +301,20 @@ function SearchPage() {
       <div className="search-page__orb" />
 
       <div className="search-page__app">
+        <div
+          className="search-page__counter"
+          aria-live="polite"
+          data-visible={totalPages !== null ? 'true' : 'false'}
+        >
+          <span className="search-page__counter-dot" />
+          <span className="search-page__counter-value">
+            {totalPages !== null ? totalPages.toLocaleString() : '—'}
+          </span>
+          <span className="search-page__counter-label">
+            brand pages generated on demand
+          </span>
+        </div>
+
         <div className="search-page__brand">
           <img src="/optimizely-logo.svg" alt="Optimizely" />
         </div>

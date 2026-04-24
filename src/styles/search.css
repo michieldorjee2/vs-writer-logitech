@@ -93,6 +93,55 @@
   padding: 0 24px;
 }
 
+/* Marketing counter — live page count from Graph, pill-shaped. */
+.search-page__counter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 18px 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--sp-border-medium);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  margin-bottom: 24px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.6s var(--sp-ease-out), transform 0.6s var(--sp-ease-out);
+  font-family: var(--sp-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sp-fg-3);
+}
+.search-page__counter[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+.search-page__counter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sp-accent);
+  box-shadow: 0 0 10px var(--sp-glow-strong);
+  animation: sp-pulse 2s ease-in-out infinite;
+  align-self: center;
+}
+.search-page__counter-value {
+  color: var(--sp-fg-1);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  /* Use tabular numbers so the pill doesn't twitch if the count updates. */
+  font-variant-numeric: tabular-nums;
+}
+.search-page__counter-label {
+  color: var(--sp-fg-3);
+}
+@keyframes sp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+
 /* Centered Optimizely mark (replaces the pill above the headline) */
 .search-page__brand {
   display: inline-flex;
