@@ -443,17 +443,21 @@ html:has(.abm-page) {
   display: none;
 }
 
-/* Adapt grid when blocks are missing — fall back to fewer columns */
-.intel__dossier:has(> :nth-child(3)):not(:has(> :nth-child(3):empty)) {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-.intel__dossier:not(:has(> :nth-child(3))),
-.intel__dossier:has(> :nth-child(3):empty) {
-  grid-template-columns: 1fr 1fr;
-}
-.intel__dossier:not(:has(> :nth-child(2))),
-.intel__dossier:has(> :nth-child(2):empty) {
-  grid-template-columns: 1fr;
+/* Adapt grid when blocks are missing — fall back to fewer columns.
+   Gated behind min-width so these high-specificity :has() rules don't
+   override the mobile/tablet breakpoints below. */
+@media (min-width: 1025px) {
+  .intel__dossier:has(> :nth-child(3)):not(:has(> :nth-child(3):empty)) {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .intel__dossier:not(:has(> :nth-child(3))),
+  .intel__dossier:has(> :nth-child(3):empty) {
+    grid-template-columns: 1fr 1fr;
+  }
+  .intel__dossier:not(:has(> :nth-child(2))),
+  .intel__dossier:has(> :nth-child(2):empty) {
+    grid-template-columns: 1fr;
+  }
 }
 
 
