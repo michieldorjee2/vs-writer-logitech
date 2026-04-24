@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { startSearchStarfield } from '../lib/search-starfield';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
 import '../styles/search.css';
@@ -154,12 +155,18 @@ function SearchPage() {
     setBoost: (target: number) => void;
   } | null>(null);
 
+  // `?q=` support: browsers that register us via OpenSearch drop the
+  // user's query into the address bar → hit /search?q=their+term. We
+  // read it once on mount and pre-fill the input.
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+
   const [entries, setEntries] = useState<Entry[]>([]);
   /** Raw page count from Graph (pre-dedupe). Used as the placeholder metric. */
   const [totalPages, setTotalPages] = useState<number | null>(null);
   /** Animated count-up target for the placeholder. Eases toward totalPages. */
   const [displayCount, setDisplayCount] = useState(0);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [focused, setFocused] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [recentSlugs, setRecentSlugs] = useState<string[]>(readRecent);
@@ -279,6 +286,13 @@ function SearchPage() {
   useEffect(() => {
     starRef.current?.setBoost(focused ? 1 : 0);
   }, [focused]);
+
+  /* OpenSearch hand-off: if we landed with ?q=… in the URL, focus the
+     input so results are visible immediately. One-shot, mount only. */
+  useEffect(() => {
+    if (initialQuery) inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const select = useCallback((entry: Entry) => {
     // Persist recent

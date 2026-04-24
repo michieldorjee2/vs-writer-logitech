@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/"
+                       xmlns:moz="http://www.mozilla.org/2006/browser/search/">
+  <ShortName>Optimizely Showcase</ShortName>
+  <LongName>Optimizely Showcase — AI-generated brand experiences</LongName>
+  <Description>Search 1,000+ AI-generated 1:1 brand experiences powered by Optimizely Opal and Graph.</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Image width="512" height="512" type="image/svg+xml">https://showcase.optimizely.com/optimizely-logo.svg</Image>
+  <Url type="text/html"
+       method="get"
+       template="https://showcase.optimizely.com/search?q={searchTerms}"/>
+  <moz:SearchForm>https://showcase.optimizely.com/search</moz:SearchForm>
+</OpenSearchDescription>
