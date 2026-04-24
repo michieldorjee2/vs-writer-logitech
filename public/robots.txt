@@ -1,18 +1,43 @@
-# Allow only Claude and Gemini AI crawlers
-User-agent: ClaudeBot
-Allow: /
+# Block all crawlers, including search engines and AI training bots.
+# This is an internal booth/demo surface — not meant to be indexed.
 
-User-agent: claude-web
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: Googlebot
-Allow: /
-
-# Block everything else
 User-agent: *
 Disallow: /
 
-# No sitemap — content is dynamically generated
+# Explicitly named for the major search engines since some respect
+# their own UA line before the wildcard. Belt-and-braces.
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Googlebot-Image
+Disallow: /
+
+User-agent: Googlebot-News
+Disallow: /
+
+User-agent: AdsBot-Google
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
+User-agent: msnbot
+Disallow: /
+
+User-agent: DuckDuckBot
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: Slurp
+Disallow: /
+
+User-agent: Applebot
+Disallow: /
