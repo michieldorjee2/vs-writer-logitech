@@ -4,6 +4,7 @@ import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
 import SearchPage from './components/SearchPage';
+import FloatingSidebar from './components/FloatingSidebar';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 
 /*
@@ -102,6 +103,10 @@ function PageLoader() {
             {isABMPage(data)
                 ? <ABMHyperPage page={data} />
                 : <DynamicComparisonPage page={data} />}
+            <FloatingSidebar
+                page={data}
+                variant={isABMPage(data) ? 'abm' : 'dynamic'}
+            />
         </Suspense>
     );
 }

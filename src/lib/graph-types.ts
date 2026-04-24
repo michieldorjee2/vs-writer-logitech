@@ -267,4 +267,15 @@ export interface CompetitorComparisonPage {
 
     // Legacy block fields (may be empty objects from old content)
     Testimonials?: TestimonialRef[] | null;
+
+    // X-ray sales overlay — per-section data-source annotations.
+    // When the CMS doesn't return entries, the component falls back to a
+    // built-in default list keyed by the section id (see xray-defaults.ts).
+    xraySections?: Array<{
+        SectionId: string;
+        Title?: string | null;
+        Tools?: string[] | null;
+        Sources?: string[] | null;
+        Notes?: string | null;
+    }> | null;
 }
