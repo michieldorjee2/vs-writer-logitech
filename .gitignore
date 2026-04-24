@@ -32,3 +32,6 @@ api/_ssr-bundle.mjs.map
 *.sw?
 .vercel
 .env*.local
+
+# Claude Code local state
+.claude/
