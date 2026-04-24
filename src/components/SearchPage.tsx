@@ -306,13 +306,28 @@ function SearchPage() {
           aria-live="polite"
           data-visible={totalPages !== null ? 'true' : 'false'}
         >
-          <span className="search-page__counter-dot" />
-          <span className="search-page__counter-value">
-            {totalPages !== null ? totalPages.toLocaleString() : '—'}
-          </span>
-          <span className="search-page__counter-label">
-            brand pages generated on demand
-          </span>
+          <div
+            className="search-page__counter-3d"
+            aria-label={totalPages !== null ? `${totalPages} brand pages generated` : undefined}
+          >
+            {Array.from({ length: 20 }, (_, d) => (
+              <span
+                key={d}
+                className="search-page__counter-extrude"
+                aria-hidden="true"
+                style={{ '--d': 20 - d } as React.CSSProperties}
+              >
+                {totalPages !== null ? totalPages.toLocaleString() : '—'}
+              </span>
+            ))}
+            <span className="search-page__counter-face">
+              {totalPages !== null ? totalPages.toLocaleString() : '—'}
+            </span>
+          </div>
+          <div className="search-page__counter-caption">
+            <span className="search-page__counter-dot" />
+            Brand pages generated on demand
+          </div>
         </div>
 
         <div className="search-page__brand">
