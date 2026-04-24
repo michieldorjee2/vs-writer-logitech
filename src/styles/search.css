@@ -111,6 +111,13 @@
   transform: translateY(0);
 }
 
+/*
+ * 3D stage. We tilt the whole block back in real perspective so the
+ * extrusion is viewed at an angle — that's what makes it read as a
+ * solid object in the scene rather than a flat stack of outlines.
+ * The CSS `perspective()` + `rotateX()` give us a real vanishing
+ * point, not just parallel offsets.
+ */
 .search-page__counter-3d {
   position: relative;
   display: inline-block;
@@ -120,13 +127,17 @@
   letter-spacing: -0.03em;
   /* Big enough to read as a hero metric, still fits on an iPad. */
   font-size: clamp(4.5rem, 9vw, 9rem);
-  /* Outer glow tied to the brand accent. */
-  filter:
-    drop-shadow(0 0 60px color-mix(in oklch, var(--sp-accent) 40%, transparent))
-    drop-shadow(0 0 120px color-mix(in oklch, var(--sp-accent) 15%, transparent));
-  animation: sp-counter-float 8s ease-in-out infinite;
-  /* Establish a 3D context so perspective on children reads properly. */
+  /* A small drop-shadow grounds the body; the big diffuse glow was
+     filling the sides and flattening the volume. */
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.55));
+  /* Tilt slightly back so the extrusion reads as depth, not offset. */
+  transform: perspective(1200px) rotateX(14deg);
+  transform-origin: 50% 60%;
   transform-style: preserve-3d;
+  animation: sp-counter-float 9s ease-in-out infinite;
+  /* Reserve vertical space for the extruded body below the glyph so
+     the stack can't overlap the caption underneath. */
+  padding-bottom: 0.45em;
 }
 
 .search-page__counter-extrude,
@@ -138,36 +149,38 @@
 
 /*
  * Extrusion stack. --d goes 20 (back) → 1 (just behind the face).
- * Offsets are scaled small so the number doesn't smear across the hero.
- * Each layer trails the float so the 3D body wobbles like a pendant.
+ * Pure downward translateY pushes each layer further into the tilt,
+ * which under the rotateX above foreshortens into real depth.
+ * Spacing is 3px/layer → 60px of total extruded body.
  */
 .search-page__counter-extrude {
   position: absolute;
   inset: 0;
-  transform: translate(calc(var(--d) * 0.9px), calc(var(--d) * 1.8px));
+  transform: translateY(calc(var(--d) * 3px));
   color: #0022a0;
   -webkit-text-stroke: 1px #0028b8;
   paint-order: stroke fill;
-  animation: sp-counter-layer 8s ease-in-out infinite;
-  animation-delay: calc(var(--d) * -0.06s);
 }
-/* Depth shading — deeper layers are darker so the extrusion reads. */
-.search-page__counter-extrude:nth-child(-n+5)           { color: #000b48; -webkit-text-stroke-color: #00105a; }
-.search-page__counter-extrude:nth-child(n+6):nth-child(-n+10)  { color: #001570; -webkit-text-stroke-color: #001c88; }
-.search-page__counter-extrude:nth-child(n+11):nth-child(-n+15) { color: #001d98; -webkit-text-stroke-color: #0024b0; }
-.search-page__counter-extrude:nth-child(n+16)           { color: #0028c0; -webkit-text-stroke-color: #0030dc; }
+/* Depth shading — deeper layers darker so the volume reads even on the
+   flat-ish tilt. Drop the saturation too as we go back, so the sides
+   don't compete with the bright front face. */
+.search-page__counter-extrude:nth-child(-n+5)                  { color: #000830; -webkit-text-stroke-color: #00103e; }
+.search-page__counter-extrude:nth-child(n+6):nth-child(-n+10)  { color: #000f55; -webkit-text-stroke-color: #001870; }
+.search-page__counter-extrude:nth-child(n+11):nth-child(-n+15) { color: #001785; -webkit-text-stroke-color: #00209a; }
+.search-page__counter-extrude:nth-child(n+16)                  { color: #0022b0; -webkit-text-stroke-color: #002cd0; }
 
-/* The bright front face — neon-lit, carries the brand accent. */
+/* The bright front face — neon-lit, carries the brand accent.
+   Glow is tight: wide/soft glows were leaking onto the extrusion
+   sides and turning the 3D body back into a flat slab. */
 .search-page__counter-face {
   position: relative;
-  color: #e8edff;
+  color: #f2f5ff;
   text-shadow:
     0 0 2px #fff,
-    0 0 6px #c8d4ff,
-    0 0 14px rgba(80, 120, 255, 0.95),
-    0 0 28px color-mix(in oklch, var(--sp-accent) 90%, transparent),
-    0 0 55px color-mix(in oklch, var(--sp-accent) 55%, transparent),
-    0 0 100px color-mix(in oklch, var(--sp-accent) 30%, transparent);
+    0 0 4px #d8e0ff,
+    0 0 8px rgba(120, 150, 255, 0.9),
+    0 0 16px color-mix(in oklch, var(--sp-accent) 85%, transparent),
+    0 0 32px color-mix(in oklch, var(--sp-accent) 40%, transparent);
   animation: sp-counter-neon 3s ease-in-out infinite;
 }
 
@@ -191,15 +204,16 @@
   animation: sp-pulse 2s ease-in-out infinite;
 }
 
-/* Float + wobble. The whole block rocks gently; layers trail it so the
-   3D body shears as it moves — cheap parallax. */
+/* Float: gentle yaw on the Y axis so the extrusion catches the eye as
+   a real rotating solid, and a small bob on Y. Kept the perspective
+   + rotateX baseline from the base rule so the solid stays tilted. */
 @keyframes sp-counter-float {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50%      { transform: translate3d(0, -6px, 0) rotate(-0.4deg); }
-}
-@keyframes sp-counter-layer {
-  0%, 100% { transform: translate(calc(var(--d) * 0.9px), calc(var(--d) * 1.8px)); }
-  50%      { transform: translate(calc(var(--d) * 0.9px - 1px), calc(var(--d) * 1.8px + 2px)); }
+  0%, 100% {
+    transform: perspective(1200px) rotateX(14deg) rotateY(-2deg) translateY(0);
+  }
+  50% {
+    transform: perspective(1200px) rotateX(14deg) rotateY(2deg) translateY(-6px);
+  }
 }
 @keyframes sp-counter-neon {
   0%, 100% { filter: brightness(1); }
@@ -212,7 +226,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .search-page__counter-3d,
-  .search-page__counter-extrude,
   .search-page__counter-face,
   .search-page__counter-dot { animation: none; }
 }
