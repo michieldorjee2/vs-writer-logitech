@@ -214,10 +214,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const slug = url.pathname.replace(/^\/|\/$/g, '');
   const template = htmlTemplate;
 
-  // Home + preview + search → SPA shell (no SSR needed)
-  if (!slug || slug === 'preview' || slug === 'search') {
+  // Home + preview → SPA shell (no SSR needed)
+  if (!slug || slug === 'preview') {
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(template);
+  }
+
+  // /search — SPA shell with explicit meta for social cards / search engines.
+  if (slug === 'search') {
+    const title = 'Optimizely Showcase — Every brand deserves its own story';
+    const description =
+      'Search 1,000+ AI-generated brand experiences. Opal builds 1:1 landing pages for every company you pitch, grounded in Optimizely Graph.';
+    const canonical = `${SITE_URL}/search`;
+    const headHtml = [
+      `<title>${escapeHtml(title)}</title>`,
+      `<meta name="description" content="${escapeHtml(description)}" />`,
+      `<link rel="canonical" href="${escapeHtml(canonical)}" />`,
+      `<meta property="og:type" content="website" />`,
+      `<meta property="og:site_name" content="Optimizely Showcase" />`,
+      `<meta property="og:title" content="${escapeHtml(title)}" />`,
+      `<meta property="og:description" content="${escapeHtml(description)}" />`,
+      `<meta property="og:url" content="${escapeHtml(canonical)}" />`,
+      `<meta name="twitter:card" content="summary_large_image" />`,
+      `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+      `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+    ].join('\n    ');
+
+    let html = template;
+    html = html.replace(/<title>[^<]*<\/title>/, '');
+    html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/, '');
+    html = html.replace('</head>', `    ${headHtml}\n  </head>`);
+
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    return res.status(200).send(html);
   }
 
   const authKey = process.env.GRAPH_AUTH_KEY;
