@@ -1,13 +1,28 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
-import DynamicComparisonPage from './components/DynamicComparisonPage';
-import ABMHyperPage from './components/ABMHyperPage';
-import BlockPreview from './components/BlockPreview';
 import SearchPage from './components/SearchPage';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
+
+/*
+ * Lazy-load the heavy page renderers. ABMHyperPage pulls in gsap +
+ * ScrollTrigger + the ABM CSS bundle; DynamicComparisonPage pulls
+ * framer-motion transitively. None of that should ship on the
+ * /search booth path. Suspense fallbacks match the existing spinner.
+ */
+const DynamicComparisonPage = lazy(() => import('./components/DynamicComparisonPage'));
+const ABMHyperPage = lazy(() => import('./components/ABMHyperPage'));
+const BlockPreview = lazy(() => import('./components/BlockPreview'));
+
+function RouteSpinner() {
+    return (
+        <div className="flex min-h-screen items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-optimizely-blue" />
+        </div>
+    );
+}
 
 function isABMPage(page: CompetitorComparisonPage): boolean {
     return !!(page.intelEyebrow || page.customerLogo);
@@ -82,9 +97,13 @@ function PageLoader() {
         return <NotFound slug={slug || ''} />;
     }
 
-    return isABMPage(data)
-        ? <ABMHyperPage page={data} />
-        : <DynamicComparisonPage page={data} />;
+    return (
+        <Suspense fallback={<RouteSpinner />}>
+            {isABMPage(data)
+                ? <ABMHyperPage page={data} />
+                : <DynamicComparisonPage page={data} />}
+        </Suspense>
+    );
 }
 
 const CMS_URL = import.meta.env.VITE_CMS_URL || '';
@@ -136,14 +155,13 @@ function PreviewLoader() {
     const isEditMode = searchParams.get('ctx') === 'edit';
 
     // Dispatch: full page vs individual block
-    if (data.__typename === 'CompetitorComparisonPage' || !data.__typename) {
-        const page = data as CompetitorComparisonPage;
-        return isABMPage(page)
-            ? <ABMHyperPage page={page} editMode={isEditMode} />
-            : <DynamicComparisonPage page={page} />;
-    }
+    const body = (data.__typename === 'CompetitorComparisonPage' || !data.__typename)
+        ? (isABMPage(data as CompetitorComparisonPage)
+            ? <ABMHyperPage page={data as CompetitorComparisonPage} editMode={isEditMode} />
+            : <DynamicComparisonPage page={data as CompetitorComparisonPage} />)
+        : <BlockPreview block={data as PreviewBlock} />;
 
-    return <BlockPreview block={data as PreviewBlock} />;
+    return <Suspense fallback={<RouteSpinner />}>{body}</Suspense>;
 }
 
 function App() {

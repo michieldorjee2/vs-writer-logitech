@@ -240,9 +240,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
     ].join('\n    ');
 
+    // Strip fallback title/description (and the leading whitespace they
+    // occupy) then inject the /search-specific head just before </head>.
     let html = template;
-    html = html.replace(/<title>[^<]*<\/title>/, '');
-    html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/, '');
+    html = html.replace(/^\s*<title>[^<]*<\/title>\s*$/m, '');
+    html = html.replace(/^\s*<meta name="description" content="[^"]*"\s*\/?>\s*$/m, '');
+    html = html.replace(/\n{3,}/g, '\n\n');
     html = html.replace('</head>', `    ${headHtml}\n  </head>`);
 
     res.setHeader('Content-Type', 'text/html');
@@ -284,9 +287,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ---- Assemble final HTML ----
     let html = template;
 
-    // Replace default title/description with page-specific ones
-    html = html.replace(/<title>[^<]*<\/title>/, '');
-    html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/, '');
+    // Replace default title/description with page-specific ones.
+    // Match whole lines so we don't leave empty-indented rows behind.
+    html = html.replace(/^\s*<title>[^<]*<\/title>\s*$/m, '');
+    html = html.replace(/^\s*<meta name="description" content="[^"]*"\s*\/?>\s*$/m, '');
+    html = html.replace(/\n{3,}/g, '\n\n');
 
     // Inject SEO head tags before </head>
     html = html.replace('</head>', `    ${headHtml}\n  </head>`);

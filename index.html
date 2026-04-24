@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/optimizely-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <!-- Safe fallback meta — per-page SSR overrides these in ssr-handler.tsx.
@@ -20,14 +20,16 @@
     <!-- Preconnect to critical origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://www.optimizely.com" />
+    <link rel="preconnect" href="https://cdn.brandfetch.io" crossorigin />
+    <link rel="preconnect" href="https://d1igp3oop3iho5.cloudfront.net" crossorigin />
+    <link rel="dns-prefetch" href="https://www.optimizely.com" />
 
     <!-- Google Fonts - async loaded to avoid render-blocking -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" /></noscript>
 
-    <!-- ODP (Optimizely Data Platform) tracking SDK -->
+    <!-- ODP (Optimizely Data Platform) tracking SDK — async, non-blocking -->
     <script>window.zaius=window.zaius||[];</script>
     <script src="https://d1igp3oop3iho5.cloudfront.net/v2/8yoUTdBkNwpVOLCXeZpKdw/zaius-min.js" async></script>
 
@@ -39,17 +41,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- GitHub Pages SPA redirect handler -->
-    <script>
-      (function(l) {
-        if (l.search[1] === '/') {
-          var decoded = l.search.slice(1).split('&').map(function(s) {
-            return s.replace(/~and~/g, '&')
-          }).join('?');
-          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
-        }
-      }(window.location))
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -143,6 +143,29 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
 }
 
 /**
+ * Strip HTML comments (and their surrounding blank lines) from the
+ * built index.html. Keeps source readable but ships a smaller,
+ * comment-free file. Conditional comments (`<!--[if IE]>`) are left
+ * untouched for the handful of bots/readers that still care.
+ */
+function stripHtmlComments(): Plugin {
+  return {
+    name: 'strip-html-comments',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        return html
+          .replace(/^\s*<!--(?!\[if)[\s\S]*?-->\s*$/gm, '')
+          .replace(/<!--(?!\[if)[\s\S]*?-->/g, '')
+          // Collapse 3+ consecutive blank lines the replacements may leave.
+          .replace(/\n{3,}/g, '\n\n');
+      },
+    },
+  };
+}
+
+/**
  * Vite plugin that proxies /api/content and /api/preview during dev.
  * Auth keys stay server-side — never shipped to the browser.
  */
@@ -235,6 +258,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      stripHtmlComments(),
       ...(authKey ? [graphDevProxy(authKey, singleKey)] : []),
     ],
     resolve: {
@@ -250,6 +274,19 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       cssCodeSplit: true,
+      /*
+       * /search is the fast-path entry; it doesn't need framer-motion
+       * or the shared content-mappers chunk. Filter those out of the
+       * auto-generated <link rel="modulepreload"> list so we don't
+       * force the booth iPad to fetch 40kB of JS it'll never run.
+       * Route-specific lazy chunks still load normally when needed.
+       */
+      modulePreload: {
+        resolveDependencies: (_filename, deps) =>
+          deps.filter(
+            (d) => !/vendor-motion|content-mappers|ABMHyperPage|DynamicComparisonPage|BlockPreview/.test(d),
+          ),
+      },
       rollupOptions: {
         output: {
           manualChunks: {
