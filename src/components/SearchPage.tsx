@@ -155,22 +155,30 @@ function SearchPage() {
   } | null>(null);
 
   const [entries, setEntries] = useState<Entry[]>([]);
-  /** Raw page count from Graph (pre-dedupe). Used as a marketing metric. */
+  /** Raw page count from Graph (pre-dedupe). Used as the placeholder metric. */
   const [totalPages, setTotalPages] = useState<number | null>(null);
+  /** Animated count-up target for the placeholder. Eases toward totalPages. */
+  const [displayCount, setDisplayCount] = useState(0);
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [recentSlugs, setRecentSlugs] = useState<string[]>(readRecent);
 
-  /* Load the search index on mount. */
+  /* Load the search index on mount, then refresh silently every 5 min so
+     the count stays fresh on a booth-mode iPad without a full reload. */
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/search-index')
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((json: { items: IndexItem[]; total?: number }) => {
+
+    async function load() {
+      try {
+        const r = await fetch('/api/search-index', { cache: 'no-store' });
+        if (!r.ok) throw new Error(`${r.status}`);
+        const json = (await r.json()) as { items: IndexItem[]; total?: number };
         if (cancelled) return;
+
         if (typeof json.total === 'number') setTotalPages(json.total);
         else if (Array.isArray(json.items)) setTotalPages(json.items.length);
+
         const mapped = (json.items || [])
           .map(toEntry)
           .filter((e) => e.slug); // skip anything without a URL
@@ -185,12 +193,47 @@ function SearchPage() {
           return true;
         });
         setEntries(deduped);
-      })
-      .catch(() => {
-        /* Empty index is fine — UI still renders */
-      });
-    return () => { cancelled = true; };
+      } catch {
+        /* Empty index is fine — UI still renders. Next refresh will retry. */
+      }
+    }
+
+    load();
+    const id = window.setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, []);
+
+  /* Count-up animation. Runs from displayCount → totalPages every time the
+     target changes (initial load and each 5-min refresh). Uses RAF so we
+     don't kick the React reconciler once per number. */
+  useEffect(() => {
+    if (totalPages === null) return;
+    const from = displayCount;
+    const to = totalPages;
+    if (from === to) return;
+
+    // Initial load gets a longer, more satisfying ramp. Background refreshes
+    // just tick from the old value to the new — usually small deltas.
+    const duration = from === 0 ? 1600 : 600;
+    const start = performance.now();
+    let raf = 0;
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      // easeOutCubic — fast start, gentle settle
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayCount(Math.round(from + (to - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // Intentionally omit displayCount — we want this to fire only when
+    // totalPages changes (target update), not on each intermediate step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
 
   /* Starfield lifecycle. */
   useEffect(() => {
@@ -301,35 +344,6 @@ function SearchPage() {
       <div className="search-page__orb" />
 
       <div className="search-page__app">
-        <div
-          className="search-page__counter"
-          aria-live="polite"
-          data-visible={totalPages !== null ? 'true' : 'false'}
-        >
-          <div
-            className="search-page__counter-3d"
-            aria-label={totalPages !== null ? `${totalPages} brand pages generated` : undefined}
-          >
-            {Array.from({ length: 20 }, (_, d) => (
-              <span
-                key={d}
-                className="search-page__counter-extrude"
-                aria-hidden="true"
-                style={{ '--d': 20 - d } as React.CSSProperties}
-              >
-                {totalPages !== null ? totalPages.toLocaleString() : '—'}
-              </span>
-            ))}
-            <span className="search-page__counter-face">
-              {totalPages !== null ? totalPages.toLocaleString() : '—'}
-            </span>
-          </div>
-          <div className="search-page__counter-caption">
-            <span className="search-page__counter-dot" />
-            Brand pages generated on demand
-          </div>
-        </div>
-
         <div className="search-page__brand">
           <img src="/optimizely-logo.svg" alt="Optimizely" />
         </div>
@@ -371,7 +385,11 @@ function SearchPage() {
                 type="text"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Search a company…"
+                placeholder={
+                  totalPages !== null
+                    ? `${displayCount.toLocaleString()} brands and counting…`
+                    : 'Search a company…'
+                }
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
