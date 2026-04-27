@@ -48,7 +48,12 @@ query GetPage($slug: String!) {
 
 const SEARCH_INDEX_QUERY = `
 query SearchIndex($limit: Int!, $skip: Int!) {
-  CompetitorComparisonPage(locale: en, limit: $limit, skip: $skip) {
+  CompetitorComparisonPage(
+    locale: en
+    limit: $limit
+    skip: $skip
+    orderBy: { _metadata: { published: DESC } }
+  ) {
     total
     items {
       _metadata { url { default hierarchical } published }
@@ -64,7 +69,7 @@ query SearchIndex($limit: Int!, $skip: Int!) {
 }
 `
 const SEARCH_INDEX_PAGE_SIZE = 100
-const SEARCH_INDEX_MAX = 1500
+const SEARCH_INDEX_MAX = 5000
 
 const PREVIEW_QUERY = `
 query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
