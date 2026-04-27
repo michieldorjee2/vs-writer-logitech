@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import XrayMode from './XrayMode';
 import '../styles/floating-sidebar.css';
@@ -11,14 +10,14 @@ interface Props {
 }
 
 /**
- * Left-edge floating action column rendered on top of the content page.
- *   • Back-to-search button: only visible when the page was opened from
- *     /search (signalled via ?search=1 in the URL).
- *   • X-ray toggle: always visible; reveals the per-section data overlay.
+ * Booth-only floating action column rendered on top of the content page.
+ *   • Back-to-search button: returns the visitor to /search.
+ *   • X-ray toggle: reveals the per-section data overlay.
+ *
+ * Mounted by App.tsx ONLY when `?search=1` is present in the URL — the
+ * caller owns that gate, so this component always renders both buttons.
  */
 function FloatingSidebar({ page, variant }: Props) {
-  const [searchParams] = useSearchParams();
-  const fromSearch = searchParams.has('search');
   const [xrayActive, setXrayActive] = useState(false);
 
   const handleBack = useCallback(() => {
@@ -38,21 +37,19 @@ function FloatingSidebar({ page, variant }: Props) {
         className="xray-sidebar"
         aria-label="Page tools"
       >
-        {fromSearch && (
-          <button
-            type="button"
-            className="xray-sidebar__btn xray-sidebar__btn--back"
-            onClick={handleBack}
-            aria-label="Back to search"
-            title="Back to search"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            <span className="xray-sidebar__label">Search</span>
-          </button>
-        )}
+        <button
+          type="button"
+          className="xray-sidebar__btn xray-sidebar__btn--back"
+          onClick={handleBack}
+          aria-label="Back to search"
+          title="Back to search"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          <span className="xray-sidebar__label">Search</span>
+        </button>
 
         <button
           type="button"

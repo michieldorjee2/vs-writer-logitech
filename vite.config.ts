@@ -289,7 +289,7 @@ export default defineConfig(({ mode }) => {
       modulePreload: {
         resolveDependencies: (_filename, deps) =>
           deps.filter(
-            (d) => !/vendor-motion|content-mappers|ABMHyperPage|DynamicComparisonPage|BlockPreview/.test(d),
+            (d) => !/vendor-motion|content-mappers|ABMHyperPage|DynamicComparisonPage|BlockPreview|FloatingSidebar/.test(d),
           ),
       },
       rollupOptions: {
