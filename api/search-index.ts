@@ -4,14 +4,26 @@ const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
 /**
  * Graph caps `limit` at 100 per page, so we paginate by skip until we've
- * drained the index or hit a safety cap.
+ * drained the index or hit the safety cap. The cap is generous — the
+ * dataset grows continuously and a recently-added brand (e.g. Dayforce)
+ * has to be reachable through the booth UI even on a busy week.
+ *
+ * orderBy published DESC gives stable pagination AND surfaces the
+ * newest entries first. If we ever do hit MAX_ITEMS, the oldest pages
+ * — which are the least interesting to a sales floor anyway — are
+ * what get cut.
  */
 const PAGE_SIZE = 100;
-const MAX_ITEMS = 1500;
+const MAX_ITEMS = 5000;
 
 const INDEX_QUERY = `
 query SearchIndex($limit: Int!, $skip: Int!) {
-  CompetitorComparisonPage(locale: en, limit: $limit, skip: $skip) {
+  CompetitorComparisonPage(
+    locale: en
+    limit: $limit
+    skip: $skip
+    orderBy: { _metadata: { published: DESC } }
+  ) {
     total
     items {
       _metadata { url { default hierarchical } published }
