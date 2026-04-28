@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import {
@@ -17,9 +17,15 @@ interface Props {
 
 type AnchorPos = {
   section: XraySectionInfo;
-  top: number;   // viewport-relative (cards live in a fixed overlay)
+  /* Viewport-relative box of the section. The dark veil is rendered as an
+   * SVG with these rectangles cut out, so the section content shows through. */
+  left: number;
+  top: number;
+  width: number;
   height: number;
 };
+
+type Viewport = { w: number; h: number };
 
 const SCAN_DURATION_MS = 1600;
 
@@ -31,11 +37,40 @@ function measureAnchors(sections: XraySectionInfo[]): AnchorPos[] {
     const rect = el.getBoundingClientRect();
     anchors.push({
       section: s,
+      left: rect.left,
       top: rect.top,
+      width: rect.width,
       height: rect.height,
     });
   }
   return anchors;
+}
+
+function getViewport(): Viewport {
+  if (typeof window === 'undefined') return { w: 1280, h: 720 };
+  return { w: window.innerWidth, h: window.innerHeight };
+}
+
+/**
+ * Four little angle brackets at each corner of the section's bounding box —
+ * gives the trace a measuring-tool / technical-scan feel rather than a
+ * plain rounded rectangle.
+ */
+function CornerBrackets({ a }: { a: AnchorPos }) {
+  const inset = 6;
+  const len = 18;
+  const x1 = a.left + inset;
+  const y1 = a.top + inset;
+  const x2 = a.left + a.width - inset;
+  const y2 = a.top + a.height - inset;
+  return (
+    <g className="xray-trace__corners">
+      <path d={`M${x1},${y1 + len} L${x1},${y1} L${x1 + len},${y1}`} />
+      <path d={`M${x2 - len},${y1} L${x2},${y1} L${x2},${y1 + len}`} />
+      <path d={`M${x2},${y2 - len} L${x2},${y2} L${x2 - len},${y2}`} />
+      <path d={`M${x1 + len},${y2} L${x1},${y2} L${x1},${y2 - len}`} />
+    </g>
+  );
 }
 
 function XrayMode({ active, onClose, page, variant }: Props) {
@@ -44,6 +79,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
   const [phase, setPhase] = useState<'idle' | 'scanning' | 'revealed'>('idle');
   const [anchors, setAnchors] = useState<AnchorPos[]>([]);
+  const [viewport, setViewport] = useState<Viewport>(getViewport);
   const [expanded, setExpanded] = useState<string | null>(null);
   const scanStartRef = useRef(0);
 
@@ -64,11 +100,15 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     return () => window.clearTimeout(t);
   }, [active]);
 
-  /* Measure anchored sections once scan completes and on scroll/resize. */
+  /* Re-measure section rects + viewport on scroll/resize so the SVG mask,
+   * outlines, and floating cards stay glued to their components. */
   useLayoutEffect(() => {
     if (phase !== 'revealed') return;
 
-    const update = () => setAnchors(measureAnchors(sections));
+    const update = () => {
+      setAnchors(measureAnchors(sections));
+      setViewport(getViewport());
+    };
     update();
 
     window.addEventListener('scroll', update, { passive: true });
@@ -91,15 +131,91 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
   if (!active) return null;
 
+  const showCutouts = phase === 'revealed';
+
   const overlay = (
     <div
       className={'xray-overlay xray-overlay--' + phase}
       role="dialog"
       aria-label="X-ray view"
     >
-      {/* Grid texture + vignette */}
+      {/* Grid texture sits behind the veil for the scan-grid feel. */}
       <div className="xray-overlay__grid" aria-hidden="true" />
       <div className="xray-overlay__vignette" aria-hidden="true" />
+
+      {/*
+       * The dark veil + section cutouts + traced outlines all live in this
+       * single SVG. The mask makes each section's rect transparent so the
+       * actual page content shows through; a second pass strokes a
+       * turquoise outline around the same rects with corner brackets.
+       */}
+      <svg
+        className="xray-overlay__trace"
+        width={viewport.w}
+        height={viewport.h}
+        viewBox={`0 0 ${viewport.w} ${viewport.h}`}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <mask id="xray-cutout" maskUnits="userSpaceOnUse">
+            {/* White = visible (veil shows). Black = cutout (veil hides). */}
+            <rect x="0" y="0" width={viewport.w} height={viewport.h} fill="white" />
+            {showCutouts && anchors.map((a) => (
+              <rect
+                key={a.section.id}
+                x={a.left}
+                y={a.top}
+                width={a.width}
+                height={a.height}
+                rx={14}
+                ry={14}
+                fill="black"
+              />
+            ))}
+          </mask>
+        </defs>
+
+        {/* Dark veil with the section rects punched out */}
+        <rect
+          className="xray-trace__veil"
+          width={viewport.w}
+          height={viewport.h}
+          mask="url(#xray-cutout)"
+        />
+
+        {/* Trace outlines + corner brackets + section number */}
+        {showCutouts && anchors.map((a, i) => {
+          const perimeter = 2 * (a.width + a.height);
+          return (
+            <g
+              key={a.section.id}
+              className="xray-trace__group"
+              style={{ ['--reveal-index']: i, ['--perimeter']: `${perimeter}px` } as CSSProperties}
+            >
+              <rect
+                className="xray-trace__rect"
+                x={a.left}
+                y={a.top}
+                width={a.width}
+                height={a.height}
+                rx={14}
+                ry={14}
+                strokeDasharray={perimeter}
+                strokeDashoffset={perimeter}
+              />
+              <CornerBrackets a={a} />
+              <text
+                className="xray-trace__num"
+                x={a.left + 24}
+                y={a.top + 36}
+              >
+                {String(i + 1).padStart(2, '0')}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
 
       {/* Scanline — sweeps top → bottom during `scanning` */}
       {phase === 'scanning' && (
@@ -113,17 +229,16 @@ function XrayMode({ active, onClose, page, variant }: Props) {
         </>
       )}
 
-      {/* Reveal phase: annotation cards pinned to each section */}
-      {phase === 'revealed' && anchors.map(({ section, top, height }, i) => {
+      {/* Annotation cards float beside their section outlines */}
+      {phase === 'revealed' && anchors.map(({ section, top }, i) => {
         const isOpen = expanded === section.id;
         return (
           <div
             key={section.id}
             className={'xray-card' + (isOpen ? ' xray-card--open' : '')}
             style={{
-              top: `${top + 24}px`,
+              top: `${top + 56}px`,   // sits below the corner number badge
               ['--reveal-index' as string]: i,
-              ['--section-height' as string]: `${height}px`,
             }}
           >
             <div className="xray-card__header" onClick={() => setExpanded(isOpen ? null : section.id)}>
