@@ -17,28 +17,47 @@ interface Props {
 
 type AnchorPos = {
   section: XraySectionInfo;
-  /** 1-based number shown in the corner of every outline of this section. */
+  /** 1-based number shown in the corner of the outline. */
   sectionNumber: number;
-  /** True only for the first match of this section — the one the card pins to. */
-  isFirstOfSection: boolean;
-  /* Document-relative bounding box. Because the SVG + cards live inside a
-   * position:absolute container sized to the full document, the browser
-   * does the scroll math natively — no per-frame React updates needed. */
+  /* Padded union bounding box of every match for this section, in
+   * document-relative coordinates. The SVG + cards live inside a
+   * position:absolute container sized to the full document, so the
+   * browser does the scroll math natively. */
   left: number;
   top: number;
   width: number;
   height: number;
+  /* Annotation card placement (also document-relative). */
+  cardLeft: number;
+  cardTop: number;
+  cardSide: 'above' | 'below';
 };
 
 type DocSize = { w: number; h: number };
 
 const SCAN_DURATION_MS = 1600;
+/** Visual breathing room added around each component's bounding box. */
+const OUTLINE_PADDING = 12;
+/** Gap between the card and the component it points at. */
+const CARD_GAP = 32;
+/** Visual width of an annotation card (matches the CSS). Used for placement. */
+const CARD_WIDTH = 300;
+/** Approximate collapsed card height — sufficient for placement maths. */
+const CARD_HEIGHT_COLLAPSED = 76;
 
-function measureAnchors(sections: XraySectionInfo[]): AnchorPos[] {
+function measureAnchors(sections: XraySectionInfo[], docW: number): AnchorPos[] {
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
-  const out: AnchorPos[] = [];
-  let visibleSectionCount = 0;
+
+  // First pass: union bounding boxes per section.
+  const groups: Array<{
+    section: XraySectionInfo;
+    minLeft: number;
+    minTop: number;
+    maxRight: number;
+    maxBottom: number;
+  }> = [];
+
   for (const s of sections) {
     let nodeList: NodeListOf<Element>;
     try {
@@ -49,32 +68,62 @@ function measureAnchors(sections: XraySectionInfo[]): AnchorPos[] {
     }
     if (nodeList.length === 0) continue;
 
-    const matches: Array<{ rect: DOMRect; el: Element }> = [];
+    let minLeft = Infinity;
+    let minTop = Infinity;
+    let maxRight = -Infinity;
+    let maxBottom = -Infinity;
+
     nodeList.forEach((el) => {
       const rect = (el as HTMLElement).getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
-      matches.push({ rect, el });
+      minLeft = Math.min(minLeft, rect.left);
+      minTop = Math.min(minTop, rect.top);
+      maxRight = Math.max(maxRight, rect.right);
+      maxBottom = Math.max(maxBottom, rect.bottom);
     });
-    if (matches.length === 0) continue;
 
-    // Sort matches top-to-bottom so the first/card-bearing match is the
-    // topmost one on screen — feels right when the section is e.g. a row
-    // of cards.
-    matches.sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
+    if (minLeft === Infinity) continue;
 
-    visibleSectionCount += 1;
-    matches.forEach((m, idx) => {
-      out.push({
-        section: s,
-        sectionNumber: visibleSectionCount,
-        isFirstOfSection: idx === 0,
-        left: m.rect.left + scrollX,
-        top: m.rect.top + scrollY,
-        width: m.rect.width,
-        height: m.rect.height,
-      });
-    });
+    groups.push({ section: s, minLeft, minTop, maxRight, maxBottom });
   }
+
+  // Second pass: turn into AnchorPos with padding + card placement.
+  const out: AnchorPos[] = [];
+  groups.forEach((g, i) => {
+    const left = g.minLeft + scrollX - OUTLINE_PADDING;
+    const top = g.minTop + scrollY - OUTLINE_PADDING;
+    const width = (g.maxRight - g.minLeft) + 2 * OUTLINE_PADDING;
+    const height = (g.maxBottom - g.minTop) + 2 * OUTLINE_PADDING;
+
+    // Card placement: above the component by default, right-aligned to it.
+    // Falls back to below if the component is too close to the page top.
+    const margin = 16;
+    let cardLeft = left + width - CARD_WIDTH;
+    if (cardLeft < margin) cardLeft = margin;
+    if (cardLeft + CARD_WIDTH > docW - margin) {
+      cardLeft = docW - CARD_WIDTH - margin;
+    }
+
+    let cardTop = top - CARD_HEIGHT_COLLAPSED - CARD_GAP;
+    let cardSide: 'above' | 'below' = 'above';
+    if (cardTop < margin) {
+      cardTop = top + height + CARD_GAP;
+      cardSide = 'below';
+    }
+
+    out.push({
+      section: g.section,
+      sectionNumber: i + 1,
+      left,
+      top,
+      width,
+      height,
+      cardLeft,
+      cardTop,
+      cardSide,
+    });
+  });
+
   return out;
 }
 
@@ -90,7 +139,7 @@ function getDocSize(): DocSize {
 /** Four little angle brackets at each corner of the component's bounding box. */
 function CornerBrackets({ a }: { a: AnchorPos }) {
   const inset = 4;
-  const len = 14;
+  const len = 16;
   const x1 = a.left + inset;
   const y1 = a.top + inset;
   const x2 = a.left + a.width - inset;
@@ -103,6 +152,36 @@ function CornerBrackets({ a }: { a: AnchorPos }) {
       <path d={`M${x1 + len},${y2} L${x1},${y2} L${x1},${y2 - len}`} />
     </g>
   );
+}
+
+/**
+ * Loose curved string from the card down to the corner of its component.
+ * Quadratic bezier with a slight droop control point — looks like a
+ * helium-balloon string instead of a taut leader line.
+ */
+function buildConnectorPath(a: AnchorPos): string {
+  const cardW = CARD_WIDTH;
+  const cardH = CARD_HEIGHT_COLLAPSED;
+
+  if (a.cardSide === 'above') {
+    // String hangs from card's bottom-right area down/across to the
+    // top-right of the component.
+    const sx = a.cardLeft + cardW - 28;
+    const sy = a.cardTop + cardH;
+    const ex = Math.min(a.cardLeft + cardW + 30, a.left + a.width - 18);
+    const ey = a.top + 14;
+    const cx = (sx + ex) / 2;
+    const cy = sy + Math.max(20, (ey - sy) * 0.45); // droop downward
+    return `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`;
+  }
+  // below: string goes from card's top down to component's bottom-right
+  const sx = a.cardLeft + cardW - 28;
+  const sy = a.cardTop;
+  const ex = Math.min(a.cardLeft + cardW + 30, a.left + a.width - 18);
+  const ey = a.top + a.height - 14;
+  const cx = (sx + ex) / 2;
+  const cy = sy - Math.max(20, (sy - ey) * 0.45);
+  return `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`;
 }
 
 function XrayMode({ active, onClose, page, variant }: Props) {
@@ -141,8 +220,9 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     if (phase !== 'revealed') return;
 
     const update = () => {
-      setAnchors(measureAnchors(sections));
-      setDocSize(getDocSize());
+      const ds = getDocSize();
+      setDocSize(ds);
+      setAnchors(measureAnchors(sections, ds.w));
     };
     update();
 
@@ -196,22 +276,22 @@ function XrayMode({ active, onClose, page, variant }: Props) {
         <defs>
           <mask id="xray-cutout" maskUnits="userSpaceOnUse">
             <rect x="0" y="0" width={docSize.w} height={docSize.h} fill="white" />
-            {showCutouts && anchors.map((a, i) => (
+            {showCutouts && anchors.map((a) => (
               <rect
-                key={`${a.section.id}-${i}`}
+                key={a.section.id}
                 x={a.left}
                 y={a.top}
                 width={a.width}
                 height={a.height}
-                rx={10}
-                ry={10}
+                rx={12}
+                ry={12}
                 fill="black"
               />
             ))}
           </mask>
         </defs>
 
-        {/* Dark veil with the component rects punched out */}
+        {/* Dark veil with the (padded, unioned) component rects punched out */}
         <rect
           className="xray-trace__veil"
           width={docSize.w}
@@ -219,13 +299,12 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           mask="url(#xray-cutout)"
         />
 
-        {/* Trace outlines + corner brackets + component number — one per
-         * matched element, all sharing the section's number. */}
+        {/* Trace outline + corner brackets + section number — one per section. */}
         {showCutouts && anchors.map((a, i) => {
           const perimeter = 2 * (a.width + a.height);
           return (
             <g
-              key={`${a.section.id}-${i}`}
+              key={a.section.id}
               className="xray-trace__group"
               style={{ ['--reveal-index']: i } as CSSProperties}
             >
@@ -235,8 +314,8 @@ function XrayMode({ active, onClose, page, variant }: Props) {
                 y={a.top}
                 width={a.width}
                 height={a.height}
-                rx={10}
-                ry={10}
+                rx={12}
+                ry={12}
                 strokeDasharray={perimeter}
                 strokeDashoffset={perimeter}
               />
@@ -251,25 +330,36 @@ function XrayMode({ active, onClose, page, variant }: Props) {
             </g>
           );
         })}
+
+        {/* Connector strings — drawn behind the cards but on top of the veil
+         * so they read as a thin glowing line from card to component. */}
+        {showCutouts && anchors.map((a, i) => (
+          <path
+            key={`connector-${a.section.id}`}
+            className="xray-trace__connector"
+            d={buildConnectorPath(a)}
+            style={{ ['--reveal-index']: i } as CSSProperties}
+          />
+        ))}
       </svg>
 
-      {/* Annotation cards — one per section, anchored to the FIRST match of
-       * that section. Other matches share the same number on their outline
-       * but don't get a duplicate card. */}
-      {showCutouts && anchors.filter((a) => a.isFirstOfSection).map(({ section, sectionNumber, left, top, width }, i) => {
+      {/* Annotation cards — float OUTSIDE the component (above by default,
+       * below if there's no room) connected by the curved string above. */}
+      {showCutouts && anchors.map((a, i) => {
+        const { section, sectionNumber, cardLeft, cardTop } = a;
         const isOpen = expanded === section.id;
-        // Pin card just inside the top-left of its component, but never
-        // past where it would render off the right edge.
-        const cardLeft = Math.min(left + 16, Math.max(0, docSize.w - 320 - 16));
         return (
           <div
             key={section.id}
-            className={'xray-card' + (isOpen ? ' xray-card--open' : '')}
+            className={
+              'xray-card xray-card--' + a.cardSide +
+              (isOpen ? ' xray-card--open' : '')
+            }
             style={{
-              top: `${top + 36}px`,
+              top: `${cardTop}px`,
               left: `${cardLeft}px`,
               ['--reveal-index' as string]: i,
-              ['--anchor-width' as string]: `${width}px`,
+              ['--float-delay' as string]: `${(i * 0.31) % 2.5}s`,
             }}
           >
             <button
@@ -351,16 +441,11 @@ function XrayMode({ active, onClose, page, variant }: Props) {
         <div className="xray-hud__left">
           <span className="xray-hud__dot" />
           <span className="xray-hud__title">X-RAY MODE</span>
-          {phase === 'revealed' && (() => {
-            const sectionCount = anchors.filter((a) => a.isFirstOfSection).length;
-            const traceCount = anchors.length;
-            return (
-              <span className="xray-hud__meta">
-                {sectionCount} component{sectionCount === 1 ? '' : 's'}
-                {traceCount !== sectionCount ? ` · ${traceCount} traces` : ''} · built by Aldus
-              </span>
-            );
-          })()}
+          {phase === 'revealed' && (
+            <span className="xray-hud__meta">
+              {anchors.length} component{anchors.length === 1 ? '' : 's'} · built by Aldus
+            </span>
+          )}
         </div>
         <button type="button" className="xray-hud__close" onClick={onClose} aria-label="Exit X-ray mode">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
