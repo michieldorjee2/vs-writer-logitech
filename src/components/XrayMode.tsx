@@ -17,48 +17,52 @@ interface Props {
 
 type AnchorPos = {
   section: XraySectionInfo;
-  /* Viewport-relative box of the section. The dark veil is rendered as an
-   * SVG with these rectangles cut out, so the section content shows through. */
+  /* Document-relative bounding box. Because the SVG + cards live inside a
+   * position:absolute container sized to the full document, the browser
+   * does the scroll math natively — no per-frame React updates needed. */
   left: number;
   top: number;
   width: number;
   height: number;
 };
 
-type Viewport = { w: number; h: number };
+type DocSize = { w: number; h: number };
 
 const SCAN_DURATION_MS = 1600;
 
 function measureAnchors(sections: XraySectionInfo[]): AnchorPos[] {
-  const anchors: AnchorPos[] = [];
+  const scrollX = window.scrollX || window.pageXOffset || 0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const out: AnchorPos[] = [];
   for (const s of sections) {
-    const el = document.getElementById(s.id);
+    const el = document.querySelector(s.selector) as HTMLElement | null;
     if (!el) continue;
     const rect = el.getBoundingClientRect();
-    anchors.push({
+    if (rect.width === 0 && rect.height === 0) continue;
+    out.push({
       section: s,
-      left: rect.left,
-      top: rect.top,
+      left: rect.left + scrollX,
+      top: rect.top + scrollY,
       width: rect.width,
       height: rect.height,
     });
   }
-  return anchors;
+  return out;
 }
 
-function getViewport(): Viewport {
+function getDocSize(): DocSize {
   if (typeof window === 'undefined') return { w: 1280, h: 720 };
-  return { w: window.innerWidth, h: window.innerHeight };
+  const doc = document.documentElement;
+  return {
+    w: Math.max(doc.scrollWidth, doc.clientWidth),
+    h: Math.max(doc.scrollHeight, doc.clientHeight),
+  };
 }
 
-/**
- * Four little angle brackets at each corner of the section's bounding box —
- * gives the trace a measuring-tool / technical-scan feel rather than a
- * plain rounded rectangle.
- */
+/** Four little angle brackets at each corner of the component's bounding box. */
 function CornerBrackets({ a }: { a: AnchorPos }) {
-  const inset = 6;
-  const len = 18;
+  const inset = 4;
+  const len = 14;
   const x1 = a.left + inset;
   const y1 = a.top + inset;
   const x2 = a.left + a.width - inset;
@@ -79,7 +83,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
   const [phase, setPhase] = useState<'idle' | 'scanning' | 'revealed'>('idle');
   const [anchors, setAnchors] = useState<AnchorPos[]>([]);
-  const [viewport, setViewport] = useState<Viewport>(getViewport);
+  const [docSize, setDocSize] = useState<DocSize>(getDocSize);
   const [expanded, setExpanded] = useState<string | null>(null);
   const scanStartRef = useRef(0);
 
@@ -100,22 +104,32 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     return () => window.clearTimeout(t);
   }, [active]);
 
-  /* Re-measure section rects + viewport on scroll/resize so the SVG mask,
-   * outlines, and floating cards stay glued to their components. */
+  /* Measure once we hit `revealed`. With document-relative coords the
+   * positions don't change as the user scrolls — the browser composites
+   * the absolute-positioned overlay natively, no scroll listener needed.
+   * We only need to re-measure when the document layout itself changes
+   * (resize, fonts loading, lazy images filling in). */
   useLayoutEffect(() => {
     if (phase !== 'revealed') return;
 
     const update = () => {
       setAnchors(measureAnchors(sections));
-      setViewport(getViewport());
+      setDocSize(getDocSize());
     };
     update();
 
-    window.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update);
+
+    // Watch the document for height changes (images loading, animations,
+    // expanding accordions). Cheap: ResizeObserver fires only on actual
+    // size changes, not every scroll frame.
+    const ro = new ResizeObserver(update);
+    ro.observe(document.body);
+    ro.observe(document.documentElement);
+
     return () => {
-      window.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
+      ro.disconnect();
     };
   }, [phase, sections]);
 
@@ -133,34 +147,27 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
   const showCutouts = phase === 'revealed';
 
-  const overlay = (
+  /* Document-sized layer: dark veil + cutouts + traced outlines + cards.
+   * `position: absolute` on .xray-overlay (set in CSS) means the browser
+   * scrolls this layer with the document at compositor speed. */
+  const docLayer = (
     <div
       className={'xray-overlay xray-overlay--' + phase}
+      style={{ width: docSize.w, height: docSize.h }}
       role="dialog"
       aria-label="X-ray view"
     >
-      {/* Grid texture sits behind the veil for the scan-grid feel. */}
-      <div className="xray-overlay__grid" aria-hidden="true" />
-      <div className="xray-overlay__vignette" aria-hidden="true" />
-
-      {/*
-       * The dark veil + section cutouts + traced outlines all live in this
-       * single SVG. The mask makes each section's rect transparent so the
-       * actual page content shows through; a second pass strokes a
-       * turquoise outline around the same rects with corner brackets.
-       */}
       <svg
         className="xray-overlay__trace"
-        width={viewport.w}
-        height={viewport.h}
-        viewBox={`0 0 ${viewport.w} ${viewport.h}`}
+        width={docSize.w}
+        height={docSize.h}
+        viewBox={`0 0 ${docSize.w} ${docSize.h}`}
         preserveAspectRatio="none"
         aria-hidden="true"
       >
         <defs>
           <mask id="xray-cutout" maskUnits="userSpaceOnUse">
-            {/* White = visible (veil shows). Black = cutout (veil hides). */}
-            <rect x="0" y="0" width={viewport.w} height={viewport.h} fill="white" />
+            <rect x="0" y="0" width={docSize.w} height={docSize.h} fill="white" />
             {showCutouts && anchors.map((a) => (
               <rect
                 key={a.section.id}
@@ -168,30 +175,30 @@ function XrayMode({ active, onClose, page, variant }: Props) {
                 y={a.top}
                 width={a.width}
                 height={a.height}
-                rx={14}
-                ry={14}
+                rx={10}
+                ry={10}
                 fill="black"
               />
             ))}
           </mask>
         </defs>
 
-        {/* Dark veil with the section rects punched out */}
+        {/* Dark veil with the component rects punched out */}
         <rect
           className="xray-trace__veil"
-          width={viewport.w}
-          height={viewport.h}
+          width={docSize.w}
+          height={docSize.h}
           mask="url(#xray-cutout)"
         />
 
-        {/* Trace outlines + corner brackets + section number */}
+        {/* Trace outlines + corner brackets + component number */}
         {showCutouts && anchors.map((a, i) => {
           const perimeter = 2 * (a.width + a.height);
           return (
             <g
               key={a.section.id}
               className="xray-trace__group"
-              style={{ ['--reveal-index']: i, ['--perimeter']: `${perimeter}px` } as CSSProperties}
+              style={{ ['--reveal-index']: i } as CSSProperties}
             >
               <rect
                 className="xray-trace__rect"
@@ -199,16 +206,16 @@ function XrayMode({ active, onClose, page, variant }: Props) {
                 y={a.top}
                 width={a.width}
                 height={a.height}
-                rx={14}
-                ry={14}
+                rx={10}
+                ry={10}
                 strokeDasharray={perimeter}
                 strokeDashoffset={perimeter}
               />
               <CornerBrackets a={a} />
               <text
                 className="xray-trace__num"
-                x={a.left + 24}
-                y={a.top + 36}
+                x={a.left + 18}
+                y={a.top + 28}
               >
                 {String(i + 1).padStart(2, '0')}
               </text>
@@ -217,36 +224,34 @@ function XrayMode({ active, onClose, page, variant }: Props) {
         })}
       </svg>
 
-      {/* Scanline — sweeps top → bottom during `scanning` */}
-      {phase === 'scanning' && (
-        <>
-          <div className="xray-overlay__scanline" aria-hidden="true" />
-          <div className="xray-overlay__scanline-glow" aria-hidden="true" />
-          <div className="xray-overlay__scan-label" aria-hidden="true">
-            <span className="xray-overlay__scan-dot" />
-            ANALYSING PAGE STRUCTURE…
-          </div>
-        </>
-      )}
-
-      {/* Annotation cards float beside their section outlines */}
-      {phase === 'revealed' && anchors.map(({ section, top }, i) => {
+      {/* Annotation cards — anchored to each component in document space */}
+      {showCutouts && anchors.map(({ section, left, top, width }, i) => {
         const isOpen = expanded === section.id;
+        // Pin card just inside the top-left of its component, but never
+        // past where it would render off the right edge.
+        const cardLeft = Math.min(left + 16, Math.max(0, docSize.w - 320 - 16));
         return (
           <div
             key={section.id}
             className={'xray-card' + (isOpen ? ' xray-card--open' : '')}
             style={{
-              top: `${top + 56}px`,   // sits below the corner number badge
+              top: `${top + 44}px`,
+              left: `${cardLeft}px`,
               ['--reveal-index' as string]: i,
+              ['--anchor-width' as string]: `${width}px`,
             }}
           >
-            <div className="xray-card__header" onClick={() => setExpanded(isOpen ? null : section.id)}>
+            <button
+              type="button"
+              className="xray-card__header"
+              onClick={() => setExpanded(isOpen ? null : section.id)}
+              aria-expanded={isOpen}
+            >
               <div className="xray-card__badge">
                 <span className="xray-card__badge-num">{String(i + 1).padStart(2, '0')}</span>
               </div>
               <div className="xray-card__heading">
-                <div className="xray-card__eyebrow">SECTION</div>
+                <div className="xray-card__eyebrow">COMPONENT</div>
                 <div className="xray-card__title">{section.title}</div>
               </div>
               <svg
@@ -262,7 +267,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
               >
                 <path d="M6 9l6 6 6-6" />
               </svg>
-            </div>
+            </button>
 
             <div className="xray-card__body">
               <div className="xray-card__body-inner">
@@ -290,15 +295,34 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           </div>
         );
       })}
+    </div>
+  );
 
-      {/* Header HUD */}
+  /* Viewport-fixed layer: HUD + scanline + decorative grid/vignette.
+   * These should always be in viewport regardless of scroll. */
+  const viewportLayer = (
+    <div className={'xray-fixed-layer xray-fixed-layer--' + phase} aria-hidden={false}>
+      <div className="xray-overlay__grid" aria-hidden="true" />
+      <div className="xray-overlay__vignette" aria-hidden="true" />
+
+      {phase === 'scanning' && (
+        <>
+          <div className="xray-overlay__scanline" aria-hidden="true" />
+          <div className="xray-overlay__scanline-glow" aria-hidden="true" />
+          <div className="xray-overlay__scan-label" aria-hidden="true">
+            <span className="xray-overlay__scan-dot" />
+            ANALYSING PAGE STRUCTURE…
+          </div>
+        </>
+      )}
+
       <div className="xray-hud">
         <div className="xray-hud__left">
           <span className="xray-hud__dot" />
           <span className="xray-hud__title">X-RAY MODE</span>
           {phase === 'revealed' && (
             <span className="xray-hud__meta">
-              {anchors.length} section{anchors.length === 1 ? '' : 's'} · built by Aldus
+              {anchors.length} component{anchors.length === 1 ? '' : 's'} · built by Aldus
             </span>
           )}
         </div>
@@ -312,7 +336,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     </div>
   );
 
-  return createPortal(overlay, document.body);
+  return createPortal(<>{docLayer}{viewportLayer}</>, document.body);
 }
 
 export default XrayMode;

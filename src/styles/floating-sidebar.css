@@ -135,34 +135,47 @@
   opacity: 0.9;
 }
 
-/* ------------ Overlay root ------------ */
-/* NB: we intentionally DON'T lock body scroll — the sales presenter
-   must be able to scroll the page so each section's annotation card
-   scrolls into view with it. Scanline + grid stay fixed to the viewport. */
+/* ------------ Two-layer overlay architecture ------------
+ * .xray-overlay      → position: absolute, sized to the full document.
+ *                      Contains the SVG veil + cutouts + traced outlines
+ *                      and the floating annotation cards. Because every
+ *                      coordinate is document-relative, the browser
+ *                      composites the whole layer natively as the user
+ *                      scrolls (no React state churn → no jelly lag).
+ * .xray-fixed-layer  → position: fixed, viewport-pinned. Contains the
+ *                      HUD, scanline, and decorative grid/vignette so
+ *                      they stay locked in view regardless of scroll.
+ */
 
 .xray-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  /* width + height applied inline to match documentElement.scrollWidth/Height */
+  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: #e9ebf1;
+}
+
+.xray-fixed-layer {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 1001;
   pointer-events: none;
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
   color: #e9ebf1;
 }
 
-/* The dark veil is now drawn inside .xray-overlay__trace as an SVG with
-   cutouts for each section — the page content shows through where the
-   cutouts land. Anything below the SVG (grid, vignette) is z-stacked
-   behind the veil; the trace stroke + brackets sit above it. */
-
-.xray-overlay__grid,
-.xray-overlay__vignette {
+.xray-fixed-layer .xray-overlay__grid,
+.xray-fixed-layer .xray-overlay__vignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 0;
 }
 
-.xray-overlay__grid {
+.xray-fixed-layer .xray-overlay__grid {
   background-image:
     linear-gradient(rgba(0, 229, 255, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 229, 255, 0.06) 1px, transparent 1px);
@@ -171,19 +184,19 @@
   transition: opacity 600ms ease 160ms;
 }
 
-.xray-overlay--scanning .xray-overlay__grid,
-.xray-overlay--revealed .xray-overlay__grid {
+.xray-fixed-layer--scanning .xray-overlay__grid,
+.xray-fixed-layer--revealed .xray-overlay__grid {
   opacity: 1;
 }
 
-.xray-overlay__vignette {
+.xray-fixed-layer .xray-overlay__vignette {
   background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.55) 100%);
   opacity: 0;
   transition: opacity 600ms ease 100ms;
 }
 
-.xray-overlay--scanning .xray-overlay__vignette,
-.xray-overlay--revealed .xray-overlay__vignette {
+.xray-fixed-layer--scanning .xray-overlay__vignette,
+.xray-fixed-layer--revealed .xray-overlay__vignette {
   opacity: 1;
 }
 
