@@ -15,6 +15,13 @@ import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 const DynamicComparisonPage = lazy(() => import('./components/DynamicComparisonPage'));
 const ABMHyperPage = lazy(() => import('./components/ABMHyperPage'));
 const BlockPreview = lazy(() => import('./components/BlockPreview'));
+/*
+ * Booth-only sales sidebar. Gated on `?search=1` in the URL — visitors
+ * arriving through any normal channel never even download this chunk
+ * (the X-ray overlay + scan animation + xray-defaults all sit behind
+ * this lazy boundary).
+ */
+const FloatingSidebar = lazy(() => import('./components/FloatingSidebar'));
 
 function RouteSpinner() {
     return (
@@ -80,6 +87,7 @@ function HomePage() {
 
 function PageLoader() {
     const { '*': slug } = useParams();
+    const [searchParams] = useSearchParams();
     const { data, isLoading, error } = usePageContent(slug || '');
 
     // Inject title, meta description, canonical, and JSON-LD
@@ -97,11 +105,21 @@ function PageLoader() {
         return <NotFound slug={slug || ''} />;
     }
 
+    // The whole sales sidebar (back-to-search + X-ray) is booth-only.
+    // Only mount it when we know the visitor came in via /search.
+    const fromSearch = searchParams.has('search');
+
     return (
         <Suspense fallback={<RouteSpinner />}>
             {isABMPage(data)
                 ? <ABMHyperPage page={data} />
                 : <DynamicComparisonPage page={data} />}
+            {fromSearch && (
+                <FloatingSidebar
+                    page={data}
+                    variant={isABMPage(data) ? 'abm' : 'dynamic'}
+                />
+            )}
         </Suspense>
     );
 }

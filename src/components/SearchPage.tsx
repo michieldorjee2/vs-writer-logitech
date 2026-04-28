@@ -301,7 +301,9 @@ function SearchPage() {
     writeRecent(next);
     // Always open in a new tab — booth iPads keep /search as the "home"
     // surface so attendees can run more searches without a back-button trip.
-    window.open(`/${entry.slug}`, '_blank', 'noopener,noreferrer');
+    // `?search=1` marks the tab as search-originated so the destination
+    // page can surface a floating "back to search" button.
+    window.open(`/${entry.slug}?search=1`, '_blank', 'noopener,noreferrer');
   }, [recentSlugs]);
 
   const ghostText = useMemo(() => {
