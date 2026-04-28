@@ -17,6 +17,10 @@ interface Props {
 
 type AnchorPos = {
   section: XraySectionInfo;
+  /** 1-based number shown in the corner of every outline of this section. */
+  sectionNumber: number;
+  /** True only for the first match of this section — the one the card pins to. */
+  isFirstOfSection: boolean;
   /* Document-relative bounding box. Because the SVG + cards live inside a
    * position:absolute container sized to the full document, the browser
    * does the scroll math natively — no per-frame React updates needed. */
@@ -34,17 +38,41 @@ function measureAnchors(sections: XraySectionInfo[]): AnchorPos[] {
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
   const out: AnchorPos[] = [];
+  let visibleSectionCount = 0;
   for (const s of sections) {
-    const el = document.querySelector(s.selector) as HTMLElement | null;
-    if (!el) continue;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) continue;
-    out.push({
-      section: s,
-      left: rect.left + scrollX,
-      top: rect.top + scrollY,
-      width: rect.width,
-      height: rect.height,
+    let nodeList: NodeListOf<Element>;
+    try {
+      nodeList = document.querySelectorAll(s.selector);
+    } catch {
+      // Bad selector — skip rather than crash the whole reveal.
+      continue;
+    }
+    if (nodeList.length === 0) continue;
+
+    const matches: Array<{ rect: DOMRect; el: Element }> = [];
+    nodeList.forEach((el) => {
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return;
+      matches.push({ rect, el });
+    });
+    if (matches.length === 0) continue;
+
+    // Sort matches top-to-bottom so the first/card-bearing match is the
+    // topmost one on screen — feels right when the section is e.g. a row
+    // of cards.
+    matches.sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
+
+    visibleSectionCount += 1;
+    matches.forEach((m, idx) => {
+      out.push({
+        section: s,
+        sectionNumber: visibleSectionCount,
+        isFirstOfSection: idx === 0,
+        left: m.rect.left + scrollX,
+        top: m.rect.top + scrollY,
+        width: m.rect.width,
+        height: m.rect.height,
+      });
     });
   }
   return out;
@@ -168,9 +196,9 @@ function XrayMode({ active, onClose, page, variant }: Props) {
         <defs>
           <mask id="xray-cutout" maskUnits="userSpaceOnUse">
             <rect x="0" y="0" width={docSize.w} height={docSize.h} fill="white" />
-            {showCutouts && anchors.map((a) => (
+            {showCutouts && anchors.map((a, i) => (
               <rect
-                key={a.section.id}
+                key={`${a.section.id}-${i}`}
                 x={a.left}
                 y={a.top}
                 width={a.width}
@@ -191,12 +219,13 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           mask="url(#xray-cutout)"
         />
 
-        {/* Trace outlines + corner brackets + component number */}
+        {/* Trace outlines + corner brackets + component number — one per
+         * matched element, all sharing the section's number. */}
         {showCutouts && anchors.map((a, i) => {
           const perimeter = 2 * (a.width + a.height);
           return (
             <g
-              key={a.section.id}
+              key={`${a.section.id}-${i}`}
               className="xray-trace__group"
               style={{ ['--reveal-index']: i } as CSSProperties}
             >
@@ -214,18 +243,20 @@ function XrayMode({ active, onClose, page, variant }: Props) {
               <CornerBrackets a={a} />
               <text
                 className="xray-trace__num"
-                x={a.left + 18}
-                y={a.top + 28}
+                x={a.left + 16}
+                y={a.top + 24}
               >
-                {String(i + 1).padStart(2, '0')}
+                {String(a.sectionNumber).padStart(2, '0')}
               </text>
             </g>
           );
         })}
       </svg>
 
-      {/* Annotation cards — anchored to each component in document space */}
-      {showCutouts && anchors.map(({ section, left, top, width }, i) => {
+      {/* Annotation cards — one per section, anchored to the FIRST match of
+       * that section. Other matches share the same number on their outline
+       * but don't get a duplicate card. */}
+      {showCutouts && anchors.filter((a) => a.isFirstOfSection).map(({ section, sectionNumber, left, top, width }, i) => {
         const isOpen = expanded === section.id;
         // Pin card just inside the top-left of its component, but never
         // past where it would render off the right edge.
@@ -235,7 +266,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
             key={section.id}
             className={'xray-card' + (isOpen ? ' xray-card--open' : '')}
             style={{
-              top: `${top + 44}px`,
+              top: `${top + 36}px`,
               left: `${cardLeft}px`,
               ['--reveal-index' as string]: i,
               ['--anchor-width' as string]: `${width}px`,
@@ -248,7 +279,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
               aria-expanded={isOpen}
             >
               <div className="xray-card__badge">
-                <span className="xray-card__badge-num">{String(i + 1).padStart(2, '0')}</span>
+                <span className="xray-card__badge-num">{String(sectionNumber).padStart(2, '0')}</span>
               </div>
               <div className="xray-card__heading">
                 <div className="xray-card__eyebrow">COMPONENT</div>
@@ -320,11 +351,16 @@ function XrayMode({ active, onClose, page, variant }: Props) {
         <div className="xray-hud__left">
           <span className="xray-hud__dot" />
           <span className="xray-hud__title">X-RAY MODE</span>
-          {phase === 'revealed' && (
-            <span className="xray-hud__meta">
-              {anchors.length} component{anchors.length === 1 ? '' : 's'} · built by Aldus
-            </span>
-          )}
+          {phase === 'revealed' && (() => {
+            const sectionCount = anchors.filter((a) => a.isFirstOfSection).length;
+            const traceCount = anchors.length;
+            return (
+              <span className="xray-hud__meta">
+                {sectionCount} component{sectionCount === 1 ? '' : 's'}
+                {traceCount !== sectionCount ? ` · ${traceCount} traces` : ''} · built by Aldus
+              </span>
+            );
+          })()}
         </div>
         <button type="button" className="xray-hud__close" onClick={onClose} aria-label="Exit X-ray mode">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

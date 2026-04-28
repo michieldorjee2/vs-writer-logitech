@@ -4,15 +4,20 @@
    visible component of an Aldus 1:1 landing page when the CMS
    hasn't supplied page-specific overrides via `xraySections`.
 
-   Each entry is keyed by a unique `id` (used for CMS overrides)
-   and points at a DOM node via a CSS `selector` (the first match
-   becomes the outlined component).
+   Each entry is keyed by a unique `id` and points at one or
+   more DOM nodes via a CSS `selector` (querySelectorAll). Every
+   match becomes its own outlined component on the page; all
+   matches under the same selector share a single annotation card.
    ============================================================ */
 
 export type XraySectionInfo = {
   /** Stable identifier — used to match CMS overrides. */
   id: string;
-  /** CSS selector pointing at the component to outline. First match wins. */
+  /**
+   * CSS selector pointing at the component(s) to outline. May match
+   * multiple elements (e.g. each .roi__card); every match gets its
+   * own traced outline + corner brackets + number.
+   */
   selector: string;
   /** Display title shown on the annotation card. */
   title: string;
@@ -24,16 +29,10 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* ABM / Aldus 1:1 landing page — granular per-component breakdown. */
+/* ABM / Aldus 1:1 landing page — focus on actual content elements
+ * (headlines, individual cards, list groups) rather than the full-width
+ * <section> wrappers. */
 export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
-  {
-    id: 'hero-3d',
-    selector: '#hero-canvas',
-    title: 'Hero 3D logo',
-    tools: ['Three.js / WebGL', 'Brandfetch logo CDN'],
-    sources: ['Customer logo SVG', 'Brand accent colour'],
-    notes: 'Custom shader extrudes the brand mark in real time.',
-  },
   {
     id: 'hero-title',
     selector: '.hero__title',
@@ -50,95 +49,102 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
   },
   {
     id: 'intel-headline',
-    selector: '.intel__hero',
+    selector: '.intel__headline',
     title: 'Account intel headline',
     tools: ['Perplexity Deep Research'],
     sources: ['Account name + market context'],
   },
   {
     id: 'intel-stats',
-    selector: '.intel__stats',
+    selector: '.intel__stat-item',
     title: 'Stat ribbon',
     tools: ['Perplexity', 'Crunchbase', 'Public filings'],
     sources: ['Revenue, headcount, market cap, customer count'],
   },
   {
     id: 'stakeholders',
-    selector: '.intel__people-row',
+    selector: '.intel__person-card',
     title: 'Key stakeholders',
     tools: ['LinkedIn lookup', 'SFDC contact match'],
     sources: ['Decision makers + roles + LinkedIn URLs'],
   },
   {
     id: 'tech-stack',
-    selector: '.intel__dossier > *:nth-child(1)',
+    selector: '.intel__tech-stack',
     title: 'Current tech stack',
     tools: ['BuiltWith', 'Wappalyzer'],
     sources: ['Detected vendors on the live site'],
   },
   {
     id: 'investments',
-    selector: '.intel__dossier > *:nth-child(2)',
+    selector: '.intel__invest-list',
     title: 'Strategic investments',
     tools: ['Job posting analysis', 'Press release scan'],
     sources: ['Hiring signals + public initiatives'],
   },
   {
     id: 'news',
-    selector: '.intel__dossier > *:nth-child(3)',
+    selector: '.intel__news',
     title: 'In the news',
     tools: ['News API', 'Claude summarisation'],
     sources: ['Recent press coverage with URLs'],
   },
   {
-    id: 'challenge',
-    selector: '.challenge__left',
-    title: 'Current-state capture',
-    tools: ['Playwright headless screenshot'],
+    id: 'challenge-headline',
+    selector: '.challenge__headline',
+    title: 'Challenge headline',
+    tools: ['Claude page analysis'],
+    sources: ['Site-derived problem statement'],
+  },
+  {
+    id: 'challenge-screenshot',
+    selector: '.challenge__screenshot',
+    title: 'Current website capture',
+    tools: ['Playwright headless browser'],
     sources: ['Live render of the brand site', 'Browser URL'],
-    notes: 'Screenshot is a real capture, not stock imagery.',
+    notes: 'Real screenshot of their site — not stock imagery.',
   },
   {
     id: 'pain-points',
-    selector: '.challenge__pain-points',
+    selector: '.challenge__pain',
     title: 'Pain points',
     tools: ['Claude page analysis'],
     sources: ['Site-derived pain narrative'],
   },
   {
-    id: 'comparison',
-    selector: '.comparison__table',
-    title: 'Side-by-side comparison',
+    id: 'comparison-row',
+    selector: '.comparison__row',
+    title: 'Comparison row',
     tools: ['Optimizely battlecard KB', 'Product docs RAG'],
-    sources: ['Competitor + Optimizely feature parity matrix'],
+    sources: ['Per-feature competitor + Optimizely capability'],
   },
   {
     id: 'logo-wall',
-    selector: '.proof__logos',
-    title: 'Logo wall',
+    selector: '.proof__logo-item, .proof__logo-you',
+    title: 'Reference customer',
     tools: ['DAM curated set'],
-    sources: ['Reference customers (vertical-matched)'],
+    sources: ['Vertical-matched customer logo'],
   },
   {
     id: 'testimonials',
-    selector: '.proof__testimonials',
-    title: 'Testimonials',
+    selector: '.proof__testimonial',
+    title: 'Testimonial',
     tools: ['Customer quote DB'],
-    sources: ['Verified customer quotes + roles'],
+    sources: ['Verified customer quote + role'],
   },
   {
     id: 'analysts',
-    selector: '.proof__analysts',
+    selector: '.proof__analyst-card',
     title: 'Analyst recognition',
     tools: ['Analyst report index'],
-    sources: ['Gartner / Forrester badges + URLs'],
+    sources: ['Gartner / Forrester badge + URL'],
   },
   {
-    id: 'roi-grid',
-    selector: '.roi__grid',
-    title: 'ROI cards',
+    id: 'roi-cards',
+    selector: '.roi__card',
+    title: 'ROI metric',
     tools: ['Forrester TEI model'],
-    sources: ['Industry-segmented uplift bands'],
+    sources: ['Industry-segmented uplift band', 'Citation source'],
   },
   {
     id: 'roi-projection',
@@ -148,29 +154,37 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     sources: ['Estimated traffic + AOV'],
   },
   {
-    id: 'timeline',
-    selector: '.timeline',
-    title: 'Migration timeline',
+    id: 'timeline-phases',
+    selector: '.timeline__phase',
+    title: 'Migration phase',
     tools: ['Project planner template'],
-    sources: ['Phased rollout assumptions'],
+    sources: ['Phased rollout assumption'],
   },
   {
-    id: 'team',
-    selector: '.migration-team',
-    title: 'Dedicated team',
+    id: 'team-members',
+    selector: '.migration-team__member',
+    title: 'Account team member',
     tools: ['SFDC AE directory', 'Gravatar'],
-    sources: ['Account team + emails'],
+    sources: ['Name + role + email'],
   },
   {
-    id: 'cta',
-    selector: '.cta__content',
-    title: 'Closing CTA',
-    tools: ['Claude copy generation', 'Calendar scheduling link'],
-    sources: ['Closing headline + booking URL'],
+    id: 'cta-title',
+    selector: '.cta__title',
+    title: 'Closing CTA headline',
+    tools: ['Claude copy generation'],
+    sources: ['Closing headline'],
+  },
+  {
+    id: 'cta-description',
+    selector: '.cta__description',
+    title: 'Closing CTA description',
+    tools: ['Claude copy generation'],
+    sources: ['Supporting line'],
   },
 ];
 
-/* Dynamic comparison — non-ABM variant. Uses the existing section ids. */
+/* Dynamic comparison — non-ABM variant. Targets inner content where
+ * possible; falls back to the section ids for less-themed parts. */
 export const DYNAMIC_XRAY_DEFAULTS: XraySectionInfo[] = [
   { id: 'hero',        selector: '#hero',        title: 'Hero',           tools: ['Claude Opus 4'], sources: ['Eyebrow, headline, subheadline', 'Primary CTA'] },
   { id: 'logos',       selector: '#logos',       title: 'Logo Bar',       tools: ['Optimizely DAM'], sources: ['Curated customer logos'] },
