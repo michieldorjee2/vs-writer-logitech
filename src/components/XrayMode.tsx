@@ -15,14 +15,13 @@ interface Props {
   variant: 'abm' | 'dynamic';
 }
 
+type CardSide = 'above' | 'below' | 'left' | 'right';
+
 type AnchorPos = {
   section: XraySectionInfo;
   /** 1-based number shown in the corner of the outline. */
   sectionNumber: number;
-  /* Padded union bounding box of every match for this section, in
-   * document-relative coordinates. The SVG + cards live inside a
-   * position:absolute container sized to the full document, so the
-   * browser does the scroll math natively. */
+  /* Padded union bounding box of every match, in document-relative coords. */
   left: number;
   top: number;
   width: number;
@@ -30,49 +29,113 @@ type AnchorPos = {
   /* Annotation card placement (also document-relative). */
   cardLeft: number;
   cardTop: number;
-  cardSide: 'above' | 'below';
+  cardSide: CardSide;
 };
 
 type DocSize = { w: number; h: number };
+type Rect = { x: number; y: number; w: number; h: number };
 
 const SCAN_DURATION_MS = 1600;
 /** Visual breathing room added around each component's bounding box. */
 const OUTLINE_PADDING = 12;
 /** Gap between the card and the component it points at. */
-const CARD_GAP = 32;
-/** Visual width of an annotation card (matches the CSS). Used for placement. */
+const CARD_GAP = 36;
+/** Visual width of an annotation card (matches the CSS — keep in sync). */
 const CARD_WIDTH = 300;
 /** Approximate collapsed card height — sufficient for placement maths. */
 const CARD_HEIGHT_COLLAPSED = 76;
+/** Document-edge safety margin so cards don't bleed off the viewport. */
+const DOC_MARGIN = 16;
 
-function measureAnchors(sections: XraySectionInfo[], docW: number): AnchorPos[] {
+/** AABB intersection test. */
+function rectsOverlap(a: Rect, b: Rect): boolean {
+  return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+}
+
+/**
+ * Pick the best card placement for an anchor by trying a list of candidate
+ * sides in priority order and returning the first one that doesn't overlap
+ * any OTHER component's outline. Falls back to "above with overlap" if
+ * nothing works (rare on real pages).
+ */
+function placeCard(
+  outline: { left: number; top: number; width: number; height: number },
+  others: Array<{ left: number; top: number; width: number; height: number }>,
+  doc: DocSize,
+): { cardLeft: number; cardTop: number; cardSide: CardSide } {
+  const cw = CARD_WIDTH;
+  const ch = CARD_HEIGHT_COLLAPSED;
+  const m = DOC_MARGIN;
+
+  // Right-aligned X for above/below candidates so the card sits over the
+  // component's right edge — keeps the connector short.
+  const rightAlignedX = Math.max(m, Math.min(doc.w - cw - m, outline.left + outline.width - cw));
+  const leftAlignedX = Math.max(m, Math.min(doc.w - cw - m, outline.left));
+
+  type Cand = { side: CardSide; x: number; y: number };
+  const candidates: Cand[] = [
+    // Side placements: prefer right (in margin), then left
+    { side: 'right', x: outline.left + outline.width + 16, y: outline.top + Math.max(0, (outline.height - ch) / 2) },
+    { side: 'left',  x: outline.left - cw - 16,             y: outline.top + Math.max(0, (outline.height - ch) / 2) },
+    // Above (right-aligned then left-aligned)
+    { side: 'above', x: rightAlignedX,                       y: outline.top - ch - CARD_GAP },
+    { side: 'above', x: leftAlignedX,                        y: outline.top - ch - CARD_GAP },
+    // Below (right-aligned then left-aligned)
+    { side: 'below', x: rightAlignedX,                       y: outline.top + outline.height + CARD_GAP },
+    { side: 'below', x: leftAlignedX,                        y: outline.top + outline.height + CARD_GAP },
+  ];
+
+  for (const c of candidates) {
+    // Off-page rejection
+    if (c.x < m || c.x + cw > doc.w - m) continue;
+    if (c.y < m) continue;
+    if (c.y + ch > doc.h - m) continue;
+
+    const cardRect: Rect = { x: c.x, y: c.y, w: cw, h: ch };
+    let collides = false;
+    for (const o of others) {
+      if (rectsOverlap(cardRect, { x: o.left, y: o.top, w: o.width, h: o.height })) {
+        collides = true;
+        break;
+      }
+    }
+    if (!collides) {
+      return { cardLeft: c.x, cardTop: c.y, cardSide: c.side };
+    }
+  }
+
+  // Nothing fit cleanly — accept overlap and place above by default.
+  return {
+    cardLeft: rightAlignedX,
+    cardTop: Math.max(m, outline.top - ch - CARD_GAP),
+    cardSide: 'above',
+  };
+}
+
+function measureAnchors(sections: XraySectionInfo[], doc: DocSize): AnchorPos[] {
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
 
-  // First pass: union bounding boxes per section.
-  const groups: Array<{
+  // First pass: compute padded union outlines.
+  type Outline = {
     section: XraySectionInfo;
-    minLeft: number;
-    minTop: number;
-    maxRight: number;
-    maxBottom: number;
-  }> = [];
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  const outlines: Outline[] = [];
 
   for (const s of sections) {
     let nodeList: NodeListOf<Element>;
     try {
       nodeList = document.querySelectorAll(s.selector);
     } catch {
-      // Bad selector — skip rather than crash the whole reveal.
-      continue;
+      continue; // bad selector — skip
     }
     if (nodeList.length === 0) continue;
 
-    let minLeft = Infinity;
-    let minTop = Infinity;
-    let maxRight = -Infinity;
-    let maxBottom = -Infinity;
-
+    let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
     nodeList.forEach((el) => {
       const rect = (el as HTMLElement).getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
@@ -81,46 +144,31 @@ function measureAnchors(sections: XraySectionInfo[], docW: number): AnchorPos[] 
       maxRight = Math.max(maxRight, rect.right);
       maxBottom = Math.max(maxBottom, rect.bottom);
     });
-
     if (minLeft === Infinity) continue;
 
-    groups.push({ section: s, minLeft, minTop, maxRight, maxBottom });
+    outlines.push({
+      section: s,
+      left: minLeft + scrollX - OUTLINE_PADDING,
+      top: minTop + scrollY - OUTLINE_PADDING,
+      width: maxRight - minLeft + 2 * OUTLINE_PADDING,
+      height: maxBottom - minTop + 2 * OUTLINE_PADDING,
+    });
   }
 
-  // Second pass: turn into AnchorPos with padding + card placement.
+  // Second pass: place each card, checking collisions against ALL other
+  // outlines so a card never lands on top of a different component.
   const out: AnchorPos[] = [];
-  groups.forEach((g, i) => {
-    const left = g.minLeft + scrollX - OUTLINE_PADDING;
-    const top = g.minTop + scrollY - OUTLINE_PADDING;
-    const width = (g.maxRight - g.minLeft) + 2 * OUTLINE_PADDING;
-    const height = (g.maxBottom - g.minTop) + 2 * OUTLINE_PADDING;
-
-    // Card placement: above the component by default, right-aligned to it.
-    // Falls back to below if the component is too close to the page top.
-    const margin = 16;
-    let cardLeft = left + width - CARD_WIDTH;
-    if (cardLeft < margin) cardLeft = margin;
-    if (cardLeft + CARD_WIDTH > docW - margin) {
-      cardLeft = docW - CARD_WIDTH - margin;
-    }
-
-    let cardTop = top - CARD_HEIGHT_COLLAPSED - CARD_GAP;
-    let cardSide: 'above' | 'below' = 'above';
-    if (cardTop < margin) {
-      cardTop = top + height + CARD_GAP;
-      cardSide = 'below';
-    }
-
+  outlines.forEach((o, i) => {
+    const others = outlines.filter((_, j) => j !== i);
+    const placement = placeCard(o, others, doc);
     out.push({
-      section: g.section,
+      section: o.section,
       sectionNumber: i + 1,
-      left,
-      top,
-      width,
-      height,
-      cardLeft,
-      cardTop,
-      cardSide,
+      left: o.left,
+      top: o.top,
+      width: o.width,
+      height: o.height,
+      ...placement,
     });
   });
 
@@ -136,7 +184,7 @@ function getDocSize(): DocSize {
   };
 }
 
-/** Four little angle brackets at each corner of the component's bounding box. */
+/** Four little angle brackets at each corner of the (padded) outline. */
 function CornerBrackets({ a }: { a: AnchorPos }) {
   const inset = 4;
   const len = 16;
@@ -155,33 +203,60 @@ function CornerBrackets({ a }: { a: AnchorPos }) {
 }
 
 /**
- * Loose curved string from the card down to the corner of its component.
- * Quadratic bezier with a slight droop control point — looks like a
- * helium-balloon string instead of a taut leader line.
+ * Loose hanging string from the card's outer edge to the OUTLINE's
+ * (padded) corner, with a cubic bezier sag pulled down by gravity.
+ *
+ * `cardLag` shifts only the card-side endpoint of the string, so as the
+ * card "drags" with scroll the string stretches/relaxes naturally while
+ * the component-side endpoint stays glued to its corner.
  */
-function buildConnectorPath(a: AnchorPos): string {
-  const cardW = CARD_WIDTH;
-  const cardH = CARD_HEIGHT_COLLAPSED;
+function buildConnectorPath(a: AnchorPos, cardLag = 0): string {
+  const cw = CARD_WIDTH;
+  const ch = CARD_HEIGHT_COLLAPSED;
+
+  let sx: number, sy: number, ex: number, ey: number;
 
   if (a.cardSide === 'above') {
-    // String hangs from card's bottom-right area down/across to the
-    // top-right of the component.
-    const sx = a.cardLeft + cardW - 28;
-    const sy = a.cardTop + cardH;
-    const ex = Math.min(a.cardLeft + cardW + 30, a.left + a.width - 18);
-    const ey = a.top + 14;
-    const cx = (sx + ex) / 2;
-    const cy = sy + Math.max(20, (ey - sy) * 0.45); // droop downward
-    return `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`;
+    // string from card-bottom to outline top-right corner
+    sx = a.cardLeft + cw - 28;
+    sy = a.cardTop + ch + cardLag;
+    ex = a.left + a.width - 6;
+    ey = a.top + 6;
+  } else if (a.cardSide === 'below') {
+    // string from card-top to outline bottom-right corner
+    sx = a.cardLeft + cw - 28;
+    sy = a.cardTop + cardLag;
+    ex = a.left + a.width - 6;
+    ey = a.top + a.height - 6;
+  } else if (a.cardSide === 'left') {
+    // card sits to the LEFT of the outline → string from card right edge
+    // to outline left edge (mid-height)
+    sx = a.cardLeft + cw;
+    sy = a.cardTop + ch / 2 + cardLag;
+    ex = a.left + 6;
+    ey = a.top + Math.min(a.height / 2, 60);
+  } else {
+    // right: card to the right of the outline
+    sx = a.cardLeft;
+    sy = a.cardTop + ch / 2 + cardLag;
+    ex = a.left + a.width - 6;
+    ey = a.top + Math.min(a.height / 2, 60);
   }
-  // below: string goes from card's top down to component's bottom-right
-  const sx = a.cardLeft + cardW - 28;
-  const sy = a.cardTop;
-  const ex = Math.min(a.cardLeft + cardW + 30, a.left + a.width - 18);
-  const ey = a.top + a.height - 14;
-  const cx = (sx + ex) / 2;
-  const cy = sy - Math.max(20, (sy - ey) * 0.45);
-  return `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`;
+
+  // Cubic bezier with two control points pulled DOWN — gravity sag.
+  // Sag depth scales with horizontal distance so short strings barely
+  // droop while long ones hang in a real catenary curve.
+  const dx = ex - sx;
+  const dy = ey - sy;
+  const dist = Math.hypot(dx, dy);
+  const sag = Math.max(28, dist * 0.5);
+
+  const cx1 = sx + dx * 0.28;
+  const cy1 = sy + sag;
+  const cx2 = sx + dx * 0.72;
+  const cy2 = ey + sag * 0.55;
+
+  return `M${sx},${sy} C${cx1},${cy1} ${cx2},${cy2} ${ex},${ey}`;
 }
 
 function XrayMode({ active, onClose, page, variant }: Props) {
@@ -193,6 +268,14 @@ function XrayMode({ active, onClose, page, variant }: Props) {
   const [docSize, setDocSize] = useState<DocSize>(getDocSize);
   const [expanded, setExpanded] = useState<string | null>(null);
   const scanStartRef = useRef(0);
+
+  // Persistent refs used by the rAF scroll-drag loop. Anchors are cached
+  // in a ref (instead of pulled from state every frame) and the connector
+  // <path> elements get keyed in by section.id so we can rewrite their d
+  // attribute directly without going through React.
+  const anchorsRef = useRef<AnchorPos[]>([]);
+  const connectorRefs = useRef<Map<string, SVGPathElement>>(new Map());
+  const overlayRef = useRef<HTMLDivElement | null>(null);
 
   /* Lifecycle: toggle activation. */
   useEffect(() => {
@@ -211,26 +294,22 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     return () => window.clearTimeout(t);
   }, [active]);
 
-  /* Measure once we hit `revealed`. With document-relative coords the
-   * positions don't change as the user scrolls — the browser composites
-   * the absolute-positioned overlay natively, no scroll listener needed.
-   * We only need to re-measure when the document layout itself changes
-   * (resize, fonts loading, lazy images filling in). */
+  /* Measure once we hit `revealed`. With document-relative coords positions
+   * don't change as the user scrolls — the absolute-positioned overlay is
+   * composited natively. We re-measure only on resize / layout changes. */
   useLayoutEffect(() => {
     if (phase !== 'revealed') return;
 
     const update = () => {
       const ds = getDocSize();
       setDocSize(ds);
-      setAnchors(measureAnchors(sections, ds.w));
+      const next = measureAnchors(sections, ds);
+      setAnchors(next);
+      anchorsRef.current = next;
     };
     update();
 
     window.addEventListener('resize', update);
-
-    // Watch the document for height changes (images loading, animations,
-    // expanding accordions). Cheap: ResizeObserver fires only on actual
-    // size changes, not every scroll frame.
     const ro = new ResizeObserver(update);
     ro.observe(document.body);
     ro.observe(document.documentElement);
@@ -240,6 +319,66 @@ function XrayMode({ active, onClose, page, variant }: Props) {
       ro.disconnect();
     };
   }, [phase, sections]);
+
+  /* Scroll-drag loop — runs only while the X-ray is revealed.
+   *
+   * Each frame:
+   *  1. read window.scrollY, compute delta vs last frame
+   *  2. accumulate `lag` with a drag coefficient and bleed it off via friction
+   *  3. write `lag` to a CSS variable on the overlay so the cards follow it
+   *     (transform translateY → balloon-drag effect)
+   *  4. rebuild each connector path with the lagged card endpoint so the
+   *     "string" stretches between the dragged card and the still-pinned
+   *     component corner
+   *
+   * Steady state at zero scroll velocity: lag → 0, everything snaps back.
+   */
+  useEffect(() => {
+    if (phase !== 'revealed') return;
+
+    let lastScroll = window.scrollY;
+    let lag = 0;
+    let raf = 0;
+    let running = true;
+
+    const tick = () => {
+      if (!running) return;
+      const cur = window.scrollY;
+      const delta = cur - lastScroll;
+      lastScroll = cur;
+
+      // Drag: scroll downward (delta > 0) pulls cards downward (positive lag),
+      // so transform: translateY(+lag) makes the card visually trail behind
+      // the page motion — like a balloon on a string.
+      lag = lag * 0.86 + delta * 0.18;
+      // Snap tiny residuals to zero so we stop firing path rewrites.
+      if (Math.abs(lag) < 0.05) lag = 0;
+
+      const overlay = overlayRef.current;
+      if (overlay) overlay.style.setProperty('--xray-scroll-lag', `${lag.toFixed(2)}px`);
+
+      // Re-issue connector path data with the lagged card endpoint.
+      // setAttribute is cheaper than re-rendering through React, and we
+      // skip the rebuild when lag has fully settled.
+      if (lag !== 0 || delta !== 0) {
+        for (const a of anchorsRef.current) {
+          const path = connectorRefs.current.get(a.section.id);
+          if (!path) continue;
+          path.setAttribute('d', buildConnectorPath(a, lag));
+        }
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      const overlay = overlayRef.current;
+      if (overlay) overlay.style.setProperty('--xray-scroll-lag', '0px');
+    };
+  }, [phase]);
 
   /* Close on Escape. */
   useEffect(() => {
@@ -260,6 +399,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
    * scrolls this layer with the document at compositor speed. */
   const docLayer = (
     <div
+      ref={overlayRef}
       className={'xray-overlay xray-overlay--' + phase}
       style={{ width: docSize.w, height: docSize.h }}
       role="dialog"
@@ -331,30 +471,34 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           );
         })}
 
-        {/* Connector strings — drawn behind the cards but on top of the veil
-         * so they read as a thin glowing line from card to component. */}
+        {/* Connector strings — kept in the SVG so they sit above the veil
+         * but below the cards. We attach a ref so the rAF loop can rewrite
+         * the d attribute directly when the cards lag with scroll. */}
         {showCutouts && anchors.map((a, i) => (
           <path
             key={`connector-${a.section.id}`}
+            ref={(el) => {
+              if (el) connectorRefs.current.set(a.section.id, el);
+              else connectorRefs.current.delete(a.section.id);
+            }}
             className="xray-trace__connector"
-            d={buildConnectorPath(a)}
+            d={buildConnectorPath(a, 0)}
             style={{ ['--reveal-index']: i } as CSSProperties}
           />
         ))}
       </svg>
 
-      {/* Annotation cards — float OUTSIDE the component (above by default,
-       * below if there's no room) connected by the curved string above. */}
+      {/* Annotation cards. The outer .xray-card is position-only and applies
+       * the scroll-drag transform via --xray-scroll-lag. The inner element
+       * runs the bob animation independently so the two transforms compose
+       * cleanly without fighting each other. */}
       {showCutouts && anchors.map((a, i) => {
-        const { section, sectionNumber, cardLeft, cardTop } = a;
+        const { section, sectionNumber, cardLeft, cardTop, cardSide } = a;
         const isOpen = expanded === section.id;
         return (
           <div
             key={section.id}
-            className={
-              'xray-card xray-card--' + a.cardSide +
-              (isOpen ? ' xray-card--open' : '')
-            }
+            className={'xray-card xray-card--' + cardSide + (isOpen ? ' xray-card--open' : '')}
             style={{
               top: `${cardTop}px`,
               left: `${cardLeft}px`,
@@ -362,55 +506,57 @@ function XrayMode({ active, onClose, page, variant }: Props) {
               ['--float-delay' as string]: `${(i * 0.31) % 2.5}s`,
             }}
           >
-            <button
-              type="button"
-              className="xray-card__header"
-              onClick={() => setExpanded(isOpen ? null : section.id)}
-              aria-expanded={isOpen}
-            >
-              <div className="xray-card__badge">
-                <span className="xray-card__badge-num">{String(sectionNumber).padStart(2, '0')}</span>
-              </div>
-              <div className="xray-card__heading">
-                <div className="xray-card__eyebrow">COMPONENT</div>
-                <div className="xray-card__title">{section.title}</div>
-              </div>
-              <svg
-                className={'xray-card__chev' + (isOpen ? ' xray-card__chev--open' : '')}
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <div className="xray-card__inner">
+              <button
+                type="button"
+                className="xray-card__header"
+                onClick={() => setExpanded(isOpen ? null : section.id)}
+                aria-expanded={isOpen}
               >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
+                <div className="xray-card__badge">
+                  <span className="xray-card__badge-num">{String(sectionNumber).padStart(2, '0')}</span>
+                </div>
+                <div className="xray-card__heading">
+                  <div className="xray-card__eyebrow">COMPONENT</div>
+                  <div className="xray-card__title">{section.title}</div>
+                </div>
+                <svg
+                  className={'xray-card__chev' + (isOpen ? ' xray-card__chev--open' : '')}
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
 
-            <div className="xray-card__body">
-              <div className="xray-card__body-inner">
-                <div className="xray-card__group">
-                  <div className="xray-card__group-label">Tools</div>
-                  <div className="xray-card__chips">
-                    {section.tools.map((t) => (
-                      <span key={t} className="xray-card__chip xray-card__chip--tool">{t}</span>
-                    ))}
+              <div className="xray-card__body">
+                <div className="xray-card__body-inner">
+                  <div className="xray-card__group">
+                    <div className="xray-card__group-label">Tools</div>
+                    <div className="xray-card__chips">
+                      {section.tools.map((t) => (
+                        <span key={t} className="xray-card__chip xray-card__chip--tool">{t}</span>
+                      ))}
+                    </div>
                   </div>
+                  <div className="xray-card__group">
+                    <div className="xray-card__group-label">Data</div>
+                    <ul className="xray-card__list">
+                      {section.sources.map((s) => (
+                        <li key={s}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  {section.notes && (
+                    <p className="xray-card__notes">{section.notes}</p>
+                  )}
                 </div>
-                <div className="xray-card__group">
-                  <div className="xray-card__group-label">Data</div>
-                  <ul className="xray-card__list">
-                    {section.sources.map((s) => (
-                      <li key={s}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-                {section.notes && (
-                  <p className="xray-card__notes">{section.notes}</p>
-                )}
               </div>
             </div>
           </div>
@@ -419,8 +565,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     </div>
   );
 
-  /* Viewport-fixed layer: HUD + scanline + decorative grid/vignette.
-   * These should always be in viewport regardless of scroll. */
+  /* Viewport-fixed layer: HUD + scanline + decorative grid/vignette. */
   const viewportLayer = (
     <div className={'xray-fixed-layer xray-fixed-layer--' + phase} aria-hidden={false}>
       <div className="xray-overlay__grid" aria-hidden="true" />

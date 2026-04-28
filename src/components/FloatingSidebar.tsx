@@ -34,8 +34,9 @@ function FloatingSidebar({ page, variant }: Props) {
   return (
     <>
       <aside
-        className="xray-sidebar"
+        className={'xray-sidebar' + (xrayActive ? ' xray-sidebar--hidden' : '')}
         aria-label="Page tools"
+        aria-hidden={xrayActive}
       >
         <button
           type="button"
