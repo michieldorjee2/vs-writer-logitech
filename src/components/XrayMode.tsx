@@ -7,6 +7,7 @@ import {
   resolveXraySections,
   type XraySectionInfo,
 } from '../lib/xray-defaults';
+import { XrayToolIcon } from '../lib/xray-tool-icons';
 
 interface Props {
   active: boolean;
@@ -395,6 +396,18 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     let raf = 0;
     let running = true;
 
+    /* Last-frame state per anchor — lets us skip writes when nothing
+     * about the outline or placement changed. The bob/lag is changing
+     * every frame, so card position + connector path always update,
+     * but on a stable page the rect / mask / corners / number text
+     * skip ~80% of their setAttribute calls. */
+    type LastState = {
+      oLeft: number; oTop: number; oWidth: number; oHeight: number;
+      cardLeft: number; cardTop: number; cardH: number;
+      lastTotal: number;
+    };
+    const lastStates = new Map<string, LastState>();
+
     const tick = () => {
       if (!running) return;
 
@@ -410,68 +423,97 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
       const t = performance.now();
       const ds = docSizeRef.current;
+      const elems = elementsRef.current;
 
-      // 2. Re-measure every section live (cheap — getBoundingClientRect is O(1))
-      for (let i = 0; i < elementsRef.current.length; i++) {
-        const ae = elementsRef.current[i];
+      for (let i = 0; i < elems.length; i++) {
+        const ae = elems[i];
         const dom = domRefs.current.get(ae.section.id);
         if (!dom) continue;
 
         const o = buildOutlineFromElements(ae.els);
         if (!o) continue;
 
-        // 3. Recompute card placement against the FRESH outline using the
-        //    cached side decision (so the card never jumps sides
-        //    mid-presentation). Use the card's actual rendered height so
-        //    the gap stays right when the card is expanded.
         const cardH = dom.card?.offsetHeight || CARD_HEIGHT_COLLAPSED;
-        const { cardLeft, cardTop } = placeCardForSide(o, ae.cardSide, ds, cardH);
+        const placement = placeCardForSide(o, ae.cardSide, ds, cardH);
+        const cardLeft = placement.cardLeft;
+        const cardTop = placement.cardTop;
 
-        // 4. Compute bob — sin wave per card, with per-card phase offset.
-        //    Lerp toward 0 when hovered (slow stop).
+        // Bob — sin wave per card with per-card phase offset, lerped to
+        // zero on hover.
         const isHovered = hoveredRef.current === ae.section.id;
         const delayMs = ((i * 0.31) % 2.5) * 1000;
         const phaseAng = ((t + delayMs) / (BOB_PERIOD_S * 1000)) * 2 * Math.PI;
         const wave = Math.sin(phaseAng);
         const targetBob = isHovered ? 0 : (ae.cardSide === 'below' ? wave * BOB_AMPLITUDE : -wave * BOB_AMPLITUDE);
-        const prev = bobValuesRef.current.get(ae.section.id) ?? 0;
-        const bobY = prev + (targetBob - prev) * HOVER_LERP;
+        const prevBob = bobValuesRef.current.get(ae.section.id) ?? 0;
+        const bobY = prevBob + (targetBob - prevBob) * HOVER_LERP;
         bobValuesRef.current.set(ae.section.id, bobY);
 
         const totalLag = lag + bobY;
 
-        // 5. Write to DOM. Each setAttribute / style write is independent
-        //    so we never block on a React commit.
-        if (dom.outlineRect) {
-          dom.outlineRect.setAttribute('x', String(o.left));
-          dom.outlineRect.setAttribute('y', String(o.top));
-          dom.outlineRect.setAttribute('width', String(o.width));
-          dom.outlineRect.setAttribute('height', String(o.height));
-        }
-        if (dom.maskRect) {
-          dom.maskRect.setAttribute('x', String(o.left));
-          dom.maskRect.setAttribute('y', String(o.top));
-          dom.maskRect.setAttribute('width', String(o.width));
-          dom.maskRect.setAttribute('height', String(o.height));
-        }
-        if (dom.cornerPaths[0]) dom.cornerPaths[0].setAttribute('d', buildCornerPath(o, 'tl'));
-        if (dom.cornerPaths[1]) dom.cornerPaths[1].setAttribute('d', buildCornerPath(o, 'tr'));
-        if (dom.cornerPaths[2]) dom.cornerPaths[2].setAttribute('d', buildCornerPath(o, 'br'));
-        if (dom.cornerPaths[3]) dom.cornerPaths[3].setAttribute('d', buildCornerPath(o, 'bl'));
-        if (dom.numText) {
-          dom.numText.setAttribute('x', String(o.left + 12));
-          dom.numText.setAttribute('y', String(o.top + 22));
+        const last = lastStates.get(ae.section.id);
+        const outlineChanged = !last
+          || last.oLeft !== o.left || last.oTop !== o.top
+          || last.oWidth !== o.width || last.oHeight !== o.height;
+        const placementChanged = !last
+          || last.cardLeft !== cardLeft || last.cardTop !== cardTop || last.cardH !== cardH;
+        const lagChanged = !last || last.lastTotal !== totalLag;
+
+        // Outline writes — only when geometry actually shifted (page is
+        // stable most of the time; this skips ~70% of setAttribute calls).
+        if (outlineChanged) {
+          if (dom.outlineRect) {
+            dom.outlineRect.setAttribute('x', String(o.left));
+            dom.outlineRect.setAttribute('y', String(o.top));
+            dom.outlineRect.setAttribute('width', String(o.width));
+            dom.outlineRect.setAttribute('height', String(o.height));
+          }
+          if (dom.maskRect) {
+            dom.maskRect.setAttribute('x', String(o.left));
+            dom.maskRect.setAttribute('y', String(o.top));
+            dom.maskRect.setAttribute('width', String(o.width));
+            dom.maskRect.setAttribute('height', String(o.height));
+          }
+          if (dom.cornerPaths[0]) dom.cornerPaths[0].setAttribute('d', buildCornerPath(o, 'tl'));
+          if (dom.cornerPaths[1]) dom.cornerPaths[1].setAttribute('d', buildCornerPath(o, 'tr'));
+          if (dom.cornerPaths[2]) dom.cornerPaths[2].setAttribute('d', buildCornerPath(o, 'br'));
+          if (dom.cornerPaths[3]) dom.cornerPaths[3].setAttribute('d', buildCornerPath(o, 'bl'));
+          if (dom.numText) {
+            dom.numText.setAttribute('x', String(o.left + 12));
+            dom.numText.setAttribute('y', String(o.top + 22));
+          }
         }
 
-        if (dom.card) {
+        // Card position writes — only when the placement coords moved.
+        // The transform (lag + bob) updates more often, handled below.
+        if (placementChanged && dom.card) {
           dom.card.style.top = `${cardTop}px`;
           dom.card.style.left = `${cardLeft}px`;
+        }
+        if (lagChanged && dom.card) {
           dom.card.style.transform = `translateY(${totalLag.toFixed(2)}px)`;
         }
 
-        const dPath = buildConnectorPath(o, cardLeft, cardTop, cardH, ae.cardSide, totalLag);
-        if (dom.wirePath) dom.wirePath.setAttribute('d', dPath);
-        if (dom.pulsePath) dom.pulsePath.setAttribute('d', dPath);
+        // Connector path — depends on outline corner + card edge + lag.
+        // Always recompute when lag changes (every frame), or when
+        // outline/placement shifted.
+        if (outlineChanged || placementChanged || lagChanged) {
+          const dPath = buildConnectorPath(o, cardLeft, cardTop, cardH, ae.cardSide, totalLag);
+          if (dom.wirePath) dom.wirePath.setAttribute('d', dPath);
+          if (dom.pulsePath) dom.pulsePath.setAttribute('d', dPath);
+        }
+
+        if (!last) {
+          lastStates.set(ae.section.id, {
+            oLeft: o.left, oTop: o.top, oWidth: o.width, oHeight: o.height,
+            cardLeft, cardTop, cardH,
+            lastTotal: totalLag,
+          });
+        } else {
+          last.oLeft = o.left; last.oTop = o.top; last.oWidth = o.width; last.oHeight = o.height;
+          last.cardLeft = cardLeft; last.cardTop = cardTop; last.cardH = cardH;
+          last.lastTotal = totalLag;
+        }
       }
 
       raf = requestAnimationFrame(tick);
@@ -669,7 +711,10 @@ function XrayMode({ active, onClose, page, variant }: Props) {
                     <div className="xray-card__group-label">Tools</div>
                     <div className="xray-card__chips">
                       {a.section.tools.map((t) => (
-                        <span key={t} className="xray-card__chip xray-card__chip--tool">{t}</span>
+                        <span key={t} className="xray-card__chip xray-card__chip--tool">
+                          <XrayToolIcon name={t} />
+                          <span>{t}</span>
+                        </span>
                       ))}
                     </div>
                   </div>

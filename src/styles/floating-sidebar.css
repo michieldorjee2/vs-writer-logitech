@@ -715,7 +715,8 @@ body.xray-active .sticky-cta {
 .xray-card__chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 500;
@@ -723,6 +724,11 @@ body.xray-active .sticky-cta {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #d9dde6;
+}
+
+.xray-card__chip svg {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .xray-card__chip--tool {

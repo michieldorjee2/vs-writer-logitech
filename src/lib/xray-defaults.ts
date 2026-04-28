@@ -1,13 +1,16 @@
 /* ============================================================
-   X-ray mode — default per-component annotations.
-   These describe which tools + data sources populated each
-   visible component of an Aldus 1:1 landing page when the CMS
-   hasn't supplied page-specific overrides via `xraySections`.
+   X-ray mode — per-component annotations.
 
-   Each entry is keyed by a unique `id` and points at one or
-   more DOM nodes via a CSS `selector` (querySelectorAll). Every
-   match becomes its own outlined component on the page; all
-   matches under the same selector share a single annotation card.
+   Each entry describes ONE visible UI component on an Aldus 1:1
+   landing page and lists which Optimizely-stack tools / data
+   sources actually populated it. Tool names are drawn from a
+   curated set that maps 1:1 to icons in `xray-tool-icons.tsx`:
+
+     Salesforce, BuiltWith, Opal, ODP, CMS, Web browsing,
+     Sitemap, LinkedIn, 6sense, Gravatar, Brandfetch
+
+   When the CMS supplies overrides via `xraySections`, those win
+   for any matching `id` — see `resolveXraySections`.
    ============================================================ */
 
 export type XraySectionInfo = {
@@ -15,13 +18,14 @@ export type XraySectionInfo = {
   id: string;
   /**
    * CSS selector pointing at the component(s) to outline. May match
-   * multiple elements (e.g. each .roi__card); every match gets its
-   * own traced outline + corner brackets + number.
+   * multiple elements (e.g. each .roi__card); the X-ray unions their
+   * bounding boxes into a single outline.
    */
   selector: string;
   /** Display title shown on the annotation card. */
   title: string;
-  /** Tools / services that produced the component. */
+  /** Tools / services that produced the component. Keep names in
+   *  sync with the ICONS map in xray-tool-icons.tsx. */
   tools: string[];
   /** Raw data inputs the component was built from. */
   sources: string[];
@@ -29,172 +33,231 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* ABM / Aldus 1:1 landing page — focus on actual content elements
- * (headlines, individual cards, list groups) rather than the full-width
- * <section> wrappers. */
+/* ABM / Aldus 1:1 landing page — granular per-component breakdown. */
 export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
+  {
+    id: 'hero-3d',
+    selector: '#hero-canvas',
+    title: 'Hero brand mark',
+    tools: ['Brandfetch'],
+    sources: ['Brand logo', 'Brand colours', 'Brand description'],
+    notes: 'Logo extruded in real-time from the brand SVG.',
+  },
   {
     id: 'hero-title',
     selector: '.hero__title',
     title: 'Hero headline',
-    tools: ['Claude Opus 4'],
-    sources: ['Generated headline (split into two accent lines)'],
+    tools: ['Opal'],
+    sources: ['Custom pitch copy', 'Persona-targeted messaging', 'Approved terms'],
   },
   {
     id: 'hero-subtitle',
     selector: '.hero__subtitle',
     title: 'Hero subtitle',
-    tools: ['Claude Opus 4'],
-    sources: ['Generated supporting line'],
+    tools: ['Opal'],
+    sources: ['Personalised supporting line', 'Approved messaging frameworks'],
   },
   {
     id: 'intel-headline',
     selector: '.intel__headline',
     title: 'Account intel headline',
-    tools: ['Perplexity Deep Research'],
-    sources: ['Account name + market context'],
+    tools: ['Opal', '6sense'],
+    sources: ['Account name', 'Industry', 'Funnel stage'],
   },
   {
     id: 'intel-stats',
     selector: '.intel__stat-item',
     title: 'Stat ribbon',
-    tools: ['Perplexity', 'Crunchbase', 'Public filings'],
-    sources: ['Revenue, headcount, market cap, customer count'],
+    tools: ['Web browsing', 'LinkedIn', 'Sitemap'],
+    sources: [
+      'Investor reports',
+      'Employee count',
+      'Total content count',
+      'Updates last 3 months',
+    ],
   },
   {
     id: 'stakeholders',
     selector: '.intel__person-card',
     title: 'Key stakeholders',
-    tools: ['LinkedIn lookup', 'SFDC contact match'],
-    sources: ['Decision makers + roles + LinkedIn URLs'],
+    tools: ['LinkedIn', 'Salesforce', 'Gravatar'],
+    sources: [
+      'Main contacts + roles',
+      'Account owner',
+      'Key contacts on file',
+      'Profile pictures',
+    ],
   },
   {
     id: 'tech-stack',
     selector: '.intel__tech-stack',
     title: 'Current tech stack',
-    tools: ['BuiltWith', 'Wappalyzer'],
+    tools: ['BuiltWith'],
     sources: ['Detected vendors on the live site'],
   },
   {
     id: 'investments',
     selector: '.intel__invest-list',
     title: 'Strategic investments',
-    tools: ['Job posting analysis', 'Press release scan'],
-    sources: ['Hiring signals + public initiatives'],
+    tools: ['Web browsing', 'Salesforce'],
+    sources: [
+      'Investor reports',
+      'Recent acquisition news',
+      'Account communication context',
+    ],
   },
   {
     id: 'news',
     selector: '.intel__news',
     title: 'In the news',
-    tools: ['News API', 'Claude summarisation'],
-    sources: ['Recent press coverage with URLs'],
+    tools: ['Web browsing'],
+    sources: [
+      'Google News',
+      'Newsroom feed',
+      'Recent c-level changes',
+      'Recent acquisition news',
+    ],
   },
   {
     id: 'challenge-headline',
     selector: '.challenge__headline',
     title: 'Challenge headline',
-    tools: ['Claude page analysis'],
-    sources: ['Site-derived problem statement'],
+    tools: ['Opal'],
+    sources: [
+      'Competitive positioning',
+      'Messaging frameworks',
+      'Website best practices',
+    ],
   },
   {
     id: 'challenge-screenshot',
     selector: '.challenge__screenshot',
     title: 'Current website capture',
-    tools: ['Playwright headless browser'],
-    sources: ['Live render of the brand site', 'Browser URL'],
-    notes: 'Real screenshot of their site — not stock imagery.',
+    tools: ['Opal', 'Web browsing'],
+    sources: ['Live screenshot of brand site', 'Customer website URL'],
+    notes: 'Real capture, not stock imagery.',
   },
   {
     id: 'pain-points',
     selector: '.challenge__pain',
     title: 'Pain points',
-    tools: ['Claude page analysis'],
-    sources: ['Site-derived pain narrative'],
+    tools: ['Opal', 'Web browsing'],
+    sources: [
+      'Site-derived pain narrative',
+      'Competitive positioning',
+      'Customer website context',
+    ],
   },
   {
     id: 'comparison-row',
     selector: '.comparison__row',
     title: 'Comparison row',
-    tools: ['Optimizely battlecard KB', 'Product docs RAG'],
-    sources: ['Per-feature competitor + Optimizely capability'],
+    tools: ['CMS', 'Opal'],
+    sources: [
+      'Competitive pages',
+      'Approved product language',
+      'Competitive positioning',
+    ],
   },
   {
     id: 'logo-wall',
     selector: '.proof__logo-item, .proof__logo-you',
     title: 'Reference customer',
-    tools: ['DAM curated set'],
-    sources: ['Vertical-matched customer logo'],
+    tools: ['CMS'],
+    sources: ['Approved customer logos', 'Vertical-matched stories'],
   },
   {
     id: 'testimonials',
     selector: '.proof__testimonial',
     title: 'Testimonial',
-    tools: ['Customer quote DB'],
-    sources: ['Verified customer quote + role'],
+    tools: ['CMS'],
+    sources: ['Customer stories', 'Approved customer quotes'],
   },
   {
     id: 'analysts',
     selector: '.proof__analyst-card',
     title: 'Analyst recognition',
-    tools: ['Analyst report index'],
-    sources: ['Gartner / Forrester badge + URL'],
+    tools: ['CMS'],
+    sources: [
+      'Forrester TEI report',
+      'Gartner MQ',
+      'Forrester Wave',
+      'Analyst reports',
+    ],
   },
   {
     id: 'roi-cards',
     selector: '.roi__card',
     title: 'ROI metric',
-    tools: ['Forrester TEI model'],
-    sources: ['Industry-segmented uplift band', 'Citation source'],
+    tools: ['CMS', '6sense'],
+    sources: [
+      'Forrester TEI report',
+      'Industry-segmented uplift bands',
+      'Account funnel stage',
+    ],
   },
   {
     id: 'roi-projection',
     selector: '.roi__projection',
     title: 'Revenue projection',
-    tools: ['Account-size heuristics', 'TEI extrapolation'],
-    sources: ['Estimated traffic + AOV'],
+    tools: ['CMS', '6sense'],
+    sources: [
+      'TEI extrapolation',
+      'Industry benchmarks',
+      'Account activity signals',
+    ],
   },
   {
     id: 'timeline-phases',
     selector: '.timeline__phase',
     title: 'Migration phase',
-    tools: ['Project planner template'],
-    sources: ['Phased rollout assumption'],
+    tools: ['Opal'],
+    sources: ['Phased rollout copy', 'Approved migration template'],
   },
   {
     id: 'team-members',
     selector: '.migration-team__member',
-    title: 'Account team member',
-    tools: ['SFDC AE directory', 'Gravatar'],
-    sources: ['Name + role + email'],
+    title: 'Account team',
+    tools: ['Salesforce', 'Gravatar'],
+    sources: [
+      'Account owner',
+      'Key contacts on file',
+      'Optimizely employees',
+      'Profile pictures',
+    ],
   },
   {
     id: 'cta-title',
     selector: '.cta__title',
     title: 'Closing CTA headline',
-    tools: ['Claude copy generation'],
-    sources: ['Closing headline'],
+    tools: ['Opal', 'ODP'],
+    sources: [
+      'Approved CTA copy',
+      'One-click form-less action',
+      'Visitor engagement tracking',
+    ],
   },
   {
     id: 'cta-description',
     selector: '.cta__description',
-    title: 'Closing CTA description',
-    tools: ['Claude copy generation'],
-    sources: ['Supporting line'],
+    title: 'CTA description',
+    tools: ['Opal'],
+    sources: ['Closing supporting line', 'Approved messaging'],
   },
 ];
 
-/* Dynamic comparison — non-ABM variant. Targets inner content where
- * possible; falls back to the section ids for less-themed parts. */
+/* Dynamic comparison page — non-ABM variant. Falls back to section IDs
+ * since the dynamic layout is content-driven and less themed. */
 export const DYNAMIC_XRAY_DEFAULTS: XraySectionInfo[] = [
-  { id: 'hero',        selector: '#hero',        title: 'Hero',           tools: ['Claude Opus 4'], sources: ['Eyebrow, headline, subheadline', 'Primary CTA'] },
-  { id: 'logos',       selector: '#logos',       title: 'Logo Bar',       tools: ['Optimizely DAM'], sources: ['Curated customer logos'] },
-  { id: 'features',    selector: '#features',    title: 'Features',       tools: ['Claude feature extraction', 'Product docs'], sources: ['Feature headlines + descriptions'] },
-  { id: 'comparison',  selector: '#comparison',  title: 'Comparison',     tools: ['Battlecard KB'], sources: ['Competitor + Optimizely feature parity'] },
-  { id: 'analyst',     selector: '#analyst',     title: 'Analyst Quote',  tools: ['Analyst report index'], sources: ['Analyst quote + source'] },
-  { id: 'testimonials',selector: '#testimonials',title: 'Testimonials',   tools: ['Customer quote DB'], sources: ['Customer quotes'] },
-  { id: 'faq',         selector: '#faq',         title: 'FAQ',            tools: ['Support KB', 'Claude summarisation'], sources: ['Common questions + curated answers'] },
-  { id: 'promo',       selector: '#promo',       title: 'Promo Card',     tools: ['Claude copy generation'], sources: ['Promo headline + CTA'] },
-  { id: 'final-cta',   selector: '#final-cta',   title: 'Closing CTA',    tools: ['Claude copy generation'], sources: ['Closing headline + CTA'] },
+  { id: 'hero',         selector: '#hero',         title: 'Hero',          tools: ['Opal'],         sources: ['Eyebrow, headline, subheadline', 'Primary CTA copy'] },
+  { id: 'logos',        selector: '#logos',        title: 'Logo Bar',      tools: ['CMS'],          sources: ['Approved customer logos'] },
+  { id: 'features',     selector: '#features',     title: 'Features',      tools: ['Opal', 'CMS'],  sources: ['Feature headlines + descriptions', 'Approved product language'] },
+  { id: 'comparison',   selector: '#comparison',   title: 'Comparison',    tools: ['CMS', 'Opal'],  sources: ['Competitive pages', 'Approved product language'] },
+  { id: 'analyst',      selector: '#analyst',      title: 'Analyst Quote', tools: ['CMS'],          sources: ['Analyst reports', 'Forrester / Gartner quotes'] },
+  { id: 'testimonials', selector: '#testimonials', title: 'Testimonials',  tools: ['CMS'],          sources: ['Customer stories', 'Approved quotes'] },
+  { id: 'faq',          selector: '#faq',          title: 'FAQ',           tools: ['Opal'],         sources: ['Curated questions + answers'] },
+  { id: 'promo',        selector: '#promo',        title: 'Promo Card',    tools: ['Opal'],         sources: ['Promo headline + CTA'] },
+  { id: 'final-cta',    selector: '#final-cta',    title: 'Closing CTA',   tools: ['Opal', 'ODP'],  sources: ['Closing headline + CTA', 'One-click form-less action'] },
 ];
 
 /** Merge any CMS-supplied overrides into the defaults. */
