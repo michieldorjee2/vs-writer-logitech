@@ -112,29 +112,32 @@ function placeCard(
   };
 }
 
-/** Position the card relative to a given outline + cached side decision. */
+/** Position the card relative to a given outline + cached side decision.
+ *  `cardH` is the live measured card height — passing it in keeps the
+ *  visual gap to the outline a constant CARD_GAP regardless of whether
+ *  the card is collapsed or expanded. */
 function placeCardForSide(
   outline: OutlineBox,
   side: CardSide,
   doc: DocSize,
+  cardH: number,
 ): { cardLeft: number; cardTop: number } {
   const cw = CARD_WIDTH;
-  const ch = CARD_HEIGHT_COLLAPSED;
   const m = DOC_MARGIN;
 
   if (side === 'right') {
-    return { cardLeft: outline.left + outline.width + 16, cardTop: outline.top + Math.max(0, (outline.height - ch) / 2) };
+    return { cardLeft: outline.left + outline.width + 16, cardTop: outline.top + Math.max(0, (outline.height - cardH) / 2) };
   }
   if (side === 'left') {
-    return { cardLeft: Math.max(m, outline.left - cw - 16), cardTop: outline.top + Math.max(0, (outline.height - ch) / 2) };
+    return { cardLeft: Math.max(m, outline.left - cw - 16), cardTop: outline.top + Math.max(0, (outline.height - cardH) / 2) };
   }
   // above / below: right-align (with safety clamp) to keep connector short
   let cardLeft = outline.left + outline.width - cw;
   if (cardLeft < m) cardLeft = m;
   if (cardLeft + cw > doc.w - m) cardLeft = doc.w - cw - m;
   const cardTop = side === 'above'
-    ? Math.max(m, outline.top - ch - CARD_GAP)
-    : Math.min(doc.h - ch - m, outline.top + outline.height + CARD_GAP);
+    ? Math.max(m, outline.top - cardH - CARD_GAP)
+    : Math.min(doc.h - cardH - m, outline.top + outline.height + CARD_GAP);
   return { cardLeft, cardTop };
 }
 
@@ -199,18 +202,18 @@ function buildConnectorPath(
   outline: OutlineBox,
   cardLeft: number,
   cardTop: number,
+  cardH: number,
   side: CardSide,
   cardLag: number,
 ): string {
   const cw = CARD_WIDTH;
-  const ch = CARD_HEIGHT_COLLAPSED;
 
   let sx: number, sy: number, ex: number, ey: number;
 
   if (side === 'above') {
     // card sits above-right; string from card bottom-right area to outline top-right corner
     sx = cardLeft + cw - 22;
-    sy = cardTop + ch + cardLag;
+    sy = cardTop + cardH + cardLag;
     ex = outline.left + outline.width;
     ey = outline.top;
   } else if (side === 'below') {
@@ -220,13 +223,13 @@ function buildConnectorPath(
     ey = outline.top + outline.height;
   } else if (side === 'left') {
     sx = cardLeft + cw;
-    sy = cardTop + ch / 2 + cardLag;
+    sy = cardTop + cardH / 2 + cardLag;
     ex = outline.left;
     ey = outline.top + Math.min(outline.height / 2, 60);
   } else {
     // right: card to the right of the outline
     sx = cardLeft;
-    sy = cardTop + ch / 2 + cardLag;
+    sy = cardTop + cardH / 2 + cardLag;
     ex = outline.left + outline.width;
     ey = outline.top + Math.min(outline.height / 2, 60);
   }
@@ -419,8 +422,10 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
         // 3. Recompute card placement against the FRESH outline using the
         //    cached side decision (so the card never jumps sides
-        //    mid-presentation).
-        const { cardLeft, cardTop } = placeCardForSide(o, ae.cardSide, ds);
+        //    mid-presentation). Use the card's actual rendered height so
+        //    the gap stays right when the card is expanded.
+        const cardH = dom.card?.offsetHeight || CARD_HEIGHT_COLLAPSED;
+        const { cardLeft, cardTop } = placeCardForSide(o, ae.cardSide, ds, cardH);
 
         // 4. Compute bob — sin wave per card, with per-card phase offset.
         //    Lerp toward 0 when hovered (slow stop).
@@ -464,7 +469,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           dom.card.style.transform = `translateY(${totalLag.toFixed(2)}px)`;
         }
 
-        const dPath = buildConnectorPath(o, cardLeft, cardTop, ae.cardSide, totalLag);
+        const dPath = buildConnectorPath(o, cardLeft, cardTop, cardH, ae.cardSide, totalLag);
         if (dom.wirePath) dom.wirePath.setAttribute('d', dPath);
         if (dom.pulsePath) dom.pulsePath.setAttribute('d', dPath);
       }
@@ -588,6 +593,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
             { left: a.left, top: a.top, width: a.width, height: a.height },
             a.cardLeft,
             a.cardTop,
+            CARD_HEIGHT_COLLAPSED,
             a.cardSide,
             0,
           );
