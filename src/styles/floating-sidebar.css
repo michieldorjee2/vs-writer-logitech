@@ -286,34 +286,30 @@ body.xray-active .sticky-cta {
   opacity: 1;
 }
 
-/* Traced rectangle — animated draw-on via stroke-dashoffset */
+/* Traced rectangle — sharp corners (rx=0 in JSX) so the corner brackets
+ * sit cleanly at the geometric corners instead of overlapping a curve. */
 .xray-trace__rect {
   fill: rgba(0, 229, 255, 0.035);
-  stroke: rgba(0, 229, 255, 0.85);
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.45));
-  animation: xray-trace-draw 700ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
-  animation-delay: calc(var(--reveal-index, 0) * 80ms);
+  stroke: rgba(0, 229, 255, 0.65);
+  stroke-width: 1;
+  stroke-linejoin: miter;
+  filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.35));
+  opacity: 0;
+  animation: xray-trace-fade 320ms ease-out forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 80ms);
 }
 
-@keyframes xray-trace-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* Corner brackets — fade in once the rect is mostly drawn */
+/* Corner brackets — fade in just after the rect appears. */
 .xray-trace__corners {
   fill: none;
   stroke: var(--xray-accent);
-  stroke-width: 2.5;
+  stroke-width: 2.25;
   stroke-linecap: square;
   stroke-linejoin: miter;
   filter: drop-shadow(0 0 4px var(--xray-accent-glow));
   opacity: 0;
   animation: xray-trace-fade 280ms ease-out forwards;
-  animation-delay: calc(var(--reveal-index, 0) * 80ms + 380ms);
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 220ms);
 }
 
 /* Section number stamped in the top-left corner of each box */
@@ -326,7 +322,7 @@ body.xray-active .sticky-cta {
   filter: drop-shadow(0 0 4px var(--xray-accent-glow));
   opacity: 0;
   animation: xray-trace-fade 280ms ease-out forwards;
-  animation-delay: calc(var(--reveal-index, 0) * 80ms + 460ms);
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 320ms);
 }
 
 @keyframes xray-trace-fade {
@@ -335,18 +331,46 @@ body.xray-active .sticky-cta {
   }
 }
 
-/* Connector "balloon string" from card to component — staggered draw-on
- * after the trace rect finishes drawing. */
-.xray-trace__connector {
+/* Connector wire — solid faint glowing line that anchors the balloon. */
+.xray-trace__connector-wire {
   fill: none;
-  stroke: var(--xray-accent);
-  stroke-width: 1.25;
+  stroke: rgba(0, 229, 255, 0.55);
+  stroke-width: 1.1;
   stroke-linecap: round;
-  stroke-dasharray: 3 4;
   filter: drop-shadow(0 0 3px var(--xray-accent-glow));
   opacity: 0;
-  animation: xray-trace-fade 360ms ease-out forwards;
-  animation-delay: calc(var(--reveal-index, 0) * 80ms + 540ms);
+  animation: xray-trace-fade 400ms ease-out forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 380ms);
+}
+
+/* Connector pulse — bright "energy packet" that travels along the wire,
+ * powering the box. We use pathLength=100 so the dasharray stays visually
+ * consistent regardless of path length, and a stroke-dashoffset animation
+ * slides the packet from start (card) to end (component). */
+.xray-trace__connector-pulse {
+  fill: none;
+  stroke: #b8f7ff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 5 100;
+  filter:
+    drop-shadow(0 0 4px var(--xray-accent))
+    drop-shadow(0 0 9px var(--xray-accent-glow));
+  opacity: 0;
+  animation:
+    xray-pulse-travel 2.4s linear infinite,
+    xray-trace-fade 400ms ease-out forwards;
+  animation-delay:
+    calc(var(--reveal-index, 0) * 80ms + 380ms),
+    calc(var(--reveal-index, 0) * 80ms + 380ms);
+}
+
+@keyframes xray-pulse-travel {
+  /* Slide one short dash through the full path length. Negative offset
+   * pushes the dash from card-end to component-end so the energy looks
+   * like it's flowing INTO the box. */
+  from { stroke-dashoffset: 5; }
+  to   { stroke-dashoffset: -100; }
 }
 
 /* ------------ Scanline ------------ */
@@ -519,19 +543,20 @@ body.xray-active .sticky-cta {
 
 /* ------------ Annotation cards ------------ */
 
-/* Outer wrapper — owns absolute position + the rAF-driven scroll-drag.
- * --xray-scroll-lag is updated every frame by XrayMode.tsx; we route it
- * through transform translateY here so the card visibly trails the
- * scroll, like a balloon on a string. */
+/* Outer wrapper — owns absolute position + transform. The transform is
+ * written every frame by XrayMode's rAF loop and combines:
+ *  - scroll-lag (balloon trailing the page as it scrolls)
+ *  - per-card bob wave (gentle helium float)
+ * Doing both in JS keeps the connector strings glued to the card edges
+ * since the same totalLag value drives both ends in lock-step. */
 .xray-card {
   position: absolute;
   /* width is fixed (matches CARD_WIDTH in XrayMode.tsx — keep in sync) so
-   * the placement maths stay accurate. left/top come from inline style. */
+   * the placement maths stay accurate. left/top come from inline style,
+   * transform is written in rAF. */
   width: 300px;
   z-index: 5;
   pointer-events: auto;
-  transform: translateY(var(--xray-scroll-lag, 0px));
-  /* No transition on transform — the rAF loop already smooths things. */
   will-change: transform;
 }
 
@@ -540,10 +565,9 @@ body.xray-active .sticky-cta {
   z-index: 6;
 }
 
-/* Inner element — owns the visual style + the perpetual bob animation.
- * Splitting position-and-lag from bob-and-fade onto separate elements
- * lets us run two independent transforms without them overwriting each
- * other. */
+/* Inner element — visual style + one-shot opacity fade-in on reveal.
+ * Note: no transform animation here; the bob lives on the outer wrapper
+ * via JS so the connector endpoints can stay in sync. */
 .xray-card__inner {
   background: var(--xray-card-bg);
   border: 1px solid var(--xray-card-border);
@@ -555,56 +579,14 @@ body.xray-active .sticky-cta {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   overflow: hidden;
-  transform-origin: 80% 100%;
   opacity: 0;
-  animation:
-    xray-card-in 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    xray-card-float 7s ease-in-out infinite;
-  animation-delay:
-    calc(var(--reveal-index, 0) * 70ms + 200ms),
-    calc(var(--reveal-index, 0) * 70ms + 700ms + var(--float-delay, 0s));
-}
-
-.xray-card--below .xray-card__inner {
-  transform-origin: 80% 0%;
-  animation:
-    xray-card-in 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    xray-card-float-below 7s ease-in-out infinite;
-  animation-delay:
-    calc(var(--reveal-index, 0) * 70ms + 200ms),
-    calc(var(--reveal-index, 0) * 70ms + 700ms + var(--float-delay, 0s));
+  animation: xray-card-in 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 70ms + 200ms);
 }
 
 @keyframes xray-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-    filter: blur(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
-  }
-}
-
-@keyframes xray-card-float {
-  0%, 100% { transform: translateY(0) rotate(-0.25deg); }
-  50%      { transform: translateY(-7px) rotate(0.4deg); }
-}
-
-@keyframes xray-card-float-below {
-  0%, 100% { transform: translateY(0) rotate(0.25deg); }
-  50%      { transform: translateY(7px) rotate(-0.4deg); }
-}
-
-/* Pause the bob on hover so the user can read the contents without
- * it drifting under their cursor. `animation-play-state` is positional
- * — first value covers the one-shot enter animation, second covers the
- * float; we leave the enter "running" because it's already finished. */
-.xray-card:hover .xray-card__inner,
-.xray-card:focus-within .xray-card__inner {
-  animation-play-state: running, paused;
+  from { opacity: 0; filter: blur(6px); }
+  to   { opacity: 1; filter: blur(0); }
 }
 
 .xray-card__header {
