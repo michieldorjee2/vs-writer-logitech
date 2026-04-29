@@ -761,7 +761,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           <span className="xray-hud__title">X-RAY MODE</span>
           {phase === 'revealed' && (
             <span className="xray-hud__meta">
-              {anchorsInit.length} component{anchorsInit.length === 1 ? '' : 's'} · built by Aldus
+              {anchorsInit.length} component{anchorsInit.length === 1 ? '' : 's'} traced
             </span>
           )}
         </div>

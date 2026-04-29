@@ -170,6 +170,70 @@ function stripHtmlComments(): Plugin {
   };
 }
 
+/** Read the JSON body off a Node IncomingMessage (Vite dev middleware). */
+async function readJsonBody(req: any): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let raw = ''
+    req.on('data', (chunk: Buffer) => { raw += chunk.toString('utf-8') })
+    req.on('end', () => {
+      if (!raw) return resolve({})
+      try { resolve(JSON.parse(raw)) } catch (e) { reject(e) }
+    })
+    req.on('error', reject)
+  })
+}
+
+/**
+ * Dev-only same-origin proxy for the Opal "send feedback" webhook.
+ * Mirrors api/opal-feedback.ts so the dev server behaves like prod.
+ */
+function opalFeedbackDevProxy(): Plugin {
+  const OPAL_WEBHOOK_URL =
+    'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/4a159bac-e9fb-43d1-82c1-a4431baebedc'
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i
+
+  return {
+    name: 'opal-feedback-dev-proxy',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = new URL(req.url || '', 'http://localhost')
+        if (url.pathname !== '/api/opal-feedback') return next()
+        if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'Method not allowed' })
+
+        let body: any = {}
+        try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
+        const { company_name, company_slug, suggested_edit, edit_user_email } = body || {}
+
+        if (
+          typeof company_name !== 'string' || !company_name.trim() ||
+          typeof company_slug !== 'string' || !company_slug.trim() ||
+          typeof suggested_edit !== 'string' || !suggested_edit.trim() ||
+          typeof edit_user_email !== 'string' || !EMAIL_RE.test(edit_user_email)
+        ) {
+          return jsonResponse(res, 400, { error: 'Missing or invalid fields' })
+        }
+
+        try {
+          const upstream = await fetch(OPAL_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company_name, company_slug, suggested_edit, edit_user_email }),
+          })
+          const text = await upstream.text()
+          jsonResponse(res, upstream.ok ? 200 : 502, {
+            ok: upstream.ok,
+            status: upstream.status,
+            body: text.slice(0, 2000),
+          })
+        } catch (err) {
+          console.error('[opal-feedback-dev-proxy]', err)
+          jsonResponse(res, 502, { error: 'Upstream fetch failed' })
+        }
+      })
+    },
+  }
+}
+
 /**
  * Vite plugin that proxies /api/content and /api/preview during dev.
  * Auth keys stay server-side — never shipped to the browser.
@@ -227,6 +291,42 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
           return
         }
 
+        if (url.pathname === '/api/edit-status') {
+          const key = url.searchParams.get('key')
+          const since = url.searchParams.get('since')
+          if (!key) return jsonResponse(res, 400, { error: 'Missing key parameter' })
+
+          const STATUS_QUERY = `
+            query EditStatusByKey($key: String!) {
+              CompetitorComparisonPage(
+                where: { _metadata: { key: { eq: $key } } }
+                locale: en
+              ) {
+                items { _metadata { key published } }
+              }
+            }
+          `
+
+          try {
+            const json = await fetchGraph(authKey, STATUS_QUERY, { key })
+            const meta = (json as any)?.data?.CompetitorComparisonPage?.items?.[0]?._metadata
+            if (!meta) return jsonResponse(res, 404, { error: 'Page not found' })
+            // The dev server has no Vercel edge cache to purge; just
+            // surface the same `changed` shape so the client behaves
+            // identically against dev and prod.
+            const changed = !!since && meta.published !== since
+            res.setHeader('Cache-Control', 'no-store')
+            return jsonResponse(res, 200, {
+              key: meta.key,
+              published: meta.published,
+              changed,
+            })
+          } catch (err) {
+            console.error('[graph-dev-proxy]', err)
+            return jsonResponse(res, 500, { error: 'Graph fetch failed' })
+          }
+        }
+
         if (url.pathname === '/api/preview') {
           const key = url.searchParams.get('key')
           if (!key) return jsonResponse(res, 400, { error: 'Missing key parameter' })
@@ -265,6 +365,7 @@ export default defineConfig(({ mode }) => {
       react(),
       stripHtmlComments(),
       ...(authKey ? [graphDevProxy(authKey, singleKey)] : []),
+      opalFeedbackDevProxy(),
     ],
     resolve: {
       alias: {

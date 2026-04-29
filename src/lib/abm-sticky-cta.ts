@@ -14,7 +14,17 @@ let scrollElHandler: (() => void) | null = null;
 let resizeHandler: (() => void) | null = null;
 let scrollElRef: Element | null = null;
 
-export function initStickyCTA(): void {
+/**
+ * Initialise the sticky CTA bar.
+ *
+ * @param customerName  Title-cased name of the company the page is
+ *                      personalised for. Inserted into the ROI-section
+ *                      phase ("See what this means for {customerName}")
+ *                      so each page reads as bespoke. Falls back to
+ *                      "your team" when the caller doesn't supply one.
+ */
+export function initStickyCTA(customerName?: string): void {
+  const subject = customerName?.trim() || 'your team';
   const bar = document.getElementById('sticky-cta');
   const textEl = document.getElementById('sticky-cta-text');
   const hero = document.getElementById('hero');
@@ -38,7 +48,7 @@ export function initStickyCTA(): void {
     { id: 'challenge', text: 'See how we solve your challenges' },
     { id: 'comparison', text: 'Compare the platforms side by side' },
     { id: 'proof', text: 'Trusted by teams like yours' },
-    { id: 'roi', text: 'See what this means for NovaTech' },
+    { id: 'roi', text: `See what this means for ${subject}` },
     { id: 'migration', text: 'Your migration path is ready' },
   ];
 

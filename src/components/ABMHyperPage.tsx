@@ -3,6 +3,7 @@ import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { initABMAnimations, cleanupABMAnimations } from '../lib/abm-animations';
 import { initABMInteractions, cleanupABMInteractions } from '../lib/abm-interactions';
 import { initStickyCTA, cleanupStickyCTA } from '../lib/abm-sticky-cta';
+import { deriveCustomerName } from '../lib/page-identity';
 import { initWarpCTA, cleanupWarpCTA } from '../lib/abm-warp-cta';
 import { initHero3D, cleanupHero3D } from '../lib/abm-hero-3d';
 import GravatarAvatar from './GravatarAvatar';
@@ -101,7 +102,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
       initHero3D(page.customerLogo, page.brandDomain, page.brandAccentColor);
       initABMAnimations();
       initABMInteractions();
-      initStickyCTA();
+      initStickyCTA(deriveCustomerName(page));
       initWarpCTA(page.brandAccentColor);
     }, 100);
 

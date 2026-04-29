@@ -303,7 +303,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     html = html.replace('<script type="module"', `${ssrDataScript}\n    <script type="module"`);
 
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    /* `?refresh=…` is the deterministic cache-buster the
+     * FloatingSidebar toast appends right after a republish. Mark
+     * those responses uncacheable so the busted entry doesn't
+     * persist next to the canonical one. Everything else gets the
+     * standard 60s + 5min SWR window, *plus* a Cache-Tag so
+     * /api/edit-status can request a tag-purge — best-effort, since
+     * Vercel tag eviction is eventually consistent. */
+    const wantsFresh = url.searchParams.has('refresh');
+    res.setHeader(
+      'Cache-Control',
+      wantsFresh
+        ? 'no-store'
+        : 'public, s-maxage=60, stale-while-revalidate=300',
+    );
+    if (!wantsFresh && page._metadata?.key) {
+      res.setHeader('Cache-Tag', `page:${page._metadata.key}`);
+    }
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     return res.status(200).send(html);
   } catch (err) {

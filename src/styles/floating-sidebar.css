@@ -172,6 +172,25 @@ body.xray-active .sticky-cta {
   60%      { box-shadow: 0 0 0 6px rgba(0, 229, 255, 0.18); }
 }
 
+/* Scan-icon laser line — gentle vertical sweep so the button reads as
+ * an active scanner rather than a static frame. The two corners stay
+ * put; only the middle line moves. */
+.xray-sidebar__scan-line {
+  transform-origin: 12px 12px;
+  animation: xray-scan-sweep 2.2s ease-in-out infinite;
+}
+
+@keyframes xray-scan-sweep {
+  0%, 100% { transform: translateY(-3.5px); opacity: 0.55; }
+  50%      { transform: translateY(3.5px); opacity: 1; }
+}
+
+.xray-sidebar__btn--xray.xray-sidebar__btn--active .xray-sidebar__scan-line,
+.xray-sidebar__btn--xray:hover .xray-sidebar__scan-line {
+  /* Keep sweeping a touch faster on hover/active for a hint of liveness. */
+  animation-duration: 1.4s;
+}
+
 .xray-sidebar__btn--xray:hover {
   color: var(--xray-accent);
   border-color: var(--xray-accent-soft);
