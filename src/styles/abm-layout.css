@@ -2325,12 +2325,14 @@ html:has(.abm-page) {
     width: 10px;
     height: 10px;
   }
-  /* Competitor = 2nd child, Optimizely = 3rd child */
+  /* Competitor = 2nd child, Optimizely = 3rd child.
+     Labels come from --competitor-label / --optimizely-label set on
+     .comparison__table, falling back to the desktop header strings. */
   .comparison__row .comparison__rating:nth-child(2)::before {
-    content: 'AEM';
+    content: var(--competitor-label, 'Competitor');
   }
   .comparison__row .comparison__rating:nth-child(3)::before {
-    content: 'Opti';
+    content: var(--optimizely-label, 'Optimizely');
     color: var(--accent-secondary);
   }
   /* Subtle top border between the two ratings */

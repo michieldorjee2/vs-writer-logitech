@@ -347,7 +347,15 @@ const ABMHyperPageServer = ({ page }: Props) => {
               )}
             </div>
 
-            <div className="comparison__table" data-animate="fade-up" data-delay="0.2">
+            <div
+              className="comparison__table"
+              data-animate="fade-up"
+              data-delay="0.2"
+              style={{
+                ['--competitor-label' as string]: `"${page.competitorName || 'Competitor'}"`,
+                ['--optimizely-label' as string]: '"Optimizely"',
+              } as React.CSSProperties}
+            >
               <div className="comparison__header-row">
                 <div className="comparison__feature-label">Feature</div>
                 <div className="comparison__competitor-label">
