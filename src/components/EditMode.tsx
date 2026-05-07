@@ -8,6 +8,7 @@ import {
   type XraySectionInfo,
 } from '../lib/xray-defaults';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
+import { isValidOptimizelyEmail, loadStoredEmail, saveStoredEmail } from '../lib/stored-email';
 import '../styles/edit-mode.css';
 
 interface Props {
@@ -36,37 +37,6 @@ const DOC_MARGIN = 16;
 /* Same-origin proxy — the upstream Opal webhook doesn't send CORS
  * headers, so we can't fetch() it from the browser directly. */
 const OPAL_FEEDBACK_ENDPOINT = '/api/opal-feedback';
-
-const EMAIL_KEY = 'opti.editmode.email.v1';
-const EMAIL_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year — browser hard cap on cookie life
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
-
-type StoredEmail = { email: string; setAt: number };
-
-function loadStoredEmail(): string | null {
-  try {
-    const raw = localStorage.getItem(EMAIL_KEY);
-    if (!raw) return null;
-    const parsed: StoredEmail = JSON.parse(raw);
-    if (!parsed?.email || typeof parsed.setAt !== 'number') return null;
-    if (Date.now() - parsed.setAt > EMAIL_TTL_MS) {
-      localStorage.removeItem(EMAIL_KEY);
-      return null;
-    }
-    return parsed.email;
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredEmail(email: string): void {
-  try {
-    const payload: StoredEmail = { email, setAt: Date.now() };
-    localStorage.setItem(EMAIL_KEY, JSON.stringify(payload));
-  } catch {
-    /* localStorage might be disabled — silently ignore. */
-  }
-}
 
 function getDocSize(): DocSize {
   if (typeof window === 'undefined') return { w: 1280, h: 720 };
@@ -351,8 +321,8 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
 
   const commitEmail = useCallback(() => {
     const trimmed = emailDraft.trim();
-    if (!EMAIL_RE.test(trimmed)) {
-      setEmailError('Please enter a valid email address');
+    if (!isValidOptimizelyEmail(trimmed)) {
+      setEmailError('Please enter a valid @optimizely.com email');
       return;
     }
     setEmail(trimmed);

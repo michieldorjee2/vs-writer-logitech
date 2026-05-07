@@ -235,6 +235,62 @@ function opalFeedbackDevProxy(): Plugin {
 }
 
 /**
+ * Dev-only same-origin proxy for the Opal "create page" webhook.
+ * Mirrors api/opal-create-page.ts so the dev server behaves like prod.
+ */
+function opalCreatePageDevProxy(): Plugin {
+  const OPAL_WEBHOOK_URL =
+    'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/632a7f56-733d-41d0-b71a-6da3b657c5c6'
+  const OPTIMIZELY_EMAIL_RE = /^[^\s@]+@optimizely\.com$/i
+  const MAX_COMPANY_NAME_LEN = 120
+
+  return {
+    name: 'opal-create-page-dev-proxy',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = new URL(req.url || '', 'http://localhost')
+        if (url.pathname !== '/api/opal-create-page') return next()
+        if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'Method not allowed' })
+
+        let body: any = {}
+        try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
+        const { company_name, edit_user_email } = body || {}
+
+        if (
+          typeof company_name !== 'string' ||
+          !company_name.trim() ||
+          company_name.trim().length > MAX_COMPANY_NAME_LEN ||
+          typeof edit_user_email !== 'string' ||
+          !OPTIMIZELY_EMAIL_RE.test(edit_user_email)
+        ) {
+          return jsonResponse(res, 400, { error: 'Missing or invalid fields' })
+        }
+
+        try {
+          const upstream = await fetch(OPAL_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              company_name: company_name.trim(),
+              edit_user_email,
+            }),
+          })
+          const text = await upstream.text()
+          jsonResponse(res, upstream.ok ? 200 : 502, {
+            ok: upstream.ok,
+            status: upstream.status,
+            body: text.slice(0, 2000),
+          })
+        } catch (err) {
+          console.error('[opal-create-page-dev-proxy]', err)
+          jsonResponse(res, 502, { error: 'Upstream fetch failed' })
+        }
+      })
+    },
+  }
+}
+
+/**
  * Vite plugin that proxies /api/content and /api/preview during dev.
  * Auth keys stay server-side — never shipped to the browser.
  */
@@ -366,6 +422,7 @@ export default defineConfig(({ mode }) => {
       stripHtmlComments(),
       ...(authKey ? [graphDevProxy(authKey, singleKey)] : []),
       opalFeedbackDevProxy(),
+      opalCreatePageDevProxy(),
     ],
     resolve: {
       alias: {

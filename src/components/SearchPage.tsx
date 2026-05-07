@@ -3,7 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { startSearchStarfield } from '../lib/search-starfield';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
+import {
+  isValidOptimizelyEmail,
+  loadStoredEmail,
+  saveStoredEmail,
+} from '../lib/stored-email';
 import '../styles/search.css';
+
+const CREATE_PAGE_ENDPOINT = '/api/opal-create-page';
+const MAX_COMPANY_NAME_LEN = 120;
+type CreatePhase = 'idle' | 'sending' | 'success' | 'error';
 
 type IndexItem = {
   _metadata: { url: { default: string; hierarchical: string }; published: string | null };
@@ -170,6 +179,18 @@ function SearchPage() {
   const [focused, setFocused] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [recentSlugs, setRecentSlugs] = useState<string[]>(readRecent);
+
+  // "Add new" flow — modal state, shared email storage with Edit mode.
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createCompany, setCreateCompany] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [createCompanyError, setCreateCompanyError] = useState<string | null>(null);
+  const [createEmailError, setCreateEmailError] = useState<string | null>(null);
+  const [createPhase, setCreatePhase] = useState<CreatePhase>('idle');
+  const [createNetworkError, setCreateNetworkError] = useState<string | null>(null);
+  const createCompanyRef = useRef<HTMLInputElement | null>(null);
+  const createEmailRef = useRef<HTMLInputElement | null>(null);
 
   /* Load the search index on mount, then refresh silently every 5 min so
      the count stays fresh on a booth-mode iPad without a full reload. */
@@ -354,10 +375,132 @@ function SearchPage() {
 
   const showSearchResults = focused || query.length > 0;
 
+  /* ---- Add-new modal handlers ---- */
+  const openCreate = useCallback(() => {
+    const stored = loadStoredEmail();
+    setCreateCompany('');
+    setCreateCompanyError(null);
+    setCreateEmailError(null);
+    setCreateNetworkError(null);
+    setCreatePhase('idle');
+    if (stored) {
+      setCreateEmail(stored);
+      setNeedsEmail(false);
+    } else {
+      setCreateEmail('');
+      setNeedsEmail(true);
+    }
+    setCreateOpen(true);
+  }, []);
+
+  const closeCreate = useCallback(() => {
+    if (createPhase === 'sending') return;
+    setCreateOpen(false);
+  }, [createPhase]);
+
+  const submitCreate = useCallback(async () => {
+    const company = createCompany.trim();
+    const emailValue = (needsEmail ? createEmail : loadStoredEmail() || createEmail).trim();
+
+    let bad = false;
+    if (!company) {
+      setCreateCompanyError('Enter a company name');
+      bad = true;
+    } else if (company.length > MAX_COMPANY_NAME_LEN) {
+      setCreateCompanyError(`Keep it under ${MAX_COMPANY_NAME_LEN} characters`);
+      bad = true;
+    } else {
+      setCreateCompanyError(null);
+    }
+
+    if (needsEmail) {
+      if (!isValidOptimizelyEmail(emailValue)) {
+        setCreateEmailError('Use your @optimizely.com email');
+        bad = true;
+      } else {
+        setCreateEmailError(null);
+      }
+    } else if (!isValidOptimizelyEmail(emailValue)) {
+      // Stored email turned out to be invalid — fall back to asking.
+      setNeedsEmail(true);
+      setCreateEmail('');
+      setCreateEmailError('Use your @optimizely.com email');
+      bad = true;
+    }
+
+    if (bad) return;
+
+    setCreatePhase('sending');
+    setCreateNetworkError(null);
+
+    if (needsEmail) saveStoredEmail(emailValue);
+
+    try {
+      const r = await fetch(CREATE_PAGE_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: company,
+          edit_user_email: emailValue,
+        }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      setCreatePhase('success');
+      window.setTimeout(() => {
+        setCreateOpen(false);
+      }, 2200);
+    } catch (err) {
+      setCreatePhase('error');
+      setCreateNetworkError(err instanceof Error ? err.message : 'Network error');
+    }
+  }, [createCompany, createEmail, needsEmail]);
+
+  /* ---- Focus the right input when the modal opens ---- */
+  useEffect(() => {
+    if (!createOpen) return;
+    const t = window.setTimeout(() => {
+      createCompanyRef.current?.focus();
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [createOpen]);
+
+  /* ---- ESC closes the modal ---- */
+  useEffect(() => {
+    if (!createOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCreate();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [createOpen, closeCreate]);
+
   return (
     <div className="search-page">
       <canvas ref={canvasRef} className="search-page__starfield" />
       <div className="search-page__orb" />
+
+      <button
+        type="button"
+        className="search-page__add-new"
+        onClick={openCreate}
+        aria-label="Add a new company"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+        <span>Add new</span>
+      </button>
 
       <div className="search-page__app">
         <div className="search-page__brand">
@@ -506,6 +649,167 @@ function SearchPage() {
           </div>
         )}
       </div>
+
+      {createOpen && (
+        <div
+          className="search-page__modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add a new company"
+          onClick={closeCreate}
+        >
+          <div
+            className="search-page__modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="search-page__modal-close"
+              onClick={closeCreate}
+              aria-label="Close"
+              disabled={createPhase === 'sending'}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+
+            {createPhase === 'success' ? (
+              <div className="search-page__modal-success">
+                <div className="search-page__modal-success-check" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </div>
+                <h3 className="search-page__modal-title">Sent to Opal</h3>
+                <p className="search-page__modal-sub">
+                  We're spinning up a page for <b>{createCompany.trim()}</b>. You'll get an email when it's live.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="search-page__modal-icon" aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                </div>
+                <h3 className="search-page__modal-title">Add a new company</h3>
+                <p className="search-page__modal-sub">
+                  Opal will build a fresh comparison page for the company you name. We'll email you when it's ready.
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    submitCreate();
+                  }}
+                >
+                  <label className="search-page__modal-label" htmlFor="add-new-company">
+                    Company name
+                  </label>
+                  <input
+                    id="add-new-company"
+                    ref={createCompanyRef}
+                    type="text"
+                    className={
+                      'search-page__modal-input search-page__modal-input--short' +
+                      (createCompanyError ? ' search-page__modal-input--error' : '')
+                    }
+                    value={createCompany}
+                    placeholder="Acme Co."
+                    autoComplete="organization"
+                    maxLength={MAX_COMPANY_NAME_LEN}
+                    onChange={(e) => {
+                      setCreateCompany(e.target.value);
+                      if (createCompanyError) setCreateCompanyError(null);
+                    }}
+                    disabled={createPhase === 'sending'}
+                  />
+                  {createCompanyError && (
+                    <div className="search-page__modal-error">{createCompanyError}</div>
+                  )}
+
+                  {needsEmail && (
+                    <>
+                      <label className="search-page__modal-label" htmlFor="add-new-email">
+                        Your email
+                      </label>
+                      <input
+                        id="add-new-email"
+                        ref={createEmailRef}
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        className={
+                          'search-page__modal-input' +
+                          (createEmailError ? ' search-page__modal-input--error' : '')
+                        }
+                        value={createEmail}
+                        placeholder="you@optimizely.com"
+                        onChange={(e) => {
+                          setCreateEmail(e.target.value);
+                          if (createEmailError) setCreateEmailError(null);
+                        }}
+                        disabled={createPhase === 'sending'}
+                      />
+                      {createEmailError && (
+                        <div className="search-page__modal-error">{createEmailError}</div>
+                      )}
+                    </>
+                  )}
+
+                  {!needsEmail && (
+                    <div className="search-page__modal-meta">
+                      Sending as <b>{createEmail}</b>
+                    </div>
+                  )}
+
+                  {createNetworkError && (
+                    <div className="search-page__modal-error search-page__modal-error--block">
+                      Couldn't reach Opal. Try again in a moment.
+                    </div>
+                  )}
+
+                  <div className="search-page__modal-actions">
+                    <button
+                      type="button"
+                      className="search-page__modal-btn search-page__modal-btn--ghost"
+                      onClick={closeCreate}
+                      disabled={createPhase === 'sending'}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="search-page__modal-btn search-page__modal-btn--primary"
+                      disabled={createPhase === 'sending'}
+                    >
+                      {createPhase === 'sending' ? (
+                        <>
+                          <span className="search-page__modal-spinner" aria-hidden="true" />
+                          <span>Sending…</span>
+                        </>
+                      ) : (
+                        <span>Send</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
