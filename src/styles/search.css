@@ -461,291 +461,162 @@
 }
 
 /* ============================================================
-   "Add new" — top-right secondary action + modal prompt
+   "Add new" — empty-state CTA + inline bar takeover
    ============================================================ */
 
-.search-page__add-new {
-  position: fixed;
-  top: 22px;
-  right: 22px;
-  z-index: 6;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: rgba(25, 30, 40, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--sp-border-medium);
-  color: var(--sp-fg-2);
-  font-family: var(--sp-font-display);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  cursor: pointer;
-  transition: background 0.2s var(--sp-ease-out),
-              border-color 0.2s var(--sp-ease-out),
-              color 0.2s var(--sp-ease-out),
-              transform 0.2s var(--sp-ease-out),
-              box-shadow 0.2s var(--sp-ease-out);
-  opacity: 0;
-  animation: sp-rise 0.8s var(--sp-ease-out) 0.4s forwards;
-}
-
-.search-page__add-new:hover {
-  background: color-mix(in srgb, var(--sp-accent) 18%, rgba(25, 30, 40, 0.85));
-  border-color: var(--sp-border-accent);
-  color: var(--sp-fg-1);
-  transform: translateY(-1px);
-  box-shadow: 0 0 24px var(--sp-glow);
-}
-
-.search-page__add-new svg { color: var(--sp-accent-soft); }
-
-/* Modal */
-
-.search-page__modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1003;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(4, 8, 18, 0.62);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  font-family: var(--sp-font-display);
-  padding: 16px;
-  animation: sp-modal-fade 220ms ease-out;
-}
-
-@keyframes sp-modal-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.search-page__modal-card {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  background: linear-gradient(180deg, rgba(20, 28, 45, 0.98), rgba(13, 19, 32, 0.98));
-  border: 1px solid var(--sp-border-accent);
-  border-radius: 18px;
-  padding: 26px 26px 22px;
-  color: var(--sp-fg-1);
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.55),
-    0 0 50px var(--sp-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  animation: sp-modal-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes sp-modal-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.search-page__modal-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: var(--sp-fg-2);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.search-page__modal-close:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-}
-.search-page__modal-close:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.search-page__modal-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--sp-accent) 40%, transparent), color-mix(in srgb, var(--sp-accent) 15%, transparent));
-  border: 1px solid var(--sp-border-accent);
-  color: #ccd7ff;
-  margin-bottom: 14px;
-  box-shadow: 0 0 24px var(--sp-glow);
-}
-
-.search-page__modal-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 6px;
-  color: #ffffff;
-  letter-spacing: -0.015em;
-}
-
-.search-page__modal-sub {
-  font-size: 13px;
-  color: var(--sp-fg-2);
-  margin: 0 0 18px;
-  line-height: 1.5;
-}
-
-.search-page__modal-label {
+/* Empty-state CTA — shown when a search returns no matches. The
+ * existing `.search-page__empty` block already covers the surrounding
+ * panel; this is the action that nudges the user to create a page. */
+.search-page__empty-line {
   display: block;
-  font-family: var(--sp-font-mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--sp-fg-3);
-  margin: 6px 0 6px;
 }
 
-.search-page__modal-input {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--sp-border-medium);
-  border-radius: 10px;
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 14px;
-  padding: 12px 14px;
-  outline: none;
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
-  box-sizing: border-box;
-}
-
-/* Short variant — keep the company-name field visually compact. */
-.search-page__modal-input--short {
-  max-width: 280px;
-}
-
-.search-page__modal-input::placeholder { color: var(--sp-fg-3); }
-
-.search-page__modal-input:focus {
-  border-color: var(--sp-accent);
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 22%, transparent);
-}
-
-.search-page__modal-input--error {
-  border-color: #ff6b6b !important;
-  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.15) !important;
-}
-
-.search-page__modal-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.search-page__modal-error {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #ff9090;
-}
-
-.search-page__modal-error--block {
-  margin-top: 12px;
-}
-
-.search-page__modal-meta {
-  margin-top: 12px;
-  font-family: var(--sp-font-mono);
-  font-size: 11px;
-  color: var(--sp-fg-3);
-}
-.search-page__modal-meta b {
-  color: var(--sp-fg-1);
-  font-weight: 600;
-}
-
-.search-page__modal-actions {
-  margin-top: 20px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.search-page__modal-btn {
-  appearance: none;
-  border-radius: 10px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 10px 18px;
-  cursor: pointer;
+.search-page__empty-cta {
+  margin: 14px 0 4px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
-}
-
-.search-page__modal-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.search-page__modal-btn--ghost {
-  background: transparent;
-  border: 1px solid var(--sp-border-medium);
-  color: var(--sp-fg-2);
-}
-
-.search-page__modal-btn--ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-}
-
-.search-page__modal-btn--primary {
+  gap: 10px;
+  padding: 11px 18px 11px 16px;
+  border-radius: 999px;
   background: var(--sp-accent);
   border: 1px solid var(--sp-accent);
   color: #ffffff;
+  font-family: var(--sp-font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
   box-shadow: 0 6px 22px var(--sp-glow);
+  transition: background 0.2s var(--sp-ease-out),
+              border-color 0.2s var(--sp-ease-out),
+              transform 0.2s var(--sp-ease-out),
+              box-shadow 0.2s var(--sp-ease-out);
 }
 
-.search-page__modal-btn--primary:hover:not(:disabled) {
+.search-page__empty-cta:hover:not(:disabled) {
   background: var(--sp-accent-hover);
   transform: translateY(-1px);
+  box-shadow: 0 10px 28px var(--sp-glow-strong);
 }
 
-.search-page__modal-spinner {
+.search-page__empty-cta b {
+  font-weight: 700;
+}
+
+.search-page__empty-cta--cooldown {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--sp-border-medium);
+  color: var(--sp-fg-2);
+  box-shadow: none;
+  cursor: not-allowed;
+  font-family: var(--sp-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.search-page__empty-cta--cooldown:hover { transform: none; }
+.search-page__empty-cta--cooldown svg { color: var(--sp-fg-3); }
+
+/* Bar swap — when in add-mode the wrap takes a softer accent so the
+ * mode change reads as deliberate (not just a placeholder change). */
+.search-page__searchwrap--add .search-page__search {
+  border-color: var(--sp-border-accent);
+  background: rgba(25, 30, 40, 0.85);
+  box-shadow: 0 0 36px var(--sp-glow);
+}
+
+/* The success state pulses briefly so the take-off is felt. */
+.search-page__search--sent {
+  border-color: var(--sp-border-accent) !important;
+  background: color-mix(in srgb, var(--sp-accent) 12%, rgba(25, 30, 40, 0.85)) !important;
+  animation: sp-sent-pulse 600ms var(--sp-ease-out);
+}
+
+@keyframes sp-sent-pulse {
+  0%   { box-shadow: 0 0 0 var(--sp-glow); }
+  40%  { box-shadow: 0 0 60px var(--sp-glow-strong); }
+  100% { box-shadow: 0 0 28px var(--sp-glow); }
+}
+
+/* Add-mode primary action — uses the same pill shape as Open but with
+ * a small glow shift so the visual diff between the two modes lands. */
+.search-page__action--add {
+  background: var(--sp-accent);
+}
+.search-page__action--add:hover:not(:disabled) {
+  background: var(--sp-accent-hover);
+}
+
+/* Cancel (X) lives between input and primary action. */
+.search-page__cancel {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--sp-fg-3);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.18s var(--sp-ease-out),
+              color 0.18s var(--sp-ease-out);
+}
+.search-page__cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sp-fg-1);
+}
+.search-page__cancel:disabled { opacity: 0.4; cursor: not-allowed; }
+.search-page__cancel svg { width: 16px; height: 16px; }
+
+/* Success-state icon (check) takes on the accent so the bar feels lit-up. */
+.search-page__icon--success {
+  color: var(--sp-accent-soft);
+  animation: sp-pop-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sp-pop-in {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Status text shown inside the bar's field area on success. */
+.search-page__add-status {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--sp-fg-1);
+  letter-spacing: -0.005em;
+}
+.search-page__add-status b { color: #ffffff; font-weight: 700; }
+
+/* Hint line below the bar while the user fills in email or company. */
+.search-page__add-hint {
+  margin-top: 14px;
+  text-align: center;
+  font-family: var(--sp-font-mono);
+  font-size: 11.5px;
+  color: var(--sp-fg-3);
+  letter-spacing: 0.02em;
+  animation: sp-rise 0.4s var(--sp-ease-out);
+}
+.search-page__add-hint b { color: var(--sp-fg-1); font-weight: 600; }
+
+.search-page__add-hint--error {
+  color: #ff9090;
+}
+
+/* Inline spinner on the Add button while submitting. */
+.search-page__spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: #ffffff;
-  animation: sp-modal-spin 0.8s linear infinite;
+  animation: sp-spin 0.8s linear infinite;
 }
 
-@keyframes sp-modal-spin {
+@keyframes sp-spin {
   to { transform: rotate(360deg); }
 }
-
-/* Success card layout */
-.search-page__modal-success {
-  text-align: center;
-  padding: 8px 4px 0;
-}
-
-.search-page__modal-success-check {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--sp-accent) 22%, transparent);
-  border: 1px solid var(--sp-border-accent);
-  color: #ccd7ff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 14px;
-  box-shadow: 0 0 32px var(--sp-glow-strong);
-  animation: sp-modal-pop 320ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes sp-modal-pop {
-  from { opacity: 0; transform: scale(0.7); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.search-page__modal-success b { color: #ffffff; font-weight: 600; }

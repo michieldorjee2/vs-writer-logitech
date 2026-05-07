@@ -12,7 +12,29 @@ import '../styles/search.css';
 
 const CREATE_PAGE_ENDPOINT = '/api/opal-create-page';
 const MAX_COMPANY_NAME_LEN = 120;
-type CreatePhase = 'idle' | 'sending' | 'success' | 'error';
+const COOLDOWN_MS = 60 * 1000;
+const COOLDOWN_KEY = 'opti.add-new.last-sent.v1';
+
+/** Inline "add new" phases: replaces the search input + Open button while active. */
+type AddPhase = null | 'email' | 'company' | 'sent';
+
+function readLastSent(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = window.localStorage.getItem(COOLDOWN_KEY);
+    return raw ? Number(raw) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeLastSent(t: number): void {
+  try {
+    window.localStorage.setItem(COOLDOWN_KEY, String(t));
+  } catch {
+    /* ignore */
+  }
+}
 
 type IndexItem = {
   _metadata: { url: { default: string; hierarchical: string }; published: string | null };
@@ -180,17 +202,15 @@ function SearchPage() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [recentSlugs, setRecentSlugs] = useState<string[]>(readRecent);
 
-  // "Add new" flow — modal state, shared email storage with Edit mode.
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createCompany, setCreateCompany] = useState('');
-  const [createEmail, setCreateEmail] = useState('');
-  const [needsEmail, setNeedsEmail] = useState(false);
-  const [createCompanyError, setCreateCompanyError] = useState<string | null>(null);
-  const [createEmailError, setCreateEmailError] = useState<string | null>(null);
-  const [createPhase, setCreatePhase] = useState<CreatePhase>('idle');
-  const [createNetworkError, setCreateNetworkError] = useState<string | null>(null);
-  const createCompanyRef = useRef<HTMLInputElement | null>(null);
-  const createEmailRef = useRef<HTMLInputElement | null>(null);
+  // "Add new" flow — inline takeover of the search bar.
+  const [addPhase, setAddPhase] = useState<AddPhase>(null);
+  const [addCompany, setAddCompany] = useState('');
+  const [addEmail, setAddEmail] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [lastSent, setLastSent] = useState<number>(() => readLastSent());
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const addInputRef = useRef<HTMLInputElement | null>(null);
 
   /* Load the search index on mount, then refresh silently every 5 min so
      the count stays fresh on a booth-mode iPad without a full reload. */
@@ -375,132 +395,131 @@ function SearchPage() {
 
   const showSearchResults = focused || query.length > 0;
 
-  /* ---- Add-new modal handlers ---- */
-  const openCreate = useCallback(() => {
+  /* ---- Cooldown bookkeeping ----
+   *
+   * We persist the last successful submission so a refresh doesn't bypass
+   * the throttle. While a cooldown is active we tick `nowMs` once a second
+   * so the button label can count down.
+   */
+  const cooldownRemaining = Math.max(
+    0,
+    Math.ceil((lastSent + COOLDOWN_MS - nowMs) / 1000),
+  );
+  const inCooldown = cooldownRemaining > 0;
+
+  useEffect(() => {
+    if (!inCooldown) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [inCooldown]);
+
+  /* ---- Add-mode (inline) handlers ----
+   *
+   * `presetCompany` lets us pre-fill the company name from the user's
+   * search query when they hit "Create page" in the empty-state CTA.
+   */
+  const enterAddMode = useCallback((presetCompany?: string) => {
+    if (inCooldown) return;
     const stored = loadStoredEmail();
-    setCreateCompany('');
-    setCreateCompanyError(null);
-    setCreateEmailError(null);
-    setCreateNetworkError(null);
-    setCreatePhase('idle');
+    setAddCompany(presetCompany?.trim() || '');
+    setAddError(null);
+    setSubmitting(false);
     if (stored) {
-      setCreateEmail(stored);
-      setNeedsEmail(false);
+      setAddEmail(stored);
+      setAddPhase('company');
     } else {
-      setCreateEmail('');
-      setNeedsEmail(true);
+      setAddEmail('');
+      setAddPhase('email');
     }
-    setCreateOpen(true);
-  }, []);
+  }, [inCooldown]);
 
-  const closeCreate = useCallback(() => {
-    if (createPhase === 'sending') return;
-    setCreateOpen(false);
-  }, [createPhase]);
+  const exitAddMode = useCallback(() => {
+    if (submitting) return;
+    setAddPhase(null);
+    setAddError(null);
+  }, [submitting]);
 
-  const submitCreate = useCallback(async () => {
-    const company = createCompany.trim();
-    const emailValue = (needsEmail ? createEmail : loadStoredEmail() || createEmail).trim();
+  const submitAddEmail = useCallback(() => {
+    const v = addEmail.trim();
+    if (!isValidOptimizelyEmail(v)) {
+      setAddError('Use your @optimizely.com email');
+      return;
+    }
+    saveStoredEmail(v);
+    setAddEmail(v);
+    setAddError(null);
+    setAddPhase('company');
+  }, [addEmail]);
 
-    let bad = false;
+  const submitAddCompany = useCallback(async () => {
+    const company = addCompany.trim();
     if (!company) {
-      setCreateCompanyError('Enter a company name');
-      bad = true;
-    } else if (company.length > MAX_COMPANY_NAME_LEN) {
-      setCreateCompanyError(`Keep it under ${MAX_COMPANY_NAME_LEN} characters`);
-      bad = true;
-    } else {
-      setCreateCompanyError(null);
+      setAddError('Enter a company name');
+      return;
+    }
+    if (company.length > MAX_COMPANY_NAME_LEN) {
+      setAddError(`Keep it under ${MAX_COMPANY_NAME_LEN} characters`);
+      return;
     }
 
-    if (needsEmail) {
-      if (!isValidOptimizelyEmail(emailValue)) {
-        setCreateEmailError('Use your @optimizely.com email');
-        bad = true;
-      } else {
-        setCreateEmailError(null);
-      }
-    } else if (!isValidOptimizelyEmail(emailValue)) {
-      // Stored email turned out to be invalid — fall back to asking.
-      setNeedsEmail(true);
-      setCreateEmail('');
-      setCreateEmailError('Use your @optimizely.com email');
-      bad = true;
+    const email = (loadStoredEmail() || addEmail).trim();
+    if (!isValidOptimizelyEmail(email)) {
+      // Stored email got cleared / invalidated — fall back to email step.
+      setAddEmail('');
+      setAddPhase('email');
+      setAddError('Use your @optimizely.com email');
+      return;
     }
 
-    if (bad) return;
-
-    setCreatePhase('sending');
-    setCreateNetworkError(null);
-
-    if (needsEmail) saveStoredEmail(emailValue);
-
+    setSubmitting(true);
+    setAddError(null);
     try {
       const r = await fetch(CREATE_PAGE_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           company_name: company,
-          edit_user_email: emailValue,
+          edit_user_email: email,
         }),
       });
       if (!r.ok) throw new Error(`${r.status}`);
-      setCreatePhase('success');
+      const t = Date.now();
+      setLastSent(t);
+      setNowMs(t);
+      writeLastSent(t);
+      setAddPhase('sent');
       window.setTimeout(() => {
-        setCreateOpen(false);
-      }, 2200);
-    } catch (err) {
-      setCreatePhase('error');
-      setCreateNetworkError(err instanceof Error ? err.message : 'Network error');
+        setAddPhase(null);
+        setAddError(null);
+      }, 2400);
+    } catch {
+      setAddError("Couldn't reach Opal. Try again.");
+    } finally {
+      setSubmitting(false);
     }
-  }, [createCompany, createEmail, needsEmail]);
+  }, [addCompany, addEmail]);
 
-  /* ---- Focus the right input when the modal opens ---- */
+  /* ---- Focus the active add-mode input on phase change ---- */
   useEffect(() => {
-    if (!createOpen) return;
-    const t = window.setTimeout(() => {
-      createCompanyRef.current?.focus();
-    }, 60);
+    if (addPhase !== 'email' && addPhase !== 'company') return;
+    const t = window.setTimeout(() => addInputRef.current?.focus(), 60);
     return () => window.clearTimeout(t);
-  }, [createOpen]);
+  }, [addPhase]);
 
-  /* ---- ESC closes the modal ---- */
+  /* ---- ESC exits add mode ---- */
   useEffect(() => {
-    if (!createOpen) return;
+    if (!addPhase) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeCreate();
+      if (e.key === 'Escape') exitAddMode();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [createOpen, closeCreate]);
+  }, [addPhase, exitAddMode]);
 
   return (
     <div className="search-page">
       <canvas ref={canvasRef} className="search-page__starfield" />
       <div className="search-page__orb" />
-
-      <button
-        type="button"
-        className="search-page__add-new"
-        onClick={openCreate}
-        aria-label="Add a new company"
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 5v14" />
-          <path d="M5 12h14" />
-        </svg>
-        <span>Add new</span>
-      </button>
 
       <div className="search-page__app">
         <div className="search-page__brand">
@@ -514,81 +533,266 @@ function SearchPage() {
         <div
           className={
             'search-page__searchwrap' +
-            (focused ? ' search-page__searchwrap--focused' : '')
+            (focused && !addPhase ? ' search-page__searchwrap--focused' : '') +
+            (addPhase ? ' search-page__searchwrap--add' : '')
           }
         >
-          <div className="search-page__search">
-            <svg
-              className="search-page__icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.35-4.35" />
-            </svg>
+          <div
+            className={
+              'search-page__search' +
+              (addPhase ? ' search-page__search--add' : '') +
+              (addPhase === 'sent' ? ' search-page__search--sent' : '')
+            }
+          >
+            {!addPhase ? (
+              <>
+                <svg
+                  className="search-page__icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
 
-            <div className="search-page__field">
-              {ghostText && (
-                <div className="search-page__ghost" aria-hidden="true">
-                  <b>{ghostText.typed}</b>
-                  {ghostText.rest}
+                <div className="search-page__field">
+                  {ghostText && (
+                    <div className="search-page__ghost" aria-hidden="true">
+                      <b>{ghostText.typed}</b>
+                      {ghostText.rest}
+                    </div>
+                  )}
+                  <input
+                    ref={inputRef}
+                    className="search-page__input"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={
+                      totalPages !== null
+                        ? `${displayCount.toLocaleString()} brands and counting…`
+                        : 'Search a company…'
+                    }
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setActiveIdx(0);
+                    }}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => {
+                      // Defer so click-on-option fires first
+                      setTimeout(() => setFocused(false), 150);
+                    }}
+                    onKeyDown={handleKeyDown}
+                  />
                 </div>
-              )}
-              <input
-                ref={inputRef}
-                className="search-page__input"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={
-                  totalPages !== null
-                    ? `${displayCount.toLocaleString()} brands and counting…`
-                    : 'Search a company…'
-                }
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setActiveIdx(0);
-                }}
-                onFocus={() => setFocused(true)}
-                onBlur={() => {
-                  // Defer so click-on-option fires first
-                  setTimeout(() => setFocused(false), 150);
-                }}
-                onKeyDown={handleKeyDown}
-              />
-            </div>
 
-            <button
-              className="search-page__action"
-              type="button"
-              disabled={!results.length}
-              onClick={() => {
-                const entry = results[activeIdx] || results[0];
-                if (entry) select(entry);
-              }}
-            >
-              <span>Open</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14" />
-                <path d="M13 5l7 7-7 7" />
-              </svg>
-            </button>
+                <button
+                  className="search-page__action"
+                  type="button"
+                  disabled={!results.length}
+                  onClick={() => {
+                    const entry = results[activeIdx] || results[0];
+                    if (entry) select(entry);
+                  }}
+                >
+                  <span>Open</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14" />
+                    <path d="M13 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            ) : addPhase === 'sent' ? (
+              <>
+                <svg
+                  className="search-page__icon search-page__icon--success"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <div className="search-page__field">
+                  <div className="search-page__add-status">
+                    Sent to Opal — we'll email you when <b>{addCompany.trim() || 'the page'}</b> is ready.
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="search-page__icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  {addPhase === 'email' ? (
+                    <>
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
+                    </>
+                  )}
+                </svg>
+
+                <div className="search-page__field">
+                  <input
+                    key={addPhase}
+                    ref={addInputRef}
+                    className="search-page__input"
+                    type={addPhase === 'email' ? 'email' : 'text'}
+                    inputMode={addPhase === 'email' ? 'email' : 'text'}
+                    autoComplete={addPhase === 'email' ? 'email' : 'organization'}
+                    spellCheck={false}
+                    maxLength={addPhase === 'company' ? MAX_COMPANY_NAME_LEN : undefined}
+                    placeholder={
+                      addPhase === 'email' ? 'you@optimizely.com' : 'Company name'
+                    }
+                    value={addPhase === 'email' ? addEmail : addCompany}
+                    disabled={submitting}
+                    onChange={(e) => {
+                      if (addPhase === 'email') setAddEmail(e.target.value);
+                      else setAddCompany(e.target.value);
+                      if (addError) setAddError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (addPhase === 'email') submitAddEmail();
+                        else submitAddCompany();
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        exitAddMode();
+                      }
+                    }}
+                  />
+                </div>
+
+                <button
+                  className="search-page__cancel"
+                  type="button"
+                  onClick={exitAddMode}
+                  disabled={submitting}
+                  aria-label="Cancel"
+                  title="Cancel"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <button
+                  className="search-page__action search-page__action--add"
+                  type="button"
+                  disabled={
+                    submitting ||
+                    (addPhase === 'email' && !addEmail.trim()) ||
+                    (addPhase === 'company' && !addCompany.trim())
+                  }
+                  onClick={() => {
+                    if (addPhase === 'email') submitAddEmail();
+                    else submitAddCompany();
+                  }}
+                >
+                  {submitting ? (
+                    <>
+                      <span className="search-page__spinner" aria-hidden="true" />
+                      <span>Sending…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{addPhase === 'email' ? 'Next' : 'Add'}</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="M13 5l7 7-7 7" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </div>
 
           <div
             className={
-              'search-page__dropdown' + (showSearchResults ? ' search-page__dropdown--open' : '')
+              'search-page__dropdown' +
+              (showSearchResults && !addPhase ? ' search-page__dropdown--open' : '')
             }
           >
             {results.length === 0 ? (
               <div className="search-page__empty">
-                No match for <b>{query}</b>.
-                <span className="search-page__empty-hint">Try a company name or domain.</span>
+                <div className="search-page__empty-line">
+                  No match for <b>{query}</b>.
+                </div>
+                {query.trim() && (
+                  <button
+                    type="button"
+                    className={
+                      'search-page__empty-cta' +
+                      (inCooldown ? ' search-page__empty-cta--cooldown' : '')
+                    }
+                    onClick={() => enterAddMode(query)}
+                    disabled={inCooldown}
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {inCooldown ? (
+                      <>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="M12 7v5l3 2" />
+                        </svg>
+                        <span>One company per minute — try again in {cooldownRemaining}s</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5v14" />
+                          <path d="M5 12h14" />
+                        </svg>
+                        <span>
+                          Create a page for <b>{query.trim()}</b>
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -627,9 +831,23 @@ function SearchPage() {
               </>
             )}
           </div>
+
+          {addPhase && addPhase !== 'sent' && (
+            <div className="search-page__add-hint" role="status">
+              {addError ? (
+                <span className="search-page__add-hint--error">{addError}</span>
+              ) : addPhase === 'email' ? (
+                <span>We'll remember your email and ping you once the page is ready.</span>
+              ) : (
+                <span>
+                  Opal will build a fresh comparison page. Sending as <b>{addEmail}</b>.
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {!query && recentEntries.length > 0 && (
+        {!query && !addPhase && recentEntries.length > 0 && (
           <div
             className="search-page__pill-row"
             style={focused ? { opacity: 0.25 } : undefined}
@@ -649,167 +867,6 @@ function SearchPage() {
           </div>
         )}
       </div>
-
-      {createOpen && (
-        <div
-          className="search-page__modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Add a new company"
-          onClick={closeCreate}
-        >
-          <div
-            className="search-page__modal-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="search-page__modal-close"
-              onClick={closeCreate}
-              aria-label="Close"
-              disabled={createPhase === 'sending'}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-
-            {createPhase === 'success' ? (
-              <div className="search-page__modal-success">
-                <div className="search-page__modal-success-check" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                </div>
-                <h3 className="search-page__modal-title">Sent to Opal</h3>
-                <p className="search-page__modal-sub">
-                  We're spinning up a page for <b>{createCompany.trim()}</b>. You'll get an email when it's live.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="search-page__modal-icon" aria-hidden="true">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 5v14" />
-                    <path d="M5 12h14" />
-                  </svg>
-                </div>
-                <h3 className="search-page__modal-title">Add a new company</h3>
-                <p className="search-page__modal-sub">
-                  Opal will build a fresh comparison page for the company you name. We'll email you when it's ready.
-                </p>
-
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    submitCreate();
-                  }}
-                >
-                  <label className="search-page__modal-label" htmlFor="add-new-company">
-                    Company name
-                  </label>
-                  <input
-                    id="add-new-company"
-                    ref={createCompanyRef}
-                    type="text"
-                    className={
-                      'search-page__modal-input search-page__modal-input--short' +
-                      (createCompanyError ? ' search-page__modal-input--error' : '')
-                    }
-                    value={createCompany}
-                    placeholder="Acme Co."
-                    autoComplete="organization"
-                    maxLength={MAX_COMPANY_NAME_LEN}
-                    onChange={(e) => {
-                      setCreateCompany(e.target.value);
-                      if (createCompanyError) setCreateCompanyError(null);
-                    }}
-                    disabled={createPhase === 'sending'}
-                  />
-                  {createCompanyError && (
-                    <div className="search-page__modal-error">{createCompanyError}</div>
-                  )}
-
-                  {needsEmail && (
-                    <>
-                      <label className="search-page__modal-label" htmlFor="add-new-email">
-                        Your email
-                      </label>
-                      <input
-                        id="add-new-email"
-                        ref={createEmailRef}
-                        type="email"
-                        inputMode="email"
-                        autoComplete="email"
-                        className={
-                          'search-page__modal-input' +
-                          (createEmailError ? ' search-page__modal-input--error' : '')
-                        }
-                        value={createEmail}
-                        placeholder="you@optimizely.com"
-                        onChange={(e) => {
-                          setCreateEmail(e.target.value);
-                          if (createEmailError) setCreateEmailError(null);
-                        }}
-                        disabled={createPhase === 'sending'}
-                      />
-                      {createEmailError && (
-                        <div className="search-page__modal-error">{createEmailError}</div>
-                      )}
-                    </>
-                  )}
-
-                  {!needsEmail && (
-                    <div className="search-page__modal-meta">
-                      Sending as <b>{createEmail}</b>
-                    </div>
-                  )}
-
-                  {createNetworkError && (
-                    <div className="search-page__modal-error search-page__modal-error--block">
-                      Couldn't reach Opal. Try again in a moment.
-                    </div>
-                  )}
-
-                  <div className="search-page__modal-actions">
-                    <button
-                      type="button"
-                      className="search-page__modal-btn search-page__modal-btn--ghost"
-                      onClick={closeCreate}
-                      disabled={createPhase === 'sending'}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="search-page__modal-btn search-page__modal-btn--primary"
-                      disabled={createPhase === 'sending'}
-                    >
-                      {createPhase === 'sending' ? (
-                        <>
-                          <span className="search-page__modal-spinner" aria-hidden="true" />
-                          <span>Sending…</span>
-                        </>
-                      ) : (
-                        <span>Send</span>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
