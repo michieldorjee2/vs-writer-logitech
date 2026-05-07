@@ -212,6 +212,12 @@ function SearchPage() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const addInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Email-edit popup, opened by clicking the address in the hint line.
+  const [emailEditOpen, setEmailEditOpen] = useState(false);
+  const [emailEditDraft, setEmailEditDraft] = useState('');
+  const [emailEditError, setEmailEditError] = useState<string | null>(null);
+  const emailEditRef = useRef<HTMLInputElement | null>(null);
+
   /* Load the search index on mount, then refresh silently every 5 min so
      the count stays fresh on a booth-mode iPad without a full reload. */
   useEffect(() => {
@@ -502,19 +508,54 @@ function SearchPage() {
   /* ---- Focus the active add-mode input on phase change ---- */
   useEffect(() => {
     if (addPhase !== 'email' && addPhase !== 'company') return;
+    if (emailEditOpen) return;
     const t = window.setTimeout(() => addInputRef.current?.focus(), 60);
     return () => window.clearTimeout(t);
-  }, [addPhase]);
+  }, [addPhase, emailEditOpen]);
 
-  /* ---- ESC exits add mode ---- */
+  /* ---- Email-edit popup handlers ---- */
+  const openEmailEdit = useCallback(() => {
+    setEmailEditDraft(addEmail);
+    setEmailEditError(null);
+    setEmailEditOpen(true);
+  }, [addEmail]);
+
+  const cancelEmailEdit = useCallback(() => {
+    setEmailEditOpen(false);
+    setEmailEditError(null);
+  }, []);
+
+  const submitEmailEdit = useCallback(() => {
+    const v = emailEditDraft.trim();
+    if (!isValidOptimizelyEmail(v)) {
+      setEmailEditError('Use your @optimizely.com email');
+      return;
+    }
+    saveStoredEmail(v);
+    setAddEmail(v);
+    setEmailEditOpen(false);
+    setEmailEditError(null);
+    setAddError(null);
+  }, [emailEditDraft]);
+
+  /* Focus the popup input when it opens. */
   useEffect(() => {
-    if (!addPhase) return;
+    if (!emailEditOpen) return;
+    const t = window.setTimeout(() => emailEditRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, [emailEditOpen]);
+
+  /* ---- ESC closes the email popup first, otherwise exits add mode ---- */
+  useEffect(() => {
+    if (!addPhase && !emailEditOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') exitAddMode();
+      if (e.key !== 'Escape') return;
+      if (emailEditOpen) cancelEmailEdit();
+      else exitAddMode();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addPhase, exitAddMode]);
+  }, [addPhase, emailEditOpen, exitAddMode, cancelEmailEdit]);
 
   return (
     <div className="search-page">
@@ -623,7 +664,7 @@ function SearchPage() {
                 </svg>
                 <div className="search-page__field">
                   <div className="search-page__add-status">
-                    Sent to Opal — we'll email you when <b>{addCompany.trim() || 'the page'}</b> is ready.
+                    Sent to Opal — we'll ping you on Teams when <b>{addCompany.trim() || 'the page'}</b> is ready.
                   </div>
                 </div>
               </>
@@ -691,11 +732,8 @@ function SearchPage() {
                   onClick={exitAddMode}
                   disabled={submitting}
                   aria-label="Cancel"
-                  title="Cancel"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
+                  Never mind…
                 </button>
 
                 <button
@@ -718,7 +756,7 @@ function SearchPage() {
                     </>
                   ) : (
                     <>
-                      <span>{addPhase === 'email' ? 'Next' : 'Add'}</span>
+                      <span>{addPhase === 'email' ? 'Next' : 'Confirm'}</span>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M5 12h14" />
                         <path d="M13 5l7 7-7 7" />
@@ -837,15 +875,85 @@ function SearchPage() {
               {addError ? (
                 <span className="search-page__add-hint--error">{addError}</span>
               ) : addPhase === 'email' ? (
-                <span>We'll remember your email and ping you once the page is ready.</span>
+                <span>We'll remember this and ping you on Teams when the page is ready.</span>
               ) : (
                 <span>
-                  Opal will build a fresh comparison page. Sending as <b>{addEmail}</b>.
+                  Opal will build a fresh comparison page. Sending as{' '}
+                  <button
+                    type="button"
+                    className="search-page__email-link"
+                    onClick={openEmailEdit}
+                    title="Click to change"
+                  >
+                    {addEmail}
+                  </button>
+                  .
                 </span>
               )}
             </div>
           )}
         </div>
+
+        {emailEditOpen && (
+          <div
+            className="search-page__email-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Update your email"
+            onClick={cancelEmailEdit}
+          >
+            <div
+              className="search-page__email-modal-card"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="search-page__email-modal-title">Update email</h3>
+              <p className="search-page__email-modal-sub">
+                We'll use this address to ping you on Teams when the page is ready.
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitEmailEdit();
+                }}
+              >
+                <input
+                  ref={emailEditRef}
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  className={
+                    'search-page__email-modal-input' +
+                    (emailEditError ? ' search-page__email-modal-input--error' : '')
+                  }
+                  value={emailEditDraft}
+                  placeholder="you@optimizely.com"
+                  onChange={(e) => {
+                    setEmailEditDraft(e.target.value);
+                    if (emailEditError) setEmailEditError(null);
+                  }}
+                />
+                {emailEditError && (
+                  <div className="search-page__email-modal-error">{emailEditError}</div>
+                )}
+                <div className="search-page__email-modal-actions">
+                  <button
+                    type="button"
+                    className="search-page__email-modal-btn search-page__email-modal-btn--ghost"
+                    onClick={cancelEmailEdit}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="search-page__email-modal-btn search-page__email-modal-btn--primary"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {!query && !addPhase && recentEntries.length > 0 && (
           <div

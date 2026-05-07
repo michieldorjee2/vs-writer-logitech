@@ -547,29 +547,29 @@
   background: var(--sp-accent-hover);
 }
 
-/* Cancel (X) lives between input and primary action. */
+/* "Never mind…" cancel — text-only ghost button between input and confirm. */
 .search-page__cancel {
   appearance: none;
   background: transparent;
   border: 0;
   color: var(--sp-fg-3);
   cursor: pointer;
-  width: 36px;
+  padding: 0 12px;
   height: 36px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  font-family: var(--sp-font-display);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   flex-shrink: 0;
-  transition: background 0.18s var(--sp-ease-out),
-              color 0.18s var(--sp-ease-out);
+  white-space: nowrap;
+  transition: color 0.18s var(--sp-ease-out);
 }
 .search-page__cancel:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
   color: var(--sp-fg-1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .search-page__cancel:disabled { opacity: 0.4; cursor: not-allowed; }
-.search-page__cancel svg { width: 16px; height: 16px; }
 
 /* Success-state icon (check) takes on the accent so the bar feels lit-up. */
 .search-page__icon--success {
@@ -619,4 +619,151 @@
 
 @keyframes sp-spin {
   to { transform: rotate(360deg); }
+}
+
+/* Clickable email in the add-mode hint line — opens the email-edit popup. */
+.search-page__email-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--sp-accent-soft);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, var(--sp-accent-soft) 50%, transparent);
+  text-underline-offset: 2px;
+  transition: color 0.15s var(--sp-ease-out),
+              text-decoration-color 0.15s var(--sp-ease-out);
+}
+.search-page__email-link:hover {
+  color: #ffffff;
+  text-decoration: underline solid;
+}
+
+/* Compact email-edit popup. Lighter than the old big modal — single
+ * input + Save/Cancel, anchored center-screen with a dim backdrop. */
+.search-page__email-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1003;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 18, 0.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: var(--sp-font-display);
+  padding: 16px;
+  animation: sp-modal-fade 200ms ease-out;
+}
+
+@keyframes sp-modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.search-page__email-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: linear-gradient(180deg, rgba(20, 28, 45, 0.98), rgba(13, 19, 32, 0.98));
+  border: 1px solid var(--sp-border-accent);
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  color: var(--sp-fg-1);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.55),
+    0 0 50px var(--sp-glow);
+  animation: sp-modal-pop 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sp-modal-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.search-page__email-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.search-page__email-modal-sub {
+  font-size: 12.5px;
+  color: var(--sp-fg-2);
+  margin: 0 0 14px;
+  line-height: 1.45;
+}
+
+.search-page__email-modal-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sp-border-medium);
+  border-radius: 10px;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 11px 13px;
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  box-sizing: border-box;
+}
+.search-page__email-modal-input::placeholder { color: var(--sp-fg-3); }
+.search-page__email-modal-input:focus {
+  border-color: var(--sp-accent);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 22%, transparent);
+}
+.search-page__email-modal-input--error {
+  border-color: #ff6b6b !important;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.15) !important;
+}
+
+.search-page__email-modal-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ff9090;
+}
+
+.search-page__email-modal-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.search-page__email-modal-btn {
+  appearance: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.search-page__email-modal-btn--ghost {
+  background: transparent;
+  border: 1px solid var(--sp-border-medium);
+  color: var(--sp-fg-2);
+}
+.search-page__email-modal-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.search-page__email-modal-btn--primary {
+  background: var(--sp-accent);
+  border: 1px solid var(--sp-accent);
+  color: #ffffff;
+  box-shadow: 0 6px 22px var(--sp-glow);
+}
+.search-page__email-modal-btn--primary:hover {
+  background: var(--sp-accent-hover);
+  transform: translateY(-1px);
 }
