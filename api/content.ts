@@ -101,20 +101,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const normalizedSlug = `/${slug}/`;
 
   try {
-    // Retail dispatch: any slug under /retail/ first tries RetailCustomerPage.
-    if (slug.startsWith('retail/') || slug.startsWith('en/retail/')) {
-      const tries = [normalizedSlug];
-      if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`);
-      for (const s of tries) {
-        const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
-        const items = (json as any)?.data?.RetailCustomerPage?.items;
-        if (items && items.length > 0) {
-          res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-          return res.status(200).json({ ...items[0], __template: 'retail' });
-        }
+    // Retail dispatch: try RetailCustomerPage first on every request (CMS
+    // rejects '/' in route segments, so retail pages live at flat slugs).
+    const retailTries = [normalizedSlug];
+    if (!slug.startsWith('en/')) retailTries.push(`/en/${slug}/`);
+    if (slug.startsWith('retail/')) {
+      const stripped = slug.replace(/^retail\//, '');
+      retailTries.push(`/${stripped}/`);
+      retailTries.push(`/en/${stripped}/`);
+    }
+    for (const s of retailTries) {
+      const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
+      const items = (json as any)?.data?.RetailCustomerPage?.items;
+      if (items && items.length > 0) {
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        return res.status(200).json({ ...items[0], __template: 'retail' });
       }
-      // No retail page at this slug; fall through to comparison query.
     }
 
     let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });

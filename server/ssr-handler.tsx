@@ -97,21 +97,24 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
 async function fetchPageContent(authKey: string, slug: string) {
   const normalizedSlug = `/${slug}/`;
 
-  // Retail dispatch: any slug under /retail/ first tries the RetailCustomerPage
-  // content type. If found, we tag it with __template:'retail' so the renderer
-  // picks the retail React tree.
-  if (slug.startsWith('retail/') || slug.startsWith('en/retail/')) {
-    const tries = [normalizedSlug];
-    if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`);
-    for (const s of tries) {
-      const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
-      const items = (json as any)?.data?.RetailCustomerPage?.items;
-      if (items && items.length > 0) {
-        return { ...items[0], __template: 'retail' as const };
-      }
+  // Retail dispatch: try RetailCustomerPage first on every request. The CMS
+  // rejects '/' in route segments, so retail pages live at flat slugs like
+  // `/isabella-chen`. Hierarchical `/retail/<slug>` is also supported. If
+  // nothing matches the retail content type, fall through to comparison.
+  const retailTries = [normalizedSlug];
+  if (!slug.startsWith('en/')) retailTries.push(`/en/${slug}/`);
+  // Also accept hierarchical /retail/<slug> path by stripping the prefix.
+  if (slug.startsWith('retail/')) {
+    const stripped = slug.replace(/^retail\//, '');
+    retailTries.push(`/${stripped}/`);
+    retailTries.push(`/en/${stripped}/`);
+  }
+  for (const s of retailTries) {
+    const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
+    const items = (json as any)?.data?.RetailCustomerPage?.items;
+    if (items && items.length > 0) {
+      return { ...items[0], __template: 'retail' as const };
     }
-    // Fall through to the comparison query so a stale /retail/* slug still
-    // resolves if it was previously registered as a CompetitorComparisonPage.
   }
 
   let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
