@@ -1370,3 +1370,130 @@
   font-size: 0.95rem;
   color: var(--type-secondary);
 }
+
+/* ===========================================================================
+   Sizing pass v6 — push interactive copy up for readability
+   =========================================================================== */
+
+/* Buttons across the page */
+.retail-btn,
+.retail-btn-quiet,
+.retail-heldforyou__btn,
+.retail-worn__cta,
+.retail-look__btn {
+  font-size: 0.82rem;
+  padding: 0.85rem 1.2rem;
+}
+
+.retail-look__btn--block { padding: 1rem 1.25rem; }
+
+/* Per-item lookbook descriptors */
+.retail-heldforyou__desc {
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.retail-heldforyou__name {
+  font-size: 1.3rem;
+}
+
+.retail-heldforyou__no {
+  font-size: 0.85rem;
+}
+
+/* Set aside item */
+.retail-setaside__item {
+  font-size: 1.2rem;
+  padding: 1.85rem 0;
+}
+
+.retail-setaside__item-desc {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.retail-setaside__item-name {
+  font-size: 1.25rem;
+}
+
+.retail-setaside__label {
+  font-size: 0.85rem;
+}
+
+/* Rotation card */
+.retail-worn__name { font-size: 1.2rem; }
+.retail-worn__qualifier { font-size: 0.95rem; }
+.retail-worn__season { font-size: 0.72rem; }
+.retail-worn__tag { font-size: 0.72rem; }
+.retail-worn__note { font-size: 1rem; line-height: 1.6; }
+
+/* Lightbox */
+.retail-look__name { font-size: 1.15rem; }
+.retail-look__qualifier { font-size: 0.95rem; }
+.retail-look__price { font-size: 0.8rem; }
+.retail-look__picks-deck { font-size: 1.05rem; line-height: 1.6; }
+.retail-look__caption { font-size: 1.25rem; }
+
+/* Questions module */
+.retail-questions__chip { font-size: 1.05rem; padding: 0.85rem 1.15rem 0.85rem 1.3rem; }
+.retail-questions__panel-a { font-size: clamp(1.3rem, 1.05rem + 0.6vw, 1.7rem); }
+.retail-questions__panel-q { font-size: 0.85rem; }
+.retail-questions__deck { font-size: 1.15rem; line-height: 1.6; }
+
+/* Letter body */
+.retail-letter__paragraph {
+  font-size: clamp(1.15rem, 1.02rem + 0.4vw, 1.35rem);
+  line-height: 1.85;
+}
+
+.retail-letter__greeting {
+  font-size: clamp(1.6rem, 1.3rem + 0.8vw, 2.05rem);
+}
+
+.retail-letter__signoff {
+  font-size: clamp(1.45rem, 1.15rem + 0.7vw, 1.85rem);
+}
+
+/* Atelier body */
+.retail-atelier__body {
+  font-size: clamp(1.25rem, 1.05rem + 0.5vw, 1.55rem);
+  line-height: 1.75;
+}
+
+/* Polaroid caption + the section deck/title */
+.retail-letter-section__title {
+  font-size: clamp(2.2rem, 1.65rem + 1.55vw, 3.1rem);
+}
+
+.retail-letter-section__deck {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  max-width: 44rem;
+}
+
+.retail-polaroid__caption {
+  font-size: 1.15rem;
+  margin-top: 1.1rem;
+}
+
+/* Worn section heading + lede */
+.retail-worn__heading {
+  font-size: clamp(2.2rem, 1.65rem + 1.55vw, 3.05rem);
+}
+
+.retail-worn__lede {
+  font-size: 1.15rem;
+  line-height: 1.6;
+}
+
+/* Closing reflection */
+.retail-closing__body {
+  font-size: clamp(1.5rem, 1.15rem + 0.85vw, 2rem);
+  line-height: 1.55;
+}
+
+/* Stylist note */
+.retail-stylistnote__body {
+  font-size: clamp(1.55rem, 1.2rem + 0.95vw, 2.05rem);
+  line-height: 1.55;
+}

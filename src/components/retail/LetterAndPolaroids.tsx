@@ -1,21 +1,23 @@
 /**
  * LetterAndPolaroids — magazine spread between hero and editorial lede.
  *
- * Visual arc (driven by GSAP ScrollTrigger):
- *  1. Section enters viewport — polaroids are STACKED center, large,
- *     overlapping each other (like a deck of cards just dropped on the
- *     letter), and the letter is folded closed (3D rotate-x).
- *  2. As the user scrolls, the polaroids fan out into their slot positions
- *     around the letter, and the letter unfolds (3D rotate-x → 0).
- *  3. By the end of the section, everything is settled in its final layout.
+ * Visual arc (v6):
+ *  1. Section enters: polaroids are STACKED center as a single bundle,
+ *     held together by ONE paperclip at the top. Letter is hidden,
+ *     folded tightly into thirds underneath.
+ *  2. Scroll: paperclip lifts off and the polaroids fall apart, drifting
+ *     out to their slot positions. The letter unfolds in 3D: top third
+ *     rotates down from behind, bottom third rotates up from in front.
+ *     Visible creases mark the folds.
+ *  3. Settled: letter laid flat, polaroids fanned around it, stamp
+ *     cropped at the letter's top-right corner.
  *
- * Click a polaroid → animates from its position into a "Curated look"
- * lightbox panel showing the photo + 3-4 product picks for that moment,
- * each with an Add-to-bag button. Closing animates back. Esc / overlay
- * click closes.
+ * Click a polaroid → it grows and moves smoothly into the curated-look
+ * lightbox (Framer Motion layoutId shared-element transition).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import type { Polaroid, LetterContent } from '../../lib/retail-demo-content';
 import { pickImage } from '../../lib/retail-image-bank';
 import type { RetailRegister } from '../../lib/graph-types';
@@ -31,43 +33,40 @@ interface CuratedProduct {
 interface Props {
   letter: LetterContent;
   polaroids: Polaroid[];
-  /** Used by the curated-look lightbox to pick relevant product imagery. */
   register: RetailRegister;
 }
 
-/** Paperclip — small chrome SVG used to "attach" polaroids to the letter edge. */
-function Paperclip({ flip = false }: { flip?: boolean }) {
+/** Single paperclip that clips the whole stack initially. */
+function StackPaperclip() {
   return (
     <svg
-      className={`retail-paperclip${flip ? ' retail-paperclip--flip' : ''}`}
-      viewBox="0 0 48 96"
+      className="retail-stack-paperclip"
+      viewBox="0 0 60 120"
       aria-hidden="true"
-      width="28"
-      height="56"
+      width="48"
+      height="96"
     >
       <defs>
-        <linearGradient id="clip-grad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#cdd1d4" />
-          <stop offset="45%" stopColor="#f3f5f7" />
-          <stop offset="55%" stopColor="#a9adb1" />
-          <stop offset="100%" stopColor="#7d8083" />
+        <linearGradient id="stack-clip-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#bcc1c5" />
+          <stop offset="40%" stopColor="#f1f3f5" />
+          <stop offset="55%" stopColor="#9aa0a4" />
+          <stop offset="100%" stopColor="#6c7074" />
         </linearGradient>
       </defs>
       <path
-        d="M16 6 C 8 6, 4 12, 4 22 L 4 76 C 4 86, 10 92, 18 92 C 26 92, 32 86, 32 76 L 32 28 C 32 20, 26 14, 18 14 C 12 14, 8 18, 8 26 L 8 70"
+        d="M20 6 C 10 6, 4 14, 4 26 L 4 96 C 4 108, 12 116, 22 116 C 32 116, 40 108, 40 96 L 40 32 C 40 22, 32 16, 22 16 C 14 16, 10 22, 10 32 L 10 88"
         fill="none"
-        stroke="url(#clip-grad)"
-        strokeWidth="3.5"
+        stroke="url(#stack-clip-grad)"
+        strokeWidth="4.5"
         strokeLinecap="round"
       />
     </svg>
   );
 }
 
-/** A "curated look" — 3-4 products that go with this polaroid moment. */
-function curatedForPolaroid(p: Polaroid, register: RetailRegister): CuratedProduct[] {
+function curatedForPolaroid(p: Polaroid, _register: RetailRegister): CuratedProduct[] {
   const caption = (p.caption || '').toLowerCase();
-  // Heuristic mapping — captions reference owned anchors; pick adjacent picks.
   if (caption.includes('anna') || caption.includes('coat')) {
     return [
       { name: 'Anna Coat — relining service', qualifier: 'wool-cashmere, original maker', priceLabel: 'On request' },
@@ -101,7 +100,6 @@ function curatedForPolaroid(p: Polaroid, register: RetailRegister): CuratedProdu
       { name: 'Fabric swatch service', qualifier: 'samples sent before each season', priceLabel: 'Included' },
     ];
   }
-  // Default — pick something palette-appropriate
   return [
     { name: 'Aurelle Card Case', qualifier: 'fawn grained calf', priceLabel: '$480' },
     { name: 'Marais Belt', qualifier: 'sand grained calf', priceLabel: '$640' },
@@ -109,32 +107,24 @@ function curatedForPolaroid(p: Polaroid, register: RetailRegister): CuratedProdu
 }
 
 export default function LetterAndPolaroids({ letter, polaroids, register }: Props) {
-  const sectionRef = useRef<HTMLElement>(null);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  const close = useCallback(() => setLightboxIndex(null), []);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const close = useCallback(() => setActiveIndex(null), []);
 
   useEffect(() => {
-    if (lightboxIndex === null) return;
+    if (activeIndex === null) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
-      if (e.key === 'ArrowRight')
-        setLightboxIndex((i) => (i === null ? null : (i + 1) % polaroids.length));
-      if (e.key === 'ArrowLeft')
-        setLightboxIndex((i) => (i === null ? null : (i - 1 + polaroids.length) % polaroids.length));
+      if (e.key === 'ArrowRight') setActiveIndex((i) => (i === null ? null : (i + 1) % polaroids.length));
+      if (e.key === 'ArrowLeft') setActiveIndex((i) => (i === null ? null : (i - 1 + polaroids.length) % polaroids.length));
     };
     window.addEventListener('keydown', handler);
-    // Lock body scroll while open
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', handler);
       document.body.style.overflow = '';
     };
-  }, [lightboxIndex, close, polaroids.length]);
+  }, [activeIndex, close, polaroids.length]);
 
-  // Polaroids land in 6 slots; the GSAP animator scrubs from stacked-center
-  // to these slots based on scroll position. The slot offsets are written as
-  // CSS custom properties so the animator can interpolate.
   const slotClasses = [
     'retail-polaroid--slot-tl',
     'retail-polaroid--slot-tr',
@@ -145,84 +135,113 @@ export default function LetterAndPolaroids({ letter, polaroids, register }: Prop
   ];
 
   return (
-    <section className="retail-letter-section" ref={sectionRef} aria-labelledby="letter-heading">
-      <div className="retail-letter-section__paper" aria-hidden="true" />
+    <LayoutGroup>
+      <section className="retail-letter-section" aria-labelledby="letter-heading">
+        <div className="retail-letter-section__paper" aria-hidden="true" />
 
-      <h2 className="retail-letter-section__title" id="letter-heading">
-        A letter, attached
-      </h2>
-      <p className="retail-letter-section__deck">
-        Hand-written from Opal this week, with a few stills from where these pieces are
-        kept. Tap any photo to see what we'd pair it with.
-      </p>
+        <h2 className="retail-letter-section__title" id="letter-heading">
+          A letter, attached
+        </h2>
+        <p className="retail-letter-section__deck">
+          Hand-written from Opal this week, with a few stills from where these pieces are kept.
+          Tap any photo to see what Opal would pair with that moment.
+        </p>
 
-      <div className="retail-collage" data-retail-collage>
-        {polaroids.slice(0, 6).map((p, i) => (
-          <button
-            key={i}
-            type="button"
-            className={`retail-polaroid retail-polaroid--falling ${slotClasses[i] || ''}`}
-            style={
-              {
-                '--rotate': `${p.rotate}deg`,
-                '--stack-offset': `${i * 6}px`,
-                '--stack-rot': `${(i - 2.5) * 5}deg`,
-              } as React.CSSProperties
-            }
-            onClick={() => setLightboxIndex(i)}
-            aria-label={`${p.caption} — see curated picks`}
-            data-retail-polaroid={i}
-          >
-            <Paperclip flip={i % 2 === 1} />
-            <div className="retail-polaroid__photo">
-              <img src={p.imageUrl} alt={p.caption} loading="lazy" />
+        <div className="retail-collage" data-retail-collage>
+          {/* The stack paperclip — visible at the start, animates off as polaroids fall apart */}
+          <div className="retail-stack-paperclip-wrap" data-retail-stack-clip aria-hidden="true">
+            <StackPaperclip />
+          </div>
+
+          {polaroids.slice(0, 6).map((p, i) => (
+            <motion.button
+              key={i}
+              type="button"
+              layoutId={`polaroid-${i}`}
+              className={`retail-polaroid retail-polaroid--falling ${slotClasses[i] || ''}`}
+              style={
+                {
+                  '--rotate': `${p.rotate}deg`,
+                } as React.CSSProperties
+              }
+              onClick={() => setActiveIndex(i)}
+              aria-label={`${p.caption} — see Opal's curated picks`}
+              data-retail-polaroid={i}
+              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+            >
+              <motion.div className="retail-polaroid__photo" layoutId={`polaroid-photo-${i}`}>
+                <img src={p.imageUrl} alt={p.caption} loading="lazy" />
+              </motion.div>
+              <motion.span className="retail-polaroid__caption" layoutId={`polaroid-caption-${i}`}>
+                {p.caption}
+              </motion.span>
+            </motion.button>
+          ))}
+
+          {/* The letter — tri-fold paper that unfolds in 3D */}
+          <article className="retail-letter" data-retail-letter>
+            {/* Three folded panels — only one visible until unfold */}
+            <div className="retail-letter__panel retail-letter__panel--top" data-retail-panel="top">
+              {/* Panel content is visible on the back during fold */}
+              <div className="retail-letter__panel-inner">
+                {/* top third of the letter mirrors top content */}
+              </div>
             </div>
-            <span className="retail-polaroid__caption">{p.caption}</span>
-          </button>
-        ))}
+            <div className="retail-letter__panel retail-letter__panel--mid" data-retail-panel="mid">
+              <div className="retail-letter__stamp-corner" aria-hidden="true">
+                <OpalStamp size={108} />
+              </div>
+              <header className="retail-letter__head">
+                <span className="retail-letter__date">May, MMXXVI</span>
+              </header>
+              <p className="retail-letter__greeting">{letter.greeting}</p>
+              <div className="retail-letter__body">
+                {letter.paragraphs.map((para, i) => (
+                  <p
+                    key={i}
+                    className="retail-letter__paragraph"
+                    data-retail-letter-line={i}
+                  >
+                    {para}
+                  </p>
+                ))}
+              </div>
+              <p className="retail-letter__signoff">{letter.signoff}</p>
+              {/* Crease lines — visible after unfold */}
+              <div className="retail-letter__crease retail-letter__crease--top" aria-hidden="true" />
+              <div className="retail-letter__crease retail-letter__crease--bottom" aria-hidden="true" />
+            </div>
+            <div className="retail-letter__panel retail-letter__panel--bottom" data-retail-panel="bottom">
+              <div className="retail-letter__panel-inner" />
+            </div>
+          </article>
+        </div>
 
-        <article className="retail-letter" data-retail-letter>
-          <div className="retail-letter__stamp-corner" aria-hidden="true">
-            <OpalStamp size={96} />
-          </div>
-          <header className="retail-letter__head">
-            <span className="retail-letter__date">May, MMXXVI</span>
-          </header>
-          <p className="retail-letter__greeting">{letter.greeting}</p>
-          <div className="retail-letter__body">
-            {letter.paragraphs.map((para, i) => (
-              <p
-                key={i}
-                className="retail-letter__paragraph"
-                data-retail-letter-line={i}
-              >
-                {para}
-              </p>
-            ))}
-          </div>
-          <p className="retail-letter__signoff">{letter.signoff}</p>
-        </article>
-      </div>
-
-      {/* Curated-look lightbox */}
-      {lightboxIndex !== null && (
-        <CuratedLookLightbox
-          polaroid={polaroids[lightboxIndex]}
-          products={curatedForPolaroid(polaroids[lightboxIndex], register)}
-          onClose={close}
-          onPrev={() => setLightboxIndex((i) => (i === null ? null : (i - 1 + polaroids.length) % polaroids.length))}
-          onNext={() => setLightboxIndex((i) => (i === null ? null : (i + 1) % polaroids.length))}
-          countLabel={`${lightboxIndex + 1} / ${polaroids.length}`}
-          register={register}
-        />
-      )}
-    </section>
+        {/* Lightbox — uses Framer Motion shared layout for smooth polaroid → modal */}
+        <AnimatePresence>
+          {activeIndex !== null && (
+            <CuratedLookLightbox
+              key={`look-${activeIndex}`}
+              index={activeIndex}
+              polaroid={polaroids[activeIndex]}
+              products={curatedForPolaroid(polaroids[activeIndex], register)}
+              onClose={close}
+              onPrev={() => setActiveIndex((i) => (i === null ? null : (i - 1 + polaroids.length) % polaroids.length))}
+              onNext={() => setActiveIndex((i) => (i === null ? null : (i + 1) % polaroids.length))}
+              countLabel={`${activeIndex + 1} / ${polaroids.length}`}
+              register={register}
+            />
+          )}
+        </AnimatePresence>
+      </section>
+    </LayoutGroup>
   );
 }
 
-/* ---- Lightbox component ---- */
+/* ---- Lightbox ---- */
 
 function CuratedLookLightbox({
+  index,
   polaroid,
   products,
   onClose,
@@ -231,6 +250,7 @@ function CuratedLookLightbox({
   countLabel,
   register,
 }: {
+  index: number;
   polaroid: Polaroid;
   products: CuratedProduct[];
   onClose: () => void;
@@ -240,20 +260,39 @@ function CuratedLookLightbox({
   register: RetailRegister;
 }) {
   return (
-    <div className="retail-look" onClick={onClose} role="dialog" aria-modal="true" aria-label="Curated look">
+    <motion.div
+      className="retail-look"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Curated look"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.24 }}
+    >
       <button type="button" className="retail-look__close" onClick={onClose} aria-label="Close">×</button>
 
-      <div className="retail-look__pane" onClick={(e) => e.stopPropagation()}>
-        {/* Photo column — feels like the polaroid grown */}
-        <figure className="retail-look__photo">
-          <img src={polaroid.imageUrl} alt={polaroid.caption} />
-          <figcaption className="retail-look__caption">
-            <OpalStamp size={48} className="retail-look__caption-stamp" />
+      <motion.div
+        className="retail-look__pane"
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        {/* Photo column — shares layoutId with the source polaroid so it
+            morphs from the original position. */}
+        <motion.figure className="retail-look__photo" layoutId={`polaroid-${index}`}>
+          <motion.div className="retail-look__photo-inner" layoutId={`polaroid-photo-${index}`}>
+            <img src={polaroid.imageUrl} alt={polaroid.caption} />
+          </motion.div>
+          <motion.figcaption className="retail-look__caption" layoutId={`polaroid-caption-${index}`}>
+            <OpalStamp size={56} className="retail-look__caption-stamp" />
             <span>{polaroid.caption}</span>
-          </figcaption>
-        </figure>
+          </motion.figcaption>
+        </motion.figure>
 
-        {/* Curated picks column */}
         <section className="retail-look__picks" aria-label="Curated picks">
           <header className="retail-look__picks-head">
             <span className="retail-label-gold">Curated for this moment</span>
@@ -312,18 +351,17 @@ function CuratedLookLightbox({
             <button
               type="button"
               className="retail-look__btn retail-look__btn--quiet retail-look__btn--block"
-              onClick={() => demoToast('Saved to your next visit at Crosby Street.', 'note')}
+              onClick={() => demoToast('Saved to your next visit at the atelier.', 'note')}
             >
               Save the look
             </button>
           </footer>
         </section>
-      </div>
+      </motion.div>
 
-      {/* Nav + count */}
       <button type="button" className="retail-look__nav retail-look__nav--prev" onClick={(e) => { e.stopPropagation(); onPrev(); }} aria-label="Previous photo">‹</button>
       <button type="button" className="retail-look__nav retail-look__nav--next" onClick={(e) => { e.stopPropagation(); onNext(); }} aria-label="Next photo">›</button>
       <span className="retail-look__count">{countLabel}</span>
-    </div>
+    </motion.div>
   );
 }
