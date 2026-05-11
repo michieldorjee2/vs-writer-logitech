@@ -15,6 +15,7 @@ import AtelierNote from './retail/AtelierNote';
 import SmallInvitation from './retail/SmallInvitation';
 import Appointment from './retail/Appointment';
 import StylistsNote from './retail/StylistsNote';
+import OpalQuestions from './retail/OpalQuestions';
 import ClosingReflection from './retail/ClosingReflection';
 
 interface Props {
@@ -125,7 +126,7 @@ export default function RetailCustomerPageServer({ page, deviceRecognized = true
       )}
 
       {demo?.letter && demo?.polaroids?.length ? (
-        <LetterAndPolaroids letter={demo.letter} polaroids={demo.polaroids} />
+        <LetterAndPolaroids letter={demo.letter} polaroids={demo.polaroids} register={page.register} />
       ) : (
         <EditorialLede
           monthStamp={page.monthStamp}
@@ -148,8 +149,12 @@ export default function RetailCustomerPageServer({ page, deviceRecognized = true
       {smallInvitation && <SmallInvitation block={smallInvitation} register={page.register} />}
 
       {stylistNote && stylistSigned && !degraded && (
-        <StylistsNote body={stylistNote} signedBy={stylistSigned} contactHref={STYLIST_MAILTO} />
+        <StylistsNote body={stylistNote} signedBy={stylistSigned} />
       )}
+
+      {demo?.questions?.length ? (
+        <OpalQuestions questions={demo.questions} />
+      ) : null}
 
       {appointment && (
         <section id="appointment">

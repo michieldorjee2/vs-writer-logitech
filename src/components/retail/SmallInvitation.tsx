@@ -6,6 +6,7 @@
 
 import SlatePlate from './SlatePlate';
 import type { SmallInvitationBlock, RetailRegister } from '../../lib/graph-types';
+import { demoToast } from '../../lib/retail-demo-toast';
 
 interface Props {
   block: SmallInvitationBlock;
@@ -34,9 +35,15 @@ export default function SmallInvitation({ block, register }: Props) {
         </p>
 
         {block.cta && (
-          <a href="#appointment" className="retail-link" data-retail-reveal data-retail-delay="360">
+          <button
+            type="button"
+            className="retail-link"
+            onClick={() => demoToast(`Opal will set out the ${block.itemName} for your next visit.`, 'note')}
+            data-retail-reveal
+            data-retail-delay="360"
+          >
             {block.cta} →
-          </a>
+          </button>
         )}
       </div>
     </section>

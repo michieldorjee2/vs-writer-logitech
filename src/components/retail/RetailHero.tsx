@@ -94,11 +94,11 @@ export default function RetailHero({
           {words.map((word, i) => (
             <span
               key={i}
-              className="word"
+              className="word-wrap"
               style={{ '--word-delay': `${250 + i * 90}ms` } as React.CSSProperties}
             >
-              <span>{word}</span>
-              {i < words.length - 1 ? ' ' : ''}
+              <span className="word">{word}</span>
+              {i < words.length - 1 ? <span className="word-gap">&nbsp;</span> : null}
             </span>
           ))}
         </h1>

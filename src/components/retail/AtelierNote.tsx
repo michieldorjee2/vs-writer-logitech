@@ -6,6 +6,7 @@
 
 import SlatePlate from './SlatePlate';
 import type { AtelierNoteBlock, RetailRegister } from '../../lib/graph-types';
+import { demoToast } from '../../lib/retail-demo-toast';
 
 interface Props {
   block: AtelierNoteBlock;
@@ -41,14 +42,15 @@ export default function AtelierNote({ block, register }: Props) {
           </p>
 
           {block.cta && (
-            <a
+            <button
+              type="button"
               className="retail-link retail-atelier__cta"
-              href="mailto:stylist@maisonaurelle.example?subject=Re%3A%20The%20atelier%20note"
+              onClick={() => demoToast('Opal will collect the piece for service.', 'note')}
               data-retail-reveal
               data-retail-delay="240"
             >
               {block.cta} →
-            </a>
+            </button>
           )}
         </div>
       </div>

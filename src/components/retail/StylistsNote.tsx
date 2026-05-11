@@ -1,21 +1,21 @@
 /**
  * StylistsNote — italic, hand-written-feeling block.
- * Signed; the body is a personal message from the stylist to the customer.
- * The single named human attribution on the page lives here in v3.
+ * Signed by Opal. The body is a personal message addressed to the customer.
  */
+
+import { demoToast } from '../../lib/retail-demo-toast';
 
 interface Props {
   body: string;
   signedBy: string;
-  contactHref?: string;
 }
 
-export default function StylistsNote({ body, signedBy, contactHref }: Props) {
+export default function StylistsNote({ body, signedBy }: Props) {
   return (
     <section className="retail-stylistnote" aria-labelledby="stylist-note-heading">
       <div className="retail-stylistnote__inner">
         <span className="retail-label-gold" id="stylist-note-heading" data-retail-hairline>
-          A note from your atelier
+          A note from Opal
         </span>
         <blockquote className="retail-stylistnote__body" data-retail-reveal>
           {body.split(/\n\s*\n/).map((para, i) => (
@@ -24,13 +24,15 @@ export default function StylistsNote({ body, signedBy, contactHref }: Props) {
         </blockquote>
         <div className="retail-stylistnote__sign">
           <span className="retail-stylistnote__rule" aria-hidden="true" />
-          <span className="retail-stylistnote__signed">— {signedBy}</span>
+          <span className="retail-stylistnote__signed">{signedBy}</span>
         </div>
-        {contactHref && (
-          <a className="retail-link retail-stylistnote__cta" href={contactHref}>
-            Write back →
-          </a>
-        )}
+        <button
+          type="button"
+          className="retail-link retail-stylistnote__cta"
+          onClick={() => demoToast('Opal has noted your reply.', 'note')}
+        >
+          Write back →
+        </button>
       </div>
     </section>
   );

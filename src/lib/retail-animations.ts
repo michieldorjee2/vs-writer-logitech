@@ -197,21 +197,98 @@ function initPageMount(): void {
   });
 }
 
-/* ---- Polaroids — staggered entrance with rotation snap ---- */
-function initPolaroidStagger(): void {
-  const polaroids = gsap.utils.toArray<HTMLElement>('.retail-polaroid');
-  if (polaroids.length === 0) return;
+/* ---- Polaroids: stack → fan + letter 3D unfold (scrub) ----
+ *
+ * Initial state (start of section):
+ *   - Polaroids are stacked center, large, overlapping
+ *   - Letter is folded closed (rotateX(-78deg), scale 0.96)
+ *
+ * As the user scrolls, polaroids fly to their final slot positions
+ * (recorded by .retail-polaroid--slot-* CSS placement) while the letter
+ * unfolds (rotateX → 0, scale → 1). The whole arc runs over ~80% of the
+ * section's scrollable height with scrub:0.6 so it feels smooth, not
+ * jittery.
+ *
+ * We use gsap.fromTo on each polaroid: starts at a center-stacked
+ * position, ends at "do nothing" (its CSS-placed slot). Letter has its
+ * own timeline.
+ */
+function initPolaroidFanOut(): void {
+  const section = document.querySelector<HTMLElement>('.retail-letter-section');
+  const polaroids = gsap.utils.toArray<HTMLElement>('.retail-polaroid--falling');
+  const letter = document.querySelector<HTMLElement>('[data-retail-letter]');
+  if (!section || polaroids.length === 0) return;
 
-  ScrollTrigger.create({
-    trigger: '.retail-letter-section',
-    start: 'top 75%',
-    once: true,
-    onEnter: () => {
-      polaroids.forEach((p, i) => {
-        setTimeout(() => p.classList.add('is-revealed'), i * 150);
-      });
+  // 3D perspective on the section so the letter unfold reads as fold-open
+  section.style.perspective = '1600px';
+
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: section,
+      start: 'top 80%',
+      end: 'bottom 30%',
+      scrub: 0.6,
     },
   });
+
+  // Polaroids — compute the delta from each polaroid's CSS-placed slot to
+  // the letter's center, then animate FROM that center back to 0,0 (rest).
+  // This makes the stack-to-fan effect feel like the polaroids dropped on
+  // top of the letter and then dealt outwards.
+  const letterRect = letter?.getBoundingClientRect();
+  const letterCenterX = letterRect ? letterRect.left + letterRect.width / 2 : 0;
+  const letterCenterY = letterRect ? letterRect.top + letterRect.height / 2 : 0;
+
+  polaroids.forEach((p, i) => {
+    const rect = p.getBoundingClientRect();
+    const polCenterX = rect.left + rect.width / 2;
+    const polCenterY = rect.top + rect.height / 2;
+    const dx = letterCenterX - polCenterX;
+    const dy = letterCenterY - polCenterY;
+    const stackOffsetX = (i - 2.5) * 10;
+    const stackOffsetY = (i - 2.5) * 14;
+    const stackRot = (i - 2.5) * 5;
+
+    tl.fromTo(
+      p,
+      {
+        x: dx + stackOffsetX,
+        y: dy + stackOffsetY,
+        rotate: stackRot,
+        scale: 1.15,
+        opacity: 0.45,
+      },
+      {
+        x: 0,
+        y: 0,
+        rotate: 'var(--rotate)',
+        scale: 1,
+        opacity: 1,
+        ease: 'power2.out',
+      },
+      i * 0.05
+    );
+  });
+
+  if (letter) {
+    // Letter unfolds — starts hidden + tilted, ends flat
+    tl.fromTo(
+      letter,
+      {
+        rotateX: -78,
+        scaleY: 0.6,
+        opacity: 0,
+        transformOrigin: '50% 0%',
+      },
+      {
+        rotateX: 0,
+        scaleY: 1,
+        opacity: 1,
+        ease: 'power3.out',
+      },
+      0
+    );
+  }
 }
 
 /* ---- Letter — paragraph-by-paragraph reveal as user scrolls down ---- */
@@ -253,7 +330,7 @@ export function initRetailAnimations(): void {
   initMaskReveals();
   initHairlines();
   initLookbookStagger();
-  initPolaroidStagger();
+  initPolaroidFanOut();
   initLetterReveal();
   initAtelierParallax();
   initTopbar();

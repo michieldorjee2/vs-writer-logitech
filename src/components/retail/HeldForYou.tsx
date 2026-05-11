@@ -7,6 +7,8 @@
 import SlatePlate from './SlatePlate';
 import type { HeldForYouBlock, RetailRegister } from '../../lib/graph-types';
 
+import { demoToast } from '../../lib/retail-demo-toast';
+
 function formatPrice(cents: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -38,12 +40,11 @@ export default function HeldForYou({ block, register }: Props) {
         {block.items.slice(0, 3).map((item, i) => {
           const anchor = `held-${i + 1}`;
           return (
-            <a
+            <article
               key={i}
               className="retail-heldforyou__frame"
-              href={`#${anchor}`}
               id={anchor}
-              aria-label={`${item.name}${item.descriptor ? ` — ${item.descriptor}` : ''}`}
+              aria-labelledby={`${anchor}-name`}
             >
               <div className="retail-heldforyou__slate" data-retail-mask>
                 <SlatePlate
@@ -55,7 +56,7 @@ export default function HeldForYou({ block, register }: Props) {
               </div>
               <div className="retail-heldforyou__caption">
                 <span className="retail-heldforyou__no">N° {String(i + 1).padStart(2, '0')}</span>
-                <h3 className="retail-heldforyou__name">{item.name}</h3>
+                <h3 id={`${anchor}-name`} className="retail-heldforyou__name">{item.name}</h3>
                 {item.descriptor && (
                   <p className="retail-heldforyou__desc">{item.descriptor}</p>
                 )}
@@ -64,8 +65,25 @@ export default function HeldForYou({ block, register }: Props) {
                     {formatPrice(item.priceCents)}
                   </span>
                 )}
+                <div className="retail-heldforyou__actions">
+                  <button
+                    type="button"
+                    className="retail-heldforyou__btn"
+                    onClick={() => demoToast(`${item.name} added to your bag.`, 'success')}
+                  >
+                    Add to bag
+                  </button>
+                  <button
+                    type="button"
+                    className="retail-heldforyou__btn retail-heldforyou__btn--quiet"
+                    onClick={() => demoToast(`${item.name} saved to your list.`, 'note')}
+                    aria-label={`Save ${item.name}`}
+                  >
+                    ♡ Save
+                  </button>
+                </div>
               </div>
-            </a>
+            </article>
           );
         })}
       </div>

@@ -6,6 +6,7 @@
  */
 
 import type { AppointmentBlock } from '../../lib/graph-types';
+import { demoToast } from '../../lib/retail-demo-toast';
 
 const VARIANT_LABEL = {
   named_appointment: 'Your atelier, when you would like',
@@ -56,19 +57,21 @@ export default function Appointment({ block }: Props) {
         )}
 
         <div className="retail-appointment__actions">
-          <a
+          <button
+            type="button"
             className="retail-btn"
-            href={`mailto:stylist@maisonaurelle.example?subject=${encodeURIComponent(`Appointment — ${block.boutique || 'Maison Aurelle'}`)}&body=${encodeURIComponent('I would like to reserve the slot that suits you best.')}`}
+            onClick={() => demoToast(`Reserved at ${block.boutique || 'the atelier'}.`, 'success')}
           >
             {primary}
-          </a>
+          </button>
           {secondary && (
-            <a
+            <button
+              type="button"
               className="retail-btn-quiet"
-              href="mailto:stylist@maisonaurelle.example?subject=Another%20time"
+              onClick={() => demoToast('Opal will follow up about another time.', 'note')}
             >
               {secondary}
-            </a>
+            </button>
           )}
         </div>
       </article>

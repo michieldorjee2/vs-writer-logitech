@@ -12,6 +12,13 @@ export interface WornAnchor {
   name: string;
   qualifier: string;
   season: string;
+  /** Paired suggestion — a new piece that accessorizes this anchor. */
+  pairedWith?: {
+    name: string;
+    qualifier: string;
+    /** Why this pairing — short editorial line. */
+    note: string;
+  };
 }
 
 export interface Polaroid {
@@ -32,6 +39,11 @@ export interface LetterContent {
   paragraphs: string[];
   /** Signature line ("— C.") */
   signoff: string;
+}
+
+export interface QA {
+  q: string;
+  a: string;
 }
 
 export interface DemoCustomer {
@@ -70,6 +82,7 @@ export interface DemoCustomer {
   stylistNoteSignedBy: string;
 
   closingReflection: string;
+  questions: QA[];
   footerLine: string;
 
   appointmentSlotPhrase?: string;
@@ -79,7 +92,7 @@ export interface DemoCustomer {
 const ISABELLA: DemoCustomer = {
   displayName: 'Isabella Chen',
   primaryCity: 'New York',
-  stylistName: 'Camille',
+  stylistName: 'Opal',
   stylistBoutique: 'Crosby Street',
   initials: 'I.C.',
   neighborhood: 'Tribeca',
@@ -92,42 +105,42 @@ const ISABELLA: DemoCustomer = {
   letter: {
     greeting: 'Dear Isabella,',
     paragraphs: [
-      "I've been holding the Plis pair since your last fitting — they came in on Tuesday morning, on the same delivery as the new oat merino. I thought of you when I unwrapped them.",
+      "Opal here, from the Crosby Street atelier. I've been holding the Plis pair since your last fitting — they came in on Tuesday morning, on the same delivery as the new oat merino. I thought of you when I unwrapped them.",
       "The Anna is in its third winter this fall. There's a way the wool-cashmere goes when it's been worn well — the shoulders settle, the lining loosens just slightly at the seams. We can re-line it without changing the fall. I've kept a swatch from the original run aside in case you'd like.",
       "The Marais has been the quieter friend, I think — it's the trench you take to the early appointments, not the long lunches. The blazer I've set out this week is meant to bridge the two: warm enough for May, soft enough that it doesn't fight with the silk.",
       "Come in when you can. I'll have everything ready.",
     ],
-    signoff: '— C.',
+    signoff: '— Opal',
   },
 
   polaroids: [
     {
-      imageUrl: 'https://images.unsplash.com/photo-1606567595334-d39972c85dbe?auto=format&fit=crop&w=600&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=900&q=80',
       caption: 'The Anna, on its hook.',
       rotate: -6,
     },
     {
-      imageUrl: 'https://images.unsplash.com/photo-1583846783214-7229a91b20ed?auto=format&fit=crop&w=600&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=900&q=80',
       caption: 'Cashmere folded the way you like it.',
       rotate: 8,
     },
     {
-      imageUrl: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=600&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=900&q=80',
       caption: 'The Plis, on linen — unwrapped this Tuesday.',
       rotate: -4,
     },
     {
-      imageUrl: 'https://images.unsplash.com/photo-1495707902641-75cac588d2e9?auto=format&fit=crop&w=600&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1444723121867-7a241cacace9?auto=format&fit=crop&w=900&q=80',
       caption: 'Crosby Street, morning light.',
       rotate: 9,
     },
     {
-      imageUrl: 'https://images.unsplash.com/photo-1495774856032-8b90bbb32b32?auto=format&fit=crop&w=600&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=900&q=80',
       caption: 'The atelier notebook, kept open at your page.',
       rotate: -10,
     },
     {
-      imageUrl: 'https://images.unsplash.com/photo-1611657687058-d97a31aff3eb?auto=format&fit=crop&w=600&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=900&q=80',
       caption: 'A swatch from the Anna run, set aside.',
       rotate: 5,
     },
@@ -135,10 +148,36 @@ const ISABELLA: DemoCustomer = {
 
   wornThisYearLabel: 'In your rotation',
   wornAnchors: [
-    { name: 'Anna Coat',     qualifier: 'camel wool-cashmere',      season: 'autumn 2024' },
-    { name: 'Marais Trench', qualifier: 'sand cotton-gabardine',    season: 'autumn 2025' },
-    { name: 'Liane Tote',    qualifier: 'espresso grained calf',    season: 'autumn 2024' },
-    { name: 'Plis Earrings', qualifier: '18k brushed gold',         season: 'autumn 2025' },
+    {
+      name: 'Anna Coat',
+      qualifier: 'camel wool-cashmere',
+      season: 'autumn 2024',
+      pairedWith: {
+        name: 'Charcoal Woven Stole',
+        qualifier: 'herringbone cashmere',
+        note: 'A weight that sits between scarf and wrap. Carries the camel into late autumn.',
+      },
+    },
+    {
+      name: 'Marais Trench',
+      qualifier: 'sand cotton-gabardine',
+      season: 'autumn 2025',
+      pairedWith: {
+        name: 'Côte Knit',
+        qualifier: 'oat merino, longer body',
+        note: 'Cut to sit cleanly over the trench at the shoulder.',
+      },
+    },
+    {
+      name: 'Liane Tote',
+      qualifier: 'espresso grained calf',
+      season: 'autumn 2024',
+      pairedWith: {
+        name: 'Liane Zip Wallet',
+        qualifier: 'same espresso hide',
+        note: 'Carried in the hand, or set quietly inside the tote.',
+      },
+    },
   ],
 
   heldHeader: 'Selected by Camille for you, this week',
@@ -182,6 +221,33 @@ const ISABELLA: DemoCustomer = {
   closingReflection:
     "The wardrobe you're building doesn't ask for new colors. It asks for the right weight, the right fall, and the rare object that earns its place. May is the quiet month — most things stay. One or two come in.",
 
+  questions: [
+    {
+      q: 'Does the Côte come in deep navy?',
+      a: 'Not in this run. The oat and the ink are the only two colours we developed for May. A navy is planned for autumn — I can hold a place on the list if you would like.',
+    },
+    {
+      q: 'Where is the merino sourced?',
+      a: 'A spinning house outside Biella, in the Italian Alps. The same supplier we have used for the Anna lining since 2019. The yarn is single-origin, traceable to the herd.',
+    },
+    {
+      q: 'How long does relining the Anna take?',
+      a: 'About a fortnight, including the time the coat spends with the maker. We collect from your address and return the piece the same way. No charge for outerwear bought through the house.',
+    },
+    {
+      q: 'Can the blazer be tailored shorter?',
+      a: 'Yes — the cut allows up to 4cm shorter without disturbing the pocket line. The atelier on Crosby Street will do the alteration in three days.',
+    },
+    {
+      q: 'Is the Plis pair limited?',
+      a: 'It is not a numbered piece, but the long-drop variation runs about twelve a season. There are six left.',
+    },
+    {
+      q: 'Could it be sent to Tribeca tomorrow?',
+      a: 'Yes. Same-day in Manhattan if you reserve before 3pm; tomorrow morning otherwise. Either way the pieces travel in linen.',
+    },
+  ],
+
   footerLine:
     'Pieces are held by appointment. Write to your stylist any time.',
 
@@ -193,7 +259,7 @@ const ISABELLA: DemoCustomer = {
 const MARCUS: DemoCustomer = {
   displayName: 'Marcus Whitfield',
   primaryCity: 'London',
-  stylistName: 'Edward',
+  stylistName: 'Opal',
   stylistBoutique: 'Mount Street',
   initials: 'M.W.',
   neighborhood: 'Mayfair',
@@ -209,7 +275,7 @@ const MARCUS: DemoCustomer = {
       "I'd suggest the Walnut Wholecut for the second pair — a warmer register without leaving the family. And a third shirt cloth alongside the poplin and voile when you're ready.",
       "Tea at four if it suits.",
     ],
-    signoff: '— Edward',
+    signoff: '— Opal',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80', caption: 'The 1972, on the desk.', rotate: -7 },
@@ -221,10 +287,24 @@ const MARCUS: DemoCustomer = {
   ],
   wornThisYearLabel: 'In the wardrobe',
   wornAnchors: [
-    { name: '1972 Dress Watch',     qualifier: 'vault, original strap retained', season: 'June 2025' },
-    { name: 'Mahogany Oxford',      qualifier: 'burnished calf',                  season: 'November 2024' },
-    { name: 'Vicuña Scarf',         qualifier: 'ash',                             season: 'December 2025' },
-    { name: 'Bespoke Shirts',       qualifier: 'poplin + voile, French cuff',     season: 'November 2024' },
+    {
+      name: '1972 Dress Watch',
+      qualifier: 'vault, original strap retained',
+      season: 'June 2025',
+      pairedWith: { name: 'Walnut Leather Strap', qualifier: 'aged calf', note: 'Drawn for the same patina at the same age.' },
+    },
+    {
+      name: 'Mahogany Oxford',
+      qualifier: 'burnished calf',
+      season: 'November 2024',
+      pairedWith: { name: 'Walnut Wholecut', qualifier: 'second pair, warmer register', note: 'A complement, not a substitute, once the first goes for resole.' },
+    },
+    {
+      name: 'Vicuña Scarf',
+      qualifier: 'ash',
+      season: 'December 2025',
+      pairedWith: { name: 'Cream Poplin Shirt', qualifier: 'French-cuff block on file', note: 'A third cloth alongside poplin and voile.' },
+    },
   ],
   heldHeader: 'Pieces drawn for you this month',
   heldDescriptors: {
@@ -252,6 +332,11 @@ const MARCUS: DemoCustomer = {
   stylistNoteSignedBy: 'Edward',
   closingReflection:
     "The collection is finished — what's left is care, and the occasional object that earns its place. May is for the second pair, the third cloth, the small refinement.",
+  questions: [
+    { q: 'When is the next vault release?', a: 'A second dress watch from 1968 is on the cabinet through June 27. Provenance file is bound.' },
+    { q: 'Where is the maker for the Oxford?', a: 'Northampton, the same house we have used since the line opened. Resole takes ten days.' },
+    { q: 'Can the cuff be re-monogrammed?', a: 'Yes — three letters, hand-engraved. The work happens here at Mount Street, two weeks.' },
+  ],
   footerLine:
     'Vault pieces are released to viewing by appointment. Provenance files travel ahead of the pieces.',
   appointmentSlotPhrase: 'Edward holds the file and both straps on site',
@@ -277,7 +362,7 @@ const ARIA: DemoCustomer = {
       "The Lume family was made to travel together. The shoulder in warm amber arrived ahead of the others; it sits one shade quieter than the fuchsia and one warmer than the citron. The collection adds up the way a colour study does.",
       "Come by, or send word. The bag will wait.",
     ],
-    signoff: '— The Miami atelier',
+    signoff: '— Opal',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=600&q=80', caption: 'The new Lume — third colour.', rotate: -8 },
@@ -289,10 +374,24 @@ const ARIA: DemoCustomer = {
   ],
   wornThisYearLabel: 'In your collection',
   wornAnchors: [
-    { name: 'Lume Mini Bag',      qualifier: 'citron',                  season: 'August 2025' },
-    { name: 'Lume Crossbody',     qualifier: 'fuchsia patent',          season: 'January 2026' },
-    { name: 'Volute Necklace',    qualifier: 'gold-vermeil, double-drop', season: 'January 2026' },
-    { name: 'Sera Clutch',        qualifier: 'oxblood python-stamped',   season: 'February 2025' },
+    {
+      name: 'Lume Mini Bag',
+      qualifier: 'citron',
+      season: 'August 2025',
+      pairedWith: { name: 'Lume Shoulder, Warm Amber', qualifier: 'mid-size, burnished calf', note: 'The third light of the family.' },
+    },
+    {
+      name: 'Volute Necklace',
+      qualifier: 'gold-vermeil, double-drop',
+      season: 'January 2026',
+      pairedWith: { name: 'Volute Cuff', qualifier: 'gold-vermeil, brushed', note: 'The wrist added to the conversation.' },
+    },
+    {
+      name: 'Sera Clutch',
+      qualifier: 'oxblood python-stamped',
+      season: 'February 2025',
+      pairedWith: { name: 'Sera Sandal', qualifier: 'low-heel, oxblood', note: 'Closes the pairing the clutch has been waiting for.' },
+    },
   ],
   heldHeader: 'Three pieces, two families',
   heldDescriptors: {
@@ -320,6 +419,11 @@ const ARIA: DemoCustomer = {
   stylistNoteSignedBy: 'The Miami atelier',
   closingReflection:
     'The capsules continue when you do. There is no urgency — these pieces are made to wait the season out, in the colorways the season chose.',
+  questions: [
+    { q: 'Will the Lume come in deep emerald?', a: 'Not for this season. The amber is the third colour; emerald is on the autumn board, in patent.' },
+    { q: 'Can I see the Sera in oxblood at the boutique?', a: 'It is on the cabinet at the Miami Design District atelier from Wednesday. Coffee, no expectation.' },
+    { q: 'Is the Volute cuff adjustable?', a: 'Yes — the inner band is tightened by a hidden hinge. Sized at the atelier in five minutes.' },
+  ],
   footerLine:
     'Maison Aurelle holds a boutique in the Miami Design District since 2014. By appointment, by request, or by walk-in.',
   appointmentSlotPhrase: 'Private viewings — Miami Design District',
@@ -329,7 +433,7 @@ const ARIA: DemoCustomer = {
 const SEBASTIAN: DemoCustomer = {
   displayName: 'Sebastian Laurent',
   primaryCity: 'Paris',
-  stylistName: 'Margaux',
+  stylistName: 'Opal',
   stylistBoutique: 'rue Saint-Honoré',
   initials: 'S.L.',
   neighborhood: '1er arrondissement',
@@ -345,7 +449,7 @@ const SEBASTIAN: DemoCustomer = {
       "Raw linen by the metre is now available; the same cloth that lines the capsule, before it becomes anything. For those who work with their hands, or simply want the material itself.",
       "Le cabinet est ouvert mardi et jeudi de 10h à 18h. Une note avant suffit.",
     ],
-    signoff: '— Margaux',
+    signoff: '— Opal',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1605518215584-eb9f86f0e80c?auto=format&fit=crop&w=600&q=80', caption: '12/40, kept on the rail.', rotate: -7 },
@@ -357,10 +461,24 @@ const SEBASTIAN: DemoCustomer = {
   ],
   wornThisYearLabel: 'Dans la maison',
   wornAnchors: [
-    { name: 'Capsule Jacket 12/40', qualifier: 'numbered, charcoal',         season: 'September 2025' },
-    { name: 'Ceramic Vessel 08/24', qualifier: 'atelier signed',             season: 'January 2026' },
-    { name: 'Sculpted Wool Coat',   qualifier: 'ash',                         season: 'January 2025' },
-    { name: 'Architectural Ring',   qualifier: 'sterling, brutalist',         season: 'January 2025' },
+    {
+      name: 'Capsule Jacket 12/40',
+      qualifier: 'numbered, charcoal',
+      season: 'September 2025',
+      pairedWith: { name: 'Capsule Trouser 07/40', qualifier: 'hand-numbered', note: 'A numbered companion, paired and inscribed.' },
+    },
+    {
+      name: 'Ceramic Vessel 08/24',
+      qualifier: 'atelier signed',
+      season: 'January 2026',
+      pairedWith: { name: 'Basalt Tray', qualifier: 'same edition language', note: 'It is not a set. A conversation between two surfaces.' },
+    },
+    {
+      name: 'Architectural Ring',
+      qualifier: 'sterling, brutalist',
+      season: 'January 2025',
+      pairedWith: { name: 'Bague Plane No. 4', qualifier: 'sterling, flat-forged', note: 'A quieter companion on the same hand.' },
+    },
   ],
   heldHeader: 'La suite',
   heldDescriptors: {
@@ -389,6 +507,11 @@ const SEBASTIAN: DemoCustomer = {
   stylistNoteSignedBy: 'Margaux',
   closingReflection:
     "Numbered pieces do not return. The maison s'élargit slowly — un objet, une coupe à la fois.",
+  questions: [
+    { q: 'Combien reste-t-il du pantalon 07/40 ?', a: 'Quatre pièces dont la vôtre, déjà inscrite. Les autres partiront avant la fin de mai.' },
+    { q: "What's the firing run for the basalt tray?", a: 'Twenty-four trays, each signed. 08/24 to 31/24. The early numbers tend to leave first.' },
+    { q: 'Can the capsule trouser be re-fitted?', a: 'Yes — Margaux marks the chalk at rue Saint-Honoré. Final fitting is included with the piece.' },
+  ],
   footerLine:
     'Les pièces numérotées ne reviennent pas en stock.',
   appointmentSlotPhrase: 'Margaux is in Tuesday and Thursday',
@@ -414,7 +537,7 @@ const OLIVIA: DemoCustomer = {
       "Anything reserved can be sent to Aspen or to Sag Harbor — whichever is current the week it ships.",
       "Crosby Street, Tuesday through Saturday, by appointment.",
     ],
-    signoff: '— The Crosby Street atelier',
+    signoff: '— Opal',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1485518882345-15568b007407?auto=format&fit=crop&w=600&q=80', caption: 'The ski parka, hung for the season.', rotate: -8 },
@@ -426,10 +549,24 @@ const OLIVIA: DemoCustomer = {
   ],
   wornThisYearLabel: 'In the household',
   wornAnchors: [
-    { name: 'Cashmere Down Puffer',   qualifier: 'ivory',                   season: 'December 2024' },
-    { name: 'Technical Ski Parka',    qualifier: 'deep navy',               season: 'December 2025' },
-    { name: 'Linen-Silk Caftan',      qualifier: 'white',                   season: 'July 2025' },
-    { name: 'Beach Tote',             qualifier: 'raffia + natural leather', season: 'July 2025' },
+    {
+      name: 'Technical Ski Parka',
+      qualifier: 'deep navy',
+      season: 'December 2025',
+      pairedWith: { name: 'Seasonal Storage', qualifier: 'cleaned, re-lofted, held in cold rooms', note: 'Returned to Aspen September 30 — no charge for outerwear bought through the house.' },
+    },
+    {
+      name: 'Linen-Silk Caftan',
+      qualifier: 'white',
+      season: 'July 2025',
+      pairedWith: { name: 'Linen-Silk Throw, Natural', qualifier: 'undyed, 200×280cm', note: 'Weighted enough for cool evenings on the water.' },
+    },
+    {
+      name: 'Beach Tote',
+      qualifier: 'raffia + natural leather',
+      season: 'July 2025',
+      pairedWith: { name: 'Raffia Market Tote', qualifier: 'larger, structured base', note: 'A larger companion to the one already by the door.' },
+    },
   ],
   heldHeader: 'Held for the move to the coast',
   heldDescriptors: {
@@ -457,6 +594,11 @@ const OLIVIA: DemoCustomer = {
   stylistNoteSignedBy: 'The Crosby Street atelier',
   closingReflection:
     'The household has two seasons, and the wardrobe meets them in the middle. May holds, June ships, the parka returns in autumn.',
+  questions: [
+    { q: 'When does the parka come back?', a: 'September 30, to Aspen. Cleaned, re-lofted, ready for the first snow.' },
+    { q: 'Can the kids cashmere be replaced if outgrown?', a: 'Yes — we hold the next size in oat against the household account and ship when needed.' },
+    { q: 'Could the throw be sent to Sag Harbor next week?', a: 'Yes. Either Friday or Tuesday — we route to whichever address is current.' },
+  ],
   footerLine:
     'The household account holds both addresses; anything reserved can be directed to whichever is current.',
   appointmentSlotPhrase: 'Crosby Street, New York — by appointment',

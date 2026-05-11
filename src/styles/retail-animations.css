@@ -74,13 +74,13 @@
 }
 
 /* Hero entrance — word reveal */
-.retail-hero__title .word > span {
+.retail-hero__title .word-wrap .word {
   transition:
     transform var(--dur-cinematic) var(--ease-pose);
   transition-delay: var(--word-delay, 0ms);
 }
 
-.retail-hero.is-loaded .retail-hero__title .word > span {
+.retail-hero.is-loaded .retail-hero__title .word-wrap .word {
   transform: translateY(0);
 }
 
@@ -152,7 +152,7 @@
   [data-retail-hairline]::after {
     transform: scaleX(1);
   }
-  .retail-hero__title .word > span { transform: none; }
+  .retail-hero__title .word-wrap .word { transform: none; }
   .retail-hero__meta { opacity: 1; }
   .retail-hero__line2 { opacity: 0.92; }
   .retail-page { opacity: 1; }

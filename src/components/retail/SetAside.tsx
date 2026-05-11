@@ -5,6 +5,7 @@
  */
 
 import type { SetAsideBlock } from '../../lib/graph-types';
+import { demoToast } from '../../lib/retail-demo-toast';
 
 interface Props {
   block: SetAsideBlock;
@@ -36,10 +37,20 @@ export default function SetAside({ block, primaryCity }: Props) {
         </ul>
 
         <div className="retail-setaside__actions">
-          <a className="retail-btn" href="#appointment">{primary}</a>
-          <a className="retail-btn-quiet" href={`mailto:stylist@maisonaurelle.example?subject=Send%20to%20${encodeURIComponent(primaryCity || 'me')}`}>
+          <button
+            type="button"
+            className="retail-btn"
+            onClick={() => demoToast('Viewing reserved at your atelier.', 'success')}
+          >
+            {primary}
+          </button>
+          <button
+            type="button"
+            className="retail-btn-quiet"
+            onClick={() => demoToast(`Sent to ${primaryCity || 'your address'}.`, 'note')}
+          >
             {secondary}
-          </a>
+          </button>
         </div>
       </div>
     </section>
