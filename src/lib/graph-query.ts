@@ -110,3 +110,61 @@ query GetAllCompetitorPages {
   }
 }
 `;
+
+// ============================================================================
+// RetailCustomerPage — Maison Aurelle showcase template
+// ============================================================================
+
+export const RETAIL_PAGE_QUERY = `
+query GetRetailPage($slug: String!) {
+  RetailCustomerPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { key url { default hierarchical } published }
+      template
+      PageTitle MetaDescription CanonicalUrl { default }
+      customerSlug customerDisplayName register monthStamp
+      hero {
+        imageUrl { default }
+        imageDirection
+        line1
+        line2
+      }
+      heldForYou {
+        header
+        dynamic
+        items {
+          name descriptor priceCents priceVisibility
+          imageUrl { default }
+          imageDirection
+        }
+      }
+      setAside {
+        primaryAction secondaryAction dynamic
+        items {
+          name descriptor privateProvenance
+          imageUrl { default }
+        }
+      }
+      atelierNote {
+        title body cta
+        imageUrl { default }
+        imageDirection
+      }
+      smallInvitation {
+        itemName line cta
+        imageUrl { default }
+        imageDirection
+      }
+      appointment {
+        variant boutique stylistName slotPhrase slots
+        primaryAction secondaryAction dynamic
+      }
+      footerLine
+      deviceDegraded generatedAt generatedBy canvasVersion
+    }
+  }
+}
+`;

@@ -1,0 +1,136 @@
+/* ===========================================================================
+   Retail (Maison Aurelle) — design tokens
+   Light-paper aesthetic. Cream ground, ink type, brushed gold hairlines.
+   Override by register via .retail-page.register-<name>.
+   =========================================================================== */
+
+.retail-page {
+  /* ===== Palette ===== */
+  --aurelle-ecru:        #f5efe6;
+  --aurelle-cream:       #faf6ed;
+  --aurelle-fawn:        #d9cab3;
+  --aurelle-oat:         #cabfa5;
+  --aurelle-sand:        #c2b58e;
+  --aurelle-slate:       #5c5f63;
+  --aurelle-ink:         #1a1a1a;
+  --aurelle-charcoal:    #2c2c2c;
+  --aurelle-walnut:      #6e5a3c;
+  --aurelle-mahogany:    #4f2a1b;
+  --aurelle-ash:         #b8b3aa;
+  --aurelle-brushed-gold:#b89968;
+
+  /* ===== Semantic ===== */
+  --ground:              var(--aurelle-cream);
+  --paper:               var(--aurelle-ecru);
+  --type-primary:        var(--aurelle-ink);
+  --type-secondary:      var(--aurelle-slate);
+  --type-quiet:          rgba(26, 26, 26, 0.58);
+  --rule:                rgba(26, 26, 26, 0.16);
+  --rule-bright:         rgba(26, 26, 26, 0.32);
+  --gold:                var(--aurelle-brushed-gold);
+
+  /* ===== Type stack ===== */
+  /* Tiempos, Lyon, GT Sectra → fall back to system serifs at the same weight.
+     We don't load custom fonts in this build; the system serifs (Iowan, Charter, Georgia)
+     render at a similar register and avoid layout shift. */
+  --font-serif:          'Iowan Old Style', 'Apple Garamond', 'Charter', 'Georgia', serif;
+  --font-display:        'Iowan Old Style', 'Apple Garamond', 'Charter', 'Georgia', serif;
+  --font-sans:           ui-sans-serif, -apple-system, 'Inter', 'Helvetica Neue', sans-serif;
+  --font-mono:           ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+
+  /* ===== Type scale ===== */
+  --type-xs:             clamp(0.625rem, 0.6rem + 0.1vw, 0.7rem);
+  --type-sm:             clamp(0.75rem, 0.7rem + 0.2vw, 0.85rem);
+  --type-base:           clamp(0.95rem, 0.9rem + 0.2vw, 1.05rem);
+  --type-md:             clamp(1.1rem, 1.05rem + 0.3vw, 1.25rem);
+  --type-lg:             clamp(1.4rem, 1.2rem + 0.6vw, 1.75rem);
+  --type-xl:             clamp(2rem,   1.7rem + 1.2vw, 2.8rem);
+  --type-2xl:            clamp(3rem,   2.4rem + 2.4vw, 4.8rem);
+  --type-3xl:            clamp(4rem,   3rem + 4vw,    7rem);
+  --type-hero:           clamp(5.5rem, 3.5rem + 6vw,  10rem);
+
+  /* ===== Tracking ===== */
+  --track-tight:         -0.02em;
+  --track-snug:          -0.01em;
+  --track-normal:        0;
+  --track-loose:         0.03em;
+  --track-caps:          0.18em;
+  --track-marquee:       0.32em;
+
+  /* ===== Leading ===== */
+  --lead-tight:          1.04;
+  --lead-snug:           1.16;
+  --lead-relaxed:        1.45;
+  --lead-loose:          1.7;
+
+  /* ===== Layout ===== */
+  --rail:                clamp(1.5rem, 2vw + 1rem, 3.5rem);
+  --gutter-narrow:       clamp(1rem, 1vw + 0.5rem, 1.5rem);
+  --gutter:              clamp(1.5rem, 2vw + 0.5rem, 2.5rem);
+  --column-narrow:       min(38rem, 90vw);
+  --column-reading:      min(44rem, 92vw);
+  --column-wide:         min(78rem, 94vw);
+
+  /* ===== Motion ===== */
+  --ease-quiet:          cubic-bezier(0.16, 0.84, 0.32, 1);    /* deceleration */
+  --ease-pose:           cubic-bezier(0.34, 0, 0.16, 1);       /* asymmetric */
+  --ease-fade:           cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:            220ms;
+  --dur:                 480ms;
+  --dur-slow:            900ms;
+  --dur-cinematic:       1600ms;
+
+  /* ===== Surfaces ===== */
+  --paper-grain:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.012) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.008) 0 1px, transparent 1px 5px);
+  --slate-warm:          #2a2622;
+  --slate-cool:          #232529;
+  --slate-clay:          #3b2f25;
+
+  background: var(--ground);
+  color: var(--type-primary);
+  font-family: var(--font-serif);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1, 'ss01' 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Register variants ===== */
+
+.retail-page.register-archive {
+  --ground:              #f1ebde;
+  --type-secondary:      #4a4438;
+  --gold:                #957642;
+}
+
+.retail-page.register-discovery {
+  --ground:              #f7ede4;
+  --type-secondary:      #5a3a2c;
+  --gold:                #c98a4f;
+  --type-hero:           clamp(4.5rem, 3rem + 5vw, 8rem);
+}
+
+.retail-page.register-atelier {
+  --ground:              #ecebe7;
+  --type-primary:        #111;
+  --type-secondary:      #3a3a36;
+  --gold:                #8c7a4d;
+  --column-reading:      min(40rem, 92vw);
+}
+
+.retail-page.register-family {
+  --ground:              #f5f0e6;
+  --type-secondary:      #4f4838;
+  --gold:                #b89968;
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .retail-page {
+    --dur-cinematic:     200ms;
+    --dur-slow:          200ms;
+    --dur:               150ms;
+    --dur-fast:          120ms;
+  }
+}

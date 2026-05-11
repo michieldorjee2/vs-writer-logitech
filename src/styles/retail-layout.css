@@ -1,0 +1,795 @@
+/* ===========================================================================
+   Retail — layout
+   Magazine-grade spatial system: full-bleed plates, editorial columns,
+   asymmetric spreads. Each section earns its own spacing.
+   =========================================================================== */
+
+.retail-page {
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  overflow-x: clip;
+}
+
+/* ===== Top bar — minimal, fades into the page ===== */
+.retail-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem var(--rail);
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity var(--dur) var(--ease-fade), transform var(--dur) var(--ease-fade);
+}
+
+.retail-topbar.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.retail-wordmark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--type-md);
+  letter-spacing: var(--track-snug);
+  color: var(--type-primary);
+}
+
+.retail-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--type-secondary);
+}
+
+/* ===== Scroll progress hairline (left rail) ===== */
+.retail-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+  z-index: 40;
+  pointer-events: none;
+}
+
+.retail-progress__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--gold);
+  height: 0;
+  will-change: height;
+}
+
+/* ===== Section base ===== */
+.retail-section {
+  position: relative;
+  padding: clamp(5rem, 8vw, 9rem) var(--rail);
+  isolation: isolate;
+}
+
+.retail-section--bleed {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.retail-inner {
+  max-width: var(--column-wide);
+  margin: 0 auto;
+}
+
+.retail-inner--reading {
+  max-width: var(--column-reading);
+  margin: 0 auto;
+}
+
+.retail-inner--narrow {
+  max-width: var(--column-narrow);
+  margin: 0 auto;
+}
+
+/* ===== Hero — full-bleed with overlay title ===== */
+.retail-hero {
+  position: relative;
+  min-height: 96vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  background: var(--ground);
+}
+
+.retail-hero__slate {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  will-change: transform;
+}
+
+.retail-hero__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(180deg,
+    rgba(20, 17, 12, 0) 0%,
+    rgba(20, 17, 12, 0) 55%,
+    rgba(20, 17, 12, 0.55) 100%);
+  pointer-events: none;
+}
+
+.retail-hero__content {
+  position: relative;
+  z-index: 3;
+  padding: 0 var(--rail) clamp(3rem, 6vw, 5rem);
+  color: #f5efe6;
+  max-width: var(--column-wide);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.retail-hero__meta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: clamp(1.5rem, 2vw, 2rem);
+  opacity: 0;
+}
+
+.retail-hero__monogram {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--type-md);
+  letter-spacing: var(--track-snug);
+}
+
+.retail-hero__monogram-rule {
+  flex: 0 0 3rem;
+  height: 1px;
+  background: var(--gold);
+  opacity: 0.8;
+}
+
+.retail-hero__monogram-stamp {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.retail-hero__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--type-hero);
+  line-height: 0.96;
+  letter-spacing: -0.025em;
+  color: #f5efe6;
+  max-width: 18ch;
+  margin: 0 0 1rem;
+}
+
+.retail-hero__title .word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.retail-hero__title .word > span {
+  display: inline-block;
+  transform: translateY(110%);
+  will-change: transform;
+}
+
+.retail-hero__line2 {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.4rem, 1rem + 1.4vw, 2.2rem);
+  line-height: 1.3;
+  max-width: 38rem;
+  color: #f5efe6;
+  opacity: 0.92;
+  margin: 0;
+}
+
+.retail-hero__scrollhint {
+  position: absolute;
+  right: var(--rail);
+  bottom: 2rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: rgba(245, 239, 230, 0.7);
+}
+
+.retail-hero__scrollhint::after {
+  content: '';
+  display: inline-block;
+  width: 3rem;
+  height: 1px;
+  background: rgba(245, 239, 230, 0.6);
+  transform-origin: left;
+  animation: retailHairlineSweep 2.4s var(--ease-quiet) infinite;
+}
+
+@keyframes retailHairlineSweep {
+  0%   { transform: scaleX(0); }
+  55%  { transform: scaleX(1); }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+
+/* ===== Editorial intro (lede) ===== */
+.retail-lede {
+  padding: clamp(6rem, 10vw, 10rem) var(--rail) clamp(4rem, 6vw, 6rem);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  background: var(--ground);
+}
+
+.retail-lede__label-row {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 2rem;
+  align-items: baseline;
+  margin: 0 auto clamp(2.5rem, 4vw, 4rem);
+  max-width: var(--column-wide);
+  width: 100%;
+}
+
+.retail-lede__body {
+  max-width: var(--column-reading);
+  margin: 0 auto;
+  text-align: left;
+}
+
+.retail-lede__paragraph {
+  font-family: var(--font-serif);
+  font-size: clamp(1.15rem, 1rem + 0.4vw, 1.4rem);
+  line-height: 1.55;
+  margin: 0 0 1.25em;
+  color: var(--type-primary);
+}
+
+.retail-lede__paragraph .retail-italic {
+  color: var(--type-secondary);
+}
+
+.retail-lede__rule {
+  margin: clamp(3rem, 4vw, 4rem) auto 0;
+  width: 3rem;
+  height: 1px;
+  background: var(--gold);
+  opacity: 0.7;
+}
+
+/* ===== Held for you — horizontal lookbook ===== */
+.retail-heldforyou {
+  background: var(--ground);
+  padding: clamp(4rem, 6vw, 6rem) 0 clamp(6rem, 8vw, 9rem);
+}
+
+.retail-heldforyou__head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2rem;
+  align-items: end;
+  max-width: var(--column-wide);
+  margin: 0 auto clamp(2.5rem, 4vw, 4rem);
+  padding: 0 var(--rail);
+}
+
+.retail-heldforyou__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(2rem, 1.5rem + 1.6vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.retail-heldforyou__by {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--type-secondary);
+  text-align: right;
+  max-width: 18rem;
+}
+
+.retail-heldforyou__lookbook {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  padding: 0 var(--rail);
+  max-width: var(--column-wide);
+  margin: 0 auto;
+}
+
+@media (max-width: 880px) {
+  .retail-heldforyou__lookbook {
+    grid-template-columns: 1fr;
+  }
+}
+
+.retail-heldforyou__frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+}
+
+.retail-heldforyou__slate {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}
+
+.retail-heldforyou__caption {
+  padding: 1.5rem 0 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.retail-heldforyou__no {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.retail-heldforyou__name {
+  font-family: var(--font-display);
+  font-size: var(--type-md);
+  line-height: 1.25;
+  color: var(--type-primary);
+}
+
+.retail-heldforyou__desc {
+  font-family: var(--font-serif);
+  font-size: var(--type-sm);
+  line-height: 1.55;
+  color: var(--type-secondary);
+}
+
+.retail-heldforyou__price {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-loose);
+  color: var(--type-quiet);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-fade);
+  margin-top: 0.4rem;
+  text-transform: uppercase;
+}
+
+.retail-heldforyou__frame:hover .retail-heldforyou__price {
+  opacity: 1;
+}
+
+/* ===== Set aside — quiet single column ===== */
+.retail-setaside {
+  background: var(--paper);
+  padding: clamp(6rem, 9vw, 9rem) var(--rail);
+}
+
+.retail-setaside__inner {
+  max-width: var(--column-reading);
+  margin: 0 auto;
+  text-align: center;
+}
+
+.retail-setaside__label {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: clamp(1.5rem, 2vw, 2rem);
+}
+
+.retail-setaside__items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 clamp(2.5rem, 4vw, 3rem);
+}
+
+.retail-setaside__item {
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-serif);
+  font-size: var(--type-md);
+  line-height: 1.5;
+  color: var(--type-primary);
+}
+
+.retail-setaside__items li:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.retail-setaside__item-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.retail-setaside__item-desc {
+  font-size: var(--type-sm);
+  color: var(--type-secondary);
+  line-height: 1.55;
+}
+
+.retail-setaside__actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* ===== Atelier note — magazine spread ===== */
+.retail-atelier {
+  background: var(--ground);
+  padding: clamp(5rem, 7vw, 7rem) var(--rail);
+}
+
+.retail-atelier__spread {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  gap: clamp(2rem, 4vw, 5rem);
+  align-items: start;
+  max-width: var(--column-wide);
+  margin: 0 auto;
+}
+
+@media (max-width: 880px) {
+  .retail-atelier__spread {
+    grid-template-columns: 1fr;
+  }
+}
+
+.retail-atelier__plate {
+  position: relative;
+  aspect-ratio: 4 / 5.2;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.retail-atelier__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-top: 2rem;
+}
+
+.retail-atelier__label {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.retail-atelier__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.8rem, 1.3rem + 1.4vw, 2.6rem);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.retail-atelier__body {
+  font-family: var(--font-serif);
+  font-size: var(--type-md);
+  line-height: 1.65;
+  margin: 0;
+  max-width: 32rem;
+}
+
+.retail-atelier__cta {
+  margin-top: 0.5rem;
+}
+
+/* ===== Small invitation — restraint as design ===== */
+.retail-invitation {
+  background: var(--paper);
+  padding: clamp(7rem, 11vw, 12rem) var(--rail);
+  text-align: center;
+}
+
+.retail-invitation__inner {
+  max-width: var(--column-narrow);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.5rem, 3vw, 3rem);
+}
+
+.retail-invitation__plate {
+  width: clamp(14rem, 28vw, 20rem);
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.retail-invitation__name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--type-md);
+  color: var(--gold);
+}
+
+.retail-invitation__line {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 1rem + 1vw, 2rem);
+  line-height: 1.4;
+  color: var(--type-primary);
+  max-width: 28rem;
+  margin: 0;
+}
+
+/* ===== Appointment — paper card ===== */
+.retail-appointment {
+  background: var(--ground);
+  padding: clamp(5rem, 7vw, 7rem) var(--rail) clamp(6rem, 9vw, 9rem);
+}
+
+.retail-appointment__card {
+  max-width: 32rem;
+  margin: 0 auto;
+  background: var(--paper);
+  padding: clamp(2.5rem, 4vw, 3.5rem);
+  border: 1px solid var(--rule);
+  position: relative;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  text-align: center;
+}
+
+.retail-appointment__card::before,
+.retail-appointment__card::after {
+  content: '';
+  position: absolute;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1px solid var(--gold);
+  opacity: 0.55;
+}
+
+.retail-appointment__card::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.retail-appointment__card::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.retail-appointment__label {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.retail-appointment__boutique {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.6rem, 1.2rem + 1vw, 2.2rem);
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.retail-appointment__phrase {
+  font-family: var(--font-serif);
+  font-size: var(--type-sm);
+  line-height: 1.55;
+  color: var(--type-secondary);
+  margin: 0 0 1.5rem;
+}
+
+.retail-appointment__slots {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.retail-appointment__slot {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-base);
+  color: var(--type-primary);
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.retail-appointment__slots li:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.retail-appointment__actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ===== Footer ===== */
+.retail-footer {
+  background: var(--ground);
+  border-top: 1px solid var(--rule);
+  padding: clamp(3rem, 5vw, 5rem) var(--rail);
+}
+
+.retail-footer__inner {
+  max-width: var(--column-wide);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2rem;
+  align-items: center;
+}
+
+.retail-footer__mark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--type-lg);
+  color: var(--type-primary);
+}
+
+.retail-footer__line {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-sm);
+  line-height: 1.55;
+  color: var(--type-secondary);
+  text-align: right;
+  max-width: 36rem;
+}
+
+@media (max-width: 680px) {
+  .retail-footer__inner {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+  .retail-footer__line { text-align: left; }
+}
+
+/* ===== Section header (shared) ===== */
+.retail-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  margin-bottom: clamp(2.5rem, 4vw, 4rem);
+}
+
+.retail-section-header__num {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--gold);
+  flex-shrink: 0;
+  width: 4rem;
+}
+
+.retail-section-header__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.4rem, 1rem + 0.8vw, 1.8rem);
+  letter-spacing: -0.005em;
+}
+
+/* ===== SlatePlate (image placeholder + image surface) ===== */
+.retail-slate {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: rgba(245, 239, 230, 0.6);
+}
+
+/* When used as the full element (lookbook frames) */
+.retail-heldforyou__slate .retail-slate,
+.retail-atelier__plate .retail-slate,
+.retail-invitation__plate .retail-slate {
+  position: absolute;
+  inset: 0;
+}
+
+.retail-slate__grain {
+  position: absolute;
+  inset: 0;
+  background-image: var(--paper-grain);
+  background-size: 4px 4px, 5px 5px;
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.retail-slate__crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  opacity: 0.18;
+}
+
+.retail-slate__cross {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: currentColor;
+}
+
+.retail-slate__cross--v {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  right: auto;
+  width: 1px;
+  height: auto;
+}
+
+.retail-slate__marker {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: rgba(245, 239, 230, 0.7);
+}
+
+.retail-slate__direction {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: rgba(245, 239, 230, 0.6);
+  font-style: italic;
+  max-width: 24rem;
+}

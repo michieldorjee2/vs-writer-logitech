@@ -279,3 +279,100 @@ export interface CompetitorComparisonPage {
         Notes?: string | null;
     }> | null;
 }
+
+// ============================================================================
+// RetailCustomerPage — Maison Aurelle showcase template
+// ============================================================================
+
+export type RetailRegister = 'minimal' | 'archive' | 'discovery' | 'atelier' | 'family';
+export type AppointmentVariant = 'named_appointment' | 'intro_appointment' | 'walk_in';
+
+export interface RetailHeroBlock {
+    imageUrl?: { default: string } | null;
+    imageDirection?: string | null;
+    line1: string;
+    line2?: string | null;
+}
+
+export interface HeldForYouItem {
+    name: string;
+    descriptor: string;
+    priceCents?: number | null;
+    priceVisibility?: 'always' | 'on_hover' | 'hidden';
+    imageUrl?: { default: string } | null;
+    imageDirection?: string | null;
+}
+
+export interface HeldForYouBlock {
+    header?: string | null;
+    items: HeldForYouItem[];
+    dynamic?: boolean;
+}
+
+export interface SetAsideItem {
+    name: string;
+    descriptor: string;
+    privateProvenance?: string | null;
+    imageUrl?: { default: string } | null;
+}
+
+export interface SetAsideBlock {
+    items: SetAsideItem[];
+    primaryAction?: string | null;
+    secondaryAction?: string | null;
+    dynamic?: boolean;
+}
+
+export interface AtelierNoteBlock {
+    title?: string | null;
+    body: string;
+    cta?: string | null;
+    imageUrl?: { default: string } | null;
+    imageDirection?: string | null;
+}
+
+export interface SmallInvitationBlock {
+    itemName: string;
+    line: string;
+    cta?: string | null;
+    imageUrl?: { default: string } | null;
+    imageDirection?: string | null;
+}
+
+export interface AppointmentBlock {
+    variant: AppointmentVariant;
+    boutique?: string | null;
+    stylistName?: string | null;
+    slotPhrase?: string | null;
+    slots?: string[] | null;
+    primaryAction?: string | null;
+    secondaryAction?: string | null;
+    dynamic?: boolean;
+}
+
+export interface RetailCustomerPage {
+    _metadata: {
+        key: string;
+        url: { default: string; hierarchical: string };
+        published?: string | null;
+    };
+    template: 'retail';
+    PageTitle: string;
+    MetaDescription: string;
+    CanonicalUrl?: { default: string } | null;
+    customerSlug: string;
+    customerDisplayName: string;
+    register: RetailRegister;
+    monthStamp?: string | null;
+    hero?: RetailHeroBlock | null;
+    heldForYou?: HeldForYouBlock | null;
+    setAside?: SetAsideBlock | null;
+    atelierNote?: AtelierNoteBlock | null;
+    smallInvitation?: SmallInvitationBlock | null;
+    appointment?: AppointmentBlock | null;
+    footerLine?: string | null;
+    deviceDegraded?: boolean;
+    generatedAt?: string;
+    generatedBy?: string;
+    canvasVersion?: number;
+}

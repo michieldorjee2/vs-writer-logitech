@@ -2,6 +2,39 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
+const RETAIL_PAGE_QUERY = `
+query GetRetailPage($slug: String!) {
+  RetailCustomerPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { key url { default hierarchical } published }
+      template
+      PageTitle MetaDescription CanonicalUrl { default }
+      customerSlug customerDisplayName register monthStamp
+      hero { imageUrl { default } imageDirection line1 line2 }
+      heldForYou {
+        header dynamic
+        items { name descriptor priceCents priceVisibility imageUrl { default } imageDirection }
+      }
+      setAside {
+        primaryAction secondaryAction dynamic
+        items { name descriptor privateProvenance imageUrl { default } }
+      }
+      atelierNote { title body cta imageUrl { default } imageDirection }
+      smallInvitation { itemName line cta imageUrl { default } imageDirection }
+      appointment {
+        variant boutique stylistName slotPhrase slots
+        primaryAction secondaryAction dynamic
+      }
+      footerLine
+      deviceDegraded generatedAt generatedBy canvasVersion
+    }
+  }
+}
+`;
+
 const PAGE_QUERY = `
 query GetPage($slug: String!) {
   CompetitorComparisonPage(
@@ -68,6 +101,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const normalizedSlug = `/${slug}/`;
 
   try {
+    // Retail dispatch: any slug under /retail/ first tries RetailCustomerPage.
+    if (slug.startsWith('retail/') || slug.startsWith('en/retail/')) {
+      const tries = [normalizedSlug];
+      if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`);
+      for (const s of tries) {
+        const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
+        const items = (json as any)?.data?.RetailCustomerPage?.items;
+        if (items && items.length > 0) {
+          res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+          return res.status(200).json({ ...items[0], __template: 'retail' });
+        }
+      }
+      // No retail page at this slug; fall through to comparison query.
+    }
+
     let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
     let items = (json as any)?.data?.CompetitorComparisonPage?.items;
 

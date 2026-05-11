@@ -14,6 +14,7 @@ import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
  */
 const DynamicComparisonPage = lazy(() => import('./components/DynamicComparisonPage'));
 const ABMHyperPage = lazy(() => import('./components/ABMHyperPage'));
+const RetailCustomerPage = lazy(() => import('./components/RetailCustomerPage'));
 const BlockPreview = lazy(() => import('./components/BlockPreview'));
 /*
  * Booth-only sales sidebar. Gated on `?search=1` in the URL — visitors
@@ -33,6 +34,10 @@ function RouteSpinner() {
 
 function isABMPage(page: CompetitorComparisonPage): boolean {
     return !!(page.intelEyebrow || page.customerLogo);
+}
+
+function isRetailPage(page: any): boolean {
+    return page?.template === 'retail' || !!page?.customerSlug;
 }
 
 /** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
@@ -111,10 +116,12 @@ function PageLoader() {
 
     return (
         <Suspense fallback={<RouteSpinner />}>
-            {isABMPage(data)
-                ? <ABMHyperPage page={data} />
-                : <DynamicComparisonPage page={data} />}
-            {fromSearch && (
+            {isRetailPage(data)
+                ? <RetailCustomerPage page={data as any} />
+                : isABMPage(data)
+                    ? <ABMHyperPage page={data} />
+                    : <DynamicComparisonPage page={data} />}
+            {fromSearch && !isRetailPage(data) && (
                 <FloatingSidebar
                     page={data}
                     variant={isABMPage(data) ? 'abm' : 'dynamic'}

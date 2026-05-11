@@ -1,0 +1,209 @@
+/* ===========================================================================
+   Retail — typography
+   Editorial / magazine register. Display serifs, small-caps labels, drop caps.
+   =========================================================================== */
+
+.retail-page * { box-sizing: border-box; }
+
+/* ===== Display ===== */
+.retail-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--type-hero);
+  line-height: var(--lead-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--type-primary);
+}
+
+.retail-display em,
+.retail-display .italic {
+  font-style: italic;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1, 'ss01' 1, 'salt' 1;
+}
+
+.retail-h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--type-2xl);
+  line-height: var(--lead-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--type-primary);
+}
+
+.retail-h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--type-xl);
+  line-height: var(--lead-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--type-primary);
+}
+
+.retail-h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--type-lg);
+  line-height: var(--lead-snug);
+  color: var(--type-primary);
+}
+
+/* ===== Body ===== */
+.retail-prose {
+  font-family: var(--font-serif);
+  font-size: var(--type-base);
+  line-height: var(--lead-relaxed);
+  letter-spacing: 0;
+  color: var(--type-primary);
+}
+
+.retail-prose-lg {
+  font-family: var(--font-serif);
+  font-size: var(--type-md);
+  line-height: var(--lead-relaxed);
+  color: var(--type-primary);
+}
+
+/* Drop cap — first paragraph in atelier-note + intro */
+.retail-dropcap::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-size: 5.4em;
+  line-height: 0.84;
+  padding: 0.08em 0.12em 0 0;
+  font-weight: 400;
+  font-feature-settings: 'salt' 1, 'ss01' 1;
+  color: var(--type-primary);
+}
+
+/* ===== Small caps / labels ===== */
+.retail-label {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--type-secondary);
+}
+
+.retail-label-gold {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--gold);
+}
+
+.retail-label-marquee {
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--type-secondary);
+}
+
+/* ===== Subtle italic accents ===== */
+.retail-italic {
+  font-style: italic;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'salt' 1;
+}
+
+/* ===== Hairlines & rules ===== */
+.retail-rule {
+  display: block;
+  height: 1px;
+  width: 100%;
+  background: var(--rule);
+  border: 0;
+}
+
+.retail-rule-gold {
+  display: block;
+  height: 1px;
+  width: 100%;
+  background: var(--gold);
+  opacity: 0.6;
+  border: 0;
+}
+
+.retail-rule-short {
+  display: block;
+  height: 1px;
+  width: 3rem;
+  background: var(--rule-bright);
+  border: 0;
+}
+
+/* ===== Ornaments ===== */
+.retail-fleuron {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--gold);
+  opacity: 0.7;
+  letter-spacing: 0;
+}
+
+/* ===== Links ===== */
+.retail-link {
+  color: inherit;
+  text-decoration: none;
+  position: relative;
+  display: inline-block;
+  padding-bottom: 1px;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  transition: background-size var(--dur) var(--ease-quiet);
+}
+
+.retail-link:hover {
+  background-size: 100% 2px;
+}
+
+/* ===== Buttons (quiet, paper-card style) ===== */
+.retail-btn {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  font-weight: 500;
+  padding: 0.95rem 1.6rem;
+  background: transparent;
+  color: var(--type-primary);
+  border: 1px solid var(--rule-bright);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease-fade),
+    color var(--dur) var(--ease-fade),
+    border-color var(--dur) var(--ease-fade);
+}
+
+.retail-btn:hover {
+  background: var(--type-primary);
+  color: var(--ground);
+  border-color: var(--type-primary);
+}
+
+.retail-btn-quiet {
+  background: transparent;
+  color: var(--type-secondary);
+  border: none;
+  padding: 0.6rem 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 1px solid var(--rule);
+  transition: color var(--dur) var(--ease-fade), border-color var(--dur) var(--ease-fade);
+}
+
+.retail-btn-quiet:hover {
+  color: var(--type-primary);
+  border-color: var(--type-primary);
+}

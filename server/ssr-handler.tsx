@@ -2,12 +2,46 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { renderToString } from 'react-dom/server';
 import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
 import ABMHyperPageServer from '../src/components/ABMHyperPage.server';
+import RetailCustomerPageServer from '../src/components/RetailCustomerPage.server';
 
 // ---------------------------------------------------------------------------
 // Content Graph – fetch page data
 // ---------------------------------------------------------------------------
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
+
+const RETAIL_PAGE_QUERY = `
+query GetRetailPage($slug: String!) {
+  RetailCustomerPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { key url { default hierarchical } published }
+      template
+      PageTitle MetaDescription CanonicalUrl { default }
+      customerSlug customerDisplayName register monthStamp
+      hero { imageUrl { default } imageDirection line1 line2 }
+      heldForYou {
+        header dynamic
+        items { name descriptor priceCents priceVisibility imageUrl { default } imageDirection }
+      }
+      setAside {
+        primaryAction secondaryAction dynamic
+        items { name descriptor privateProvenance imageUrl { default } }
+      }
+      atelierNote { title body cta imageUrl { default } imageDirection }
+      smallInvitation { itemName line cta imageUrl { default } imageDirection }
+      appointment {
+        variant boutique stylistName slotPhrase slots
+        primaryAction secondaryAction dynamic
+      }
+      footerLine
+      deviceDegraded generatedAt generatedBy canvasVersion
+    }
+  }
+}
+`;
 
 const PAGE_QUERY = `
 query GetPage($slug: String!) {
@@ -62,6 +96,24 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
 
 async function fetchPageContent(authKey: string, slug: string) {
   const normalizedSlug = `/${slug}/`;
+
+  // Retail dispatch: any slug under /retail/ first tries the RetailCustomerPage
+  // content type. If found, we tag it with __template:'retail' so the renderer
+  // picks the retail React tree.
+  if (slug.startsWith('retail/') || slug.startsWith('en/retail/')) {
+    const tries = [normalizedSlug];
+    if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`);
+    for (const s of tries) {
+      const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
+      const items = (json as any)?.data?.RetailCustomerPage?.items;
+      if (items && items.length > 0) {
+        return { ...items[0], __template: 'retail' as const };
+      }
+    }
+    // Fall through to the comparison query so a stale /retail/* slug still
+    // resolves if it was previously registered as a CompetitorComparisonPage.
+  }
+
   let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
   let items = (json as any)?.data?.CompetitorComparisonPage?.items;
 
@@ -271,12 +323,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- Render React component tree to HTML ----
-    // Detect ABM template
-    const isABM = !!(page.intelEyebrow || page.customerLogo);
+    // Three templates: retail (luxury fashion), abm (B2B account-based), comparison (B2B vs-X).
+    // Retail is tagged in fetchPageContent; ABM is signal-detected.
+    const isRetail = (page as any).__template === 'retail' || page.template === 'retail';
+    const isABM = !isRetail && !!(page.intelEyebrow || page.customerLogo);
 
-    const appHtml = isABM
-      ? renderToString(<ABMHyperPageServer page={page} />)
-      : renderToString(<DynamicComparisonPageServer page={page} />);
+    const appHtml = isRetail
+      ? renderToString(<RetailCustomerPageServer page={page} />)
+      : isABM
+        ? renderToString(<ABMHyperPageServer page={page} />)
+        : renderToString(<DynamicComparisonPageServer page={page} />);
 
     // ---- Build SEO head tags ----
     const headHtml = buildHeadHtml(page);

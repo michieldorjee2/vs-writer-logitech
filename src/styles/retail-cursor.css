@@ -1,0 +1,71 @@
+/* ===========================================================================
+   Retail — custom cursor
+   Tiny ink dot that grows into a circle on interactive elements,
+   becomes a labelled disk on imagery.
+   =========================================================================== */
+
+@media (hover: hover) and (pointer: fine) {
+  .retail-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--type-primary);
+    pointer-events: none;
+    z-index: 9999;
+    mix-blend-mode: multiply;
+    transform: translate(-50%, -50%);
+    transition:
+      width var(--dur) var(--ease-quiet),
+      height var(--dur) var(--ease-quiet),
+      background var(--dur) var(--ease-quiet),
+      mix-blend-mode 0s linear;
+    will-change: transform;
+  }
+
+  .retail-cursor.is-link {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--type-primary);
+    mix-blend-mode: normal;
+  }
+
+  .retail-cursor.is-image {
+    width: 84px;
+    height: 84px;
+    background: rgba(245, 239, 230, 0.92);
+    mix-blend-mode: normal;
+    border: none;
+  }
+
+  .retail-cursor__label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    letter-spacing: var(--track-caps);
+    text-transform: uppercase;
+    color: var(--type-primary);
+    opacity: 0;
+    transform: scale(0.92);
+    transition:
+      opacity var(--dur) var(--ease-quiet),
+      transform var(--dur) var(--ease-quiet);
+  }
+
+  .retail-cursor.is-image .retail-cursor__label {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .retail-cursor { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retail-cursor {
+    transition: none;
+  }
+}

@@ -5,6 +5,14 @@
 @import './styles/abm-components.css';
 @import './styles/abm-animations.css';
 
+/* Retail (Maison Aurelle) template — light-paper editorial register.
+   Scoped via .retail-page so the dark ABM theme is unaffected. */
+@import './styles/retail-variables.css';
+@import './styles/retail-typography.css';
+@import './styles/retail-layout.css';
+@import './styles/retail-animations.css';
+@import './styles/retail-cursor.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
