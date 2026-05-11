@@ -44,6 +44,9 @@ function setMode(mode: 'default' | 'link' | 'image', label?: string): void {
 }
 
 export function initRetailInteractions(): void {
+  // Cursor disabled by request — keep native cursor, skip everything below.
+  return;
+
   // Mobile / coarse pointer: skip entirely
   const isFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   if (!isFinePointer) return;

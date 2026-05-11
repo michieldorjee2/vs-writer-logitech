@@ -38,16 +38,16 @@
   --font-sans:           ui-sans-serif, -apple-system, 'Inter', 'Helvetica Neue', sans-serif;
   --font-mono:           ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
 
-  /* ===== Type scale ===== */
-  --type-xs:             clamp(0.625rem, 0.6rem + 0.1vw, 0.7rem);
-  --type-sm:             clamp(0.75rem, 0.7rem + 0.2vw, 0.85rem);
-  --type-base:           clamp(0.95rem, 0.9rem + 0.2vw, 1.05rem);
-  --type-md:             clamp(1.1rem, 1.05rem + 0.3vw, 1.25rem);
-  --type-lg:             clamp(1.4rem, 1.2rem + 0.6vw, 1.75rem);
-  --type-xl:             clamp(2rem,   1.7rem + 1.2vw, 2.8rem);
-  --type-2xl:            clamp(3rem,   2.4rem + 2.4vw, 4.8rem);
-  --type-3xl:            clamp(4rem,   3rem + 4vw,    7rem);
-  --type-hero:           clamp(5.5rem, 3.5rem + 6vw,  10rem);
+  /* ===== Type scale — sized up for readability (2026-05-11) ===== */
+  --type-xs:             clamp(0.75rem,  0.7rem + 0.15vw, 0.85rem);
+  --type-sm:             clamp(0.9rem,   0.85rem + 0.2vw, 1rem);
+  --type-base:           clamp(1.125rem, 1.05rem + 0.3vw, 1.275rem);
+  --type-md:             clamp(1.25rem,  1.15rem + 0.4vw, 1.45rem);
+  --type-lg:             clamp(1.6rem,   1.35rem + 0.7vw, 1.95rem);
+  --type-xl:             clamp(2.2rem,   1.8rem + 1.3vw, 3rem);
+  --type-2xl:            clamp(3.2rem,   2.5rem + 2.5vw, 5rem);
+  --type-3xl:            clamp(4.2rem,   3.2rem + 4.2vw, 7.5rem);
+  --type-hero:           clamp(5.8rem,   3.6rem + 6.2vw, 10.5rem);
 
   /* ===== Tracking ===== */
   --track-tight:         -0.02em;

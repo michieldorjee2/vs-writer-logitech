@@ -56,8 +56,20 @@ export default function Appointment({ block }: Props) {
         )}
 
         <div className="retail-appointment__actions">
-          <button className="retail-btn">{primary}</button>
-          {secondary && <button className="retail-btn-quiet">{secondary}</button>}
+          <a
+            className="retail-btn"
+            href={`mailto:stylist@maisonaurelle.example?subject=${encodeURIComponent(`Appointment — ${block.boutique || 'Maison Aurelle'}`)}&body=${encodeURIComponent('I would like to reserve the slot that suits you best.')}`}
+          >
+            {primary}
+          </a>
+          {secondary && (
+            <a
+              className="retail-btn-quiet"
+              href="mailto:stylist@maisonaurelle.example?subject=Another%20time"
+            >
+              {secondary}
+            </a>
+          )}
         </div>
       </article>
     </section>

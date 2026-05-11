@@ -362,9 +362,14 @@ export interface RetailCustomerPage {
     MetaDescription: string;
     CanonicalUrl?: { default: string } | null;
     customerSlug: string;
-    customerDisplayName: string;
+    customerDisplayName?: string | null;
     register: RetailRegister;
     monthStamp?: string | null;
+    // v3 editorial fields
+    editorialIntro?: string | null;
+    stylistNoteBody?: string | null;
+    stylistNoteSignedBy?: string | null;
+    closingReflection?: string | null;
     hero?: RetailHeroBlock | null;
     heldForYou?: HeldForYouBlock | null;
     setAside?: SetAsideBlock | null;

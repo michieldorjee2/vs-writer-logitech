@@ -133,18 +133,13 @@
   will-change: transform;
 }
 
-/* Custom cursor */
-@media (hover: hover) and (pointer: fine) {
-  .retail-page {
-    cursor: none;
-  }
+/* Native cursor — explicitly restored over any inherited cursor:none */
+.retail-page,
+.retail-page * { cursor: auto; }
 
-  .retail-page a,
-  .retail-page button,
-  .retail-page [data-retail-hover] {
-    cursor: none;
-  }
-}
+.retail-page a,
+.retail-page button,
+.retail-page [data-retail-hover] { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   [data-retail-reveal] {

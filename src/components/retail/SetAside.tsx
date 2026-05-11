@@ -36,8 +36,10 @@ export default function SetAside({ block, primaryCity }: Props) {
         </ul>
 
         <div className="retail-setaside__actions">
-          <button className="retail-btn">{primary}</button>
-          <button className="retail-btn-quiet">{secondary}</button>
+          <a className="retail-btn" href="#appointment">{primary}</a>
+          <a className="retail-btn-quiet" href={`mailto:stylist@maisonaurelle.example?subject=Send%20to%20${encodeURIComponent(primaryCity || 'me')}`}>
+            {secondary}
+          </a>
         </div>
       </div>
     </section>

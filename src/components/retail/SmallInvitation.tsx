@@ -20,8 +20,8 @@ export default function SmallInvitation({ block, register }: Props) {
           <SlatePlate
             imageUrl={(block.itemImageUrl?.default ?? block.imageUrl?.default) || null}
             imageDirection={block.imageDirection || undefined}
+            itemName={block.itemName}
             register={register}
-            marker="invitation"
           />
         </div>
 
@@ -34,7 +34,7 @@ export default function SmallInvitation({ block, register }: Props) {
         </p>
 
         {block.cta && (
-          <a href="#" className="retail-link" data-retail-reveal data-retail-delay="360">
+          <a href="#appointment" className="retail-link" data-retail-reveal data-retail-delay="360">
             {block.cta} →
           </a>
         )}

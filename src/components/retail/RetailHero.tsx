@@ -24,8 +24,8 @@ export default function RetailHero({ block, monthStamp, register }: Props) {
         <SlatePlate
           imageUrl={block.imageUrl?.default}
           imageDirection={block.imageDirection || undefined}
+          itemName={block.line1}
           register={register}
-          marker="hero"
         />
       </div>
 

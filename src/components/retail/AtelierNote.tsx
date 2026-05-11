@@ -20,8 +20,8 @@ export default function AtelierNote({ block, register }: Props) {
           <SlatePlate
             imageUrl={block.imageUrl?.default}
             imageDirection={block.imageDirection || undefined}
+            itemName={block.title || 'atelier'}
             register={register}
-            marker="atelier"
           />
         </div>
 
@@ -41,7 +41,12 @@ export default function AtelierNote({ block, register }: Props) {
           </p>
 
           {block.cta && (
-            <a className="retail-link retail-atelier__cta" href="#" data-retail-reveal data-retail-delay="240">
+            <a
+              className="retail-link retail-atelier__cta"
+              href="mailto:stylist@maisonaurelle.example?subject=Re%3A%20The%20atelier%20note"
+              data-retail-reveal
+              data-retail-delay="240"
+            >
               {block.cta} →
             </a>
           )}

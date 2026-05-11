@@ -35,34 +35,39 @@ export default function HeldForYou({ block, register }: Props) {
       </div>
 
       <div className="retail-heldforyou__lookbook">
-        {block.items.slice(0, 3).map((item, i) => (
-          <article
-            key={i}
-            className="retail-heldforyou__frame"
-            data-cursor-label="view"
-          >
-            <div className="retail-heldforyou__slate" data-retail-mask>
-              <SlatePlate
-                imageUrl={item.imageUrl?.default}
-                imageDirection={item.imageDirection || undefined}
-                register={register}
-                marker={String(i + 1).padStart(2, '0')}
-              />
-            </div>
-            <div className="retail-heldforyou__caption">
-              <span className="retail-heldforyou__no">N° {String(i + 1).padStart(2, '0')}</span>
-              <h3 className="retail-heldforyou__name">{item.name}</h3>
-              {item.descriptor && (
-                <p className="retail-heldforyou__desc">{item.descriptor}</p>
-              )}
-              {item.priceCents != null && item.priceVisibility !== 'hidden' && (
-                <span className="retail-heldforyou__price">
-                  {formatPrice(item.priceCents)}
-                </span>
-              )}
-            </div>
-          </article>
-        ))}
+        {block.items.slice(0, 3).map((item, i) => {
+          const anchor = `held-${i + 1}`;
+          return (
+            <a
+              key={i}
+              className="retail-heldforyou__frame"
+              href={`#${anchor}`}
+              id={anchor}
+              aria-label={`${item.name}${item.descriptor ? ` — ${item.descriptor}` : ''}`}
+            >
+              <div className="retail-heldforyou__slate" data-retail-mask>
+                <SlatePlate
+                  imageUrl={item.imageUrl?.default}
+                  imageDirection={item.imageDirection || undefined}
+                  itemName={`${item.name} ${item.descriptor || ''}`}
+                  register={register}
+                />
+              </div>
+              <div className="retail-heldforyou__caption">
+                <span className="retail-heldforyou__no">N° {String(i + 1).padStart(2, '0')}</span>
+                <h3 className="retail-heldforyou__name">{item.name}</h3>
+                {item.descriptor && (
+                  <p className="retail-heldforyou__desc">{item.descriptor}</p>
+                )}
+                {item.priceCents != null && item.priceVisibility !== 'hidden' && (
+                  <span className="retail-heldforyou__price">
+                    {formatPrice(item.priceCents)}
+                  </span>
+                )}
+              </div>
+            </a>
+          );
+        })}
       </div>
     </section>
   );

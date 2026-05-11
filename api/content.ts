@@ -12,7 +12,8 @@ query GetRetailPage($slug: String!) {
       _metadata { key url { default hierarchical } published }
       template
       PageTitle MetaDescription CanonicalUrl { default }
-      customerSlug register monthStamp
+      customerSlug customerDisplayName register monthStamp
+      editorialIntro stylistNoteBody stylistNoteSignedBy closingReflection
       hero { imageUrl { default } line1 line2 linkTo { default } }
       heldForYou {
         header dynamic
