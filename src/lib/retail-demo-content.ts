@@ -14,13 +14,43 @@ export interface WornAnchor {
   season: string;
 }
 
+export interface Polaroid {
+  /** Image URL — typically an atmospheric still that evokes the customer's life. */
+  imageUrl: string;
+  /** Handwritten-feeling caption shown below the image. */
+  caption: string;
+  /** Initial rotation in degrees. Polaroids look natural at -10 to +10. */
+  rotate: number;
+  /** Approximate aspect for the photo (default 1:1). Use 0.75 for tall, 1.33 for wide. */
+  aspect?: number;
+}
+
+export interface LetterContent {
+  /** Greeting line — "Dear Isabella," */
+  greeting: string;
+  /** Paragraphs. Each rendered with stagger fade-in as the section enters view. */
+  paragraphs: string[];
+  /** Signature line ("— C.") */
+  signoff: string;
+}
+
 export interface DemoCustomer {
   displayName: string;
   primaryCity: string;
   stylistName: string | null;
   stylistBoutique: string | null;
 
+  /** Initials shown in the hero's personal monogram — "I.C.", "M.W.", etc. */
+  initials: string;
+  /** Personal locale shown next to initials — typically a neighborhood, not the city. */
+  neighborhood: string;
+  /** Personal hero line — replaces the generic line1. References pieces she actually owns. */
+  personalHeroLine1: string;
+  personalHeroLine2: string;
+
   editorialIntro: string;
+  letter: LetterContent;
+  polaroids: Polaroid[];
   wornThisYearLabel: string;
   wornAnchors: WornAnchor[];
 
@@ -51,9 +81,57 @@ const ISABELLA: DemoCustomer = {
   primaryCity: 'New York',
   stylistName: 'Camille',
   stylistBoutique: 'Crosby Street',
+  initials: 'I.C.',
+  neighborhood: 'Tribeca',
+  personalHeroLine1: 'After the Anna, before the linen.',
+  personalHeroLine2: 'One piece in oat for the weeks the coats rest.',
 
   editorialIntro:
     "Four orders, two wardrobes — the spring you set down in March and the autumn you keep returning to. The Anna in camel, the Marais in sand, the Liane carried like an extension of the hand. This May, in the weeks between the coats and what comes after, the question is the bridge: a piece in oat linen-wool that holds the wardrobe together while the season turns. Camille has set three things aside, and one quieter object — to be seen if you'd like.",
+
+  letter: {
+    greeting: 'Dear Isabella,',
+    paragraphs: [
+      "I've been holding the Plis pair since your last fitting — they came in on Tuesday morning, on the same delivery as the new oat merino. I thought of you when I unwrapped them.",
+      "The Anna is in its third winter this fall. There's a way the wool-cashmere goes when it's been worn well — the shoulders settle, the lining loosens just slightly at the seams. We can re-line it without changing the fall. I've kept a swatch from the original run aside in case you'd like.",
+      "The Marais has been the quieter friend, I think — it's the trench you take to the early appointments, not the long lunches. The blazer I've set out this week is meant to bridge the two: warm enough for May, soft enough that it doesn't fight with the silk.",
+      "Come in when you can. I'll have everything ready.",
+    ],
+    signoff: '— C.',
+  },
+
+  polaroids: [
+    {
+      imageUrl: 'https://images.unsplash.com/photo-1606567595334-d39972c85dbe?auto=format&fit=crop&w=600&q=80',
+      caption: 'The Anna, on its hook.',
+      rotate: -6,
+    },
+    {
+      imageUrl: 'https://images.unsplash.com/photo-1583846783214-7229a91b20ed?auto=format&fit=crop&w=600&q=80',
+      caption: 'Cashmere folded the way you like it.',
+      rotate: 8,
+    },
+    {
+      imageUrl: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=600&q=80',
+      caption: 'The Plis, on linen — unwrapped this Tuesday.',
+      rotate: -4,
+    },
+    {
+      imageUrl: 'https://images.unsplash.com/photo-1495707902641-75cac588d2e9?auto=format&fit=crop&w=600&q=80',
+      caption: 'Crosby Street, morning light.',
+      rotate: 9,
+    },
+    {
+      imageUrl: 'https://images.unsplash.com/photo-1495774856032-8b90bbb32b32?auto=format&fit=crop&w=600&q=80',
+      caption: 'The atelier notebook, kept open at your page.',
+      rotate: -10,
+    },
+    {
+      imageUrl: 'https://images.unsplash.com/photo-1611657687058-d97a31aff3eb?auto=format&fit=crop&w=600&q=80',
+      caption: 'A swatch from the Anna run, set aside.',
+      rotate: 5,
+    },
+  ],
 
   wornThisYearLabel: 'In your rotation',
   wornAnchors: [
@@ -117,8 +195,30 @@ const MARCUS: DemoCustomer = {
   primaryCity: 'London',
   stylistName: 'Edward',
   stylistBoutique: 'Mount Street',
+  initials: 'M.W.',
+  neighborhood: 'Mayfair',
+  personalHeroLine1: 'The second pair, the third cloth.',
+  personalHeroLine2: 'The 1972 file is bound; the Oxford is due for its first resole.',
   editorialIntro:
     "Three orders, four objects of consequence — the 1972 dress watch with its original strap retained, the Mahogany Oxford coming up on its first resole, the bespoke shirts in pairs. May is the threshold month for what comes next: a second shoe in conversation with the first, a third cloth to sit alongside poplin and voile. Edward has the provenance file on hand and a quiet pair of objects on the cabinet shelf, ready when you are.",
+  letter: {
+    greeting: 'Dear Mr. Whitfield,',
+    paragraphs: [
+      "The provenance file on the 1972 is complete. I had it bound this week alongside the strap — the original kept flat, the new walnut leather drawn for comparison at the same age.",
+      "The Mahogany Oxford is approaching the window for its first resole. The maker has the lasts on file; the work takes ten days. If you'd like, I can have them collected next time the box goes out.",
+      "I'd suggest the Walnut Wholecut for the second pair — a warmer register without leaving the family. And a third shirt cloth alongside the poplin and voile when you're ready.",
+      "Tea at four if it suits.",
+    ],
+    signoff: '— Edward',
+  },
+  polaroids: [
+    { imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80', caption: 'The 1972, on the desk.', rotate: -7 },
+    { imageUrl: 'https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&w=600&q=80', caption: 'The Mahogany Oxford, kept on the rack.', rotate: 6 },
+    { imageUrl: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80', caption: 'Shirts in pairs, French cuff.', rotate: -3 },
+    { imageUrl: 'https://images.unsplash.com/photo-1495707902641-75cac588d2e9?auto=format&fit=crop&w=600&q=80', caption: 'Mount Street, four o\'clock.', rotate: 9 },
+    { imageUrl: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=600&q=80', caption: 'The provenance file, bound.', rotate: -8 },
+    { imageUrl: 'https://images.unsplash.com/photo-1583846783214-7229a91b20ed?auto=format&fit=crop&w=600&q=80', caption: 'Vicuña in ash.', rotate: 4 },
+  ],
   wornThisYearLabel: 'In the wardrobe',
   wornAnchors: [
     { name: '1972 Dress Watch',     qualifier: 'vault, original strap retained', season: 'June 2025' },
@@ -163,8 +263,30 @@ const ARIA: DemoCustomer = {
   primaryCity: 'Miami Beach',
   stylistName: null,
   stylistBoutique: null,
+  initials: 'A.P.',
+  neighborhood: 'Miami Beach',
+  personalHeroLine1: 'The third light of the Lume family.',
+  personalHeroLine2: 'Citron, fuchsia — and the one the season chose.',
   editorialIntro:
     'Two capsules in motion — the Lume bag family in citron and fuchsia, the Volute jewelry pair in gold-vermeil. May arrives as the season the third colorway lands and the silhouette of the wrist is added to the conversation. No stylist on file yet; the next time you stop into Miami Design District, the new Lume and the cuff that pairs to your Volute will both be on the cabinet.',
+  letter: {
+    greeting: 'Dear Aria,',
+    paragraphs: [
+      "The Miami Design District boutique is open Wednesday through Saturday. We don't expect a visit — but if you'd like to see the new Lume in its third colorway, the box is on the cabinet by the window.",
+      "Three pieces from your wishlist have arrived this week. We've kept the Hibou in the ivory-and-gold print and the second Volute, oxidized, on a private hold against this account through the end of May.",
+      "The Lume family was made to travel together. The shoulder in warm amber arrived ahead of the others; it sits one shade quieter than the fuchsia and one warmer than the citron. The collection adds up the way a colour study does.",
+      "Come by, or send word. The bag will wait.",
+    ],
+    signoff: '— The Miami atelier',
+  },
+  polaroids: [
+    { imageUrl: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=600&q=80', caption: 'The new Lume — third colour.', rotate: -8 },
+    { imageUrl: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=600&q=80', caption: 'The Volute, paired.', rotate: 7 },
+    { imageUrl: 'https://images.unsplash.com/photo-1591561954557-26941169b49e?auto=format&fit=crop&w=600&q=80', caption: 'The Sera, oxblood, in the evening.', rotate: -5 },
+    { imageUrl: 'https://images.unsplash.com/photo-1612722432474-b971cdcea546?auto=format&fit=crop&w=600&q=80', caption: 'The Hibou caftan, ivory and gold.', rotate: 9 },
+    { imageUrl: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?auto=format&fit=crop&w=600&q=80', caption: 'Miami Design District, Saturday.', rotate: -9 },
+    { imageUrl: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=600&q=80', caption: 'Metallic sandal, the way you wear them.', rotate: 6 },
+  ],
   wornThisYearLabel: 'In your collection',
   wornAnchors: [
     { name: 'Lume Mini Bag',      qualifier: 'citron',                  season: 'August 2025' },
@@ -209,8 +331,30 @@ const SEBASTIAN: DemoCustomer = {
   primaryCity: 'Paris',
   stylistName: 'Margaux',
   stylistBoutique: 'rue Saint-Honoré',
+  initials: 'S.L.',
+  neighborhood: '1er arrondissement',
+  personalHeroLine1: 'Le pantalon, 07/40.',
+  personalHeroLine2: 'Numbered, paired to the jacket already in the closet.',
   editorialIntro:
     "Le pantalon. La capsule jacket 12/40 already in your closet, the ceramic 08/24 on the dining room shelf — la maison s'élargit objet par objet. May brings a numbered companion to the trouser, a basalt tray in the same edition language, and a length of raw linen for those who work with their hands. Margaux is at rue Saint-Honoré through Saturday; the cabinet is open, no reservation required for a first look.",
+  letter: {
+    greeting: 'Cher Sebastian,',
+    paragraphs: [
+      "The capsule trouser numbered 07/40 has been kept aside with the jacket already in your closet. The hand-card is inscribed and held with the piece.",
+      "The basalt tray came in this week — same edition language as the ceramic vessel that left here in January. It is not a set. It is a conversation between two surfaces.",
+      "Raw linen by the metre is now available; the same cloth that lines the capsule, before it becomes anything. For those who work with their hands, or simply want the material itself.",
+      "Le cabinet est ouvert mardi et jeudi de 10h à 18h. Une note avant suffit.",
+    ],
+    signoff: '— Margaux',
+  },
+  polaroids: [
+    { imageUrl: 'https://images.unsplash.com/photo-1605518215584-eb9f86f0e80c?auto=format&fit=crop&w=600&q=80', caption: '12/40, kept on the rail.', rotate: -7 },
+    { imageUrl: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=600&q=80', caption: '08/24, on the shelf.', rotate: 8 },
+    { imageUrl: 'https://images.unsplash.com/photo-1599391398131-cd12dfc6c24e?auto=format&fit=crop&w=600&q=80', caption: 'Tissu brut, before the cut.', rotate: -6 },
+    { imageUrl: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=600&q=80', caption: 'Le carnet, ouvert.', rotate: 4 },
+    { imageUrl: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=600&q=80', caption: 'Sterling, flat-forged.', rotate: 9 },
+    { imageUrl: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?auto=format&fit=crop&w=600&q=80', caption: 'Rue Saint-Honoré, mardi.', rotate: -9 },
+  ],
   wornThisYearLabel: 'Dans la maison',
   wornAnchors: [
     { name: 'Capsule Jacket 12/40', qualifier: 'numbered, charcoal',         season: 'September 2025' },
@@ -256,8 +400,30 @@ const OLIVIA: DemoCustomer = {
   primaryCity: 'Aspen',
   stylistName: null,
   stylistBoutique: null,
+  initials: 'O.B.',
+  neighborhood: 'Aspen & Sag Harbor',
+  personalHeroLine1: 'From the mountain to the shore.',
+  personalHeroLine2: 'The parka into storage, the throw onto the porch.',
   editorialIntro:
     'Two residences and two wardrobes that meet in the middle. The ski parka is hung for the season; the raffia tote came in last July. May is the threshold week between mountain and shore — pieces that travel well, a throw for cool evenings at the water, the storage of what kept you warm. The household account holds both addresses; anything reserved can go to whichever is current.',
+  letter: {
+    greeting: 'For the Brennan household,',
+    paragraphs: [
+      "The technical parka and the cashmere puffer are at the end of their season. Aurelle offers seasonal storage on outerwear bought through the house — cleaned, re-lofted, held in climate-controlled conditions until autumn. A collection can be arranged from either address.",
+      "Three pieces are held for the coast: a generous linen-silk throw for cooler evenings on the water, a packable canvas overshirt that travels flat, and a larger raffia tote alongside the one already in the household.",
+      "Anything reserved can be sent to Aspen or to Sag Harbor — whichever is current the week it ships.",
+      "Crosby Street, Tuesday through Saturday, by appointment.",
+    ],
+    signoff: '— The Crosby Street atelier',
+  },
+  polaroids: [
+    { imageUrl: 'https://images.unsplash.com/photo-1485518882345-15568b007407?auto=format&fit=crop&w=600&q=80', caption: 'The ski parka, hung for the season.', rotate: -8 },
+    { imageUrl: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=600&q=80', caption: 'The cashmere puffer, ivory.', rotate: 7 },
+    { imageUrl: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80', caption: 'Raffia tote, kept by the door.', rotate: -5 },
+    { imageUrl: 'https://images.unsplash.com/photo-1612722432474-b971cdcea546?auto=format&fit=crop&w=600&q=80', caption: 'The linen-silk caftan, for July.', rotate: 9 },
+    { imageUrl: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=600&q=80', caption: 'Table objects, in oat glaze.', rotate: -6 },
+    { imageUrl: 'https://images.unsplash.com/photo-1631679706909-1844bbd07221?auto=format&fit=crop&w=600&q=80', caption: 'Cashmere throw, folded.', rotate: 6 },
+  ],
   wornThisYearLabel: 'In the household',
   wornAnchors: [
     { name: 'Cashmere Down Puffer',   qualifier: 'ivory',                   season: 'December 2024' },

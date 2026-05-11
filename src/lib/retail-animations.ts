@@ -197,6 +197,49 @@ function initPageMount(): void {
   });
 }
 
+/* ---- Polaroids — staggered entrance with rotation snap ---- */
+function initPolaroidStagger(): void {
+  const polaroids = gsap.utils.toArray<HTMLElement>('.retail-polaroid');
+  if (polaroids.length === 0) return;
+
+  ScrollTrigger.create({
+    trigger: '.retail-letter-section',
+    start: 'top 75%',
+    once: true,
+    onEnter: () => {
+      polaroids.forEach((p, i) => {
+        setTimeout(() => p.classList.add('is-revealed'), i * 150);
+      });
+    },
+  });
+}
+
+/* ---- Letter — paragraph-by-paragraph reveal as user scrolls down ---- */
+function initLetterReveal(): void {
+  const paragraphs = gsap.utils.toArray<HTMLElement>('[data-retail-letter-line]');
+  const signoff = document.querySelector<HTMLElement>('.retail-letter__signoff');
+
+  paragraphs.forEach((p, i) => {
+    ScrollTrigger.create({
+      trigger: p,
+      start: 'top 85%',
+      once: true,
+      onEnter: () => {
+        setTimeout(() => p.classList.add('is-revealed'), i * 60);
+      },
+    });
+  });
+
+  if (signoff) {
+    ScrollTrigger.create({
+      trigger: signoff,
+      start: 'top 90%',
+      once: true,
+      onEnter: () => signoff.classList.add('is-revealed'),
+    });
+  }
+}
+
 /* ===== Public API ===== */
 
 export function initRetailAnimations(): void {
@@ -210,6 +253,8 @@ export function initRetailAnimations(): void {
   initMaskReveals();
   initHairlines();
   initLookbookStagger();
+  initPolaroidStagger();
+  initLetterReveal();
   initAtelierParallax();
   initTopbar();
   initProgressRail();

@@ -19,6 +19,7 @@ import { initRetailAnimations, cleanupRetailAnimations } from '../lib/retail-ani
 import { initRetailInteractions, cleanupRetailInteractions } from '../lib/retail-interactions';
 import { getDemoContent, resolveDescriptor } from '../lib/retail-demo-content';
 import RetailHero from './retail/RetailHero';
+import LetterAndPolaroids from './retail/LetterAndPolaroids';
 import EditorialLede from './retail/EditorialLede';
 import WornThisYear from './retail/WornThisYear';
 import HeldForYou from './retail/HeldForYou';
@@ -146,15 +147,25 @@ export default function RetailCustomerPage({ page, deviceRecognized = true, edit
           block={page.hero}
           monthStamp={page.monthStamp}
           register={page.register}
+          initials={demo?.initials}
+          neighborhood={demo?.neighborhood}
+          stylistName={demo?.stylistName}
+          stylistBoutique={demo?.stylistBoutique}
+          personalLine1={demo?.personalHeroLine1}
+          personalLine2={demo?.personalHeroLine2}
         />
       )}
 
-      <EditorialLede
-        monthStamp={page.monthStamp}
-        register={page.register}
-        intro={editorialIntro || ''}
-        pullLine={null}
-      />
+      {demo?.letter && demo?.polaroids?.length ? (
+        <LetterAndPolaroids letter={demo.letter} polaroids={demo.polaroids} />
+      ) : (
+        <EditorialLede
+          monthStamp={page.monthStamp}
+          register={page.register}
+          intro={editorialIntro || ''}
+          pullLine={null}
+        />
+      )}
 
       {demo && (
         <WornThisYear
