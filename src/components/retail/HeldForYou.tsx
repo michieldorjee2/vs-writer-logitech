@@ -52,7 +52,9 @@ export default function HeldForYou({ block, register }: Props) {
             <div className="retail-heldforyou__caption">
               <span className="retail-heldforyou__no">N° {String(i + 1).padStart(2, '0')}</span>
               <h3 className="retail-heldforyou__name">{item.name}</h3>
-              <p className="retail-heldforyou__desc">{item.descriptor}</p>
+              {item.descriptor && (
+                <p className="retail-heldforyou__desc">{item.descriptor}</p>
+              )}
               {item.priceCents != null && item.priceVisibility !== 'hidden' && (
                 <span className="retail-heldforyou__price">
                   {formatPrice(item.priceCents)}

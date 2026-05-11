@@ -12,18 +12,18 @@ query GetRetailPage($slug: String!) {
       _metadata { key url { default hierarchical } published }
       template
       PageTitle MetaDescription CanonicalUrl { default }
-      customerSlug customerDisplayName register monthStamp
-      hero { imageUrl { default } imageDirection line1 line2 }
+      customerSlug register monthStamp
+      hero { imageUrl { default } line1 line2 linkTo { default } }
       heldForYou {
         header dynamic
-        items { name descriptor priceCents priceVisibility imageUrl { default } imageDirection }
+        items { name priceCents priceVisibility imageUrl { default } }
       }
       setAside {
         primaryAction secondaryAction dynamic
-        items { name descriptor privateProvenance imageUrl { default } }
+        items { name imageUrl { default } }
       }
-      atelierNote { title body cta imageUrl { default } imageDirection }
-      smallInvitation { itemName line cta imageUrl { default } imageDirection }
+      atelierNote { title body cta imageUrl { default } }
+      smallInvitation { itemName line cta itemImageUrl { default } }
       appointment {
         variant boutique stylistName slotPhrase slots
         primaryAction secondaryAction dynamic
@@ -77,6 +77,44 @@ query GetPage($slug: String!) {
 }
 `;
 
+/**
+ * Recover fields the agent wrote in propertiesJson but the registered
+ * content type doesn't expose as typed fields (descriptor, imageDirection,
+ * privateProvenance, customerDisplayName). Same logic as ssr-handler.tsx.
+ */
+function mergeRetailJson(page: any): any {
+  const raw = page?._json;
+  if (!raw || typeof raw !== 'object') return page;
+  const merge = (block: any, src: any) =>
+    src && typeof src === 'object' ? { ...src, ...(block || {}) } : block;
+  if (raw.customerDisplayName && !page.customerDisplayName) page.customerDisplayName = raw.customerDisplayName;
+  if (page.hero || raw.hero) page.hero = merge(page.hero, raw.hero);
+  if (page.heldForYou && Array.isArray(raw.heldForYou?.items)) {
+    page.heldForYou = {
+      ...raw.heldForYou,
+      ...page.heldForYou,
+      items: page.heldForYou.items.map((it: any) => {
+        const fromRaw = raw.heldForYou.items.find((r: any) => r.name === it.name);
+        return fromRaw ? { ...fromRaw, ...it } : it;
+      }),
+    };
+  }
+  if (page.setAside && Array.isArray(raw.setAside?.items)) {
+    page.setAside = {
+      ...raw.setAside,
+      ...page.setAside,
+      items: page.setAside.items.map((it: any) => {
+        const fromRaw = raw.setAside.items.find((r: any) => r.name === it.name);
+        return fromRaw ? { ...fromRaw, ...it } : it;
+      }),
+    };
+  }
+  page.atelierNote = merge(page.atelierNote, raw.atelierNote);
+  page.smallInvitation = merge(page.smallInvitation, raw.smallInvitation);
+  page.appointment = merge(page.appointment, raw.appointment);
+  return page;
+}
+
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
   const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
     method: 'POST',
@@ -116,7 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (items && items.length > 0) {
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-        return res.status(200).json({ ...items[0], __template: 'retail' });
+        return res.status(200).json(mergeRetailJson({ ...items[0], __template: 'retail' }));
       }
     }
 

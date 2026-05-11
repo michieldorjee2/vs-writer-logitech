@@ -18,7 +18,7 @@ export default function SmallInvitation({ block, register }: Props) {
       <div className="retail-invitation__inner">
         <div className="retail-invitation__plate" data-retail-mask>
           <SlatePlate
-            imageUrl={block.imageUrl?.default}
+            imageUrl={(block.itemImageUrl?.default ?? block.imageUrl?.default) || null}
             imageDirection={block.imageDirection || undefined}
             register={register}
             marker="invitation"

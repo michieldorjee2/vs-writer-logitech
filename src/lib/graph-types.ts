@@ -336,6 +336,7 @@ export interface SmallInvitationBlock {
     line: string;
     cta?: string | null;
     imageUrl?: { default: string } | null;
+    itemImageUrl?: { default: string } | null;
     imageDirection?: string | null;
 }
 

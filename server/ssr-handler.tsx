@@ -10,6 +10,12 @@ import RetailCustomerPageServer from '../src/components/RetailCustomerPage.serve
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
+// Query matches the registered RetailCustomerPage schema in Optimizely Graph.
+// Fields the CMS doesn't yet expose (descriptor on items, imageDirection on
+// every block, privateProvenance, customerDisplayName) are excluded here —
+// the agent writes them in propertiesJson but they're dropped server-side.
+// `_json` captures the raw write blob so we can recover descriptors / image
+// directions client-side until those fields are added to the content type.
 const RETAIL_PAGE_QUERY = `
 query GetRetailPage($slug: String!) {
   RetailCustomerPage(
@@ -20,18 +26,18 @@ query GetRetailPage($slug: String!) {
       _metadata { key url { default hierarchical } published }
       template
       PageTitle MetaDescription CanonicalUrl { default }
-      customerSlug customerDisplayName register monthStamp
-      hero { imageUrl { default } imageDirection line1 line2 }
+      customerSlug register monthStamp
+      hero { imageUrl { default } line1 line2 linkTo { default } }
       heldForYou {
         header dynamic
-        items { name descriptor priceCents priceVisibility imageUrl { default } imageDirection }
+        items { name priceCents priceVisibility imageUrl { default } }
       }
       setAside {
         primaryAction secondaryAction dynamic
-        items { name descriptor privateProvenance imageUrl { default } }
+        items { name imageUrl { default } }
       }
-      atelierNote { title body cta imageUrl { default } imageDirection }
-      smallInvitation { itemName line cta imageUrl { default } imageDirection }
+      atelierNote { title body cta imageUrl { default } }
+      smallInvitation { itemName line cta itemImageUrl { default } }
       appointment {
         variant boutique stylistName slotPhrase slots
         primaryAction secondaryAction dynamic
@@ -85,6 +91,57 @@ query GetPage($slug: String!) {
 }
 `;
 
+/**
+ * Recover fields that the agent wrote to the CMS but the registered content
+ * type doesn't yet expose (descriptor on items, image direction strings,
+ * privateProvenance on set-aside items). The agent's create_page call sends
+ * a propertiesJson blob; the CMS persists it verbatim under `_json` even when
+ * it doesn't surface every key as a typed field. We re-merge those fields
+ * into the page object so React components see the rich content the agent
+ * actually generated.
+ */
+function mergeRetailJson(page: any): any {
+  const raw = page?._json;
+  if (!raw || typeof raw !== 'object') return page;
+  const merge = (block: any, src: any) => {
+    if (!src || typeof src !== 'object') return block;
+    return { ...src, ...(block || {}) };
+  };
+  // Top-level scalars
+  if (raw.customerDisplayName && !page.customerDisplayName) page.customerDisplayName = raw.customerDisplayName;
+  // Hero
+  if (page.hero || raw.hero) {
+    page.hero = merge(page.hero, raw.hero);
+  }
+  // Held for you items — merge `descriptor` back onto each item by name
+  if (page.heldForYou && Array.isArray(raw.heldForYou?.items)) {
+    page.heldForYou = {
+      ...raw.heldForYou,
+      ...page.heldForYou,
+      items: page.heldForYou.items.map((it: any) => {
+        const fromRaw = raw.heldForYou.items.find((r: any) => r.name === it.name);
+        return fromRaw ? { ...fromRaw, ...it } : it;
+      }),
+    };
+  }
+  // Set-aside items
+  if (page.setAside && Array.isArray(raw.setAside?.items)) {
+    page.setAside = {
+      ...raw.setAside,
+      ...page.setAside,
+      items: page.setAside.items.map((it: any) => {
+        const fromRaw = raw.setAside.items.find((r: any) => r.name === it.name);
+        return fromRaw ? { ...fromRaw, ...it } : it;
+      }),
+    };
+  }
+  // Atelier note + small invitation + appointment — merge whole blocks
+  page.atelierNote = merge(page.atelierNote, raw.atelierNote);
+  page.smallInvitation = merge(page.smallInvitation, raw.smallInvitation);
+  page.appointment = merge(page.appointment, raw.appointment);
+  return page;
+}
+
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
   const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
     method: 'POST',
@@ -113,7 +170,7 @@ async function fetchPageContent(authKey: string, slug: string) {
     const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
     const items = (json as any)?.data?.RetailCustomerPage?.items;
     if (items && items.length > 0) {
-      return { ...items[0], __template: 'retail' as const };
+      return mergeRetailJson({ ...items[0], __template: 'retail' as const });
     }
   }
 

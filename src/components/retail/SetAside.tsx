@@ -28,7 +28,9 @@ export default function SetAside({ block, primaryCity }: Props) {
           {block.items.map((item, i) => (
             <li key={i} className="retail-setaside__item" data-retail-reveal data-retail-delay={`${i * 80}`}>
               <span className="retail-setaside__item-name">{item.name}</span>
-              <span className="retail-setaside__item-desc">{item.descriptor}</span>
+              {item.descriptor && (
+                <span className="retail-setaside__item-desc">{item.descriptor}</span>
+              )}
             </li>
           ))}
         </ul>
