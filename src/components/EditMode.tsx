@@ -10,6 +10,7 @@ import {
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { isValidOptimizelyEmail, loadStoredEmail, saveStoredEmail } from '../lib/stored-email';
 import { streamEdit, type EditAction } from '../lib/opal-edit-stream';
+import { animateSectionEdit } from '../lib/inplace-edit';
 import '../styles/edit-mode.css';
 
 interface Props {
@@ -57,6 +58,35 @@ type ActiveCard = {
   newText?: string;
   key: number;
 };
+
+/* Wait for Opal's republish to land by polling the same /api/edit-status
+ * ping the sidebar uses: when the page's Graph `published` timestamp moves
+ * past the baseline we captured at submit, the edit is live (and the
+ * endpoint has already purged the edge cache). Resolves true on change,
+ * false on timeout/abort. */
+async function waitForRepublish(
+  key: string,
+  since: string,
+  signal: AbortSignal,
+  deadlineMs = 120_000,
+): Promise<boolean> {
+  const end = Date.now() + deadlineMs;
+  await sleep(1500);
+  while (Date.now() < end && !signal.aborted) {
+    try {
+      const qs = `key=${encodeURIComponent(key)}&since=${encodeURIComponent(since)}`;
+      const res = await fetch(`/api/edit-status?${qs}`, { cache: 'no-store', signal });
+      if (res.ok) {
+        const data = (await res.json()) as { changed?: boolean };
+        if (data?.changed) return true;
+      }
+    } catch {
+      /* network blip — retry */
+    }
+    await sleep(2500);
+  }
+  return false;
+}
 
 function getDocSize(): DocSize {
   if (typeof window === 'undefined') return { w: 1280, h: 720 };
@@ -465,6 +495,9 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       edit_user_email: email,
     };
 
+    const baselinePublished = page._metadata?.published ?? null;
+    const pageKey = page._metadata?.key ?? null;
+
     const ac = new AbortController();
     liveAbort.current = ac;
     let editSeq = 0;
@@ -503,23 +536,36 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
           const id = matchSectionId(ev.section) ?? curFocus;
           curFocus = id;
           setFocusSectionId(id);
-          scrollToSection(id);
-          const card: ActiveCard = {
-            sectionId: id,
-            section: ev.section,
-            target: ev.target,
-            action: ev.action,
-            old: ev.old,
-            newText: ev.new,
-            key: ev.index ?? ++editSeq,
-          };
-          setActiveCard(card);
-          const typeLen = ev.action === 'remove' ? 0 : (ev.new?.length ?? 0);
-          await sleep(1100 + Math.min(typeLen * 22, 2800));
+          const key = ev.index ?? ++editSeq;
+
+          // Try to apply the edit IN PLACE on the real page element.
+          const els = id ? elementsRef.current.find((x) => x.section.id === id)?.els ?? [] : [];
+          let appliedInPlace = false;
+          if (els.length) {
+            appliedInPlace = await animateSectionEdit(els, ev.action, ev.old, ev.new, ac.signal);
+          }
+
+          // Couldn't locate the text on the page → fall back to the card.
+          if (!appliedInPlace) {
+            scrollToSection(id);
+            setActiveCard({
+              sectionId: id,
+              section: ev.section,
+              target: ev.target,
+              action: ev.action,
+              old: ev.old,
+              newText: ev.new,
+              key,
+            });
+            const typeLen = ev.action === 'remove' ? 0 : (ev.new?.length ?? 0);
+            await sleep(1100 + Math.min(typeLen * 22, 2800));
+            setActiveCard(null);
+          }
+
           setApplied((prev) => [
             ...prev,
             {
-              id: card.key,
+              id: key,
               section: ev.section,
               target: ev.target,
               action: ev.action,
@@ -527,7 +573,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
               newText: ev.new,
             },
           ]);
-          setActiveCard(null);
         } else if (ev.type === 'commit') {
           curFocus = null;
           setFocusSectionId(null);
@@ -551,19 +596,27 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       }
     }
 
-    liveAbort.current = null;
-    // Tell the parent to start its post-edit machinery (sidebar countdown).
+    // Notify the parent (sidebar countdown) regardless of outcome.
     onSent?.();
 
-    // If the agent committed, reload with a cache-buster so the visitor
-    // sees the freshly republished page. (Same buster the toast uses.)
+    // If the agent committed, WAIT for the republish to actually land —
+    // poll the Graph `published` ping — then cache-bust reload so the
+    // visitor sees the real, freshly-published change (not just our
+    // optimistic in-place animation).
     if (committed) {
-      window.setTimeout(() => {
+      setLiveStatus('Publishing… waiting for it to go live');
+      if (pageKey && baselinePublished) {
+        await waitForRepublish(pageKey, baselinePublished, ac.signal);
+      } else {
+        await sleep(2500);
+      }
+      if (!ac.signal.aborted) {
         const u = new URL(window.location.href);
         u.searchParams.set('refresh', String(Date.now()));
         window.location.assign(u.toString());
-      }, 2800);
+      }
     }
+    liveAbort.current = null;
   }, [comments, email, page, sections, onSent, matchSectionId, scrollToSection]);
 
   /** Dismiss the live overlay without reloading (Close on the live HUD). */
