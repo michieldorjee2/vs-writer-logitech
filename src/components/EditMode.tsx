@@ -9,6 +9,7 @@ import {
 } from '../lib/xray-defaults';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { isValidOptimizelyEmail, loadStoredEmail, saveStoredEmail } from '../lib/stored-email';
+import { streamEdit, type EditAction } from '../lib/opal-edit-stream';
 import '../styles/edit-mode.css';
 
 interface Props {
@@ -34,9 +35,28 @@ const POPUP_WIDTH = 340;
 const POPUP_GAP = 14;
 const DOC_MARGIN = 16;
 
-/* Same-origin proxy — the upstream Opal webhook doesn't send CORS
- * headers, so we can't fetch() it from the browser directly. */
-const OPAL_FEEDBACK_ENDPOINT = '/api/opal-feedback';
+/* Live edit-mode streams the account_page_live_edit agent and animates
+ * its thinking + edits on the page, then commits once. (The old
+ * fire-and-forget webhook lived at /api/opal-feedback.) */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type AppliedEdit = {
+  id: number;
+  section: string;
+  target?: string;
+  action: EditAction;
+  old?: string;
+  newText?: string;
+};
+type ActiveCard = {
+  sectionId: string | null;
+  section: string;
+  target?: string;
+  action: EditAction;
+  old?: string;
+  newText?: string;
+  key: number;
+};
 
 function getDocSize(): DocSize {
   if (typeof window === 'undefined') return { w: 1280, h: 720 };
@@ -112,7 +132,7 @@ function clamp(v: number, lo: number, hi: number): number {
  * the sticky CTA, edit-mode webhook, and any future consumer all
  * agree on the answer for a given page. */
 
-type Phase = 'editing' | 'sending' | 'thanks';
+type Phase = 'editing' | 'working' | 'thanks';
 
 function EditMode({ active, onClose, onSent, page, variant }: Props) {
   const defaults = variant === 'abm' ? ABM_XRAY_DEFAULTS : DYNAMIC_XRAY_DEFAULTS;
@@ -151,6 +171,40 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
 
   const sendError = useRef<string | null>(null);
 
+  /* ---- Live edit-stream state (the on-page animation) ---- */
+  const [liveStatus, setLiveStatus] = useState('');
+  const [liveSummary, setLiveSummary] = useState('');
+  const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
+  const [activeCard, setActiveCard] = useState<ActiveCard | null>(null);
+  const [applied, setApplied] = useState<AppliedEdit[]>([]);
+  const [liveDone, setLiveDone] = useState<{ changes?: string[] } | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const liveAbort = useRef<AbortController | null>(null);
+
+  /** Match an agent's section name to one of our x-ray sections. The send
+   *  payload labels each comment "Section: <title>", so the agent usually
+   *  echoes a title; fall back to a fuzzy contains match. */
+  const matchSectionId = useCallback(
+    (name?: string): string | null => {
+      if (!name) return null;
+      const k = name.toLowerCase().trim();
+      for (const s of sections) if (s.title.toLowerCase().trim() === k) return s.id;
+      for (const s of sections) {
+        const t = s.title.toLowerCase();
+        if (t.includes(k) || k.includes(t)) return s.id;
+      }
+      return null;
+    },
+    [sections],
+  );
+
+  const scrollToSection = useCallback((id: string | null) => {
+    if (!id) return;
+    const entry = elementsRef.current.find((x) => x.section.id === id);
+    const el = entry?.els[0] as HTMLElement | undefined;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
   /* ---- Lifecycle: opening / closing the mode ---- */
   useEffect(() => {
     if (!active) {
@@ -160,6 +214,15 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       setActiveSection(null);
       setEmailModalOpen(false);
       setEmailError(null);
+      liveAbort.current?.abort();
+      liveAbort.current = null;
+      setLiveStatus('');
+      setLiveSummary('');
+      setFocusSectionId(null);
+      setActiveCard(null);
+      setApplied([]);
+      setLiveDone(null);
+      setLiveError(null);
       document.body.classList.remove('edit-active');
       return;
     }
@@ -372,8 +435,16 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     const entries = Object.entries(comments);
     if (entries.length === 0 || !email) return;
 
-    setPhase('sending');
     sendError.current = null;
+    setActiveSection(null);
+    setLiveStatus('Connecting to Opal…');
+    setLiveSummary('');
+    setFocusSectionId(null);
+    setActiveCard(null);
+    setApplied([]);
+    setLiveDone(null);
+    setLiveError(null);
+    setPhase('working');
 
     const slug = getPageSlug(page);
     const companyName = deriveCustomerName(page);
@@ -387,34 +458,120 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       )
       .join('\n\n---\n\n');
 
-    const body = {
+    const payload = {
       company_name: companyName,
       company_slug: slug,
       suggested_edit: suggestedEdit,
       edit_user_email: email,
     };
 
+    const ac = new AbortController();
+    liveAbort.current = ac;
+    let editSeq = 0;
+    let committed = false;
+    let curFocus: string | null = null;
+
     try {
-      await fetch(OPAL_FEEDBACK_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      for await (const e of streamEdit(payload, ac.signal)) {
+        if (e.kind === 'error') {
+          setLiveError(e.message);
+          setLiveStatus('Something went wrong');
+          continue;
+        }
+        if (e.kind === 'tool') {
+          if (e.name === 'get_page')
+            setLiveStatus(e.phase === 'call' ? 'Reading the page…' : 'Page loaded');
+          else if (e.name === 'update_page')
+            setLiveStatus(e.phase === 'call' ? 'Saving changes…' : 'Changes saved');
+          await sleep(180);
+          continue;
+        }
+        const ev = e.ev;
+        if (ev.type === 'plan') {
+          setLiveSummary(ev.summary ?? '');
+          setLiveStatus('Planning the edits…');
+          await sleep(700);
+        } else if (ev.type === 'section_focus') {
+          const id = matchSectionId(ev.section);
+          curFocus = id;
+          setFocusSectionId(id);
+          setActiveCard(null);
+          setLiveStatus(`Working on “${ev.section}”…`);
+          scrollToSection(id);
+          await sleep(650);
+        } else if (ev.type === 'edit') {
+          const id = matchSectionId(ev.section) ?? curFocus;
+          curFocus = id;
+          setFocusSectionId(id);
+          scrollToSection(id);
+          const card: ActiveCard = {
+            sectionId: id,
+            section: ev.section,
+            target: ev.target,
+            action: ev.action,
+            old: ev.old,
+            newText: ev.new,
+            key: ev.index ?? ++editSeq,
+          };
+          setActiveCard(card);
+          const typeLen = ev.action === 'remove' ? 0 : (ev.new?.length ?? 0);
+          await sleep(1100 + Math.min(typeLen * 22, 2800));
+          setApplied((prev) => [
+            ...prev,
+            {
+              id: card.key,
+              section: ev.section,
+              target: ev.target,
+              action: ev.action,
+              old: ev.old,
+              newText: ev.new,
+            },
+          ]);
+          setActiveCard(null);
+        } else if (ev.type === 'commit') {
+          curFocus = null;
+          setFocusSectionId(null);
+          setActiveCard(null);
+          setLiveStatus('Saving changes…');
+          await sleep(300);
+        } else if (ev.type === 'done') {
+          committed = !!ev.saved;
+          setLiveDone({ changes: ev.changes });
+          setLiveStatus(ev.saved ? 'Done — changes are live' : 'Done');
+          await sleep(200);
+        } else if (ev.type === 'error') {
+          setLiveError(ev.message ?? 'The agent reported an error.');
+          setLiveStatus('Something went wrong');
+        }
+      }
     } catch (err) {
-      sendError.current = err instanceof Error ? err.message : 'Network error';
+      if (!ac.signal.aborted) {
+        setLiveError(err instanceof Error ? err.message : 'Stream error');
+        setLiveStatus('Something went wrong');
+      }
     }
 
-    // Tell the parent to start the "Working…" countdown on the
-    // Edit sidebar button. We notify regardless of network outcome —
-    // the user has handed the work off to Opal either way.
+    liveAbort.current = null;
+    // Tell the parent to start its post-edit machinery (sidebar countdown).
     onSent?.();
 
-    setPhase('thanks');
-    // Animate thanks for ~2.6s then exit
-    window.setTimeout(() => {
-      onClose();
-    }, 2600);
-  }, [comments, email, page, sections, onClose, onSent]);
+    // If the agent committed, reload with a cache-buster so the visitor
+    // sees the freshly republished page. (Same buster the toast uses.)
+    if (committed) {
+      window.setTimeout(() => {
+        const u = new URL(window.location.href);
+        u.searchParams.set('refresh', String(Date.now()));
+        window.location.assign(u.toString());
+      }, 2800);
+    }
+  }, [comments, email, page, sections, onSent, matchSectionId, scrollToSection]);
+
+  /** Dismiss the live overlay without reloading (Close on the live HUD). */
+  const dismissLive = useCallback(() => {
+    liveAbort.current?.abort();
+    liveAbort.current = null;
+    onClose();
+  }, [onClose]);
 
   if (!active) return null;
 
@@ -426,7 +583,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
   /** Document-sized SVG layer with the outline boxes. */
   const docLayer = (
     <div
-      className="edit-overlay"
+      className={'edit-overlay' + (phase === 'working' ? ' edit-overlay--working' : '')}
       style={{ width: docSize.w, height: docSize.h }}
       aria-label="Edit mode overlay"
     >
@@ -446,7 +603,8 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
               className={
                 'edit-box' +
                 (hasComment ? ' edit-box--commented' : '') +
-                (activeSection === section.id ? ' edit-box--active' : '')
+                (activeSection === section.id ? ' edit-box--active' : '') +
+                (phase === 'working' && focusSectionId === section.id ? ' edit-box--live' : '')
               }
               style={{ ['--reveal-index']: i } as CSSProperties}
               onClick={() => openCommentForSection(section.id)}
@@ -615,10 +773,10 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
             disabled={!canSend}
             aria-label="Send feedback"
           >
-            {phase === 'sending' ? (
+            {phase === 'working' ? (
               <>
                 <span className="edit-hud__spinner" aria-hidden="true" />
-                <span>Sending…</span>
+                <span>Editing live…</span>
               </>
             ) : (
               <>
@@ -751,6 +909,71 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     </div>
   ) : null;
 
+  /** Anchored diff card for the edit Opal is currently making. */
+  let liveCard: ReactElement | null = null;
+  if (phase === 'working' && activeCard) {
+    const entry = activeCard.sectionId
+      ? outlines.find((o) => o.section.id === activeCard.sectionId)
+      : null;
+    const CARD_H = 168;
+    const style: CSSProperties = entry
+      ? (() => {
+          const p = placePopup(entry.box, docSize, CARD_H);
+          return { top: p.top, left: p.left, width: POPUP_WIDTH, position: 'absolute' };
+        })()
+      : { position: 'fixed', top: '42%', left: '50%', transform: 'translate(-50%, -50%)', width: POPUP_WIDTH };
+    liveCard = <LiveCard card={activeCard} style={style} />;
+  }
+
+  /** Fixed live status HUD (bottom): narration, applied edits, done/error. */
+  const liveHud = phase === 'working' ? (
+    <div className="live-hud" role="status" aria-live="polite">
+      <div className="live-hud__bar">
+        {liveDone ? (
+          <span className="live-hud__check" aria-hidden="true">✓</span>
+        ) : liveError ? (
+          <span className="live-hud__bang" aria-hidden="true">!</span>
+        ) : (
+          <span className="edit-hud__spinner" aria-hidden="true" />
+        )}
+        <span className="live-hud__status">{liveStatus}</span>
+        <button
+          type="button"
+          className="live-hud__close"
+          onClick={dismissLive}
+          aria-label="Close live edit"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      {liveSummary && !liveDone && !liveError && (
+        <div className="live-hud__summary">{liveSummary}</div>
+      )}
+      {applied.length > 0 && !liveDone && (
+        <ul className="live-hud__applied">
+          {applied.map((a) => (
+            <li key={a.id}>
+              <span className={'live-hud__tag live-hud__tag--' + a.action}>{a.action}</span>
+              <b>{a.section}</b>
+              {a.target ? ` · ${a.target}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+      {liveDone && (
+        <div className="live-hud__done">
+          {(liveDone.changes ?? []).map((c, i) => (
+            <div key={i} className="live-hud__change">✓ {c}</div>
+          ))}
+          <div className="live-hud__reload">Reloading to show your changes…</div>
+        </div>
+      )}
+      {liveError && <div className="live-hud__errbox">{liveError}</div>}
+    </div>
+  ) : null;
+
   return createPortal(
     <>
       {docLayer}
@@ -758,8 +981,71 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       {hudLayer}
       {emailModal}
       {thanksSplash}
+      {liveCard}
+      {liveHud}
     </>,
     document.body,
+  );
+}
+
+/** Strike-out + typewriter card for a single live edit. */
+function LiveCard({ card, style }: { card: ActiveCard; style: CSSProperties }) {
+  const [struck, setStruck] = useState(false);
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const hasOld = card.action !== 'add' && !!card.old;
+    const t1 = setTimeout(() => setStruck(true), hasOld ? 450 : 0);
+    const t2 = setTimeout(() => setTyping(true), card.action === 'remove' ? 1e9 : hasOld ? 950 : 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [card.key, card.action, card.old]);
+
+  return (
+    <div className="live-card" style={style} role="status">
+      <div className="live-card__head">
+        <span className={'live-card__badge live-card__badge--' + card.action}>{card.action}</span>
+        <span className="live-card__target">{card.target ?? card.section}</span>
+      </div>
+      <div className="live-card__diff">
+        {card.action !== 'add' && card.old && (
+          <span className={'live-card__old' + (struck ? ' is-struck' : '')}>{card.old}</span>
+        )}
+        {card.action === 'replace' && <span className="live-card__arrow">→</span>}
+        {card.action !== 'remove' && typing && (
+          <span className="live-card__new">
+            <Typewriter text={card.newText ?? ''} cps={55} caret />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Typewriter({ text, cps, caret }: { text: string; cps: number; caret?: boolean }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    setN(0);
+    if (!text) return;
+    const step = Math.max(12, 1000 / cps);
+    const id = setInterval(() => {
+      setN((p) => {
+        if (p >= text.length) {
+          clearInterval(id);
+          return p;
+        }
+        return p + 1;
+      });
+    }, step);
+    return () => clearInterval(id);
+  }, [text, cps]);
+  const done = n >= text.length;
+  return (
+    <>
+      {text.slice(0, n)}
+      {caret && !done && <span className="live-card__caret">&nbsp;</span>}
+    </>
   );
 }
 

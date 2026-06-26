@@ -15,11 +15,11 @@
    ============================================================ */
 
 :root {
-  --edit-blue: #0037ff;
-  --edit-blue-soft: rgba(0, 55, 255, 0.18);
-  --edit-blue-strong: rgba(0, 55, 255, 0.55);
-  --edit-blue-glow: rgba(25, 75, 255, 0.45);
-  --edit-card-bg: rgba(13, 19, 32, 0.96);
+  --edit-blue: #abff44;
+  --edit-blue-soft: rgba(171, 255, 68, 0.18);
+  --edit-blue-strong: rgba(171, 255, 68, 0.55);
+  --edit-blue-glow: rgba(171, 255, 68, 0.45);
+  --edit-card-bg: rgba(13, 58, 41, 0.96);
   --edit-card-border: rgba(255, 255, 255, 0.1);
 }
 
@@ -27,8 +27,8 @@
 
 .xray-sidebar__btn--edit:hover {
   color: var(--edit-blue);
-  border-color: rgba(25, 75, 255, 0.35);
-  background: rgba(25, 75, 255, 0.08);
+  border-color: rgba(171, 255, 68, 0.35);
+  background: rgba(171, 255, 68, 0.08);
 }
 
 .xray-sidebar__btn--edit.xray-sidebar__btn--active {
@@ -49,16 +49,16 @@
  * the progress ring but is hard to read at the small label size. */
 .xray-sidebar__btn--edit.xray-sidebar__btn--working {
   color: #ffffff !important;
-  background: rgba(0, 55, 255, 0.08) !important;
-  border-color: rgba(0, 55, 255, 0.28) !important;
+  background: rgba(171, 255, 68, 0.08) !important;
+  border-color: rgba(171, 255, 68, 0.28) !important;
   cursor: help;
   position: relative;
   animation: edit-working-breathe 2.4s ease-in-out infinite;
 }
 
 @keyframes edit-working-breathe {
-  0%, 100% { box-shadow: 0 0 14px rgba(0, 55, 255, 0.32); }
-  50%      { box-shadow: 0 0 22px rgba(0, 55, 255, 0.55); }
+  0%, 100% { box-shadow: 0 0 14px rgba(171, 255, 68, 0.32); }
+  50%      { box-shadow: 0 0 22px rgba(171, 255, 68, 0.55); }
 }
 
 /* The ring + clock icon sit together in the icon-area of the flex
@@ -84,7 +84,7 @@
 
 .xray-sidebar__ring-track {
   fill: none;
-  stroke: rgba(0, 55, 255, 0.18);
+  stroke: rgba(171, 255, 68, 0.18);
   stroke-width: 2.4;
 }
 
@@ -165,7 +165,7 @@ body.edit-active .sticky-cta {
 .edit-box__rect {
   /* The fill is what shows through once the stroke is drawn. We hold
    * fill-opacity at 0 during the stroke phase, then fade it in. */
-  fill: rgba(0, 55, 255, 0.04);
+  fill: rgba(171, 255, 68, 0.04);
   fill-opacity: 0;
   stroke: var(--edit-blue);
   stroke-width: 2;
@@ -175,7 +175,7 @@ body.edit-active .sticky-cta {
    * the keyframes pull it down to 0 to "draw" the outline. */
   stroke-dasharray: 100 100;
   stroke-dashoffset: 100;
-  filter: drop-shadow(0 0 6px rgba(25, 75, 255, 0.45));
+  filter: drop-shadow(0 0 6px rgba(171, 255, 68, 0.45));
   /* All boxes animate together, no stagger:
    *   1. Outlines trace in for 720ms.
    *   2. The transparent blue fill flashes in for 220ms once the
@@ -201,19 +201,19 @@ body.edit-active .sticky-cta {
 
 .edit-box:hover .edit-box__rect,
 .edit-box:focus-visible .edit-box__rect {
-  fill: rgba(0, 55, 255, 0.1);
+  fill: rgba(171, 255, 68, 0.1);
   stroke-width: 2.4;
   filter: drop-shadow(0 0 12px var(--edit-blue-glow));
 }
 
 .edit-box--active .edit-box__rect {
-  stroke: #6687ff;
-  fill: rgba(102, 135, 255, 0.16);
-  filter: drop-shadow(0 0 18px rgba(102, 135, 255, 0.55));
+  stroke: #abff44;
+  fill: rgba(171, 255, 68, 0.16);
+  filter: drop-shadow(0 0 18px rgba(171, 255, 68, 0.55));
 }
 
 .edit-box--commented .edit-box__rect {
-  fill: rgba(0, 55, 255, 0.13);
+  fill: rgba(171, 255, 68, 0.13);
   stroke-dasharray: none;
 }
 
@@ -230,7 +230,7 @@ body.edit-active .sticky-cta {
 
 .edit-box__badge-bg {
   fill: var(--edit-blue);
-  filter: drop-shadow(0 4px 10px rgba(0, 55, 255, 0.55));
+  filter: drop-shadow(0 4px 10px rgba(171, 255, 68, 0.55));
 }
 
 .edit-box__badge-text {
@@ -274,7 +274,7 @@ body.edit-active .sticky-cta {
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  color: #e9ebf1;
+  color: #eff6e9;
   animation: edit-hud-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   max-width: calc(100vw - 32px);
 }
@@ -323,7 +323,7 @@ body.edit-active .sticky-cta {
 
 .edit-hud__hint {
   font-size: 12px;
-  color: #a8b0c0;
+  color: #a1ac8d;
   padding-left: 12px;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   white-space: nowrap;
@@ -346,7 +346,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #d9dde6;
+  color: #d8e4cb;
   padding: 6px 12px;
   border-radius: 999px;
   display: inline-flex;
@@ -380,7 +380,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: var(--edit-blue);
   border: 1px solid var(--edit-blue);
-  color: #ffffff;
+  color: #08251a;
   padding: 9px 18px;
   border-radius: 999px;
   display: inline-flex;
@@ -399,7 +399,7 @@ body.edit-active .sticky-cta {
 }
 
 .edit-hud__send:hover:not(:disabled) {
-  background: #194bff;
+  background: #7ddd3d;
   transform: translateY(-1px);
   box-shadow:
     0 10px 30px var(--edit-blue-glow),
@@ -412,8 +412,8 @@ body.edit-active .sticky-cta {
 
 .edit-hud__send--disabled,
 .edit-hud__send:disabled {
-  background: rgba(0, 55, 255, 0.35);
-  border-color: rgba(0, 55, 255, 0.35);
+  background: rgba(171, 255, 68, 0.35);
+  border-color: rgba(171, 255, 68, 0.35);
   color: rgba(255, 255, 255, 0.65);
   cursor: not-allowed;
   box-shadow: none;
@@ -451,7 +451,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d9dde6;
+  color: #d8e4cb;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -474,16 +474,16 @@ body.edit-active .sticky-cta {
   position: absolute;
   z-index: 1002;
   background: var(--edit-card-bg);
-  border: 1px solid rgba(0, 55, 255, 0.4);
+  border: 1px solid rgba(171, 255, 68, 0.4);
   border-radius: 14px;
   padding: 14px;
   box-shadow:
     0 24px 60px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(0, 55, 255, 0.15),
-    0 0 32px rgba(0, 55, 255, 0.18);
+    0 0 0 1px rgba(171, 255, 68, 0.15),
+    0 0 32px rgba(171, 255, 68, 0.18);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  color: #e9ebf1;
+  color: #eff6e9;
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
   pointer-events: auto;
   animation: edit-popup-in 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
@@ -510,7 +510,7 @@ body.edit-active .sticky-cta {
   font-size: 9px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #6687ff;
+  color: #abff44;
   font-weight: 600;
   opacity: 0.85;
   margin-bottom: 2px;
@@ -519,7 +519,7 @@ body.edit-active .sticky-cta {
 .edit-popup__title {
   font-size: 15px;
   font-weight: 600;
-  color: #f1f3f8;
+  color: #eff6e9;
   line-height: 1.25;
 }
 
@@ -527,7 +527,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: transparent;
   border: 0;
-  color: #a8b0c0;
+  color: #a1ac8d;
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -549,7 +549,7 @@ body.edit-active .sticky-cta {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  color: #f1f3f8;
+  color: #eff6e9;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.45;
@@ -560,13 +560,13 @@ body.edit-active .sticky-cta {
 }
 
 .edit-popup__textarea::placeholder {
-  color: #6f7689;
+  color: #717863;
 }
 
 .edit-popup__textarea:focus {
   border-color: var(--edit-blue);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(0, 55, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(171, 255, 68, 0.18);
 }
 
 .edit-popup__actions {
@@ -595,7 +595,7 @@ body.edit-active .sticky-cta {
 .edit-popup__btn--ghost {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #c5ccd9;
+  color: #c3ceaf;
 }
 
 .edit-popup__btn--ghost:hover {
@@ -606,18 +606,18 @@ body.edit-active .sticky-cta {
 .edit-popup__btn--primary {
   background: var(--edit-blue);
   border: 1px solid var(--edit-blue);
-  color: #ffffff;
+  color: #08251a;
   box-shadow: 0 4px 14px var(--edit-blue-glow);
 }
 
 .edit-popup__btn--primary:hover:not(:disabled) {
-  background: #194bff;
+  background: #7ddd3d;
   transform: translateY(-1px);
 }
 
 .edit-popup__btn--primary:disabled {
-  background: rgba(0, 55, 255, 0.35);
-  border-color: rgba(0, 55, 255, 0.35);
+  background: rgba(171, 255, 68, 0.35);
+  border-color: rgba(171, 255, 68, 0.35);
   box-shadow: none;
 }
 
@@ -641,7 +641,7 @@ body.edit-active .sticky-cta {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(4, 8, 18, 0.62);
+  background: rgba(8, 37, 26, 0.62);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -658,14 +658,14 @@ body.edit-active .sticky-cta {
   position: relative;
   width: 100%;
   max-width: 420px;
-  background: linear-gradient(180deg, rgba(20, 28, 45, 0.98), rgba(13, 19, 32, 0.98));
-  border: 1px solid rgba(0, 55, 255, 0.35);
+  background: linear-gradient(180deg, rgba(13, 58, 41, 0.98), rgba(13, 58, 41, 0.98));
+  border: 1px solid rgba(171, 255, 68, 0.35);
   border-radius: 18px;
   padding: 26px 26px 22px;
-  color: #e9ebf1;
+  color: #eff6e9;
   box-shadow:
     0 30px 80px rgba(0, 0, 0, 0.55),
-    0 0 50px rgba(0, 55, 255, 0.25),
+    0 0 50px rgba(171, 255, 68, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   animation: edit-modal-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -682,7 +682,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: transparent;
   border: 0;
-  color: #a8b0c0;
+  color: #a1ac8d;
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -700,9 +700,9 @@ body.edit-active .sticky-cta {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(0, 55, 255, 0.4), rgba(0, 55, 255, 0.15));
-  border: 1px solid rgba(0, 55, 255, 0.5);
-  color: #ccd7ff;
+  background: linear-gradient(135deg, rgba(171, 255, 68, 0.4), rgba(171, 255, 68, 0.15));
+  border: 1px solid rgba(171, 255, 68, 0.5);
+  color: #d8e4cb;
   margin-bottom: 14px;
   box-shadow: 0 0 24px var(--edit-blue-glow);
 }
@@ -716,7 +716,7 @@ body.edit-active .sticky-cta {
 
 .edit-email-modal__sub {
   font-size: 13px;
-  color: #a8b0c0;
+  color: #a1ac8d;
   margin: 0 0 18px;
   line-height: 1.5;
 }
@@ -736,13 +736,13 @@ body.edit-active .sticky-cta {
 }
 
 .edit-email-modal__input::placeholder {
-  color: #6f7689;
+  color: #717863;
 }
 
 .edit-email-modal__input:focus {
   border-color: var(--edit-blue);
   background: rgba(255, 255, 255, 0.07);
-  box-shadow: 0 0 0 3px rgba(0, 55, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(171, 255, 68, 0.18);
 }
 
 .edit-email-modal__input--error {
@@ -777,7 +777,7 @@ body.edit-active .sticky-cta {
 .edit-email-modal__btn--ghost {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #c5ccd9;
+  color: #c3ceaf;
 }
 
 .edit-email-modal__btn--ghost:hover {
@@ -793,7 +793,7 @@ body.edit-active .sticky-cta {
 }
 
 .edit-email-modal__btn--primary:hover {
-  background: #194bff;
+  background: #7ddd3d;
   transform: translateY(-1px);
 }
 
@@ -820,8 +820,8 @@ body.edit-active .sticky-cta {
 
 .edit-thanks__panel {
   position: relative;
-  background: linear-gradient(180deg, rgba(20, 28, 45, 0.96), rgba(13, 19, 32, 0.96));
-  border: 1px solid rgba(0, 55, 255, 0.45);
+  background: linear-gradient(180deg, rgba(13, 58, 41, 0.96), rgba(13, 58, 41, 0.96));
+  border: 1px solid rgba(171, 255, 68, 0.45);
   border-radius: 22px;
   padding: 36px 48px;
   display: flex;
@@ -831,7 +831,7 @@ body.edit-active .sticky-cta {
   color: #ffffff;
   box-shadow:
     0 30px 90px rgba(0, 0, 0, 0.55),
-    0 0 60px rgba(0, 55, 255, 0.45);
+    0 0 60px rgba(171, 255, 68, 0.45);
   animation:
     edit-thanks-panel-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
     edit-thanks-panel-out 380ms ease-in 2200ms forwards;
@@ -850,13 +850,13 @@ body.edit-active .sticky-cta {
   width: 78px;
   height: 78px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--edit-blue), #6687ff);
+  background: linear-gradient(135deg, var(--edit-blue), #abff44);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   box-shadow:
-    0 8px 28px rgba(0, 55, 255, 0.6),
+    0 8px 28px rgba(171, 255, 68, 0.6),
     inset 0 2px 0 rgba(255, 255, 255, 0.25);
   animation: edit-check-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms backwards;
 }
@@ -876,7 +876,7 @@ body.edit-active .sticky-cta {
 
 .edit-thanks__sig {
   font-size: 14px;
-  color: #6687ff;
+  color: #abff44;
   font-style: italic;
   letter-spacing: 0.04em;
   font-weight: 500;
@@ -934,13 +934,13 @@ body.edit-active .sticky-cta {
   gap: 14px;
   padding: 12px 14px 12px 14px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(20, 28, 45, 0.98), rgba(13, 19, 32, 0.98));
-  border: 1px solid rgba(0, 55, 255, 0.45);
+  background: linear-gradient(180deg, rgba(13, 58, 41, 0.98), rgba(13, 58, 41, 0.98));
+  border: 1px solid rgba(171, 255, 68, 0.45);
   color: #ffffff;
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
   box-shadow:
     0 18px 50px rgba(0, 0, 0, 0.45),
-    0 0 40px rgba(0, 55, 255, 0.35),
+    0 0 40px rgba(171, 255, 68, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   animation: edit-landed-in 380ms cubic-bezier(0.16, 1, 0.3, 1);
   max-width: calc(100vw - 32px);
@@ -958,9 +958,9 @@ body.edit-active .sticky-cta {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--edit-blue), #6687ff);
+  background: linear-gradient(135deg, var(--edit-blue), #abff44);
   color: #ffffff;
-  box-shadow: 0 0 20px rgba(0, 55, 255, 0.55);
+  box-shadow: 0 0 20px rgba(171, 255, 68, 0.55);
   flex-shrink: 0;
   animation: edit-landed-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms backwards;
 }
@@ -985,7 +985,7 @@ body.edit-active .sticky-cta {
 
 .edit-landed-toast__copy span {
   font-size: 12px;
-  color: #a8b0c0;
+  color: #a1ac8d;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1018,7 +1018,7 @@ body.edit-active .sticky-cta {
 }
 
 .edit-landed-toast__btn:hover {
-  background: #194bff;
+  background: #7ddd3d;
   transform: translateY(-1px);
 }
 
@@ -1026,7 +1026,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #c5ccd9;
+  color: #c3ceaf;
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -1054,7 +1054,7 @@ body.edit-active .sticky-cta {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(4, 8, 18, 0.55);
+  background: rgba(8, 37, 26, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -1066,14 +1066,14 @@ body.edit-active .sticky-cta {
   position: relative;
   width: 100%;
   max-width: 420px;
-  background: linear-gradient(180deg, rgba(20, 28, 45, 0.98), rgba(13, 19, 32, 0.98));
-  border: 1px solid rgba(0, 55, 255, 0.35);
+  background: linear-gradient(180deg, rgba(13, 58, 41, 0.98), rgba(13, 58, 41, 0.98));
+  border: 1px solid rgba(171, 255, 68, 0.35);
   border-radius: 18px;
   padding: 26px 26px 22px;
-  color: #e9ebf1;
+  color: #eff6e9;
   box-shadow:
     0 30px 80px rgba(0, 0, 0, 0.55),
-    0 0 50px rgba(0, 55, 255, 0.25),
+    0 0 50px rgba(171, 255, 68, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   animation: edit-modal-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1085,7 +1085,7 @@ body.edit-active .sticky-cta {
   appearance: none;
   background: transparent;
   border: 0;
-  color: #a8b0c0;
+  color: #a1ac8d;
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -1103,18 +1103,18 @@ body.edit-active .sticky-cta {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(0, 55, 255, 0.4), rgba(0, 55, 255, 0.15));
-  border: 1px solid rgba(0, 55, 255, 0.5);
-  color: #ccd7ff;
+  background: linear-gradient(135deg, rgba(171, 255, 68, 0.4), rgba(171, 255, 68, 0.15));
+  border: 1px solid rgba(171, 255, 68, 0.5);
+  color: #d8e4cb;
   margin-bottom: 14px;
   box-shadow: 0 0 24px var(--edit-blue-glow);
   animation: edit-working-icon-tick 3.6s linear infinite;
 }
 
 @keyframes edit-working-icon-tick {
-  from { box-shadow: 0 0 24px rgba(0, 55, 255, 0.35); }
-  50%  { box-shadow: 0 0 32px rgba(0, 55, 255, 0.6); }
-  to   { box-shadow: 0 0 24px rgba(0, 55, 255, 0.35); }
+  from { box-shadow: 0 0 24px rgba(171, 255, 68, 0.35); }
+  50%  { box-shadow: 0 0 32px rgba(171, 255, 68, 0.6); }
+  to   { box-shadow: 0 0 24px rgba(171, 255, 68, 0.35); }
 }
 
 .edit-working-modal__title {
@@ -1126,7 +1126,7 @@ body.edit-active .sticky-cta {
 
 .edit-working-modal__sub {
   font-size: 13.5px;
-  color: #b0b8ca;
+  color: #a1ac8d;
   margin: 0 0 18px;
   line-height: 1.55;
 }
@@ -1137,9 +1137,9 @@ body.edit-active .sticky-cta {
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(0, 55, 255, 0.12);
-  border: 1px solid rgba(0, 55, 255, 0.32);
-  color: #ccd7ff;
+  background: rgba(171, 255, 68, 0.12);
+  border: 1px solid rgba(171, 255, 68, 0.32);
+  color: #d8e4cb;
   font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -1177,7 +1177,7 @@ body.edit-active .sticky-cta {
 }
 
 .edit-working-modal__btn:hover {
-  background: #194bff;
+  background: #7ddd3d;
   transform: translateY(-1px);
 }
 
@@ -1207,4 +1207,156 @@ body.edit-active .sticky-cta {
   .edit-landed-toast__icon {
     animation: none !important;
   }
+}
+
+/* ============================================================
+   Live edit mode — the on-page streaming animation
+   ============================================================ */
+
+/* While Opal is working, the section boxes are read-only and the one
+   it's actively editing pulses. */
+.edit-overlay--working .edit-box {
+  pointer-events: none;
+  cursor: default;
+}
+.edit-box--live .edit-box__rect {
+  stroke: var(--edit-blue);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 10px var(--edit-blue-glow));
+  animation: liveBoxPulse 1.5s ease-in-out infinite;
+}
+@keyframes liveBoxPulse {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--edit-blue-glow)); opacity: 0.85; }
+  50% { filter: drop-shadow(0 0 16px var(--edit-blue-glow)); opacity: 1; }
+}
+
+/* Anchored diff card for the current edit */
+.live-card {
+  z-index: 1003;
+  background: var(--edit-card-bg);
+  border: 1px solid var(--edit-blue-strong);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--edit-blue-soft);
+  color: #eafff0;
+  font-size: 13px;
+  animation: liveCardIn 0.28s ease;
+}
+@keyframes liveCardIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.live-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.live-card__badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-weight: 700;
+}
+.live-card__badge--replace { background: var(--edit-blue-soft); color: var(--edit-blue); }
+.live-card__badge--add { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
+.live-card__badge--remove { background: rgba(255, 107, 129, 0.16); color: #ff8a9c; }
+.live-card__target {
+  font-size: 11px;
+  color: rgba(234, 255, 240, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.live-card__diff {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.live-card__old {
+  color: #ff8a9c;
+  position: relative;
+  display: inline;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 60%;
+  background-size: 0% 1.5px;
+  transition: background-size 0.5s ease, opacity 0.5s ease;
+}
+.live-card__old.is-struck { background-size: 100% 1.5px; opacity: 0.5; }
+.live-card__arrow { color: rgba(234, 255, 240, 0.4); margin: 0 6px; }
+.live-card__new { color: var(--edit-blue); }
+.live-card__caret {
+  display: inline-block;
+  width: 7px;
+  background: var(--edit-blue);
+  margin-left: 1px;
+  animation: liveCaret 1s steps(2) infinite;
+}
+@keyframes liveCaret { 50% { opacity: 0; } }
+
+/* Bottom status HUD */
+.live-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1004;
+  width: min(560px, calc(100vw - 32px));
+  background: var(--edit-card-bg);
+  border: 1px solid var(--edit-blue-strong);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  color: #eafff0;
+  animation: liveCardIn 0.3s ease;
+}
+.live-hud__bar { display: flex; align-items: center; gap: 10px; }
+.live-hud__status { font-size: 13.5px; font-weight: 600; flex: 1; }
+.live-hud__check {
+  width: 18px; height: 18px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%; background: var(--edit-blue); color: #062a17;
+  font-size: 12px; font-weight: 800;
+}
+.live-hud__bang {
+  width: 18px; height: 18px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%; background: #ff6b81; color: #2a0d13;
+  font-size: 12px; font-weight: 800;
+}
+.live-hud__close {
+  background: transparent; border: none; color: rgba(234, 255, 240, 0.6);
+  cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center;
+}
+.live-hud__close:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.live-hud__summary {
+  margin-top: 8px; font-size: 12.5px; line-height: 1.5;
+  color: rgba(234, 255, 240, 0.8);
+}
+.live-hud__applied {
+  margin: 10px 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 5px;
+  max-height: 132px; overflow-y: auto;
+}
+.live-hud__applied li {
+  font-size: 12px; color: rgba(234, 255, 240, 0.85);
+  display: flex; align-items: center; gap: 7px;
+}
+.live-hud__tag {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 1px 6px; border-radius: 4px; font-weight: 700;
+}
+.live-hud__tag--replace { background: var(--edit-blue-soft); color: var(--edit-blue); }
+.live-hud__tag--add { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
+.live-hud__tag--remove { background: rgba(255, 107, 129, 0.16); color: #ff8a9c; }
+.live-hud__done { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.live-hud__change { font-size: 12.5px; color: var(--edit-blue); }
+.live-hud__reload {
+  margin-top: 6px; font-size: 11.5px; color: rgba(234, 255, 240, 0.55); font-style: italic;
+}
+.live-hud__errbox {
+  margin-top: 8px; font-size: 12.5px; color: #ff8a9c;
 }
