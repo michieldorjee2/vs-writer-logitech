@@ -1379,6 +1379,17 @@ body.edit-active .sticky-cta {
 .live-inplace--old.is-gone {
   opacity: 0;
 }
+/* Whole-element strike (hero H1 and other span-split copy) */
+.live-inplace-block.is-struck {
+  text-decoration: line-through;
+  text-decoration-color: #ff6b81;
+  opacity: 0.55;
+  transition: opacity 0.5s ease;
+}
+.live-inplace-block.is-gone {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
 .live-inplace--new,
 .live-inplace--add {
   background: var(--edit-blue-soft);
