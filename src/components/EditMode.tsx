@@ -9,7 +9,7 @@ import {
 } from '../lib/xray-defaults';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { isValidOptimizelyEmail, loadStoredEmail, saveStoredEmail } from '../lib/stored-email';
-import { streamEdit, type EditAction } from '../lib/opal-edit-stream';
+import { streamEdit, editKind, type EditKind } from '../lib/opal-edit-stream';
 import { animateSectionEdit } from '../lib/inplace-edit';
 import '../styles/edit-mode.css';
 
@@ -45,7 +45,9 @@ type AppliedEdit = {
   id: number;
   section: string;
   target?: string;
-  action: EditAction;
+  kind: EditKind;
+  status: 'applied' | 'skipped';
+  reason?: string;
   old?: string;
   newText?: string;
 };
@@ -53,7 +55,7 @@ type ActiveCard = {
   sectionId: string | null;
   section: string;
   target?: string;
-  action: EditAction;
+  kind: EditKind;
   old?: string;
   newText?: string;
   key: number;
@@ -207,8 +209,9 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<ActiveCard | null>(null);
   const [applied, setApplied] = useState<AppliedEdit[]>([]);
-  const [liveDone, setLiveDone] = useState<{ changes?: string[] } | null>(null);
+  const [liveDone, setLiveDone] = useState<{ changes?: string[]; skipped?: string[] } | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [willReload, setWillReload] = useState(false);
   const liveAbort = useRef<AbortController | null>(null);
 
   /** Match an agent's section name to one of our x-ray sections. The send
@@ -253,6 +256,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       setApplied([]);
       setLiveDone(null);
       setLiveError(null);
+      setWillReload(false);
       document.body.classList.remove('edit-active');
       return;
     }
@@ -474,6 +478,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     setApplied([]);
     setLiveDone(null);
     setLiveError(null);
+    setWillReload(false);
     setPhase('working');
 
     const slug = getPageSlug(page);
@@ -501,22 +506,32 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     const ac = new AbortController();
     liveAbort.current = ac;
     let editSeq = 0;
-    let committed = false;
+    let committed = false; // update_page succeeded (tool result or done.saved)
+    let sawDone = false;
+    let sawError = false;
     let curFocus: string | null = null;
 
     try {
       for await (const e of streamEdit(payload, ac.signal)) {
         if (e.kind === 'error') {
+          sawError = true;
           setLiveError(e.message);
           setLiveStatus('Something went wrong');
           continue;
         }
         if (e.kind === 'tool') {
-          if (e.name === 'get_page')
+          if (e.name === 'get_page') {
             setLiveStatus(e.phase === 'call' ? 'Reading the page…' : 'Page loaded');
-          else if (e.name === 'update_page')
-            setLiveStatus(e.phase === 'call' ? 'Saving changes…' : 'Changes saved');
-          await sleep(180);
+          } else if (e.name === 'update_page') {
+            if (e.phase === 'call') setLiveStatus('Saving changes…');
+            else {
+              setLiveStatus('Changes saved');
+              if (e.ok !== false) committed = true;
+            }
+          } else if (e.name === 'take_webpage_screenshot') {
+            setLiveStatus(e.phase === 'call' ? 'Taking a fresh screenshot…' : 'Screenshot captured');
+          }
+          await sleep(160);
           continue;
         }
         const ev = e.ev;
@@ -537,29 +552,32 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
           curFocus = id;
           setFocusSectionId(id);
           const key = ev.index ?? ++editSeq;
+          const kind = editKind(ev);
+          const skipped = ev.status === 'skipped';
 
-          // Try to apply the edit IN PLACE on the real page element.
-          const els = id ? elementsRef.current.find((x) => x.section.id === id)?.els ?? [] : [];
-          let appliedInPlace = false;
-          if (els.length) {
-            appliedInPlace = await animateSectionEdit(els, ev.action, ev.old, ev.new, ac.signal);
-          }
-
-          // Couldn't locate the text on the page → fall back to the card.
-          if (!appliedInPlace) {
+          if (skipped) {
+            // Nothing to apply on-page — just surface it so it stays visible.
             scrollToSection(id);
-            setActiveCard({
-              sectionId: id,
-              section: ev.section,
-              target: ev.target,
-              action: ev.action,
-              old: ev.old,
-              newText: ev.new,
-              key,
-            });
-            const typeLen = ev.action === 'remove' ? 0 : (ev.new?.length ?? 0);
-            await sleep(1100 + Math.min(typeLen * 22, 2800));
-            setActiveCard(null);
+            setLiveStatus(`Skipped: ${ev.target ?? ev.section}`);
+            await sleep(700);
+          } else {
+            const els = id ? elementsRef.current.find((x) => x.section.id === id)?.els ?? [] : [];
+            let appliedInPlace = false;
+            if (els.length) {
+              appliedInPlace = await animateSectionEdit(
+                els,
+                { kind, old: ev.old, new: ev.new, newUrl: ev.newUrl },
+                ac.signal,
+              );
+            }
+            // Couldn't locate the target on the page → fall back to the card.
+            if (!appliedInPlace) {
+              scrollToSection(id);
+              setActiveCard({ sectionId: id, section: ev.section, target: ev.target, kind, old: ev.old, newText: ev.new, key });
+              const typeLen = ev.new?.length ?? 0;
+              await sleep(1100 + Math.min(typeLen * 22, 2600));
+              setActiveCard(null);
+            }
           }
 
           setApplied((prev) => [
@@ -568,7 +586,9 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
               id: key,
               section: ev.section,
               target: ev.target,
-              action: ev.action,
+              kind,
+              status: skipped ? 'skipped' : 'applied',
+              reason: ev.reason,
               old: ev.old,
               newText: ev.new,
             },
@@ -580,19 +600,33 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
           setLiveStatus('Saving changes…');
           await sleep(300);
         } else if (ev.type === 'done') {
-          committed = !!ev.saved;
-          setLiveDone({ changes: ev.changes });
+          sawDone = true;
+          if (ev.saved) committed = true;
+          setLiveDone({ changes: ev.changes, skipped: ev.skipped });
           setLiveStatus(ev.saved ? 'Done — changes are live' : 'Done');
           await sleep(200);
         } else if (ev.type === 'error') {
+          sawError = true;
           setLiveError(ev.message ?? 'The agent reported an error.');
           setLiveStatus('Something went wrong');
         }
       }
     } catch (err) {
       if (!ac.signal.aborted) {
+        sawError = true;
         setLiveError(err instanceof Error ? err.message : 'Stream error');
         setLiveStatus('Something went wrong');
+      }
+    }
+
+    // Never hang: if the stream ended without a terminal event, finalize now.
+    if (!sawDone && !sawError && !ac.signal.aborted) {
+      if (committed) {
+        setLiveDone({ changes: ['Changes saved.'] });
+        setLiveStatus('Changes saved');
+      } else {
+        setLiveError('Opal stopped before confirming. Some edits may not have been applied — try again.');
+        setLiveStatus('Incomplete');
       }
     }
 
@@ -604,6 +638,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     // visitor sees the real, freshly-published change (not just our
     // optimistic in-place animation).
     if (committed) {
+      setWillReload(true);
       setLiveStatus('Publishing… waiting for it to go live');
       if (pageKey && baselinePublished) {
         await waitForRepublish(pageKey, baselinePublished, ac.signal);
@@ -1007,10 +1042,13 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       {applied.length > 0 && !liveDone && (
         <ul className="live-hud__applied">
           {applied.map((a) => (
-            <li key={a.id}>
-              <span className={'live-hud__tag live-hud__tag--' + a.action}>{a.action}</span>
+            <li key={a.id} className={a.status === 'skipped' ? 'is-skipped' : ''}>
+              <span className={'live-hud__tag live-hud__tag--' + (a.status === 'skipped' ? 'skipped' : a.kind)}>
+                {a.status === 'skipped' ? 'skipped' : a.kind.replace('item-', '')}
+              </span>
               <b>{a.section}</b>
               {a.target ? ` · ${a.target}` : ''}
+              {a.status === 'skipped' && a.reason ? <em className="live-hud__reason"> — {a.reason}</em> : null}
             </li>
           ))}
         </ul>
@@ -1020,7 +1058,10 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
           {(liveDone.changes ?? []).map((c, i) => (
             <div key={i} className="live-hud__change">✓ {c}</div>
           ))}
-          <div className="live-hud__reload">Reloading to show your changes…</div>
+          {(liveDone.skipped ?? []).map((c, i) => (
+            <div key={'s' + i} className="live-hud__skip">⊘ {c}</div>
+          ))}
+          {willReload && <div className="live-hud__reload">Reloading to show your changes…</div>}
         </div>
       )}
       {liveError && <div className="live-hud__errbox">{liveError}</div>}
@@ -1041,32 +1082,41 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
   );
 }
 
-/** Strike-out + typewriter card for a single live edit. */
+/** Fallback card for an edit that couldn't be located on the page. */
 function LiveCard({ card, style }: { card: ActiveCard; style: CSSProperties }) {
+  const isRemove = card.kind === 'item-remove';
+  const isAdd = card.kind === 'item-add' || card.kind === 'image';
+  const showOld = !isAdd && !!card.old;
+  const showNew = !isRemove && !!card.newText;
+  const badge =
+    card.kind === 'item-add' ? 'add'
+    : card.kind === 'item-remove' ? 'remove'
+    : card.kind === 'image' ? 'image'
+    : 'edit';
+
   const [struck, setStruck] = useState(false);
   const [typing, setTyping] = useState(false);
   useEffect(() => {
-    const hasOld = card.action !== 'add' && !!card.old;
-    const t1 = setTimeout(() => setStruck(true), hasOld ? 450 : 0);
-    const t2 = setTimeout(() => setTyping(true), card.action === 'remove' ? 1e9 : hasOld ? 950 : 200);
+    const t1 = setTimeout(() => setStruck(true), showOld ? 450 : 0);
+    const t2 = setTimeout(() => setTyping(true), showOld ? 950 : 200);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [card.key, card.action, card.old]);
+  }, [card.key, showOld]);
 
   return (
     <div className="live-card" style={style} role="status">
       <div className="live-card__head">
-        <span className={'live-card__badge live-card__badge--' + card.action}>{card.action}</span>
+        <span className={'live-card__badge live-card__badge--' + badge}>{badge}</span>
         <span className="live-card__target">{card.target ?? card.section}</span>
       </div>
       <div className="live-card__diff">
-        {card.action !== 'add' && card.old && (
+        {showOld && (
           <span className={'live-card__old' + (struck ? ' is-struck' : '')}>{card.old}</span>
         )}
-        {card.action === 'replace' && <span className="live-card__arrow">→</span>}
-        {card.action !== 'remove' && typing && (
+        {showOld && showNew && <span className="live-card__arrow">→</span>}
+        {showNew && typing && (
           <span className="live-card__new">
             <Typewriter text={card.newText ?? ''} cps={55} caret />
           </span>

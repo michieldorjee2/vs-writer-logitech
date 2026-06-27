@@ -1349,9 +1349,18 @@ body.edit-active .sticky-cta {
   font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.03em;
   padding: 1px 6px; border-radius: 4px; font-weight: 700;
 }
-.live-hud__tag--replace { background: var(--edit-blue-soft); color: var(--edit-blue); }
-.live-hud__tag--add { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
+.live-hud__tag--replace,
+.live-hud__tag--text { background: var(--edit-blue-soft); color: var(--edit-blue); }
+.live-hud__tag--add,
+.live-hud__tag--image { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
 .live-hud__tag--remove { background: rgba(255, 107, 129, 0.16); color: #ff8a9c; }
+.live-hud__tag--color { background: rgba(160, 140, 255, 0.18); color: #c3b6ff; }
+.live-hud__tag--skipped { background: rgba(240, 183, 94, 0.18); color: var(--warn, #f0b75e); }
+.live-hud__applied li.is-skipped { color: rgba(234, 255, 240, 0.55); }
+.live-hud__reason { color: rgba(240, 183, 94, 0.9); font-style: normal; }
+.live-hud__skip { font-size: 12.5px; color: var(--warn, #f0b75e); }
+.live-card__badge--image { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
+.live-card__badge--edit { background: var(--edit-blue-soft); color: var(--edit-blue); }
 .live-hud__done { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
 .live-hud__change { font-size: 12.5px; color: var(--edit-blue); }
 .live-hud__reload {

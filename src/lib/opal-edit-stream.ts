@@ -8,14 +8,39 @@
  */
 
 export type EditAction = 'replace' | 'remove' | 'add';
+export type EditKind = 'text' | 'item-add' | 'item-remove' | 'image' | 'color';
+
+export type EditEvent = {
+  type: 'edit';
+  index?: number;
+  section: string;
+  target?: string;
+  /** How the UI should animate this edit. Falls back to inference from `action`. */
+  kind?: EditKind;
+  action?: EditAction;
+  status?: 'applied' | 'skipped';
+  reason?: string;
+  old?: string;
+  new?: string;
+  /** For kind:"image" — the new image URL to swap in. */
+  newUrl?: string;
+};
 
 export type AgentEvent =
   | { type: 'plan'; company?: string; slug?: string; editor?: string; sections?: string[]; summary?: string }
   | { type: 'section_focus'; section: string; note?: string }
-  | { type: 'edit'; index?: number; section: string; target?: string; action: EditAction; old?: string; new?: string }
+  | EditEvent
   | { type: 'commit'; status?: string; edits?: number }
-  | { type: 'done'; saved?: boolean; page_url?: string; changes?: string[] }
+  | { type: 'done'; saved?: boolean; page_url?: string; changes?: string[]; skipped?: string[] }
   | { type: 'error'; saved?: boolean; message?: string };
+
+/** Normalise an edit's kind (the agent may send only the legacy `action`). */
+export function editKind(e: EditEvent): EditKind {
+  if (e.kind) return e.kind;
+  if (e.action === 'add') return 'item-add';
+  if (e.action === 'remove') return 'item-remove';
+  return 'text';
+}
 
 export type LiveEvent =
   | { kind: 'agent'; ev: AgentEvent }
