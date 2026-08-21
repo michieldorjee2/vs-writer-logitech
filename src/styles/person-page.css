@@ -1,0 +1,332 @@
+/**
+ * PersonPage — 1:1 buyer page.
+ *
+ * Inherits the Greenfield palette from abm-variables.css. The one page-local
+ * token is --brand-accent, set inline from the target company's brand colour,
+ * so the page carries their colour without overriding Optimizely's.
+ *
+ * The tier drives colour: an active opportunity reads warm and present, an
+ * introduction reads cool and quiet.
+ */
+
+.person {
+  --tier-color: var(--santas-gray);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-family: var(--font-body, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+
+.person[data-tier="key"] { --tier-color: var(--optimizely-blue); }
+.person[data-tier="engaged"] { --tier-color: var(--light-blue); }
+.person[data-tier="known"] { --tier-color: var(--santas-gray); }
+
+/* ===== Reveal (progressive enhancement) ===== */
+.person.js-reveal [data-person-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.person.js-reveal [data-person-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .person.js-reveal [data-person-reveal] { opacity: 1; transform: none; transition: none; }
+}
+
+/* ===== Shared layout ===== */
+.person__section { padding: clamp(3rem, 7vw, 6rem) 1.5rem; }
+.person__section-inner { max-width: 1080px; margin: 0 auto; }
+.person__section + .person__section { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+
+.person__section-heading {
+  font-size: clamp(1.5rem, 3.2vw, 2.25rem);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+.person__lede {
+  color: var(--text-secondary);
+  font-size: clamp(1rem, 1.4vw, 1.125rem);
+  line-height: 1.6;
+  max-width: 62ch;
+  margin: 0 0 2rem;
+}
+
+/* ===== Hero ===== */
+.person__hero {
+  position: relative;
+  padding: clamp(2rem, 5vw, 4rem) 1.5rem clamp(3rem, 6vw, 5rem);
+  background:
+    radial-gradient(120% 100% at 15% 0%, color-mix(in srgb, var(--brand-accent) 18%, transparent) 0%, transparent 60%),
+    var(--bg-secondary);
+  overflow: hidden;
+}
+.person__hero-inner { max-width: 1080px; margin: 0 auto; }
+
+.person__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+  flex-wrap: wrap;
+}
+.person__company-logo { border-radius: 6px; background: #fff; padding: 2px; object-fit: contain; }
+.person__company-link { color: var(--text-secondary); text-decoration: none; }
+.person__company-link:hover { color: var(--text-primary); text-decoration: underline; }
+.person__crumb-sep { opacity: 0.5; }
+.person__crumb-current { color: var(--text-primary); }
+
+.person__identity { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2rem; }
+
+.person__avatar {
+  --size: 76px;
+  width: var(--size);
+  height: var(--size);
+  flex: 0 0 var(--size);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: calc(var(--size) / 2.8);
+  letter-spacing: 0.02em;
+  color: var(--bg-primary);
+  background: var(--av-color);
+}
+.person__avatar--sm { --size: 44px; }
+
+.person__identity-text { min-width: 0; }
+.person__eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-accent);
+}
+.person__name {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  line-height: 1.1;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.person__linkedin { color: var(--text-secondary); display: inline-flex; }
+.person__linkedin:hover { color: var(--optimizely-blue); }
+.person__title { margin: 0.35rem 0 0.75rem; color: var(--text-secondary); font-size: 1.0625rem; }
+
+.person__tier-badge {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tier-color);
+  border: 1px solid color-mix(in srgb, var(--tier-color) 45%, transparent);
+  background: color-mix(in srgb, var(--tier-color) 12%, transparent);
+}
+
+.person__headline {
+  font-size: clamp(1.5rem, 3.4vw, 2.5rem);
+  line-height: 1.2;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  max-width: 20ch;
+}
+.person__subhead {
+  color: var(--text-secondary);
+  font-size: clamp(1rem, 1.5vw, 1.1875rem);
+  line-height: 1.6;
+  max-width: 58ch;
+  margin: 0 0 1.75rem;
+}
+
+.person__cta {
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  background: var(--optimizely-blue);
+  color: var(--bg-primary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.person__cta:hover { transform: translateY(-1px); box-shadow: 0 8px 24px var(--accent-glow); }
+
+/* ===== Engagement timeline ===== */
+.person__opp {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--tier-color) 35%, transparent);
+  background: color-mix(in srgb, var(--tier-color) 8%, transparent);
+  margin-bottom: 2rem;
+}
+.person__opp-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tier-color);
+}
+.person__opp-name { font-size: 1.0625rem; }
+.person__opp-stage {
+  font-size: 0.8125rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.person__opp-detail { font-size: 0.875rem; color: var(--text-secondary); }
+
+.person__timeline { list-style: none; margin: 0; padding: 0 0 0 1.25rem; position: relative; }
+.person__timeline::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--tier-color), transparent);
+  opacity: 0.4;
+}
+.person__touchpoint { position: relative; padding: 0 0 1.5rem 1.25rem; }
+.person__touchpoint:last-child { padding-bottom: 0; }
+.person__touchpoint-dot {
+  position: absolute;
+  left: -0.3rem;
+  top: 0.4rem;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tier-color);
+}
+.person__touchpoint-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+}
+.person__touchpoint-kind {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.75rem;
+}
+.person__touchpoint-summary { margin: 0; line-height: 1.55; }
+.person__touchpoint-who { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--text-secondary); }
+
+/* ===== Remit ===== */
+.person__remit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.person__remit-card {
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 2px solid var(--brand-accent);
+}
+.person__remit-metric {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--optimizely-blue);
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+.person__remit-title { margin: 0 0 0.5rem; font-size: 1.0625rem; font-weight: 600; }
+.person__remit-desc { margin: 0; color: var(--text-secondary); line-height: 1.55; font-size: 0.9375rem; }
+
+/* ===== Peer proof ===== */
+.person__proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+.person__proof-card {
+  margin: 0;
+  padding: 1.75rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.person__proof-quote {
+  margin: 0 0 1.25rem;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  quotes: "\201C" "\201D";
+}
+.person__proof-quote::before { content: open-quote; color: var(--optimizely-blue); }
+.person__proof-quote::after { content: close-quote; color: var(--optimizely-blue); }
+.person__proof-attr { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.875rem; color: var(--text-secondary); }
+.person__proof-attr strong { color: var(--text-primary); }
+.person__proof-company { color: var(--brand-accent); }
+.person__proof-attr a { color: var(--optimizely-blue); text-decoration: none; margin-top: 0.35rem; }
+.person__proof-attr a:hover { text-decoration: underline; }
+
+/* ===== Team ===== */
+.person__team-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+.person__team-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.person__team-info { display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.875rem; color: var(--text-secondary); min-width: 0; }
+.person__team-info strong { color: var(--text-primary); font-size: 0.9375rem; }
+.person__team-email { color: var(--optimizely-blue); text-decoration: none; overflow-wrap: anywhere; }
+.person__team-email:hover { text-decoration: underline; }
+.person__team-met {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--tier-color);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ===== Closing ===== */
+.person__closing { text-align: center; background: var(--bg-secondary); }
+.person__closing .person__lede { margin-left: auto; margin-right: auto; }
+.person__closing-title {
+  font-size: clamp(1.6rem, 3.6vw, 2.5rem);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+/* ===== Footer ===== */
+.person__footer {
+  padding: 2rem 1.5rem 3rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+.person__footer .person__section-inner { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.person__back { color: var(--optimizely-blue); text-decoration: none; }
+.person__back:hover { text-decoration: underline; }
+
+/* ===== Small screens ===== */
+@media (max-width: 640px) {
+  .person__identity { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .person__avatar { --size: 60px; }
+}

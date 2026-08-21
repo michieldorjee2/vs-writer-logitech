@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { validateCompanyName, validateEmail } from './_lib/validate-input.js';
 
 /**
  * Proxy the search-page "Add new" payload to the Opal create-page webhook.
@@ -12,9 +13,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const OPAL_WEBHOOK_URL =
   'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/632a7f56-733d-41d0-b71a-6da3b657c5c6';
 
-const OPTIMIZELY_EMAIL_RE = /^[^\s@]+@optimizely\.com$/i;
-const MAX_COMPANY_NAME_LEN = 120;
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -22,14 +20,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { company_name, edit_user_email } = (req.body ?? {}) as Record<string, unknown>;
 
-  if (
-    typeof company_name !== 'string' ||
-    !company_name.trim() ||
-    company_name.trim().length > MAX_COMPANY_NAME_LEN ||
-    typeof edit_user_email !== 'string' ||
-    !OPTIMIZELY_EMAIL_RE.test(edit_user_email)
-  ) {
-    return res.status(400).json({ error: 'Missing or invalid fields' });
+  // Each accepted request buys a ~12-minute agent run at 150-200 credits and
+  // can publish a live page, so the bar for spending one is a plausible
+  // company name from an identifiable Optimizely address. See _lib/validate-input.
+  const name = validateCompanyName(company_name);
+  if (!name.ok) {
+    console.warn('[opal-create-page] rejected company_name:', name.error);
+    return res.status(400).json({ error: name.error });
+  }
+  const email = validateEmail(edit_user_email, { strict: true });
+  if (!email.ok) {
+    return res.status(400).json({ error: email.error });
   }
 
   try {
@@ -37,8 +38,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        company_name: company_name.trim(),
-        edit_user_email,
+        company_name: name.value,
+        edit_user_email: email.value,
       }),
     });
 
