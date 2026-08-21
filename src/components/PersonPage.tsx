@@ -2,9 +2,13 @@
  * PersonPage — client entry for the 1:1 buyer page.
  *
  * All markup lives in PersonPageView so the SSR entry renders the identical
- * tree. This wrapper adds one thing: scroll-reveal, as progressive
- * enhancement. The server ships every section visible, so a visitor without
- * JS (or with reduced motion) sees the complete page.
+ * tree. This wrapper adds one thing: scroll-reveal.
+ *
+ * The hidden initial state lives behind `.person--anim`, which is only added
+ * once this effect runs. The ABM page declares `[data-animate] { opacity: 0 }`
+ * unconditionally and relies on GSAP to reveal it, so if that never boots the
+ * page stays blank. Same motion grammar here — 24px rise, --ease-out, the
+ * shared duration tokens — without inheriting that failure mode.
  */
 
 import { useEffect, useRef } from 'react';
@@ -23,8 +27,8 @@ export default function PersonPage({ page }: Props) {
         if (!root) return;
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
-        root.classList.add('js-reveal');
-        const targets = Array.from(root.querySelectorAll<HTMLElement>('[data-person-reveal]'));
+        root.classList.add('person--anim');
+        const targets = Array.from(root.querySelectorAll<HTMLElement>('[data-person-anim]'));
         const observer = new IntersectionObserver(
             (entries) => {
                 for (const entry of entries) {
@@ -49,7 +53,7 @@ export default function PersonPage({ page }: Props) {
         });
         return () => {
             observer.disconnect();
-            root.classList.remove('js-reveal');
+            root.classList.remove('person--anim');
         };
     }, []);
 
