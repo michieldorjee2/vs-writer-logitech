@@ -5,9 +5,11 @@ import { initABMInteractions, cleanupABMInteractions } from '../lib/abm-interact
 import { initStickyCTA, cleanupStickyCTA } from '../lib/abm-sticky-cta';
 import { deriveCustomerName } from '../lib/page-identity';
 import { initWarpCTA, cleanupWarpCTA } from '../lib/abm-warp-cta';
+import { fireDemoWebhook } from '../lib/abm-demo-webhook';
 import { initHero3D, cleanupHero3D } from '../lib/abm-hero-3d';
 import GravatarAvatar from './GravatarAvatar';
 import { brandLogoUrl } from '../lib/brand-logo';
+import { readableAccentOnFir } from '../lib/brand-accent';
 import { useOdpTracking } from '../hooks/useOdpTracking';
 
 interface Props {
@@ -52,14 +54,40 @@ function formatStatValue(val: string): string {
   return prefix + formatted + suffix;
 }
 
+// Live customer logos from optimizely.com's CMP DAM (Graph-backed homepage carousel).
 const fallbackLogos = [
-  { url: 'https://www.optimizely.com/contentassets/f58ea35175bd4e25bf399e36d284d6f9/logo_salesforce_white_100x300.svg', alt: 'Salesforce' },
-  { url: 'https://www.optimizely.com/contentassets/854ad08b9a5642f1bbda87fdfe6b81d4/nike-logo-icon_light.svg', alt: 'Nike' },
-  { url: 'https://www.optimizely.com/contentassets/638fd78be5cc45978c7d8b42bf0d31eb/zoom-logo-white.svg', alt: 'Zoom' },
-  { url: 'https://www.optimizely.com/contentassets/04dd25ba79f04298a76e1fb50742a117/shell-logo-light.svg', alt: 'Shell' },
-  { url: 'https://www.optimizely.com/contentassets/71dcdc4b907a414ba7057d2624c2883b/dolby-logo-white.svg', alt: 'Dolby' },
-  { url: 'https://www.optimizely.com/contentassets/c3fc7cbd589947cbb8579ce42d6bf8ec/logo_new-era_white_100x300.svg', alt: 'NEW ERA' },
+  { url: 'https://images1.cmp.optimizely.com/Zz1hYmM3ZWVlZTQ0NGExMWYxOGViZDUyNzY1OGQ1ZDg4OA==', alt: 'Salesforce' },
+  { url: 'https://images3.cmp.optimizely.com/Zz1iNGQ3OTg4YTQ0NWExMWYxYWY0YzhhNGEyZTdjMzU1YQ==', alt: 'Nike' },
+  { url: 'https://images1.cmp.optimizely.com/Zz0wMDRlM2U2MjQ0NTcxMWYxYWVjYTUyNzY1OGQ1ZDg4OA==', alt: 'Zoom' },
+  { url: 'https://images4.cmp.optimizely.com/Zz03ODJlY2YwODQ0NGExMWYxYWIzYTg2ZjEzODRhZmFlZg==', alt: 'Visa' },
+  { url: 'https://images3.cmp.optimizely.com/Zz1mY2I0MzVmYzQ0NTgxMWYxOTAxYThhNGEyZTdjMzU1YQ==', alt: 'Santander' },
+  { url: 'https://images3.cmp.optimizely.com/Zz01YTg1N2VkODVhM2YxMWYxODQ4MTcyMjMyNWM5YzQ3YQ==', alt: 'Cox Automotive' },
 ];
+
+// Default footer links → live optimizely.com pages (used when CMS footerLinks is empty).
+const defaultFooterLinks = [
+  { Text: 'Products', Url: { default: 'https://www.optimizely.com/products' } },
+  { Text: 'Experimentation', Url: { default: 'https://www.optimizely.com/products/experimentation' } },
+  { Text: 'Content Management', Url: { default: 'https://www.optimizely.com/products/content-management' } },
+  { Text: 'Connectors', Url: { default: 'https://www.optimizely.com/connectors' } },
+  { Text: 'Plans', Url: { default: 'https://www.optimizely.com/plans' } },
+  { Text: 'Customer stories', Url: { default: 'https://www.optimizely.com/field-notes/customer-stories' } },
+  { Text: 'Company', Url: { default: 'https://www.optimizely.com/company' } },
+  { Text: 'Get started', Url: { default: 'https://www.optimizely.com/get-started' } },
+];
+
+/* When no real contact is found, the generator falls back to these generic
+   role-titles (as the member's Name). We hide those cards + email links. */
+const GENERIC_CONTACT_NAMES = new Set([
+  'solutions architect', 'solution architect', 'migration engineer', 'customer success manager',
+]);
+function realContacts(
+  members?: Array<{ Name: string; Role: string; Email: string | null; Initials: string }>,
+) {
+  return (members || []).filter(
+    (m) => !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()),
+  );
+}
 
 /* LinkedIn icon SVG reused across stakeholder cards */
 const LinkedInIcon = () => (
@@ -97,13 +125,24 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
   // Resolve brand logo: prefer customerLogo (SVG URL), fall back to Brandfetch CDN
   const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
 
+  // This page's own route segment, used to build links to child person pages
+  // (/{companySlug}/{personSlug}). Graph stores locale-prefixed hierarchical
+  // URLs like "/en/acme/", so strip the locale and the slashes.
+  const companySlug = (page._metadata?.url?.hierarchical || page._metadata?.url?.default || '')
+    .replace(/^\/(en)\//, '/')
+    .replace(/^\/+|\/+$/g, '') || null;
+
+  // Only real, named contacts (drop generic role-title placeholders).
+  const teamContacts = realContacts(page.teamMembers);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      initHero3D(page.customerLogo, page.brandDomain, page.brandAccentColor);
+      const accent = readableAccentOnFir(page.brandAccentColor);
+      initHero3D(page.customerLogo, page.brandDomain, accent);
       initABMAnimations();
       initABMInteractions();
       initStickyCTA(deriveCustomerName(page));
-      initWarpCTA(page.brandAccentColor);
+      initWarpCTA(accent);
     }, 100);
 
     return () => {
@@ -122,15 +161,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
     ? page.headline.split(' ').slice(1).join(' ')
     : '';
 
-  // Split first 3 logos left, last 3 right for the logo wall
-  const leftLogos = fallbackLogos.slice(0, 3);
-  const rightLogos = fallbackLogos.slice(3);
-
   return (
     <main
       className="abm-page"
       id="main-content"
-      style={page.brandAccentColor ? { '--brand-accent': page.brandAccentColor } as React.CSSProperties : undefined}
+      style={page.brandAccentColor ? { '--brand-accent': readableAccentOnFir(page.brandAccentColor) } as React.CSSProperties : undefined}
     >
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
       {/* ======== HERO ======== */}
@@ -229,12 +264,15 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                         <span className="intel__confetti-piece" style={{ '--c': '#ff6b6b' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#ffd93d' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#6bcb77' } as React.CSSProperties}>&#x25CF;</span>
-                        <span className="intel__confetti-piece" style={{ '--c': '#4d96ff' } as React.CSSProperties}>&#x25CF;</span>
+                        <span className="intel__confetti-piece" style={{ '--c': '#91dbda' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#ff6bcb' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#ffa94d' } as React.CSSProperties}>&#x25CF;</span>
                       </span>
                     )}
-                    <div className="intel__person-card">
+                    <div
+                      className="intel__person-card"
+                      data-engagement={person.EngagementTier || undefined}
+                    >
                       <div
                         className="intel__avatar"
                         style={{ '--av-color': person.AvatarColor || 'var(--optimizely-blue-60)' } as React.CSSProperties}
@@ -258,6 +296,23 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                           )}
                         </div>
                         <span className="intel__person-role">{person.Role}</span>
+                        {person.EngagementTier && person.EngagementTier !== 'known' && (
+                          <span
+                            className="intel__person-tier"
+                            data-tier={person.EngagementTier}
+                            title={person.EngagementNote || undefined}
+                          >
+                            {person.EngagementTier === 'key' ? 'Active opportunity' : 'In conversation'}
+                          </span>
+                        )}
+                        {person.PersonSlug && companySlug && (
+                          <a
+                            className="intel__person-page-link"
+                            href={`/${companySlug}/${person.PersonSlug}`}
+                          >
+                            Open their page
+                          </a>
+                        )}
                       </div>
                     </div>
                   </React.Fragment>
@@ -461,9 +516,9 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
             <h2 className="section__title">Trusted by teams like yours</h2>
           </div>
 
-          {/* Logo Wall */}
+          {/* Static logo wall (non-scrolling) with the customer "You?" slot */}
           <div className="proof__logos" id="proof-logos" data-animate="fade-up" data-delay="0.1">
-            {leftLogos.map((logo, i) => (
+            {fallbackLogos.slice(0, 3).map((logo, i) => (
               <div key={`left-${i}`} className="proof__logo-item" data-logo-side="left">
                 <img src={logo.url} alt={logo.alt} loading="lazy" width="300" height="100" />
               </div>
@@ -471,7 +526,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
             <div className="proof__logo-you" id="proof-logo-you">
               <span>{page.logoWallCustomerSlot || 'You?'}</span>
             </div>
-            {rightLogos.map((logo, i) => (
+            {fallbackLogos.slice(3).map((logo, i) => (
               <div key={`right-${i}`} className="proof__logo-item" data-logo-side="right">
                 <img src={logo.url} alt={logo.alt} loading="lazy" width="300" height="100" />
               </div>
@@ -626,7 +681,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                   >
                     <div
                       className="timeline__marker"
-                      style={{ backgroundColor: { blue: '#0037ff', purple: '#861dff', cyan: '#0099bb', green: '#1aaa55' }[phase.MarkerColor || 'blue'] || '#0037ff' }}
+                      style={{ backgroundColor: { blue: '#abff44', purple: '#007b79', cyan: '#91dbda', green: '#3ab533' }[phase.MarkerColor || 'blue'] || '#abff44' }}
                     >
                       {i + 1}
                     </div>
@@ -639,11 +694,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
               </div>
             )}
 
-            {page.teamMembers && page.teamMembers.length > 0 && (
+            {teamContacts.length > 0 && (
               <div className="migration-team" data-animate="fade-up" data-delay="4">
                 <h3 className="migration-team__title">Your dedicated Optimizely team</h3>
                 <div className="migration-team__grid">
-                  {page.teamMembers.map((member, i) => (
+                  {teamContacts.map((member, i) => (
                     <div key={i} className="migration-team__member">
                       <GravatarAvatar
                         email={member.Email}
@@ -666,7 +721,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
         <span className="sticky-cta__text" id="sticky-cta-text">
           {page.stickyCTAText || 'Explore what Optimizely can do'}
         </span>
-        <button className="warp-btn warp-btn--compact" id="sticky-connect-btn">
+        <button
+          className="warp-btn warp-btn--compact"
+          id="sticky-connect-btn"
+          onClick={() => fireDemoWebhook(page, 'sticky-connect-btn')}
+        >
           <span className="warp-btn__content">
             <span className="warp-btn__main">Get in touch</span>
           </span>
@@ -689,7 +748,11 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
             )}
             {page.ctaDescription && <p className="cta__description" {...epi('ctaDescription')}>{page.ctaDescription}</p>}
             <div className="warp-btn-wrap">
-              <button className="warp-btn" id="cta-connect-btn">
+              <button
+                className="warp-btn"
+                id="cta-connect-btn"
+                onClick={() => fireDemoWebhook(page, 'cta-connect-btn')}
+              >
                 <span className="warp-btn__content">
                   <span className="warp-btn__eyebrow">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }}>
@@ -735,7 +798,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                 </svg>
               </div>
               <h3 className="bento__title" id="modal-title">You&apos;re all set</h3>
-              <p className="bento__sub">We&apos;ve notified your team — expect a reply within 24 hours.</p>
+              <p className="bento__sub">We&apos;ve notified the Optimizely team you&apos;re interested.</p>
             </div>
 
             {/* Schedule bento */}
@@ -759,8 +822,8 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
               </span>
             </a>
 
-            {/* Team contacts */}
-            {page.teamMembers?.map((member, i) => (
+            {/* Team contacts — only real named people (generic placeholders hidden) */}
+            {teamContacts.map((member, i) => (
               <a
                 key={i}
                 href={member.Email ? `mailto:${member.Email}` : '#'}
@@ -769,7 +832,7 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
                 <GravatarAvatar
                   email={member.Email}
                   initials={member.Initials}
-                  className={`bento__avatar${i === 1 ? ' bento__avatar--blue' : ''}${i === 2 ? ' bento__avatar--green' : ''}`}
+                  className={`bento__avatar${i === 1 ? ' bento__avatar--pink' : ''}${i === 2 ? ' bento__avatar--blue' : ''}`}
                 />
                 <strong>{member.Name}</strong>
                 <span className="bento__role">{member.Role}</span>
@@ -796,15 +859,13 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
             <strong>Optimizely</strong>
             {page.footerTagline && <span>{page.footerTagline}</span>}
           </div>
-          {page.footerLinks && page.footerLinks.length > 0 && (
-            <nav aria-label="Footer" className="footer__links">
-              {page.footerLinks.map((link, i) => (
-                <a key={i} href={link.Url?.default || '#'}>
-                  {link.Text}
-                </a>
-              ))}
-            </nav>
-          )}
+          <nav aria-label="Footer" className="footer__links">
+            {(page.footerLinks?.length ? page.footerLinks : defaultFooterLinks).map((link, i) => (
+              <a key={i} href={link.Url?.default || '#'} target="_blank" rel="noopener noreferrer">
+                {link.Text}
+              </a>
+            ))}
+          </nav>
           {page.footerLegal && (
             <div className="footer__legal">
               <p>{page.footerLegal}</p>

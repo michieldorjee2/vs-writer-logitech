@@ -197,77 +197,78 @@ function initPageMount(): void {
   });
 }
 
-/* ---- Polaroids + Letter — stack-and-fall + 3D tri-fold unfold ----
+/* ---- Polaroids — stacked-and-paperclipped, fan out on scroll ----
  *
- * The arc spans ~120% of section height (scrub 0.6 for smoothness):
+ * Initial state: all 6 polaroids overlap at the letter's center, slightly
+ * offset/rotated so the bundle looks held. The paperclip lives ON the
+ * first polaroid, so visually it fastens the stack and rides with that
+ * photo afterward (no separate floating clip).
  *
- *   Phase A (0-40%):  Polaroids are stacked center, paperclipped together.
- *                     Letter folded into thirds (top + bottom panels
- *                     rotateX -90°/+90° around the crease lines, middle
- *                     scaled down vertically).
- *   Phase B (35-65%): Paperclip releases (lifts off, fades). Polaroids
- *                     spring apart toward their slot positions.
- *   Phase C (55-100%): Letter unfolds — top panel rotates from -90° to 0
- *                      around its bottom edge, bottom from +90° to 0
- *                      around its top edge, middle scales back to 1.
- *
- * Implementation: GSAP timeline with scrub. The three "panels" of the
- * letter live as separate divs in the DOM, but the unfolding is done
- * with CSS transforms on the wrapper (rotateX) since the middle panel
- * carries all the actual content.
+ * Scroll: each polaroid drifts from the stacked position out to its slot,
+ * with a small per-card stagger. Pointer events are disabled on the cards
+ * until the timeline finishes — opening one mid-flight would confuse the
+ * Framer Motion shared-element transition and leave the closed card in
+ * the wrong place.
  */
 function initPolaroidFanOut(): void {
   const section = document.querySelector<HTMLElement>('.retail-letter-section');
   const collage = document.querySelector<HTMLElement>('.retail-collage');
   const polaroids = gsap.utils.toArray<HTMLElement>('.retail-polaroid--falling');
   const letter = document.querySelector<HTMLElement>('[data-retail-letter]');
-  const midPanel = document.querySelector<HTMLElement>('[data-retail-panel="mid"]');
-  const topPanel = document.querySelector<HTMLElement>('[data-retail-panel="top"]');
-  const botPanel = document.querySelector<HTMLElement>('[data-retail-panel="bottom"]');
-  const stackClip = document.querySelector<HTMLElement>('[data-retail-stack-clip]');
   if (!section || !collage || polaroids.length === 0) return;
 
-  section.style.perspective = '1800px';
-  // Letter needs preserve-3d for the panel rotations to read as folds
-  if (letter) letter.style.transformStyle = 'preserve-3d';
-  if (midPanel) midPanel.style.transformStyle = 'preserve-3d';
+  // Disable clicks until the fan-out completes. This keeps the layoutId
+  // shared transition (in LetterAndPolaroids) consistent — the polaroid's
+  // settled bounding box matches its slot CSS rather than a mid-animation
+  // transform.
+  polaroids.forEach((p) => {
+    p.style.pointerEvents = 'none';
+  });
+
+  const enableClicks = () => polaroids.forEach((p) => { p.style.pointerEvents = ''; });
+  const disableClicks = () => polaroids.forEach((p) => { p.style.pointerEvents = 'none'; });
 
   const tl = gsap.timeline({
     scrollTrigger: {
       trigger: section,
-      start: 'top 75%',
-      end: 'bottom 25%',
-      scrub: 0.6,
+      start: 'top 70%',
+      end: 'top 10%',
+      scrub: 0.8,
+      // Settled state: timeline at progress 1 → polaroids in their slots → safe to click.
+      onLeave: enableClicks,
+      onLeaveBack: enableClicks,
+      // Scrubbing state: polaroids are mid-transform → block clicks so the
+      // shared-element lightbox transition doesn't snap to the wrong source.
+      onEnter: disableClicks,
+      onEnterBack: disableClicks,
     },
   });
 
-  // ---- Compute per-polaroid delta from slot to letter center ----
+  // ---- Compute per-polaroid delta from slot back to letter center ----
   const letterRect = letter?.getBoundingClientRect();
   const letterCenterX = letterRect ? letterRect.left + letterRect.width / 2 : 0;
-  const letterCenterY = letterRect ? letterRect.top + letterRect.height / 2 : 0;
+  const letterCenterY = letterRect ? letterRect.top + letterRect.height * 0.35 : 0;
 
-  // ---- A. Initial stack state for each polaroid ----
   polaroids.forEach((p, i) => {
     const rect = p.getBoundingClientRect();
     const polCenterX = rect.left + rect.width / 2;
     const polCenterY = rect.top + rect.height / 2;
     const dx = letterCenterX - polCenterX;
     const dy = letterCenterY - polCenterY;
-    // Tight stack — small offsets between cards so the bundle looks held
-    const stackOffsetX = (i - 2.5) * 6;
-    const stackOffsetY = (i - 2.5) * 4;
-    const stackRot = (i - 2.5) * 3;
+    const stackOffsetX = (i - 2.5) * 8;
+    const stackOffsetY = (i - 2.5) * 5;
+    const stackRot = (i - 2.5) * 3.5;
 
-    // Pre-set the "stacked" position before the timeline runs
+    // Initial: stacked at the letter center, paperclip on polaroid[0]
+    // visually holds the bundle.
     gsap.set(p, {
       x: dx + stackOffsetX,
       y: dy + stackOffsetY,
       rotate: stackRot,
-      scale: 1.05,
-      zIndex: 10 + i,
+      scale: 1.04,
+      zIndex: 10 - i, // first polaroid on top of the pile
     });
 
-    // Animate FROM stacked TO settled (slot)
     tl.to(
       p,
       {
@@ -279,128 +280,9 @@ function initPolaroidFanOut(): void {
         ease: 'power3.out',
         duration: 1,
       },
-      0.3 + i * 0.08, // tiny stagger so they don't all fly at once
+      i * 0.08,
     );
   });
-
-  // ---- B. Paperclip — visible at start, releases as polaroids spread ----
-  if (stackClip) {
-    // Position the clip at the stack centre on first paint
-    if (letterRect) {
-      gsap.set(stackClip, {
-        left: letterCenterX - (section.getBoundingClientRect().left),
-        top: letterCenterY - (section.getBoundingClientRect().top) - 80,
-      });
-    }
-    tl.to(
-      stackClip,
-      {
-        y: -120,
-        rotate: -45,
-        opacity: 0,
-        ease: 'power2.in',
-        duration: 0.8,
-      },
-      0.2,
-    );
-  }
-
-  // ---- C. Letter tri-fold unfolds ----
-  if (letter && topPanel && botPanel && midPanel) {
-    // Initial: letter is folded into thirds and small.
-    // The middle panel carries the content; the top/bottom panels are
-    // empty placeholder divs that flip down/up to reveal it.
-    gsap.set(letter, { scale: 0.9, opacity: 0 });
-    gsap.set(midPanel, {
-      scaleY: 0.34,
-      transformOrigin: '50% 50%',
-    });
-    gsap.set(topPanel, {
-      rotateX: -180,
-      transformOrigin: '50% 100%',
-      height: '33%',
-      width: '100%',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      background: '#fbf6e8',
-      borderBottom: '1px solid rgba(123, 95, 60, 0.16)',
-    });
-    gsap.set(botPanel, {
-      rotateX: 180,
-      transformOrigin: '50% 0%',
-      height: '33%',
-      width: '100%',
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      background: '#fbf6e8',
-      borderTop: '1px solid rgba(123, 95, 60, 0.16)',
-    });
-
-    // Phase 1: letter appears (still folded)
-    tl.to(
-      letter,
-      { scale: 1, opacity: 1, ease: 'power2.out', duration: 0.5 },
-      0.3,
-    );
-
-    // Phase 2: top panel unfolds first
-    tl.to(
-      topPanel,
-      { rotateX: 0, ease: 'power3.out', duration: 1 },
-      0.5,
-    );
-
-    // Phase 3: middle panel expands to full height
-    tl.to(
-      midPanel,
-      { scaleY: 1, ease: 'power3.out', duration: 1 },
-      0.7,
-    );
-
-    // Phase 4: bottom panel unfolds last
-    tl.to(
-      botPanel,
-      { rotateX: 0, ease: 'power3.out', duration: 1 },
-      1.1,
-    );
-
-    // Phase 5: hide top/bottom panel placeholders after unfold (they
-    // covered the crease lines during the fold; we want the creases
-    // visible on the laid-flat letter).
-    tl.to(
-      [topPanel, botPanel],
-      { autoAlpha: 0, ease: 'power2.in', duration: 0.4 },
-      1.9,
-    );
-  }
-}
-
-/* ---- Letter — paragraph-by-paragraph reveal as user scrolls down ---- */
-function initLetterReveal(): void {
-  const paragraphs = gsap.utils.toArray<HTMLElement>('[data-retail-letter-line]');
-  const signoff = document.querySelector<HTMLElement>('.retail-letter__signoff');
-
-  paragraphs.forEach((p, i) => {
-    ScrollTrigger.create({
-      trigger: p,
-      start: 'top 85%',
-      once: true,
-      onEnter: () => {
-        setTimeout(() => p.classList.add('is-revealed'), i * 60);
-      },
-    });
-  });
-
-  if (signoff) {
-    ScrollTrigger.create({
-      trigger: signoff,
-      start: 'top 90%',
-      once: true,
-      onEnter: () => signoff.classList.add('is-revealed'),
-    });
-  }
 }
 
 /* ===== Public API ===== */
@@ -417,7 +299,6 @@ export function initRetailAnimations(): void {
   initHairlines();
   initLookbookStagger();
   initPolaroidFanOut();
-  initLetterReveal();
   initAtelierParallax();
   initTopbar();
   initProgressRail();

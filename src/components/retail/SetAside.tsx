@@ -5,7 +5,7 @@
  */
 
 import type { SetAsideBlock } from '../../lib/graph-types';
-import { demoToast } from '../../lib/retail-demo-toast';
+import { useCart, originFromEvent, slugifyName } from '../../lib/retail-cart';
 
 interface Props {
   block: SetAsideBlock;
@@ -13,6 +13,7 @@ interface Props {
 }
 
 export default function SetAside({ block, primaryCity }: Props) {
+  const { addToCart, openDrawer } = useCart();
   if (!block.items?.length) return null;
 
   const primary = block.primaryAction || 'Reserve a viewing';
@@ -40,14 +41,29 @@ export default function SetAside({ block, primaryCity }: Props) {
           <button
             type="button"
             className="retail-btn"
-            onClick={() => demoToast('Viewing reserved at your atelier.', 'success')}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('aurelle:open-reservation', {
+                detail: { slots: ['Reserve a private viewing', 'Open the cabinet on your time'] },
+              }));
+            }}
           >
             {primary}
           </button>
           <button
             type="button"
             className="retail-btn-quiet"
-            onClick={() => demoToast(`Sent to ${primaryCity || 'your address'}.`, 'note')}
+            onClick={(e) => {
+              block.items.forEach((it) => addToCart({
+                id: `setaside-${slugifyName(it.name)}`,
+                name: it.name,
+                qualifier: it.descriptor || null,
+                imageUrl: it.imageUrl?.default || null,
+                qty: 1,
+                source: 'set-aside',
+                note: it.privateProvenance || `Sent to ${primaryCity || 'your address'} in linen wrapping.`,
+              }, originFromEvent(e, it.imageUrl?.default || null)));
+              openDrawer('cart');
+            }}
           >
             {secondary}
           </button>

@@ -452,7 +452,7 @@ const SEBASTIAN: DemoCustomer = {
     signoff: '— Opal',
   },
   polaroids: [
-    { imageUrl: 'https://images.unsplash.com/photo-1605518215584-eb9f86f0e80c?auto=format&fit=crop&w=600&q=80', caption: '12/40, kept on the rail.', rotate: -7 },
+    { imageUrl: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&w=600&q=80', caption: '12/40, kept on the rail.', rotate: -7 },
     { imageUrl: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=600&q=80', caption: '08/24, on the shelf.', rotate: 8 },
     { imageUrl: 'https://images.unsplash.com/photo-1599391398131-cd12dfc6c24e?auto=format&fit=crop&w=600&q=80', caption: 'Tissu brut, before the cut.', rotate: -6 },
     { imageUrl: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=600&q=80', caption: 'Le carnet, ouvert.', rotate: 4 },

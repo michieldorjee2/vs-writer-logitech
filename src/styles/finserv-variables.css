@@ -1,0 +1,50 @@
+/* ===========================================================================
+   Brightstream (finserv template) — design tokens
+   Mirrors financial-services.optidemo.com: Playfair Display + Jost,
+   deep-navy ground, brushed-gold primary, sage accent, warm cream surfaces.
+   Scoped under .finserv-page so it never leaks into the other templates.
+   =========================================================================== */
+
+.finserv-page {
+  /* ===== Brand palette (lifted from the live Brightstream theme) ===== */
+  --bs-shark:       #0a1628;   /* deep navy ink / hero base   */
+  --bs-midnight:    #1a2d45;   /* hero gradient end           */
+  --bs-gold:        #d4af37;   /* primary (brushed gold)      */
+  --bs-gold-soft:   #e7cd7a;
+  --bs-sage:        #8b9d83;   /* accent                      */
+  --bs-warm-white:  #fefdfb;   /* base-100                    */
+  --bs-cream:       #f8f6f1;   /* base-200                    */
+  --bs-sand:        #e8e6e1;   /* base-300                    */
+  --bs-border:      #e5e2db;
+  --bs-slate:       #64748b;
+  --bs-amber:       #ffc107;   /* demo-bar strip              */
+
+  /* ===== Semantic ===== */
+  --ground:         var(--bs-warm-white);
+  --surface:        #ffffff;
+  --surface-alt:    var(--bs-cream);
+  --ink:            var(--bs-shark);
+  --ink-soft:       rgba(10, 22, 40, 0.72);
+  --ink-quiet:      rgba(10, 22, 40, 0.55);
+  --accent:         var(--bs-gold);
+  --accent-ink:     var(--bs-shark);
+  --rule:           var(--bs-border);
+
+  /* ===== Type ===== */
+  --font-display:   'Playfair Display', 'Iowan Old Style', Georgia, serif;
+  --font-sans:      'Jost', ui-sans-serif, -apple-system, 'Inter', 'Helvetica Neue', sans-serif;
+  --font-mono:      ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+
+  /* ===== Layout ===== */
+  --bs-maxw:        1180px;
+  --bs-maxw-prose:  740px;
+  --bs-radius:      18px;
+  --bs-radius-sm:   12px;
+  --bs-gap:         clamp(1.25rem, 3vw, 2rem);
+  --bs-section-y:   clamp(4rem, 9vw, 7.5rem);
+  --bs-shadow-sm:   0 1px 3px rgba(10, 22, 40, 0.06), 0 8px 24px rgba(10, 22, 40, 0.06);
+  --bs-shadow-lg:   0 24px 60px -20px rgba(10, 22, 40, 0.28);
+  --bs-hero-overlay:
+    radial-gradient(circle at 28% 18%, rgba(212, 175, 55, 0.18), transparent 52%),
+    linear-gradient(135deg, rgba(10, 22, 40, 0.92), rgba(26, 45, 69, 0.82));
+}

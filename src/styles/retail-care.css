@@ -1,0 +1,208 @@
+/* ===========================================================================
+   Maison Aurelle — Care Timeline ("What we are keeping for you")
+   The maison's quiet docket of services + archive — runs as a vertical
+   timeline with monogram seals as nodes.
+   =========================================================================== */
+
+.retail-care {
+  padding: clamp(5rem, 9vw, 9rem) var(--rail);
+  background: var(--paper);
+  background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.012) 0 1px, transparent 1px 4px);
+  position: relative;
+  z-index: 1;
+}
+
+.retail-care__head {
+  max-width: var(--column-reading);
+  margin: 0 auto clamp(3rem, 5vw, 4.5rem);
+  text-align: center;
+  display: grid;
+  gap: 1rem;
+}
+
+.retail-care__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.retail-care__heading {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--type-xl);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--type-primary);
+}
+
+.retail-care__lede {
+  font-family: var(--font-serif);
+  font-size: var(--type-base);
+  line-height: 1.55;
+  color: var(--type-secondary);
+  margin: 0;
+  text-align: left;
+}
+
+.retail-care__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: min(54rem, 96vw);
+  margin-inline: auto;
+  display: grid;
+  gap: 2.2rem;
+}
+
+.retail-care__entry {
+  display: grid;
+  grid-template-columns: 36px 84px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Vertical rail / dot */
+.retail-care__rail {
+  position: relative;
+  height: 100%;
+  width: 36px;
+  display: flex;
+  justify-content: center;
+}
+
+.retail-care__rail-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+  margin-top: 32px;
+  box-shadow: 0 0 0 4px var(--paper), 0 0 0 5px var(--rule);
+}
+
+.retail-care__rail-line {
+  position: absolute;
+  top: 44px;
+  bottom: -2.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  background: linear-gradient(180deg, var(--rule) 0%, var(--rule) 70%, transparent 100%);
+}
+
+.retail-care__seal {
+  width: 84px;
+  height: 84px;
+  border: 1px solid var(--gold);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(184,153,104,0.18) 0%, transparent 60%),
+    var(--ground);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.retail-care__seal-photo {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(0.2) sepia(0.08);
+}
+
+.retail-care__body {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.4rem;
+}
+
+.retail-care__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.retail-care__item {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.85rem);
+  line-height: 1.2;
+  margin: 0;
+  color: var(--type-primary);
+}
+
+.retail-care__status {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--rule-bright);
+  color: var(--type-secondary);
+  background: var(--ground);
+}
+
+.retail-care__status.is-held    { color: var(--gold);            border-color: var(--gold); }
+.retail-care__status.is-ready   { color: #2d3a2f;                background: #d8e4d2; border-color: #b0c1a8; }
+.retail-care__status.is-scheduled { color: var(--type-primary);  border-color: var(--type-primary); }
+.retail-care__status.is-active  { color: #6e5a3c;                background: #efe6d3; border-color: #cabfa5; }
+.retail-care__status.is-upcoming { color: var(--type-quiet); }
+
+.retail-care__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--type-quiet);
+}
+
+.retail-care__kind { color: var(--type-secondary); }
+
+.retail-care__due {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--type-primary);
+}
+
+.retail-care__maker {
+  position: relative;
+  padding-left: 0.85rem;
+}
+.retail-care__maker::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 0.4rem;
+  height: 1px;
+  background: var(--gold);
+}
+
+.retail-care__note {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--type-secondary);
+  margin: 0.45rem 0 0;
+  max-width: 38rem;
+}
+
+@media (max-width: 680px) {
+  .retail-care__entry {
+    grid-template-columns: 28px 64px 1fr;
+    gap: 0.85rem;
+  }
+  .retail-care__seal { width: 64px; height: 64px; }
+  .retail-care__rail-dot { margin-top: 24px; }
+}

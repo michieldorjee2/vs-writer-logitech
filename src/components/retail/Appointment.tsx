@@ -6,7 +6,6 @@
  */
 
 import type { AppointmentBlock } from '../../lib/graph-types';
-import { demoToast } from '../../lib/retail-demo-toast';
 
 const VARIANT_LABEL = {
   named_appointment: 'Your atelier, when you would like',
@@ -60,7 +59,10 @@ export default function Appointment({ block }: Props) {
           <button
             type="button"
             className="retail-btn"
-            onClick={() => demoToast(`Reserved at ${block.boutique || 'the atelier'}.`, 'success')}
+            onClick={() => {
+              const slots = (block.slots && block.slots.length > 0) ? block.slots : ['By appointment'];
+              window.dispatchEvent(new CustomEvent('aurelle:open-reservation', { detail: { slots } }));
+            }}
           >
             {primary}
           </button>
@@ -68,7 +70,11 @@ export default function Appointment({ block }: Props) {
             <button
               type="button"
               className="retail-btn-quiet"
-              onClick={() => demoToast('Opal will follow up about another time.', 'note')}
+              onClick={() => {
+                // Open reservation with the other slots emphasized
+                const slots = (block.slots && block.slots.length > 0) ? block.slots : ['Write to Opal for an alternative time'];
+                window.dispatchEvent(new CustomEvent('aurelle:open-reservation', { detail: { slots } }));
+              }}
             >
               {secondary}
             </button>

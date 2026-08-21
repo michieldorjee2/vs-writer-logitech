@@ -1,0 +1,347 @@
+/* ===========================================================================
+   Brightstream (finserv template) — layout, components, interactions.
+   Personalized 1:1 landing surface that reads like financial-services.optidemo.com:
+   demo strip → sticky glass nav → full-bleed photographic hero → editorial
+   scenario → problem cards → how-it-works → profile callout → footer, plus a
+   multi-step account/booking modal.
+   =========================================================================== */
+
+/* Reset base font size for finserv pages. The app's Tailwind base sets a 10px
+   root; the Brightstream finserv CSS is sized in rem against a 16px root (to
+   match the source site), so without this every size renders ~62.5% too small. */
+html:has(.finserv-page) {
+  font-size: 16px !important;
+  overflow-x: clip;
+}
+
+.finserv-page {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+.finserv-page *,
+.finserv-page *::before,
+.finserv-page *::after { box-sizing: border-box; }
+
+.finserv-page .abm-skip-link { position: absolute; left: -9999px; }
+.finserv-page .abm-skip-link:focus {
+  left: 1rem; top: 1rem; z-index: 200;
+  background: var(--bs-shark); color: #fff; padding: 0.5rem 0.9rem; border-radius: 8px;
+}
+
+.finserv-display { font-family: var(--font-display); }
+
+/* ----- shared atoms ------------------------------------------------------- */
+
+.finserv-eyebrow {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--bs-gold);
+}
+.finserv-eyebrow::before {
+  content: ''; width: 1.6rem; height: 1px; background: currentColor; opacity: 0.7;
+}
+.finserv-eyebrow--center { justify-content: center; }
+
+.finserv-section-head { max-width: var(--bs-maxw-prose); margin: 0 auto clamp(2.5rem, 5vw, 3.5rem); text-align: center; }
+.finserv-section-head__title {
+  font-family: var(--font-display);
+  margin: 0; font-size: clamp(1.9rem, 4vw, 2.9rem); line-height: 1.12; font-weight: 600;
+  letter-spacing: -0.01em; color: var(--ink);
+}
+.finserv-section-head__sub { margin: 1rem auto 0; max-width: 56ch; color: var(--ink-soft); font-size: 1.08rem; }
+
+.finserv-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem;
+  font-family: var(--font-sans); font-weight: 500; font-size: 1rem; letter-spacing: 0.01em;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  border: 1.5px solid transparent; border-radius: 999px;
+  padding: 0.85rem 1.9rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.finserv-btn--primary { background: var(--bs-gold); color: var(--bs-shark); box-shadow: 0 8px 22px rgba(212, 175, 55, 0.32); }
+.finserv-btn--primary:hover { background: var(--bs-gold-soft); transform: translateY(-2px); box-shadow: 0 14px 30px rgba(212, 175, 55, 0.4); }
+.finserv-btn--ghost { background: transparent; color: var(--bs-warm-white); border-color: rgba(254, 253, 251, 0.45); }
+.finserv-btn--ghost:hover { background: rgba(254, 253, 251, 0.1); border-color: var(--bs-warm-white); transform: translateY(-2px); }
+.finserv-btn--dark { background: var(--bs-shark); color: var(--bs-warm-white); }
+.finserv-btn--dark:hover { background: var(--bs-midnight); transform: translateY(-2px); }
+.finserv-btn--sm { padding: 0.6rem 1.3rem; font-size: 0.92rem; }
+
+/* ----- demo strip --------------------------------------------------------- */
+
+.finserv-demobar {
+  background: var(--bs-amber); color: #4a3a00;
+  font-size: 0.78rem; font-weight: 500; letter-spacing: 0.02em;
+  text-align: center; padding: 0.4rem 1rem;
+}
+.finserv-demobar strong { font-weight: 700; }
+
+/* ----- sticky glass header ------------------------------------------------ */
+
+.finserv-topbar {
+  position: sticky; top: 0; z-index: 90;
+  background: rgba(10, 22, 40, 0.72);
+  backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid rgba(254, 253, 251, 0.1);
+}
+.finserv-topbar__inner {
+  max-width: var(--bs-maxw); margin: 0 auto;
+  padding: 1rem clamp(1rem, 4vw, 2.5rem);
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+}
+.finserv-wordmark {
+  font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; letter-spacing: -0.5px;
+  color: var(--bs-warm-white); text-decoration: none; transition: color 0.25s ease;
+  display: inline-flex; align-items: center; gap: 0.55rem;
+}
+.finserv-wordmark:hover { color: var(--bs-gold); }
+.finserv-wordmark__spark {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--bs-gold-soft), var(--bs-gold));
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.7);
+}
+.finserv-nav { display: flex; align-items: center; gap: 1.7rem; }
+.finserv-nav__link {
+  font-size: 0.92rem; font-weight: 400; color: rgba(254, 253, 251, 0.82);
+  text-decoration: none; transition: color 0.2s ease; position: relative;
+}
+.finserv-nav__link:hover { color: var(--bs-gold); }
+.finserv-topbar__right { display: flex; align-items: center; gap: 1rem; }
+.finserv-topbar__login {
+  background: none; border: none; cursor: pointer; font-family: var(--font-sans);
+  font-size: 0.92rem; color: rgba(254, 253, 251, 0.82); transition: color 0.2s ease;
+}
+.finserv-topbar__login:hover { color: var(--bs-gold); }
+@media (max-width: 1000px) { .finserv-nav { display: none; } }
+
+/* ----- hero --------------------------------------------------------------- */
+
+.finserv-hero { position: relative; min-height: 92vh; display: flex; align-items: center; isolation: isolate; overflow: hidden; }
+.finserv-hero__bg {
+  position: absolute; inset: 0; z-index: -2;
+  background-size: cover; background-position: center;
+  transform: scale(1.06); animation: finservKenburns 22s ease-out forwards;
+}
+.finserv-hero::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; background: var(--bs-hero-overlay);
+}
+@keyframes finservKenburns { to { transform: scale(1); } }
+
+.finserv-hero__inner {
+  max-width: var(--bs-maxw); width: 100%; margin: 0 auto;
+  padding: clamp(7rem, 12vw, 9rem) clamp(1.25rem, 4vw, 2.5rem) clamp(4rem, 8vw, 6rem);
+}
+.finserv-hero__pill {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 0.45rem 1rem 0.45rem 0.5rem; margin-bottom: 1.6rem;
+  background: rgba(254, 253, 251, 0.1); border: 1px solid rgba(254, 253, 251, 0.2);
+  border-radius: 999px; backdrop-filter: blur(6px);
+  font-size: 0.84rem; color: var(--bs-warm-white);
+}
+.finserv-hero__pill-tag {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--bs-shark); background: var(--bs-gold); padding: 0.2rem 0.6rem; border-radius: 999px;
+}
+.finserv-hero__headline {
+  font-family: var(--font-display);
+  margin: 0; max-width: 17ch; color: var(--bs-warm-white);
+  font-size: clamp(2.6rem, 6.2vw, 4.6rem); line-height: 1.04; font-weight: 700; letter-spacing: -0.015em;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35);
+}
+.finserv-hero__headline em { font-style: italic; color: var(--bs-gold); }
+.finserv-hero__sub {
+  margin: 1.5rem 0 0; max-width: 50ch;
+  font-size: clamp(1.05rem, 2vw, 1.28rem); color: rgba(254, 253, 251, 0.9); font-weight: 300;
+}
+.finserv-hero__cta { margin-top: 2.4rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.finserv-hero__cta-note { width: 100%; margin: 0.4rem 0 0; font-size: 0.9rem; color: rgba(254, 253, 251, 0.62); }
+
+.finserv-hero__stats {
+  margin-top: 3.2rem; display: flex; flex-wrap: wrap; gap: 2.4rem;
+  border-top: 1px solid rgba(254, 253, 251, 0.16); padding-top: 1.8rem; max-width: 640px;
+}
+.finserv-stat__value { font-family: var(--font-display); font-size: 1.9rem; font-weight: 600; color: var(--bs-warm-white); line-height: 1; }
+.finserv-stat__label { margin-top: 0.35rem; font-size: 0.82rem; letter-spacing: 0.04em; color: rgba(254, 253, 251, 0.6); text-transform: uppercase; }
+
+/* ----- scenario ----------------------------------------------------------- */
+
+.finserv-scenario { background: var(--surface); }
+.finserv-scenario__inner { max-width: var(--bs-maxw-prose); margin: 0 auto; padding: var(--bs-section-y) clamp(1.25rem, 4vw, 2rem); }
+.finserv-scenario__title {
+  font-family: var(--font-display); margin: 0 0 1.6rem;
+  font-size: clamp(1.8rem, 4vw, 2.7rem); line-height: 1.16; font-weight: 600; letter-spacing: -0.01em;
+}
+.finserv-scenario__body p { margin: 0 0 1.2rem; font-size: 1.14rem; color: var(--ink-soft); }
+.finserv-scenario__pull {
+  margin: 2.2rem 0 0; padding: 1.4rem 0 1.4rem 1.6rem; border-left: 3px solid var(--bs-gold);
+  font-family: var(--font-display); font-size: clamp(1.35rem, 3vw, 1.95rem); font-style: italic;
+  line-height: 1.32; color: var(--ink);
+}
+
+/* ----- problems ----------------------------------------------------------- */
+
+.finserv-problems { background: var(--surface-alt); }
+.finserv-problems__inner { max-width: var(--bs-maxw); margin: 0 auto; padding: var(--bs-section-y) clamp(1.25rem, 4vw, 2.5rem); }
+.finserv-problems__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--bs-gap); }
+.finserv-problem {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--bs-radius);
+  padding: clamp(1.6rem, 2.6vw, 2.2rem); box-shadow: var(--bs-shadow-sm);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.finserv-problem:hover { transform: translateY(-6px); box-shadow: var(--bs-shadow-lg); border-color: rgba(212, 175, 55, 0.5); }
+.finserv-problem__stat { display: block; font-family: var(--font-display); font-size: 2.2rem; font-weight: 600; color: var(--bs-gold); line-height: 1; margin-bottom: 0.7rem; }
+.finserv-problem__title { font-family: var(--font-display); margin: 0 0 0.55rem; font-size: 1.25rem; font-weight: 600; }
+.finserv-problem__desc { margin: 0; font-size: 0.99rem; color: var(--ink-soft); }
+
+/* ----- how it works ------------------------------------------------------- */
+
+.finserv-howitworks { background: var(--surface); }
+.finserv-howitworks__inner { max-width: var(--bs-maxw); margin: 0 auto; padding: var(--bs-section-y) clamp(1.25rem, 4vw, 2.5rem); }
+.finserv-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(1.5rem, 3vw, 3rem); position: relative; }
+.finserv-step { position: relative; }
+.finserv-step__num {
+  display: inline-flex; align-items: center; justify-content: center; width: 3.2rem; height: 3.2rem;
+  border-radius: 50%; font-family: var(--font-display); font-size: 1.3rem; font-weight: 600;
+  color: var(--bs-shark); background: var(--bs-gold);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.35); margin-bottom: 1.2rem;
+}
+.finserv-step__title { font-family: var(--font-display); margin: 0 0 0.5rem; font-size: 1.22rem; font-weight: 600; }
+.finserv-step__desc { margin: 0; font-size: 0.99rem; color: var(--ink-soft); }
+
+/* ----- profile callout ---------------------------------------------------- */
+
+.finserv-callout { position: relative; background: linear-gradient(140deg, var(--bs-shark), var(--bs-midnight)); color: var(--bs-warm-white); isolation: isolate; overflow: hidden; }
+.finserv-callout::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(circle at 78% 22%, rgba(212, 175, 55, 0.16), transparent 45%);
+}
+.finserv-callout__inner { max-width: var(--bs-maxw-prose); margin: 0 auto; padding: var(--bs-section-y) clamp(1.25rem, 4vw, 2rem); text-align: center; }
+.finserv-callout__mark { font-family: var(--font-display); font-size: 4rem; line-height: 0.6; color: var(--bs-gold); display: block; margin-bottom: 0.5rem; }
+.finserv-callout__quote { font-family: var(--font-display); margin: 0; font-size: clamp(1.5rem, 3.6vw, 2.3rem); line-height: 1.32; font-weight: 500; }
+.finserv-callout__attr { margin-top: 2rem; display: inline-flex; align-items: center; gap: 1rem; }
+.finserv-callout__avatar { width: 3.2rem; height: 3.2rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 600; color: var(--bs-shark); background: var(--bs-gold); }
+.finserv-callout__who { text-align: left; }
+.finserv-callout__name { display: block; font-weight: 500; }
+.finserv-callout__role { display: block; font-size: 0.9rem; color: rgba(254, 253, 251, 0.66); }
+
+/* ----- footer ------------------------------------------------------------- */
+
+.finserv-footer { background: var(--bs-shark); color: rgba(254, 253, 251, 0.7); }
+.finserv-footer__inner { max-width: var(--bs-maxw); margin: 0 auto; padding: clamp(3rem, 6vw, 4.5rem) clamp(1.25rem, 4vw, 2.5rem) 2.5rem; }
+.finserv-footer__top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 2rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(254, 253, 251, 0.12); }
+.finserv-footer__brand { max-width: 30ch; }
+.finserv-footer__mark { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--bs-warm-white); }
+.finserv-footer__tag { margin: 0.6rem 0 0; font-size: 0.92rem; font-weight: 300; }
+.finserv-footer__badges { display: flex; flex-wrap: wrap; gap: 0.6rem; list-style: none; margin: 0; padding: 0; }
+.finserv-badge {
+  font-size: 0.74rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase;
+  color: rgba(254, 253, 251, 0.85); padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(254, 253, 251, 0.22); border-radius: 999px;
+}
+.finserv-footer__legal { margin: 1.6rem 0 0; max-width: 80ch; font-size: 0.8rem; line-height: 1.65; color: rgba(254, 253, 251, 0.5); }
+
+/* ===========================================================================
+   Modal system (savings application / book-a-meeting / auth)
+   =========================================================================== */
+
+.finserv-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 1.25rem; background: rgba(10, 22, 40, 0.62); backdrop-filter: blur(6px);
+  animation: finservFade 0.25s ease;
+}
+@keyframes finservFade { from { opacity: 0; } }
+.finserv-modal {
+  position: relative; width: min(560px, 100%); max-height: 92vh; overflow-y: auto;
+  background: var(--bs-warm-white); color: var(--ink); border-radius: var(--bs-radius);
+  box-shadow: 0 40px 100px -25px rgba(10, 22, 40, 0.6);
+  padding: clamp(1.6rem, 4vw, 2.6rem); animation: finservRise 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes finservRise { from { opacity: 0; transform: translateY(24px) scale(0.98); } }
+.finserv-modal__close {
+  position: absolute; top: 1rem; right: 1rem; width: 2.2rem; height: 2.2rem; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink-soft);
+  font-size: 1.1rem; line-height: 1; cursor: pointer; transition: background 0.2s ease, color 0.2s ease;
+}
+.finserv-modal__close:hover { background: var(--bs-cream); color: var(--ink); }
+.finserv-modal__title { font-family: var(--font-display); margin: 0; font-size: 1.7rem; font-weight: 600; }
+.finserv-modal__subtitle { margin: 0.4rem 0 1.6rem; color: var(--ink-soft); font-size: 0.98rem; }
+
+.finserv-stepdots { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.6rem; }
+.finserv-stepdot { flex: 1; height: 4px; border-radius: 999px; background: var(--bs-sand); transition: background 0.3s ease; }
+.finserv-stepdot.is-active { background: var(--bs-gold); }
+.finserv-stepdot.is-done { background: var(--bs-sage); }
+
+.finserv-accountcard {
+  width: 100%; text-align: left; cursor: pointer; display: block;
+  border: 1.5px solid var(--rule); border-radius: var(--bs-radius-sm); background: var(--surface);
+  padding: 1.1rem 1.2rem; margin-bottom: 0.8rem; transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.finserv-accountcard:hover { border-color: var(--bs-gold); transform: translateY(-2px); }
+.finserv-accountcard.is-selected { border-color: var(--bs-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.22); }
+.finserv-accountcard__row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.finserv-accountcard__name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; }
+.finserv-accountcard__rate { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: var(--bs-gold); }
+.finserv-accountcard__rate small { font-size: 0.7rem; font-weight: 500; color: var(--ink-quiet); letter-spacing: 0.06em; }
+.finserv-accountcard__benefit { margin: 0.35rem 0 0; font-size: 0.9rem; color: var(--ink-soft); }
+
+.finserv-field { margin-bottom: 1rem; }
+.finserv-field label { display: block; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.03em; color: var(--ink-soft); margin-bottom: 0.4rem; }
+.finserv-field input {
+  width: 100%; font-family: var(--font-sans); font-size: 1rem; color: var(--ink);
+  padding: 0.75rem 0.9rem; border: 1.5px solid var(--rule); border-radius: 10px; background: var(--surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.finserv-field input:focus { outline: none; border-color: var(--bs-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18); }
+.finserv-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.finserv-deposit { position: relative; }
+.finserv-deposit__prefix { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); font-size: 1.05rem; color: var(--ink-soft); }
+.finserv-deposit input { padding-left: 1.9rem; font-family: var(--font-display); font-size: 1.2rem; }
+
+.finserv-summary { background: var(--surface-alt); border-radius: var(--bs-radius-sm); padding: 1.2rem 1.3rem; margin-bottom: 1.2rem; }
+.finserv-summary__row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; }
+.finserv-summary__row + .finserv-summary__row { border-top: 1px solid var(--rule); }
+.finserv-summary__label { font-size: 0.9rem; color: var(--ink-soft); }
+.finserv-summary__value { font-weight: 500; }
+.finserv-summary__value--accent { font-family: var(--font-display); color: var(--bs-gold); font-size: 1.25rem; font-weight: 700; }
+
+.finserv-terms { display: flex; gap: 0.65rem; align-items: flex-start; margin-bottom: 1.2rem; font-size: 0.88rem; color: var(--ink-soft); }
+.finserv-terms input { margin-top: 0.2rem; accent-color: var(--bs-gold); }
+.finserv-disclosure { font-size: 0.76rem; color: var(--ink-quiet); line-height: 1.5; margin: 0 0 1.2rem; }
+
+.finserv-modal__actions { display: flex; align-items: center; gap: 0.8rem; }
+.finserv-modal__actions .finserv-btn { flex: 1; }
+.finserv-modal__back { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 0.95rem; color: var(--ink-soft); padding: 0.6rem 0.4rem; transition: color 0.2s ease; }
+.finserv-modal__back:hover { color: var(--ink); }
+
+.finserv-modal__success { text-align: center; padding: 1rem 0; }
+.finserv-modal__check {
+  width: 4rem; height: 4rem; margin: 0 auto 1.2rem; border-radius: 50%;
+  background: rgba(139, 157, 131, 0.18); color: var(--bs-sage);
+  display: flex; align-items: center; justify-content: center; font-size: 2rem;
+  animation: finservPop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+@keyframes finservPop { from { transform: scale(0); } }
+
+/* ----- scroll reveal ------------------------------------------------------ */
+
+.finserv-page.js-reveal [data-finserv-reveal] { opacity: 0; transform: translateY(22px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.finserv-page.js-reveal [data-finserv-reveal].is-visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .finserv-page.js-reveal [data-finserv-reveal] { opacity: 1; transform: none; transition: none; }
+  .finserv-hero__bg { animation: none; transform: none; }
+}
+
+/* ----- responsive --------------------------------------------------------- */
+
+@media (max-width: 880px) {
+  .finserv-problems__grid, .finserv-steps { grid-template-columns: 1fr; }
+  .finserv-hero { min-height: 88vh; }
+  .finserv-field-row { grid-template-columns: 1fr; }
+  .finserv-hero__stats { gap: 1.6rem; }
+}

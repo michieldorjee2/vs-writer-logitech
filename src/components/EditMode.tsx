@@ -9,6 +9,8 @@ import {
 } from '../lib/xray-defaults';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { isValidOptimizelyEmail, loadStoredEmail, saveStoredEmail } from '../lib/stored-email';
+import { streamEdit, editKind, type EditKind } from '../lib/opal-edit-stream';
+import { animateSectionEdit } from '../lib/inplace-edit';
 import '../styles/edit-mode.css';
 
 interface Props {
@@ -34,9 +36,59 @@ const POPUP_WIDTH = 340;
 const POPUP_GAP = 14;
 const DOC_MARGIN = 16;
 
-/* Same-origin proxy — the upstream Opal webhook doesn't send CORS
- * headers, so we can't fetch() it from the browser directly. */
-const OPAL_FEEDBACK_ENDPOINT = '/api/opal-feedback';
+/* Live edit-mode streams the account_page_live_edit agent and animates
+ * its thinking + edits on the page, then commits once. (The old
+ * fire-and-forget webhook lived at /api/opal-feedback.) */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type AppliedEdit = {
+  id: number;
+  section: string;
+  target?: string;
+  kind: EditKind;
+  status: 'applied' | 'skipped';
+  reason?: string;
+  old?: string;
+  newText?: string;
+};
+type ActiveCard = {
+  sectionId: string | null;
+  section: string;
+  target?: string;
+  kind: EditKind;
+  old?: string;
+  newText?: string;
+  key: number;
+};
+
+/* Wait for Opal's republish to land by polling the same /api/edit-status
+ * ping the sidebar uses: when the page's Graph `published` timestamp moves
+ * past the baseline we captured at submit, the edit is live (and the
+ * endpoint has already purged the edge cache). Resolves true on change,
+ * false on timeout/abort. */
+async function waitForRepublish(
+  key: string,
+  since: string,
+  signal: AbortSignal,
+  deadlineMs = 120_000,
+): Promise<boolean> {
+  const end = Date.now() + deadlineMs;
+  await sleep(1500);
+  while (Date.now() < end && !signal.aborted) {
+    try {
+      const qs = `key=${encodeURIComponent(key)}&since=${encodeURIComponent(since)}`;
+      const res = await fetch(`/api/edit-status?${qs}`, { cache: 'no-store', signal });
+      if (res.ok) {
+        const data = (await res.json()) as { changed?: boolean };
+        if (data?.changed) return true;
+      }
+    } catch {
+      /* network blip — retry */
+    }
+    await sleep(2500);
+  }
+  return false;
+}
 
 function getDocSize(): DocSize {
   if (typeof window === 'undefined') return { w: 1280, h: 720 };
@@ -112,7 +164,7 @@ function clamp(v: number, lo: number, hi: number): number {
  * the sticky CTA, edit-mode webhook, and any future consumer all
  * agree on the answer for a given page. */
 
-type Phase = 'editing' | 'sending' | 'thanks';
+type Phase = 'editing' | 'working' | 'thanks';
 
 function EditMode({ active, onClose, onSent, page, variant }: Props) {
   const defaults = variant === 'abm' ? ABM_XRAY_DEFAULTS : DYNAMIC_XRAY_DEFAULTS;
@@ -151,6 +203,41 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
 
   const sendError = useRef<string | null>(null);
 
+  /* ---- Live edit-stream state (the on-page animation) ---- */
+  const [liveStatus, setLiveStatus] = useState('');
+  const [liveSummary, setLiveSummary] = useState('');
+  const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
+  const [activeCard, setActiveCard] = useState<ActiveCard | null>(null);
+  const [applied, setApplied] = useState<AppliedEdit[]>([]);
+  const [liveDone, setLiveDone] = useState<{ changes?: string[]; skipped?: string[] } | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [willReload, setWillReload] = useState(false);
+  const liveAbort = useRef<AbortController | null>(null);
+
+  /** Match an agent's section name to one of our x-ray sections. The send
+   *  payload labels each comment "Section: <title>", so the agent usually
+   *  echoes a title; fall back to a fuzzy contains match. */
+  const matchSectionId = useCallback(
+    (name?: string): string | null => {
+      if (!name) return null;
+      const k = name.toLowerCase().trim();
+      for (const s of sections) if (s.title.toLowerCase().trim() === k) return s.id;
+      for (const s of sections) {
+        const t = s.title.toLowerCase();
+        if (t.includes(k) || k.includes(t)) return s.id;
+      }
+      return null;
+    },
+    [sections],
+  );
+
+  const scrollToSection = useCallback((id: string | null) => {
+    if (!id) return;
+    const entry = elementsRef.current.find((x) => x.section.id === id);
+    const el = entry?.els[0] as HTMLElement | undefined;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
   /* ---- Lifecycle: opening / closing the mode ---- */
   useEffect(() => {
     if (!active) {
@@ -160,6 +247,16 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       setActiveSection(null);
       setEmailModalOpen(false);
       setEmailError(null);
+      liveAbort.current?.abort();
+      liveAbort.current = null;
+      setLiveStatus('');
+      setLiveSummary('');
+      setFocusSectionId(null);
+      setActiveCard(null);
+      setApplied([]);
+      setLiveDone(null);
+      setLiveError(null);
+      setWillReload(false);
       document.body.classList.remove('edit-active');
       return;
     }
@@ -372,8 +469,17 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     const entries = Object.entries(comments);
     if (entries.length === 0 || !email) return;
 
-    setPhase('sending');
     sendError.current = null;
+    setActiveSection(null);
+    setLiveStatus('Connecting to Opal…');
+    setLiveSummary('');
+    setFocusSectionId(null);
+    setActiveCard(null);
+    setApplied([]);
+    setLiveDone(null);
+    setLiveError(null);
+    setWillReload(false);
+    setPhase('working');
 
     const slug = getPageSlug(page);
     const companyName = deriveCustomerName(page);
@@ -387,34 +493,173 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       )
       .join('\n\n---\n\n');
 
-    const body = {
+    const payload = {
       company_name: companyName,
       company_slug: slug,
       suggested_edit: suggestedEdit,
       edit_user_email: email,
     };
 
+    const baselinePublished = page._metadata?.published ?? null;
+    const pageKey = page._metadata?.key ?? null;
+
+    const ac = new AbortController();
+    liveAbort.current = ac;
+    let editSeq = 0;
+    let committed = false; // update_page succeeded (tool result or done.saved)
+    let sawDone = false;
+    let sawError = false;
+    let curFocus: string | null = null;
+
     try {
-      await fetch(OPAL_FEEDBACK_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      for await (const e of streamEdit(payload, ac.signal)) {
+        if (e.kind === 'error') {
+          sawError = true;
+          setLiveError(e.message);
+          setLiveStatus('Something went wrong');
+          continue;
+        }
+        if (e.kind === 'tool') {
+          if (e.name === 'get_page') {
+            setLiveStatus(e.phase === 'call' ? 'Reading the page…' : 'Page loaded');
+          } else if (e.name === 'update_page') {
+            if (e.phase === 'call') setLiveStatus('Saving changes…');
+            else {
+              setLiveStatus('Changes saved');
+              if (e.ok !== false) committed = true;
+            }
+          } else if (e.name === 'take_webpage_screenshot') {
+            setLiveStatus(e.phase === 'call' ? 'Taking a fresh screenshot…' : 'Screenshot captured');
+          }
+          await sleep(160);
+          continue;
+        }
+        const ev = e.ev;
+        if (ev.type === 'plan') {
+          setLiveSummary(ev.summary ?? '');
+          setLiveStatus('Planning the edits…');
+          await sleep(700);
+        } else if (ev.type === 'section_focus') {
+          const id = matchSectionId(ev.section);
+          curFocus = id;
+          setFocusSectionId(id);
+          setActiveCard(null);
+          setLiveStatus(`Working on “${ev.section}”…`);
+          scrollToSection(id);
+          await sleep(650);
+        } else if (ev.type === 'edit') {
+          const id = matchSectionId(ev.section) ?? curFocus;
+          curFocus = id;
+          setFocusSectionId(id);
+          const key = ev.index ?? ++editSeq;
+          const kind = editKind(ev);
+          const skipped = ev.status === 'skipped';
+
+          if (skipped) {
+            // Nothing to apply on-page — just surface it so it stays visible.
+            scrollToSection(id);
+            setLiveStatus(`Skipped: ${ev.target ?? ev.section}`);
+            await sleep(700);
+          } else {
+            const els = id ? elementsRef.current.find((x) => x.section.id === id)?.els ?? [] : [];
+            let appliedInPlace = false;
+            if (els.length) {
+              appliedInPlace = await animateSectionEdit(
+                els,
+                { kind, old: ev.old, new: ev.new, newUrl: ev.newUrl },
+                ac.signal,
+              );
+            }
+            // Couldn't locate the target on the page → fall back to the card.
+            if (!appliedInPlace) {
+              scrollToSection(id);
+              setActiveCard({ sectionId: id, section: ev.section, target: ev.target, kind, old: ev.old, newText: ev.new, key });
+              const typeLen = ev.new?.length ?? 0;
+              await sleep(1100 + Math.min(typeLen * 22, 2600));
+              setActiveCard(null);
+            }
+          }
+
+          setApplied((prev) => [
+            ...prev,
+            {
+              id: key,
+              section: ev.section,
+              target: ev.target,
+              kind,
+              status: skipped ? 'skipped' : 'applied',
+              reason: ev.reason,
+              old: ev.old,
+              newText: ev.new,
+            },
+          ]);
+        } else if (ev.type === 'commit') {
+          curFocus = null;
+          setFocusSectionId(null);
+          setActiveCard(null);
+          setLiveStatus('Saving changes…');
+          await sleep(300);
+        } else if (ev.type === 'done') {
+          sawDone = true;
+          if (ev.saved) committed = true;
+          setLiveDone({ changes: ev.changes, skipped: ev.skipped });
+          setLiveStatus(ev.saved ? 'Done — changes are live' : 'Done');
+          await sleep(200);
+        } else if (ev.type === 'error') {
+          sawError = true;
+          setLiveError(ev.message ?? 'The agent reported an error.');
+          setLiveStatus('Something went wrong');
+        }
+      }
     } catch (err) {
-      sendError.current = err instanceof Error ? err.message : 'Network error';
+      if (!ac.signal.aborted) {
+        sawError = true;
+        setLiveError(err instanceof Error ? err.message : 'Stream error');
+        setLiveStatus('Something went wrong');
+      }
     }
 
-    // Tell the parent to start the "Working…" countdown on the
-    // Edit sidebar button. We notify regardless of network outcome —
-    // the user has handed the work off to Opal either way.
+    // Never hang: if the stream ended without a terminal event, finalize now.
+    if (!sawDone && !sawError && !ac.signal.aborted) {
+      if (committed) {
+        setLiveDone({ changes: ['Changes saved.'] });
+        setLiveStatus('Changes saved');
+      } else {
+        setLiveError('Opal stopped before confirming. Some edits may not have been applied — try again.');
+        setLiveStatus('Incomplete');
+      }
+    }
+
+    // Notify the parent (sidebar countdown) regardless of outcome.
     onSent?.();
 
-    setPhase('thanks');
-    // Animate thanks for ~2.6s then exit
-    window.setTimeout(() => {
-      onClose();
-    }, 2600);
-  }, [comments, email, page, sections, onClose, onSent]);
+    // If the agent committed, WAIT for the republish to actually land —
+    // poll the Graph `published` ping — then cache-bust reload so the
+    // visitor sees the real, freshly-published change (not just our
+    // optimistic in-place animation).
+    if (committed) {
+      setWillReload(true);
+      setLiveStatus('Publishing… waiting for it to go live');
+      if (pageKey && baselinePublished) {
+        await waitForRepublish(pageKey, baselinePublished, ac.signal);
+      } else {
+        await sleep(2500);
+      }
+      if (!ac.signal.aborted) {
+        const u = new URL(window.location.href);
+        u.searchParams.set('refresh', String(Date.now()));
+        window.location.assign(u.toString());
+      }
+    }
+    liveAbort.current = null;
+  }, [comments, email, page, sections, onSent, matchSectionId, scrollToSection]);
+
+  /** Dismiss the live overlay without reloading (Close on the live HUD). */
+  const dismissLive = useCallback(() => {
+    liveAbort.current?.abort();
+    liveAbort.current = null;
+    onClose();
+  }, [onClose]);
 
   if (!active) return null;
 
@@ -426,7 +671,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
   /** Document-sized SVG layer with the outline boxes. */
   const docLayer = (
     <div
-      className="edit-overlay"
+      className={'edit-overlay' + (phase === 'working' ? ' edit-overlay--working' : '')}
       style={{ width: docSize.w, height: docSize.h }}
       aria-label="Edit mode overlay"
     >
@@ -446,7 +691,8 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
               className={
                 'edit-box' +
                 (hasComment ? ' edit-box--commented' : '') +
-                (activeSection === section.id ? ' edit-box--active' : '')
+                (activeSection === section.id ? ' edit-box--active' : '') +
+                (phase === 'working' && focusSectionId === section.id ? ' edit-box--live' : '')
               }
               style={{ ['--reveal-index']: i } as CSSProperties}
               onClick={() => openCommentForSection(section.id)}
@@ -615,10 +861,10 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
             disabled={!canSend}
             aria-label="Send feedback"
           >
-            {phase === 'sending' ? (
+            {phase === 'working' ? (
               <>
                 <span className="edit-hud__spinner" aria-hidden="true" />
-                <span>Sending…</span>
+                <span>Editing live…</span>
               </>
             ) : (
               <>
@@ -751,6 +997,77 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     </div>
   ) : null;
 
+  /** Anchored diff card for the edit Opal is currently making. */
+  let liveCard: ReactElement | null = null;
+  if (phase === 'working' && activeCard) {
+    const entry = activeCard.sectionId
+      ? outlines.find((o) => o.section.id === activeCard.sectionId)
+      : null;
+    const CARD_H = 168;
+    const style: CSSProperties = entry
+      ? (() => {
+          const p = placePopup(entry.box, docSize, CARD_H);
+          return { top: p.top, left: p.left, width: POPUP_WIDTH, position: 'absolute' };
+        })()
+      : { position: 'fixed', top: '42%', left: '50%', transform: 'translate(-50%, -50%)', width: POPUP_WIDTH };
+    liveCard = <LiveCard card={activeCard} style={style} />;
+  }
+
+  /** Fixed live status HUD (bottom): narration, applied edits, done/error. */
+  const liveHud = phase === 'working' ? (
+    <div className="live-hud" role="status" aria-live="polite">
+      <div className="live-hud__bar">
+        {liveDone ? (
+          <span className="live-hud__check" aria-hidden="true">✓</span>
+        ) : liveError ? (
+          <span className="live-hud__bang" aria-hidden="true">!</span>
+        ) : (
+          <span className="edit-hud__spinner" aria-hidden="true" />
+        )}
+        <span className="live-hud__status">{liveStatus}</span>
+        <button
+          type="button"
+          className="live-hud__close"
+          onClick={dismissLive}
+          aria-label="Close live edit"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      {liveSummary && !liveDone && !liveError && (
+        <div className="live-hud__summary">{liveSummary}</div>
+      )}
+      {applied.length > 0 && !liveDone && (
+        <ul className="live-hud__applied">
+          {applied.map((a) => (
+            <li key={a.id} className={a.status === 'skipped' ? 'is-skipped' : ''}>
+              <span className={'live-hud__tag live-hud__tag--' + (a.status === 'skipped' ? 'skipped' : a.kind)}>
+                {a.status === 'skipped' ? 'skipped' : a.kind.replace('item-', '')}
+              </span>
+              <b>{a.section}</b>
+              {a.target ? ` · ${a.target}` : ''}
+              {a.status === 'skipped' && a.reason ? <em className="live-hud__reason"> — {a.reason}</em> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {liveDone && (
+        <div className="live-hud__done">
+          {(liveDone.changes ?? []).map((c, i) => (
+            <div key={i} className="live-hud__change">✓ {c}</div>
+          ))}
+          {(liveDone.skipped ?? []).map((c, i) => (
+            <div key={'s' + i} className="live-hud__skip">⊘ {c}</div>
+          ))}
+          {willReload && <div className="live-hud__reload">Reloading to show your changes…</div>}
+        </div>
+      )}
+      {liveError && <div className="live-hud__errbox">{liveError}</div>}
+    </div>
+  ) : null;
+
   return createPortal(
     <>
       {docLayer}
@@ -758,8 +1075,80 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       {hudLayer}
       {emailModal}
       {thanksSplash}
+      {liveCard}
+      {liveHud}
     </>,
     document.body,
+  );
+}
+
+/** Fallback card for an edit that couldn't be located on the page. */
+function LiveCard({ card, style }: { card: ActiveCard; style: CSSProperties }) {
+  const isRemove = card.kind === 'item-remove';
+  const isAdd = card.kind === 'item-add' || card.kind === 'image';
+  const showOld = !isAdd && !!card.old;
+  const showNew = !isRemove && !!card.newText;
+  const badge =
+    card.kind === 'item-add' ? 'add'
+    : card.kind === 'item-remove' ? 'remove'
+    : card.kind === 'image' ? 'image'
+    : 'edit';
+
+  const [struck, setStruck] = useState(false);
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setStruck(true), showOld ? 450 : 0);
+    const t2 = setTimeout(() => setTyping(true), showOld ? 950 : 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [card.key, showOld]);
+
+  return (
+    <div className="live-card" style={style} role="status">
+      <div className="live-card__head">
+        <span className={'live-card__badge live-card__badge--' + badge}>{badge}</span>
+        <span className="live-card__target">{card.target ?? card.section}</span>
+      </div>
+      <div className="live-card__diff">
+        {showOld && (
+          <span className={'live-card__old' + (struck ? ' is-struck' : '')}>{card.old}</span>
+        )}
+        {showOld && showNew && <span className="live-card__arrow">→</span>}
+        {showNew && typing && (
+          <span className="live-card__new">
+            <Typewriter text={card.newText ?? ''} cps={55} caret />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Typewriter({ text, cps, caret }: { text: string; cps: number; caret?: boolean }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    setN(0);
+    if (!text) return;
+    const step = Math.max(12, 1000 / cps);
+    const id = setInterval(() => {
+      setN((p) => {
+        if (p >= text.length) {
+          clearInterval(id);
+          return p;
+        }
+        return p + 1;
+      });
+    }, step);
+    return () => clearInterval(id);
+  }, [text, cps]);
+  const done = n >= text.length;
+  return (
+    <>
+      {text.slice(0, n)}
+      {caret && !done && <span className="live-card__caret">&nbsp;</span>}
+    </>
   );
 }
 

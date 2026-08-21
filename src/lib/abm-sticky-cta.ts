@@ -118,7 +118,7 @@ export function initStickyCTA(customerName?: string): void {
 
     // Border glow ramps up with progress
     const borderAlpha = 0.08 + progress * 0.25;
-    bar!.style.borderTopColor = `rgba(60, 110, 255, ${borderAlpha.toFixed(2)})`;
+    bar!.style.borderTopColor = `rgba(171, 255, 68, ${borderAlpha.toFixed(2)})`;
   }
 
   // Listen on both window and the scroll element to catch all scroll sources

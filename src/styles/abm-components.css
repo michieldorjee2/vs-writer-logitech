@@ -62,3 +62,38 @@
 .btn--emphasized:hover {
   background: var(--optimizely-blue-80);
 }
+
+/* ===== Stakeholder engagement (from Salesforce) =====
+   A contact we are already talking to reads differently from a cold name:
+   the tier badge and the link through to their 1:1 page only appear when
+   there is something real behind them. */
+.intel__person-tier {
+  display: inline-block;
+  margin-top: 0.4rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: default;
+}
+.intel__person-tier[data-tier="key"] {
+  color: var(--optimizely-blue);
+  border: 1px solid color-mix(in srgb, var(--optimizely-blue) 45%, transparent);
+  background: color-mix(in srgb, var(--optimizely-blue) 12%, transparent);
+}
+.intel__person-tier[data-tier="engaged"] {
+  color: var(--light-blue);
+  border: 1px solid color-mix(in srgb, var(--light-blue) 45%, transparent);
+  background: color-mix(in srgb, var(--light-blue) 12%, transparent);
+}
+.intel__person-card[data-engagement="key"] { border-color: color-mix(in srgb, var(--optimizely-blue) 35%, transparent); }
+
+.intel__person-page-link {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--optimizely-blue);
+  text-decoration: none;
+}
+.intel__person-page-link:hover { text-decoration: underline; }

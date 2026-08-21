@@ -8,6 +8,7 @@
 import React from 'react';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { brandLogoUrl } from '../lib/brand-logo';
+import { readableAccentOnFir } from '../lib/brand-accent';
 
 interface Props {
   page: CompetitorComparisonPage;
@@ -36,14 +37,39 @@ function formatStatValue(val: string): string {
   return prefix + formatted + suffix;
 }
 
+// Live customer logos from optimizely.com's CMP DAM (Graph-backed homepage carousel).
 const fallbackLogos = [
-  { url: 'https://www.optimizely.com/contentassets/f58ea35175bd4e25bf399e36d284d6f9/logo_salesforce_white_100x300.svg', alt: 'Salesforce' },
-  { url: 'https://www.optimizely.com/contentassets/854ad08b9a5642f1bbda87fdfe6b81d4/nike-logo-icon_light.svg', alt: 'Nike' },
-  { url: 'https://www.optimizely.com/contentassets/638fd78be5cc45978c7d8b42bf0d31eb/zoom-logo-white.svg', alt: 'Zoom' },
-  { url: 'https://www.optimizely.com/contentassets/04dd25ba79f04298a76e1fb50742a117/shell-logo-light.svg', alt: 'Shell' },
-  { url: 'https://www.optimizely.com/contentassets/71dcdc4b907a414ba7057d2624c2883b/dolby-logo-white.svg', alt: 'Dolby' },
-  { url: 'https://www.optimizely.com/contentassets/c3fc7cbd589947cbb8579ce42d6bf8ec/logo_new-era_white_100x300.svg', alt: 'NEW ERA' },
+  { url: 'https://images1.cmp.optimizely.com/Zz1hYmM3ZWVlZTQ0NGExMWYxOGViZDUyNzY1OGQ1ZDg4OA==', alt: 'Salesforce' },
+  { url: 'https://images3.cmp.optimizely.com/Zz1iNGQ3OTg4YTQ0NWExMWYxYWY0YzhhNGEyZTdjMzU1YQ==', alt: 'Nike' },
+  { url: 'https://images1.cmp.optimizely.com/Zz0wMDRlM2U2MjQ0NTcxMWYxYWVjYTUyNzY1OGQ1ZDg4OA==', alt: 'Zoom' },
+  { url: 'https://images4.cmp.optimizely.com/Zz03ODJlY2YwODQ0NGExMWYxYWIzYTg2ZjEzODRhZmFlZg==', alt: 'Visa' },
+  { url: 'https://images3.cmp.optimizely.com/Zz1mY2I0MzVmYzQ0NTgxMWYxOTAxYThhNGEyZTdjMzU1YQ==', alt: 'Santander' },
+  { url: 'https://images3.cmp.optimizely.com/Zz01YTg1N2VkODVhM2YxMWYxODQ4MTcyMjMyNWM5YzQ3YQ==', alt: 'Cox Automotive' },
 ];
+
+// Default footer links → live optimizely.com pages (used when CMS footerLinks is empty).
+const defaultFooterLinks = [
+  { Text: 'Products', Url: { default: 'https://www.optimizely.com/products' } },
+  { Text: 'Experimentation', Url: { default: 'https://www.optimizely.com/products/experimentation' } },
+  { Text: 'Content Management', Url: { default: 'https://www.optimizely.com/products/content-management' } },
+  { Text: 'Connectors', Url: { default: 'https://www.optimizely.com/connectors' } },
+  { Text: 'Plans', Url: { default: 'https://www.optimizely.com/plans' } },
+  { Text: 'Customer stories', Url: { default: 'https://www.optimizely.com/field-notes/customer-stories' } },
+  { Text: 'Company', Url: { default: 'https://www.optimizely.com/company' } },
+  { Text: 'Get started', Url: { default: 'https://www.optimizely.com/get-started' } },
+];
+
+/* Generic role-title placeholders used when no real contact is found — hidden. */
+const GENERIC_CONTACT_NAMES = new Set([
+  'solutions architect', 'solution architect', 'migration engineer', 'customer success manager',
+]);
+function realContacts(
+  members?: Array<{ Name: string; Role: string; Email: string | null; Initials: string }>,
+) {
+  return (members || []).filter(
+    (m) => !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()),
+  );
+}
 
 const LinkedInIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -75,16 +101,15 @@ const ABMHyperPageServer = ({ page }: Props) => {
     ? page.headline.split(' ').slice(1).join(' ')
     : '';
 
-  const leftLogos = fallbackLogos.slice(0, 3);
-  const rightLogos = fallbackLogos.slice(3);
 
   const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
+  const teamContacts = realContacts(page.teamMembers);
 
   return (
     <main
       className="abm-page"
       id="main-content"
-      style={page.brandAccentColor ? { '--brand-accent': page.brandAccentColor } as React.CSSProperties : undefined}
+      style={page.brandAccentColor ? { '--brand-accent': readableAccentOnFir(page.brandAccentColor) } as React.CSSProperties : undefined}
     >
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
       {/* ======== HERO (no canvas) ======== */}
@@ -179,7 +204,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
                         <span className="intel__confetti-piece" style={{ '--c': '#ff6b6b' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#ffd93d' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#6bcb77' } as React.CSSProperties}>&#x25CF;</span>
-                        <span className="intel__confetti-piece" style={{ '--c': '#4d96ff' } as React.CSSProperties}>&#x25CF;</span>
+                        <span className="intel__confetti-piece" style={{ '--c': '#91dbda' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#ff6bcb' } as React.CSSProperties}>&#x25CF;</span>
                         <span className="intel__confetti-piece" style={{ '--c': '#ffa94d' } as React.CSSProperties}>&#x25CF;</span>
                       </span>
@@ -407,7 +432,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
           </div>
 
           <div className="proof__logos" id="proof-logos" data-animate="fade-up" data-delay="0.1">
-            {leftLogos.map((logo, i) => (
+            {fallbackLogos.slice(0, 3).map((logo, i) => (
               <div key={`left-${i}`} className="proof__logo-item" data-logo-side="left">
                 <img src={logo.url} alt={logo.alt} width="300" height="100" />
               </div>
@@ -415,7 +440,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
             <div className="proof__logo-you" id="proof-logo-you">
               <span>{page.logoWallCustomerSlot || 'You?'}</span>
             </div>
-            {rightLogos.map((logo, i) => (
+            {fallbackLogos.slice(3).map((logo, i) => (
               <div key={`right-${i}`} className="proof__logo-item" data-logo-side="right">
                 <img src={logo.url} alt={logo.alt} width="300" height="100" />
               </div>
@@ -568,7 +593,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
                   >
                     <div
                       className="timeline__marker"
-                      style={{ backgroundColor: { blue: '#0037ff', purple: '#861dff', cyan: '#0099bb', green: '#1aaa55' }[phase.MarkerColor || 'blue'] || '#0037ff' }}
+                      style={{ backgroundColor: { blue: '#abff44', purple: '#007b79', cyan: '#91dbda', green: '#3ab533' }[phase.MarkerColor || 'blue'] || '#abff44' }}
                     >
                       {i + 1}
                     </div>
@@ -581,11 +606,11 @@ const ABMHyperPageServer = ({ page }: Props) => {
               </div>
             )}
 
-            {page.teamMembers && page.teamMembers.length > 0 && (
+            {teamContacts.length > 0 && (
               <div className="migration-team" data-animate="fade-up" data-delay="4">
                 <h3 className="migration-team__title">Your dedicated Optimizely team</h3>
                 <div className="migration-team__grid">
-                  {page.teamMembers.map((member, i) => (
+                  {teamContacts.map((member, i) => (
                     <div key={i} className="migration-team__member">
                       <div
                         className={`migration-team__avatar${i === 1 ? ' migration-team__avatar--blue' : ''}${i === 2 ? ' migration-team__avatar--green' : ''}`}
@@ -676,7 +701,7 @@ const ABMHyperPageServer = ({ page }: Props) => {
                 </svg>
               </div>
               <h3 className="bento__title" id="modal-title">You&apos;re all set</h3>
-              <p className="bento__sub">We&apos;ve notified your team — expect a reply within 24 hours.</p>
+              <p className="bento__sub">We&apos;ve notified the Optimizely team you&apos;re interested.</p>
             </div>
 
             <a
@@ -699,14 +724,14 @@ const ABMHyperPageServer = ({ page }: Props) => {
               </span>
             </a>
 
-            {page.teamMembers?.map((member, i) => (
+            {teamContacts.map((member, i) => (
               <a
                 key={i}
                 href={member.Email ? `mailto:${member.Email}` : '#'}
                 className="bento bento--person"
               >
                 <div
-                  className={`bento__avatar${i === 1 ? ' bento__avatar--blue' : ''}${i === 2 ? ' bento__avatar--green' : ''}`}
+                  className={`bento__avatar${i === 1 ? ' bento__avatar--pink' : ''}${i === 2 ? ' bento__avatar--blue' : ''}`}
                 >
                   {member.Initials}
                 </div>
@@ -734,15 +759,13 @@ const ABMHyperPageServer = ({ page }: Props) => {
             <strong>Optimizely</strong>
             {page.footerTagline && <span>{page.footerTagline}</span>}
           </div>
-          {page.footerLinks && page.footerLinks.length > 0 && (
-            <nav aria-label="Footer" className="footer__links">
-              {page.footerLinks.map((link, i) => (
-                <a key={i} href={link.Url?.default || '#'}>
-                  {link.Text}
-                </a>
-              ))}
-            </nav>
-          )}
+          <nav aria-label="Footer" className="footer__links">
+            {(page.footerLinks?.length ? page.footerLinks : defaultFooterLinks).map((link, i) => (
+              <a key={i} href={link.Url?.default || '#'} target="_blank" rel="noopener noreferrer">
+                {link.Text}
+              </a>
+            ))}
+          </nav>
           {page.footerLegal && (
             <div className="footer__legal">
               <p>{page.footerLegal}</p>

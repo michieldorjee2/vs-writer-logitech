@@ -32,8 +32,8 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Brand accent color for logo glow (falls back to cyan)
-  const accentHex = brandAccentColor || '#00ccff';
+  // Brand accent color for logo glow (falls back to brand teal)
+  const accentHex = brandAccentColor || '#91dbda';
 
   // -- Fixed star-field canvas -- lives on <body>, stays in viewport while scrolling --
   starEl = document.createElement('canvas');
@@ -62,22 +62,18 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
   const ORBIT_ITEMS: OrbitItem[] = [
     {
       label: 'Optimizely',
-      color: '#194bff',
-      glowColor: 'rgba(25,75,255,0.5)',
+      color: '#abff44',
+      glowColor: 'rgba(171,255,68,0.5)',
       imageEl: null,
-      svgMarkup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 139" fill="white">
-        <path d="M48.4 76V92.7c12.7 0 24.9-4.9 33.9-13.6 9-8.7 14.1-20.6 14.1-32.9H79.2c0 7.9-3.3 15.5-9 21.1-5.8 5.5-13.6 8.7-21.8 8.7z"/>
-        <path d="M48.4 122c-8.1 0-15.9-3.1-21.6-8.7-5.7-5.6-9-13.1-9-21s3.2-15.4 9-21c5.7-5.6 13.5-8.7 21.6-8.7V46c-6.3 0-12.5 1.2-18.2 3.5-5.8 2.3-11 5.7-15.5 10s-8 8.9-10.4 14.5C1.9 80.1.7 86.1.6 92.2c0 6.1 1.2 12.1 3.6 17.7s6.5 10.6 10.9 14.9c4.4 4.3 9.7 7.7 15.5 10 5.8 2.3 12 3.5 18.2 3.5h.1V122h.5z"/>
-        <path d="M48.4 122v16.6c12.6 0 24.8-4.9 33.7-13.5 8.9-8.6 14-20.4 14-32.8H79c0 7.9-3.2 15.4-9 21-5.7 5.4-13.5 8.6-21.6 8.7z"/>
-        <path d="M48.4 29.6V46.2c12.6 0 24.8-4.9 33.7-13.5 8.9-8.7 14-20.4 14-32.7H79c0 7.9-3.2 15.4-9 21-5.7 5.4-13.5 8.6-21.6 8.6z"/>
-        <path d="M96.3 29.6V46.2c12.6 0 24.8-4.9 33.7-13.5 8.9-8.7 14-20.4 14-32.7h-17.1c0 7.9-3.2 15.4-9 21-5.7 5.4-13.4 8.6-21.6 8.6z"/>
-      </svg>`,
+      // New Optimizely brand mark (from favicon.svg). Two subpaths + evenodd
+      // fill carve the "O" counter (the hero fills the combined Path2D evenodd).
+      svgMarkup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 83 83" fill="white"><path d="M35.1253 80.5058C42.6728 80.5058 49.3571 77.7029 56.3297 70.7303L62.0794 64.9806C68.6209 58.3677 71.6398 49.5267 71.6398 39.1039C71.6398 19.5527 60.6422 6.83044 43.8226 6.83044C36.2759 6.83044 29.5907 9.34599 22.619 16.2463L16.8684 21.9969C10.3993 28.466 7.30884 37.3793 7.30884 47.8012C7.30884 67.4961 18.2342 80.5058 35.1253 80.5058Z"/><path d="M43.8228 9.63391C28.5841 9.63391 18.7371 21.0627 18.7371 39.1036C18.7371 57.4327 28.5841 69.0053 43.8228 69.0053C58.9892 69.0053 68.8363 57.4327 68.8363 39.1036C68.8363 21.0627 58.9892 9.63391 43.8228 9.63391ZM43.7509 55.5641C39.2224 55.5641 36.2034 49.2387 36.2034 39.1042C36.2034 29.2563 39.2224 23.0754 43.7509 23.0754C48.2079 23.0754 51.2983 29.2563 51.2983 39.1042C51.2983 49.2387 48.2079 55.5641 43.7509 55.5641Z"/></svg>`,
     },
     {
       // -- CUSTOMER LOGO -- replaced dynamically from CMS --
       label: 'Customer',
-      color: brandAccentColor || '#00ccff',
-      glowColor: brandAccentColor ? `${brandAccentColor}80` : 'rgba(0,204,255,0.5)',
+      color: brandAccentColor || '#91dbda',
+      glowColor: brandAccentColor ? `${brandAccentColor}80` : 'rgba(145,219,218,0.5)',
       imageEl: null,
       svgMarkup: null, // will be loaded below if customerLogoUrl is provided
     },
@@ -200,7 +196,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     };
   });
   let starBitmap: HTMLCanvasElement | null = null;
-  const starColors = ['#aaaacc', '#6687ff', accentHex];
+  const starColors = ['#c3ceaf', '#7ddd3d', accentHex];
 
   // Twinkle subset
   const TWINKLE_COUNT = 50;
@@ -299,8 +295,8 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     GLOW_SIZE / 2,
     GLOW_SIZE / 2
   );
-  gg.addColorStop(0, 'rgba(25,75,255,0.35)');
-  gg.addColorStop(0.5, 'rgba(25,50,180,0.1)');
+  gg.addColorStop(0, 'rgba(171,255,68,0.32)');
+  gg.addColorStop(0.5, 'rgba(125,221,61,0.10)');
   gg.addColorStop(1, 'rgba(0,0,0,0)');
   gc.fillStyle = gg;
   gc.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
@@ -486,7 +482,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
     color: string,
     alpha: number
   ): void {
-    const sc = color || '#194bff';
+    const sc = color || '#abff44';
     const cr = parseInt(sc.slice(1, 3), 16);
     const cg = parseInt(sc.slice(3, 5), 16);
     const cb = parseInt(sc.slice(5, 7), 16);
@@ -740,7 +736,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
       });
     }
     if (shootingStars.length > 0) {
-      sCtx!.strokeStyle = '#99afff';
+      sCtx!.strokeStyle = '#c8ff8f';
       sCtx!.lineWidth = 1.5;
       shootingStars = shootingStars.filter((s) => {
         sCtx!.globalAlpha = s.life * 0.5;
@@ -923,7 +919,7 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
 
         // 5. Dark backdrop fill inside the squircle
         ctx!.globalAlpha = fadeIn * 0.85;
-        ctx!.fillStyle = 'rgba(10, 14, 30, 0.88)';
+        ctx!.fillStyle = 'rgba(8, 37, 26, 0.88)';
         ctx!.beginPath();
         ctx!.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, br);
         ctx!.fill();

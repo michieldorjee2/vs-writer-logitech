@@ -19,11 +19,11 @@ const Quote = (props: QuoteProps) => {
 
     switch (theme) {
         case 'light-blue':
-            quoteMarksColor = '#00CCFF';
+            quoteMarksColor = '#91DBDA';
             borderColor = 'border-[var(--light-blue-60-shade)]';
             break;
         case 'purple':
-            quoteMarksColor = '#9E4AFF';
+            quoteMarksColor = '#FF99B6';
             borderColor = 'border-[var(--purple-80-shade)]';
             break;
         case 'green':
@@ -35,7 +35,7 @@ const Quote = (props: QuoteProps) => {
             borderColor = 'border-[var(--orange-60-shade)]';
             break;
         default:
-            quoteMarksColor = '#194BFF';
+            quoteMarksColor = '#ABFF44';
             borderColor = 'border-optimizely-blue-80-shade';
             break;
     }

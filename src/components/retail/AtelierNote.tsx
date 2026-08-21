@@ -6,7 +6,6 @@
 
 import SlatePlate from './SlatePlate';
 import type { AtelierNoteBlock, RetailRegister } from '../../lib/graph-types';
-import { demoToast } from '../../lib/retail-demo-toast';
 
 interface Props {
   block: AtelierNoteBlock;
@@ -45,7 +44,11 @@ export default function AtelierNote({ block, register }: Props) {
             <button
               type="button"
               className="retail-link retail-atelier__cta"
-              onClick={() => demoToast('Opal will collect the piece for service.', 'note')}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('aurelle:open-reservation', {
+                  detail: { slots: ['A service consultation, by appointment', 'Send the piece to the atelier'] },
+                }));
+              }}
               data-retail-reveal
               data-retail-delay="240"
             >

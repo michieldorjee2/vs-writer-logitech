@@ -18,20 +18,24 @@ const HeroGradient: React.FC<HeroGradientProps> = ({ id, children }) => {
                     </div>
                 </div>
             </div>
-            {/* Gradient background (CSS replaces THREE.js canvas) */}
+            {/* Brand background — deep fir base with rationed lime/teal glow.
+                The new brand avoids gradients on flat sections, but a hero
+                earns a single restrained light source. */}
             <div
                 className="absolute inset-0 z-[1]"
                 style={{
                     background: [
-                        'radial-gradient(ellipse at 30% 50%, rgba(134, 29, 255, 0.4) 0%, transparent 60%)',
-                        'radial-gradient(ellipse at 70% 30%, rgba(0, 55, 255, 0.5) 0%, transparent 50%)',
-                        'radial-gradient(ellipse at 50% 80%, rgba(27, 6, 51, 0.8) 0%, transparent 60%)',
-                        'linear-gradient(180deg, #10141d 0%, #0e1122 100%)'
+                        'radial-gradient(ellipse at 50% 8%, rgba(171, 255, 68, 0.16) 0%, transparent 55%)',
+                        'radial-gradient(ellipse at 78% 28%, rgba(145, 219, 218, 0.10) 0%, transparent 50%)',
+                        'radial-gradient(ellipse at 50% 92%, rgba(8, 37, 26, 0.9) 0%, transparent 60%)',
+                        'linear-gradient(180deg, #0d3a29 0%, #08251a 100%)'
                     ].join(', ')
                 }}
             />
-            {/* Bottom fade */}
-            <div className="absolute bottom-0 left-0 z-[2] h-32 w-full bg-gradient-to-t from-vulcan to-transparent" />
+            {/* Lime hairline grid motif (styled via ancestor .cmp-takeout scope) */}
+            <div className="gf-grid pointer-events-none absolute inset-0 z-[2]" />
+            {/* Bottom fade into the page background */}
+            <div className="absolute bottom-0 left-0 z-[2] h-32 w-full bg-gradient-to-t from-fir-dark to-transparent" />
         </div>
     );
 };

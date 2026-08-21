@@ -15,10 +15,10 @@ const GridOverlay = lazy(() => import('./GridOverlay/_grid-overlay'));
 
 const quoteThemes = ['blue', 'light-blue', 'purple', 'green', 'orange'] as const;
 const quoteMarkColors: Record<string, string> = {
-    blue: '#194BFF',
-    'light-blue': '#00CCFF',
-    purple: '#9E4AFF',
-    green: '#3be081',
+    blue: '#ABFF44',
+    'light-blue': '#91DBDA',
+    purple: '#FF99B6',
+    green: '#3AB533',
     orange: '#ff8110',
 };
 
@@ -110,14 +110,15 @@ const DynamicComparisonPage = ({ page }: Props) => {
 
     return (
         <Suspense fallback={null}>
+          <div className="cmp-takeout">
             {/* ========== SECTION 1: Hero ========== */}
             {page.headline && (
                 <HeroGradient id="hero">
-                    <img src="/optimizely-logo.svg" alt="Optimizely" className="mb-6 h-8" />
+                    <img src="/optimizely-logo.svg" alt="Optimizely" className="mb-8 h-9" />
                     {page.eyebrow && <p className="t-overline mb-4">{page.eyebrow}</p>}
                     <div className="rte mb-6"><h1>{page.headline}</h1></div>
                     {page.subheadline && (
-                        <p className="mb-8 text-xl text-gray-300">{page.subheadline}</p>
+                        <p className="mb-8 text-xl text-fir-n4">{page.subheadline}</p>
                     )}
                     {page.cta && page.link?.default && (
                         <Button href={page.link.default} buttonStyle="primary" icon="arrowRight">
@@ -132,7 +133,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
                 <div className="container">
                     <div className="row">
                         <div className="col-12">
-                            <p className="mb-6 text-center text-sm uppercase tracking-widest text-gray-400">
+                            <p className="mb-6 text-center text-sm uppercase tracking-[0.16em] font-roboto-mono text-lime/80">
                                 Trusted by leading brands
                             </p>
                             <LogoGrid nonLogos={false} logoMedia={fallbackLogos} />
@@ -151,10 +152,10 @@ const DynamicComparisonPage = ({ page }: Props) => {
                                 <div className="rte mb-8">{parse(richTextAsTag(features.Headline.html, 'h2'))}</div>
                                 <div className="grid gap-6 md:grid-cols-2">
                                     {features.Features.map((feat, i) => (
-                                        <div key={i} className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-6">
-                                            <h3 className="mb-2 text-xl font-medium text-white">{feat.Title}</h3>
+                                        <div key={i} className="gf-card gf-card--hover p-6">
+                                            <h3 className="mb-2 text-xl font-medium text-cream">{feat.Title}</h3>
                                             {feat.Description?.html && (
-                                                <div className="rte text-base text-gray-300">{parse(feat.Description.html)}</div>
+                                                <div className="rte text-base text-fir-n4">{parse(feat.Description.html)}</div>
                                             )}
                                         </div>
                                     ))}
@@ -172,7 +173,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
                         <div className="row">
                             <div className="col-12 lg:col-10 lg:offset-1">
                                 {page.comparisonHeadline && (
-                                    <h2 className="mb-3 text-center text-4xl font-medium text-white">
+                                    <h2 className="mb-8 text-center text-4xl font-display font-semibold text-cream">
                                         {page.comparisonHeadline}
                                     </h2>
                                 )}
@@ -195,7 +196,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
                     )}
                     <p className="t-subtitle mb-6">{page.analystQuote}</p>
                     {page.analystSource && (
-                        <p className="mb-6 text-sm text-gray-400">&mdash; {page.analystSource}</p>
+                        <p className="mb-6 text-sm font-roboto-mono text-fir-n6">&mdash; {page.analystSource}</p>
                     )}
                     {page.analystCTA && page.analystCTALink?.default && (
                         <Button href={page.analystCTALink.default} buttonStyle="secondary" icon="arrowRight">
@@ -231,11 +232,11 @@ const DynamicComparisonPage = ({ page }: Props) => {
                     <div className="container">
                         <div className="row">
                             <div className="col-12 lg:col-8 lg:offset-2">
-                                <div className="rounded-lg border border-vulcan-85 bg-vulcan-95 p-8 lg:p-12">
+                                <div className="gf-card relative overflow-hidden p-8 lg:p-12">
                                     {page.promoEyebrow && <p className="t-overline mb-4">{page.promoEyebrow}</p>}
-                                    <h2 className="mb-4 text-3xl font-medium text-white">{page.promoHeading}</h2>
+                                    <h2 className="mb-4 text-3xl font-display font-semibold text-cream">{page.promoHeading}</h2>
                                     {page.promoDescription && (
-                                        <p className="mb-6 text-lg text-gray-300">{page.promoDescription}</p>
+                                        <p className="mb-6 text-lg text-fir-n4">{page.promoDescription}</p>
                                     )}
                                     {page.promoCTA && page.promoCTALink?.default && (
                                         <Button href={page.promoCTALink.default} buttonStyle="emphasized" icon="arrowRight">
@@ -263,6 +264,7 @@ const DynamicComparisonPage = ({ page }: Props) => {
                     )}
                 </HighlightSection>
             )}
+          </div>
         </Suspense>
     );
 };

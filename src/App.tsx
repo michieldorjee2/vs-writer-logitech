@@ -15,6 +15,8 @@ import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 const DynamicComparisonPage = lazy(() => import('./components/DynamicComparisonPage'));
 const ABMHyperPage = lazy(() => import('./components/ABMHyperPage'));
 const RetailCustomerPage = lazy(() => import('./components/RetailCustomerPage'));
+const FinServPage = lazy(() => import('./components/FinServPage'));
+const PersonPage = lazy(() => import('./components/PersonPage'));
 const BlockPreview = lazy(() => import('./components/BlockPreview'));
 /*
  * Booth-only sales sidebar. Gated on `?search=1` in the URL — visitors
@@ -38,6 +40,14 @@ function isABMPage(page: CompetitorComparisonPage): boolean {
 
 function isRetailPage(page: any): boolean {
     return page?.template === 'retail' || !!page?.customerSlug;
+}
+
+function isFinServPage(page: any): boolean {
+    return page?.template === 'finserv' || page?.__template === 'finserv';
+}
+
+function isPersonPage(page: any): boolean {
+    return page?.template === 'person' || page?.__template === 'person';
 }
 
 /** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
@@ -116,12 +126,16 @@ function PageLoader() {
 
     return (
         <Suspense fallback={<RouteSpinner />}>
-            {isRetailPage(data)
-                ? <RetailCustomerPage page={data as any} />
-                : isABMPage(data)
-                    ? <ABMHyperPage page={data} />
-                    : <DynamicComparisonPage page={data} />}
-            {fromSearch && !isRetailPage(data) && (
+            {isPersonPage(data)
+                ? <PersonPage page={data as any} />
+                : isRetailPage(data)
+                    ? <RetailCustomerPage page={data as any} />
+                    : isFinServPage(data)
+                        ? <FinServPage page={data as any} />
+                        : isABMPage(data)
+                            ? <ABMHyperPage page={data} />
+                            : <DynamicComparisonPage page={data} />}
+            {fromSearch && !isRetailPage(data) && !isFinServPage(data) && !isPersonPage(data) && (
                 <FloatingSidebar
                     page={data}
                     variant={isABMPage(data) ? 'abm' : 'dynamic'}

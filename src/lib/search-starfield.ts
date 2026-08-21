@@ -50,7 +50,7 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
   const ctx = (canvas.getContext('2d', HDR_CANVAS_OPTS) ||
     canvas.getContext('2d')) as CanvasRenderingContext2D;
 
-  let palette: RGB[] = initialPalette.length ? initialPalette : [[0, 55, 255]];
+  let palette: RGB[] = initialPalette.length ? initialPalette : [[171, 255, 68]];
   let w = 0;
   let h = 0;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -198,9 +198,11 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
       const rgb: RGB =
         s.tint === 'accent'
           ? palette[s.accentIdx % palette.length]
+          // "warm" stars retinted to brand teal so the field stays in-palette
+          // (lime accents + teal motes drifting on deep fir).
           : s.tint === 'warm'
-            ? [255, 220, 180]
-            : [255, 255, 255];
+            ? [145, 219, 218]
+            : [233, 245, 226];
 
       // Continuous trail: a uniform-alpha segment from the previous
       // projected position to the current one. "Uniform" is the key —
@@ -260,7 +262,7 @@ export function startSearchStarfield(canvas: HTMLCanvasElement, initialPalette: 
   raf = requestAnimationFrame(tick);
 
   return {
-    setPalette: (rgbs) => { palette = rgbs.length ? rgbs : [[0, 55, 255]]; },
+    setPalette: (rgbs) => { palette = rgbs.length ? rgbs : [[171, 255, 68]]; },
     setBoost: (target) => { boostTarget = Math.max(0, Math.min(1, target)); },
     destroy: () => {
       cancelAnimationFrame(raf);

@@ -126,11 +126,25 @@ query GetRetailPage($slug: String!) {
       template
       PageTitle MetaDescription CanonicalUrl { default }
       customerSlug customerDisplayName register monthStamp
+      primaryCity neighborhood stylistName stylistBoutique
+      initials personalHeroLine1 personalHeroLine2
+      editorialIntro stylistNoteBody stylistNoteSignedBy closingReflection
       hero {
         imageUrl { default }
         imageDirection
         line1
         line2
+      }
+      letter {
+        dateLine
+        greeting
+        paragraphs
+        signoff
+      }
+      polaroids {
+        imageUrl { default }
+        caption
+        rotate
       }
       heldForYou {
         header
@@ -162,6 +176,20 @@ query GetRetailPage($slug: String!) {
         variant boutique stylistName slotPhrase slots
         primaryAction secondaryAction dynamic
       }
+      wornLabel
+      wornAnchors {
+        name qualifier season ownedImageUrl { default }
+        pairedName pairedQualifier pairedImageUrl { default } pairedPriceLabel
+      }
+      questions {
+        question answer
+      }
+      careLabel
+      careTimeline {
+        itemName kind dueLine status note maker
+        imageUrl { default }
+      }
+      makerNote
       footerLine
       deviceDegraded generatedAt generatedBy canvasVersion
     }
