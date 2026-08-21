@@ -1,0 +1,356 @@
+/* ===========================================================================
+   Maison Aurelle — Worn-this-year / "In your rotation" — editorial bands
+   =========================================================================== */
+
+.retail-rotation {
+  position: relative;
+  padding: clamp(5rem, 9vw, 9rem) var(--rail) clamp(6rem, 10vw, 10rem);
+  background: var(--ground);
+  z-index: 1;
+}
+
+/* ---- Section head -------------------------------------------------------- */
+
+.retail-rotation__head {
+  max-width: var(--column-reading);
+  margin: 0 auto clamp(3rem, 5vw, 5rem);
+  text-align: center;
+  display: grid;
+  gap: 1rem;
+}
+
+.retail-rotation__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.retail-rotation__heading {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--type-xl);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--type-primary);
+}
+
+.retail-rotation__lede {
+  font-family: var(--font-serif);
+  font-size: var(--type-base);
+  line-height: 1.55;
+  color: var(--type-secondary);
+  margin: 0;
+}
+
+/* ---- Bands --------------------------------------------------------------- */
+
+.retail-rotation__bands {
+  display: grid;
+  gap: clamp(4rem, 8vw, 7rem);
+  max-width: min(84rem, 96vw);
+  margin: 0 auto;
+}
+
+.retail-rotation__band {
+  position: relative;
+  display: grid;
+  /* Owned image on left (60), copy + paired on right (40). On --flip bands
+     the owned image is on the right. */
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(2.25rem, 4vw, 4rem);
+  align-items: start;
+}
+
+.retail-rotation__band--flip {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.retail-rotation__band--flip .retail-rotation__owned {
+  order: 2;
+}
+
+.retail-rotation__band--flip .retail-rotation__copy {
+  order: 1;
+}
+
+/* ---- Numeral / index label ----------------------------------------------- */
+
+.retail-rotation__numeral {
+  position: absolute;
+  top: -0.85rem;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  pointer-events: none;
+}
+
+.retail-rotation__band--flip .retail-rotation__numeral {
+  left: auto;
+  right: 0;
+  flex-direction: row-reverse;
+}
+
+.retail-rotation__no {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.85rem;
+  letter-spacing: 0;
+  color: var(--gold);
+}
+
+.retail-rotation__divider {
+  width: 3rem;
+  height: 1px;
+  background: var(--gold);
+  opacity: 0.6;
+}
+
+/* ---- Owned (anchor) ------------------------------------------------------ */
+
+.retail-rotation__owned {
+  position: relative;
+}
+
+.retail-rotation__owned-figure {
+  margin: 0;
+  position: relative;
+}
+
+.retail-rotation__owned-photo {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--paper);
+  /* Editorial duotone — gentle sepia to read as memory rather than today */
+  filter: grayscale(0.18) sepia(0.12) contrast(1.04);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.05),
+    0 30px 60px -28px rgba(60, 40, 20, 0.32),
+    0 60px 90px -50px rgba(60, 40, 20, 0.18);
+}
+
+.retail-rotation__owned-cap {
+  position: absolute;
+  bottom: clamp(1rem, 2.5vw, 2rem);
+  left: clamp(1rem, 3vw, 2.4rem);
+  background: var(--paper);
+  padding: 0.75rem 1rem 0.85rem;
+  border: 1px solid var(--rule);
+  display: grid;
+  gap: 0.25rem;
+  max-width: 18rem;
+  box-shadow: 0 8px 20px -8px rgba(0,0,0,0.18);
+}
+
+/* Brass pin on the owned caption */
+.retail-rotation__owned-pin {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(135deg, #d8c486 0%, #8c7a4d 100%);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.22);
+}
+
+.retail-rotation__owned-tag {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--type-quiet);
+}
+
+.retail-rotation__owned-since {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--type-primary);
+}
+
+/* ---- Copy column --------------------------------------------------------- */
+
+.retail-rotation__copy {
+  padding-top: clamp(1.5rem, 3vw, 2.5rem);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.retail-rotation__copy-eyebrow,
+.retail-rotation__pair-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--type-quiet);
+}
+
+.retail-rotation__pair-eyebrow {
+  color: var(--gold);
+  margin-top: 0.25rem;
+}
+
+.retail-rotation__copy-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(2rem, 1.5rem + 1.2vw, 2.85rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  color: var(--type-primary);
+  margin: 0;
+}
+
+.retail-rotation__copy-qualifier {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  color: var(--type-secondary);
+}
+
+.retail-rotation__copy-body {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  line-height: 1.65;
+  color: var(--type-primary);
+  margin: 0.85rem 0 0;
+  max-width: 32rem;
+}
+
+/* Gold rule with embedded monogram */
+.retail-rotation__rule {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 1.5rem 0 0.55rem;
+}
+
+.retail-rotation__rule-line {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
+  opacity: 0.62;
+}
+
+.retail-rotation__rule-stamp {
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+  opacity: 0.85;
+}
+
+/* ---- Paired ------------------------------------------------------------- */
+
+.retail-rotation__paired {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  margin-top: 0.55rem;
+  padding: 1.25rem 1.25rem 1.4rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+
+.retail-rotation__paired-figure { margin: 0; }
+
+.retail-rotation__paired-photo {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--ground);
+  transition: transform 450ms var(--ease-pose);
+}
+
+.retail-rotation__paired:hover .retail-rotation__paired-photo {
+  transform: scale(1.03);
+}
+
+.retail-rotation__paired-meta {
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+}
+
+.retail-rotation__paired-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.45rem, 1.2rem + 0.5vw, 1.85rem);
+  line-height: 1.15;
+  margin: 0;
+  color: var(--type-primary);
+}
+
+.retail-rotation__paired-qualifier {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--type-secondary);
+}
+
+.retail-rotation__paired-price {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--type-quiet);
+  margin-top: 0.25rem;
+}
+
+.retail-rotation__paired-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.retail-rotation__btn {
+  appearance: none;
+  background: var(--type-primary);
+  color: var(--ground);
+  border: 1px solid var(--type-primary);
+  padding: 0.85rem 1.2rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 200ms, border-color 200ms;
+}
+.retail-rotation__btn:hover { background: #000; border-color: #000; }
+
+.retail-rotation__btn--quiet {
+  background: transparent;
+  color: var(--type-primary);
+  border-color: var(--rule-bright);
+}
+.retail-rotation__btn--quiet:hover {
+  background: var(--ground);
+  border-color: var(--type-primary);
+}
+
+/* ---- Responsive ---------------------------------------------------------- */
+
+@media (max-width: 880px) {
+  .retail-rotation__band,
+  .retail-rotation__band--flip {
+    grid-template-columns: 1fr;
+  }
+  .retail-rotation__band--flip .retail-rotation__owned,
+  .retail-rotation__band--flip .retail-rotation__copy {
+    order: initial;
+  }
+  .retail-rotation__owned-photo { aspect-ratio: 4 / 3.2; }
+  .retail-rotation__paired {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,53 +1,56 @@
 :root {
   /* ===== Colors — Optimizely Dark Theme ===== */
   /* Primary */
-  --optimizely-blue: #0037ff;
-  --optimizely-blue-80: #194bff;
-  --optimizely-blue-60: #6687ff;
-  --optimizely-blue-40: #99afff;
-  --optimizely-blue-20: #ccd7ff;
+  /* Greenfield brand: "optimizely-blue" ramp repointed to lime (kept name to
+     avoid touching 35+ var() refs in abm-layout.css). */
+  --optimizely-blue: #abff44;
+  --optimizely-blue-80: #7ddd3d;
+  --optimizely-blue-60: #c8ff8f;
+  --optimizely-blue-40: #d8e4cb;
+  --optimizely-blue-20: #e4f0da;
 
-  /* Dark backgrounds */
-  --vulcan: #10141d;
-  --vulcan-95: #191e28;
-  --vulcan-90: #232834;
-  --vulcan-85: #2c313f;
-  --ebony: #0e1122;
-  --dark-blue: #080736;
-  --dark-blue-90: #212149;
+  /* Dark backgrounds → fir (Greenfield brand) */
+  --vulcan: #08251a;
+  --vulcan-95: #0d3a29;
+  --vulcan-90: #114a35;
+  --vulcan-85: #197050;
+  --ebony: #061d14;
+  --dark-blue: #061d14;
+  --dark-blue-90: #0d3a29;
 
-  /* Text */
-  --bright-gray: #e9ebf1;
-  --mischka: #ced2dc;
-  --santas-gray: #969cac;
-  --pale-sky: #656c81;
-  --independence: #484f61;
-  --ghost-white: #f8f8fc;
+  /* Text → brand green-neutrals */
+  --bright-gray: #eff6e9;
+  --mischka: #d8e4cb;
+  --santas-gray: #a1ac8d;
+  --pale-sky: #717863;
+  --independence: #4a5247;
+  --ghost-white: #f8faf5;
 
   /* Secondary accent colors */
   --green: #3be081;
-  --light-blue: #00ccff;
+  --light-blue: #91dbda;
   --orange: #ff8110;
-  --purple: #861dff;
+  --purple: #007b79;
   --yellow: #ffce00;
   --red: #f13030;
 
-  /* Mapped tokens */
-  --bg-primary: var(--vulcan);
-  --bg-secondary: var(--vulcan-95);
-  --bg-tertiary: var(--vulcan-90);
-  --bg-card: var(--vulcan-95);
-  --bg-card-hover: var(--vulcan-90);
+  /* Mapped tokens — explicit fir hexes so they don't depend on --vulcan-*
+     (index.css re-declares --vulcan-* at :root, which otherwise wins). */
+  --bg-primary: #08251a;
+  --bg-secondary: #0d3a29;
+  --bg-tertiary: #114a35;
+  --bg-card: #0d3a29;
+  --bg-card-hover: #114a35;
 
   --text-primary: var(--bright-gray);
   --text-secondary: var(--santas-gray);
-  --text-tertiary: var(--pale-sky);
+  --text-tertiary: #a1ac8d;
 
   --accent-primary: var(--optimizely-blue);
   --accent-secondary: var(--optimizely-blue-60);
   --accent-tertiary: var(--optimizely-blue-40);
-  --accent-glow: rgba(0, 55, 255, 0.25);
-  --accent-glow-strong: rgba(0, 55, 255, 0.5);
+  --accent-glow: rgba(171, 255, 68, 0.25);
+  --accent-glow-strong: rgba(171, 255, 68, 0.5);
 
   --color-blue: var(--light-blue);
   --color-green: var(--green);
@@ -59,7 +62,7 @@
 
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-medium: rgba(255, 255, 255, 0.10);
-  --border-accent: rgba(0, 55, 255, 0.3);
+  --border-accent: rgba(171, 255, 68, 0.3);
 
   --gradient-hero: linear-gradient(180deg, var(--vulcan) 55%, var(--vulcan-95) 100%);
   --gradient-accent: linear-gradient(135deg, var(--optimizely-blue), var(--optimizely-blue-40));

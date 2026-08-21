@@ -13,6 +13,19 @@
 @import './styles/retail-letter.css';
 @import './styles/retail-animations.css';
 @import './styles/retail-cursor.css';
+@import './styles/retail-cart.css';
+@import './styles/retail-rotation.css';
+@import './styles/retail-care.css';
+
+/* Financial Services (Meridian Bank) template — trustworthy banking register.
+   Scoped via .finserv-page so other templates' themes are unaffected. */
+@import './styles/finserv-variables.css';
+@import './styles/finserv-layout.css';
+@import './styles/person-page.css';
+
+/* Greenfield — Optimizely 2026 brand for the competitive-takeout family.
+   Scoped via .cmp-takeout. Brand fonts (VC Nudge / Die Grotesk B) self-hosted. */
+@import './styles/greenfield.css';
 
 @tailwind base;
 @tailwind components;
@@ -21,34 +34,35 @@
 :root, html {
     --announcement-height: 0px;
     --header-height: 77px;
-    --vulcan: #10141d;
-    --vulcan-95: #191e28;
-    --vulcan-90: #232834;
-    --vulcan-85: #2c313f;
-    --green: #3be081;
+    /* Greenfield brand — fir/lime */
+    --vulcan: #08251a;
+    --vulcan-95: #0d3a29;
+    --vulcan-90: #114a35;
+    --vulcan-85: #197050;
+    --green: #3ab533;
     --orange: #ff8110;
-    --gray-300: #ced2dc;
-    --theme-color: #0037ff;
-    --theme-color-dark: #002ccc;
-    --theme-color-contrast: #fff;
-    --theme-button-hover: #194bff;
+    --gray-300: #d8e4cb;
+    --theme-color: #abff44;
+    --theme-color-dark: #7ddd3d;
+    --theme-color-contrast: #08251a;
+    --theme-button-hover: #7ddd3d;
 
     /* Dark theme type colors */
-    --color-primary: #194bff;
+    --color-primary: #abff44;
     --color-heading-large: #fff;
-    --color-heading: #e9ebf1;
-    --color-overline: #ccd7ff;
+    --color-heading: #eff6e9;
+    --color-overline: #abff44;
     --color-subtitle: #fff;
-    --color-text-body: #e9ebf1;
+    --color-text-body: #d8e4cb;
     --color-link-body: #fff;
-    --color-link-body-hover: #ced2dc;
+    --color-link-body-hover: #d8e4cb;
 
-    /* Quote theme border colors */
-    --blue-60-shade: #002199;
-    --light-blue-60-shade: #007a99;
-    --purple-60-shade: #510f99;
-    --purple-80-shade: #6b17cc;
-    --green-60-shade: #238a4d;
+    /* Quote theme border colors → brand */
+    --blue-60-shade: #197050;
+    --light-blue-60-shade: #007b79;
+    --purple-60-shade: #8f4764;
+    --purple-80-shade: #8f4764;
+    --green-60-shade: #2f8f2a;
     --orange-60-shade: #994d0a;
 }
 
@@ -60,8 +74,8 @@
     }
 
     body {
-        background-color: #10141d;
-        color: #e9ebf1;
+        background-color: #08251a;
+        color: #eff6e9;
         margin: 0;
         font-family: 'Figtree', Arial, sans-serif;
     }
@@ -189,10 +203,11 @@
     text-decoration: underline;
 }
 
-/* Theme color classes */
-.theme--blue { --theme-color: #194bff; --theme-color-dark: #002ccc; --theme-button-hover: #5176fe; }
-.theme--purple { --theme-color: #861dff; --theme-color-dark: #6b17cc; --theme-button-hover: #a254fe; }
-.theme--green { --theme-color: #3be081; --theme-color-dark: #2fb367; --theme-button-hover: #37cb77; }
+/* Theme color classes → brand accents (lime / light-blue / pink / green / amber) */
+.theme--blue { --theme-color: #abff44; --theme-color-dark: #7ddd3d; --theme-button-hover: #7ddd3d; }
+.theme--light-blue { --theme-color: #91dbda; --theme-color-dark: #007b79; --theme-button-hover: #91dbda; }
+.theme--purple { --theme-color: #ff99b6; --theme-color-dark: #8f4764; --theme-button-hover: #ffb3c8; }
+.theme--green { --theme-color: #3ab533; --theme-color-dark: #2f8f2a; --theme-button-hover: #46c93e; }
 .theme--orange { --theme-color: #ff8110; --theme-color-dark: #cc670d; --theme-button-hover: #e67611; }
 
 /* No-op marker class used by components */

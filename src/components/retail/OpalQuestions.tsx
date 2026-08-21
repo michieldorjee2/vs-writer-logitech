@@ -13,18 +13,14 @@
 
 import { useState } from 'react';
 import OpalStamp from './OpalStamp';
-
-export interface QA {
-  q: string;
-  a: string;
-}
+import type { OpalQuestion } from '../../lib/graph-types';
 
 interface Props {
   /** Heading line above the chip cloud, e.g. "Ask Opal". */
   heading?: string;
   /** Subhead positioning the section. */
   deck?: string;
-  questions: QA[];
+  questions: OpalQuestion[];
 }
 
 export default function OpalQuestions({
@@ -56,7 +52,7 @@ export default function OpalQuestions({
                 aria-expanded={activeIndex === i}
                 aria-controls={`opal-answer-${i}`}
               >
-                <span className="retail-questions__chip-q">{qa.q}</span>
+                <span className="retail-questions__chip-q">{qa.question}</span>
                 <span className="retail-questions__chip-arrow" aria-hidden="true">
                   {activeIndex === i ? '−' : '+'}
                 </span>
@@ -73,8 +69,8 @@ export default function OpalQuestions({
         >
           {activeIndex !== null && (
             <>
-              <p className="retail-questions__panel-q">{questions[activeIndex].q}</p>
-              <p className="retail-questions__panel-a">{questions[activeIndex].a}</p>
+              <p className="retail-questions__panel-q">{questions[activeIndex].question}</p>
+              <p className="retail-questions__panel-a">{questions[activeIndex].answer}</p>
               <span className="retail-questions__panel-signed">— Opal</span>
             </>
           )}

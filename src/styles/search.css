@@ -4,24 +4,26 @@
    ============================================================ */
 
 .search-page {
-  --sp-fg-1: #e9ebf1;
-  --sp-fg-2: #969cac;
-  --sp-fg-3: #656c81;
-  --sp-fg-4: #484f61;
-  --sp-border-subtle: rgba(255, 255, 255, 0.06);
-  --sp-border-medium: rgba(255, 255, 255, 0.10);
-  --sp-border-strong: rgba(255, 255, 255, 0.18);
-  --sp-border-accent: color-mix(in srgb, var(--sp-accent) 35%, transparent);
-  --sp-accent: #0037ff;
-  --sp-accent-hover: #194bff;
-  --sp-accent-soft: #99afff;
-  --sp-glow: color-mix(in srgb, var(--sp-accent) 38%, transparent);
-  --sp-glow-strong: color-mix(in srgb, var(--sp-accent) 60%, transparent);
-  --sp-bg: #10141d;
-  --sp-bg-elevated: #191e28;
+  /* Greenfield (2026) brand — lime on deep fir. See styles/greenfield.css. */
+  --sp-fg-1: #eff6e9;   /* cream — primary text          */
+  --sp-fg-2: #c3ceaf;   /* muted green-neutral           */
+  --sp-fg-3: #a1ac8d;   /* meta                          */
+  --sp-fg-4: #717863;   /* faint / ghost                 */
+  --sp-border-subtle: rgba(171, 255, 68, 0.08);
+  --sp-border-medium: rgba(171, 255, 68, 0.14);
+  --sp-border-strong: rgba(171, 255, 68, 0.26);
+  --sp-border-accent: color-mix(in srgb, var(--sp-accent) 45%, transparent);
+  --sp-accent: #abff44;        /* lime */
+  --sp-accent-hover: #7ddd3d;  /* grass */
+  --sp-accent-soft: #c8ff8f;   /* light lime for text highlights */
+  --sp-glow: color-mix(in srgb, var(--sp-accent) 30%, transparent);
+  --sp-glow-strong: color-mix(in srgb, var(--sp-accent) 52%, transparent);
+  --sp-bg: #08251a;            /* fir-dark */
+  --sp-bg-elevated: #0d3a29;   /* fir */
   --sp-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --sp-font-display: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --sp-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sp-font-display: 'VC Nudge', 'Die Grotesk B', ui-sans-serif, system-ui, sans-serif;
+  --sp-font-body: 'Die Grotesk B', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --sp-font-mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   position: fixed;
   inset: 0;
@@ -30,17 +32,17 @@
   overflow: hidden;
   background-color: var(--sp-bg);
   color: var(--sp-fg-1);
-  font-family: var(--sp-font-display);
+  font-family: var(--sp-font-body);
 }
 
-/* Widen gamut on P3 displays — picks up a real red/blue punch on iPad */
+/* Widen gamut on P3 displays — the lime gets a real electric punch on iPad */
 @media (color-gamut: p3) {
   .search-page {
-    --sp-accent: color(display-p3 0 0.18 1);
-    --sp-accent-hover: color(display-p3 0.08 0.3 1);
-    --sp-accent-soft: color(display-p3 0.55 0.68 1);
-    --sp-glow: color(display-p3 0 0.18 1 / 0.42);
-    --sp-glow-strong: color(display-p3 0 0.18 1 / 0.7);
+    --sp-accent: color(display-p3 0.67 1 0.27);
+    --sp-accent-hover: color(display-p3 0.49 0.87 0.24);
+    --sp-accent-soft: color(display-p3 0.78 1 0.56);
+    --sp-glow: color(display-p3 0.67 1 0.27 / 0.36);
+    --sp-glow-strong: color(display-p3 0.67 1 0.27 / 0.62);
   }
 }
 
@@ -107,19 +109,19 @@
   animation: sp-rise 0.8s var(--sp-ease-out) 0.08s forwards;
 }
 .search-page__brand img {
-  height: 36px;
+  height: 38px;
   width: auto;
-  filter: brightness(0) invert(1);
-  opacity: 0.95;
+  /* New brand logo is lime mark + cream wordmark — show it as-is (no invert). */
+  opacity: 1;
   pointer-events: none;
 }
 
 .search-page__headline {
   font-family: var(--sp-font-display);
-  font-weight: 700;
+  font-weight: 800;
   font-size: clamp(2.5rem, 2vw + 1.8rem, 4.2rem);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
   text-align: center;
   margin: 0 0 44px;
   color: var(--sp-fg-1);
@@ -129,10 +131,11 @@
 }
 .search-page__headline em {
   font-style: normal;
-  background: linear-gradient(135deg, var(--sp-accent) 0%, var(--sp-accent-soft) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  /* Brand emphasized-text: lime fill + dark-fir stroke (paint-order stroke fill) */
+  -webkit-text-stroke: 1px var(--sp-bg);
+  -webkit-text-fill-color: var(--sp-accent);
+  color: var(--sp-accent);
+  paint-order: stroke fill;
 }
 
 @keyframes sp-rise {
@@ -157,18 +160,21 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 14px 20px 14px 26px;
-  height: 82px;
-  background: rgba(25, 30, 40, 0.72);
+  padding: 12px 16px 12px 24px;
+  height: 72px;
+  background: rgba(13, 58, 41, 0.55);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--sp-border-medium);
-  border-radius: 999px;
-  transition: border-color 0.3s var(--sp-ease-out), background 0.3s var(--sp-ease-out);
+  /* Headless FormFieldContainer textbox: 2px neutral border, --radius-form-field,
+     ltblue focus outline */
+  border: 2px solid color-mix(in srgb, var(--color-tertiary-2) 22%, transparent);
+  border-radius: var(--radius-form-field);
+  transition: border-color 0.2s var(--sp-ease-out), background 0.2s var(--sp-ease-out), box-shadow 0.2s var(--sp-ease-out);
 }
 .search-page__searchwrap--focused .search-page__search {
-  border-color: var(--sp-border-accent);
-  background: rgba(25, 30, 40, 0.85);
+  border-color: color-mix(in srgb, var(--color-tertiary-2) 40%, transparent);
+  background: rgba(13, 58, 41, 0.72);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-secondary-ltblue) 45%, transparent);
 }
 
 .search-page__icon {
@@ -194,7 +200,7 @@
   inset: 0;
   display: flex;
   align-items: center;
-  font-family: var(--sp-font-display);
+  font-family: var(--sp-font-body);
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -219,7 +225,7 @@
   border: 0;
   outline: 0;
   color: var(--sp-fg-1);
-  font-family: var(--sp-font-display);
+  font-family: var(--sp-font-body);
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -233,22 +239,27 @@
   gap: 10px;
   height: 54px;
   padding: 0 22px 0 24px;
-  border-radius: 999px;
-  border: 0;
+  /* Canonical brand button: rounded, hard-offset "lift" shadow (not a glow) */
+  border-radius: 14px;
+  border: 2px solid var(--sp-accent);
   cursor: pointer;
   background: var(--sp-accent);
-  color: #fff;
-  font-family: var(--sp-font-display);
-  font-weight: 600;
+  color: #08251a;
+  font-family: var(--sp-font-body);
+  font-weight: 700;
   font-size: 14px;
   letter-spacing: -0.005em;
-  transition: background 0.25s var(--sp-ease-out), transform 0.25s var(--sp-ease-out), box-shadow 0.25s var(--sp-ease-out);
-  box-shadow: 0 0 0 var(--sp-glow);
+  transition: background 0.16s var(--sp-ease-out), transform 0.16s var(--sp-ease-out), box-shadow 0.16s var(--sp-ease-out);
+  box-shadow: -2px 2px 0 0 #3ab533;
 }
 .search-page__action:hover:not(:disabled) {
   background: var(--sp-accent-hover);
-  box-shadow: 0 0 28px var(--sp-glow);
-  transform: translateY(-1px);
+  transform: translate(2px, -2px);
+  box-shadow: -4px 4px 0 0 #3ab533;
+}
+.search-page__action:active:not(:disabled) {
+  transform: translate(0, 0);
+  box-shadow: -1px 1px 0 0 #3ab533;
 }
 .search-page__action:disabled {
   opacity: 0.4;
@@ -267,7 +278,7 @@
   top: calc(100% + 10px);
   left: 0;
   right: 0;
-  background: rgba(22, 26, 35, 0.92);
+  background: rgba(8, 37, 26, 0.92);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
   border: 1px solid var(--sp-border-medium);
@@ -414,25 +425,29 @@
   gap: 6px;
   padding: 6px 2px;
 }
+/* Recent companies → headless Badge, "Outline (neutral)" on dark */
 .search-page__pill {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 14px 7px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--sp-border-subtle);
-  font-size: 13px;
-  color: var(--sp-fg-2);
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px 0 8px;
+  border-radius: var(--radius-icon-sm);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-tertiary-2) 45%, transparent);
+  font-family: var(--sp-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.42px;
+  text-transform: uppercase;
+  color: var(--color-tertiary-2);
   cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s var(--sp-ease-out);
+  transition: background 0.18s var(--sp-ease-out), border-color 0.18s var(--sp-ease-out);
 }
 .search-page__pill:hover {
-  background: color-mix(in srgb, var(--sp-accent) 12%, transparent);
-  border-color: var(--sp-border-accent);
-  color: var(--sp-fg-1);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--color-tertiary-2) 8%, transparent);
+  border-color: var(--color-tertiary-2);
+  color: var(--color-tertiary-2);
 }
 .search-page__pill-logo {
   width: 20px;
@@ -477,26 +492,25 @@
   align-items: center;
   gap: 10px;
   padding: 11px 18px 11px 16px;
-  border-radius: 999px;
+  border-radius: 14px;
   background: var(--sp-accent);
-  border: 1px solid var(--sp-accent);
-  color: #ffffff;
-  font-family: var(--sp-font-display);
+  border: 2px solid var(--sp-accent);
+  color: #08251a;
+  font-family: var(--sp-font-body);
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.005em;
   cursor: pointer;
-  box-shadow: 0 6px 22px var(--sp-glow);
-  transition: background 0.2s var(--sp-ease-out),
-              border-color 0.2s var(--sp-ease-out),
-              transform 0.2s var(--sp-ease-out),
-              box-shadow 0.2s var(--sp-ease-out);
+  box-shadow: -2px 2px 0 0 #3ab533;
+  transition: background 0.16s var(--sp-ease-out),
+              transform 0.16s var(--sp-ease-out),
+              box-shadow 0.16s var(--sp-ease-out);
 }
 
 .search-page__empty-cta:hover:not(:disabled) {
   background: var(--sp-accent-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 10px 28px var(--sp-glow-strong);
+  transform: translate(2px, -2px);
+  box-shadow: -4px 4px 0 0 #3ab533;
 }
 
 .search-page__empty-cta b {
@@ -668,7 +682,7 @@
   position: relative;
   width: 100%;
   max-width: 380px;
-  background: linear-gradient(180deg, rgba(20, 28, 45, 0.98), rgba(13, 19, 32, 0.98));
+  background: linear-gradient(180deg, rgba(13, 58, 41, 0.98), rgba(8, 37, 26, 0.98));
   border: 1px solid var(--sp-border-accent);
   border-radius: 16px;
   padding: 22px 22px 18px;
@@ -759,11 +773,13 @@
 
 .search-page__email-modal-btn--primary {
   background: var(--sp-accent);
-  border: 1px solid var(--sp-accent);
-  color: #ffffff;
-  box-shadow: 0 6px 22px var(--sp-glow);
+  border: 2px solid var(--sp-accent);
+  color: #08251a;
+  font-weight: 700;
+  box-shadow: -2px 2px 0 0 #3ab533;
 }
 .search-page__email-modal-btn--primary:hover {
   background: var(--sp-accent-hover);
-  transform: translateY(-1px);
+  transform: translate(2px, -2px);
+  box-shadow: -4px 4px 0 0 #3ab533;
 }

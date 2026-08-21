@@ -6,8 +6,7 @@
 
 import SlatePlate from './SlatePlate';
 import type { HeldForYouBlock, RetailRegister } from '../../lib/graph-types';
-
-import { demoToast } from '../../lib/retail-demo-toast';
+import { useCart, originFromEvent, slugifyName } from '../../lib/retail-cart';
 
 function formatPrice(cents: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
@@ -23,6 +22,7 @@ interface Props {
 }
 
 export default function HeldForYou({ block, register }: Props) {
+  const { addToCart, saveForLater } = useCart();
   return (
     <section className="retail-heldforyou">
       <div className="retail-heldforyou__head">
@@ -69,14 +69,31 @@ export default function HeldForYou({ block, register }: Props) {
                   <button
                     type="button"
                     className="retail-heldforyou__btn"
-                    onClick={() => demoToast(`${item.name} added to your bag.`, 'success')}
+                    onClick={(e) => addToCart({
+                      id: `held-${slugifyName(item.name)}`,
+                      name: item.name,
+                      qualifier: item.descriptor || null,
+                      imageUrl: item.imageUrl?.default || null,
+                      priceCents: item.priceCents ?? null,
+                      priceLabel: null,
+                      qty: 1,
+                      source: 'held',
+                      note: 'Held in your size at the atelier.',
+                    }, originFromEvent(e, item.imageUrl?.default || null))}
                   >
                     Add to bag
                   </button>
                   <button
                     type="button"
                     className="retail-heldforyou__btn retail-heldforyou__btn--quiet"
-                    onClick={() => demoToast(`${item.name} saved to your list.`, 'note')}
+                    onClick={() => saveForLater({
+                      id: `held-${slugifyName(item.name)}`,
+                      name: item.name,
+                      qualifier: item.descriptor || null,
+                      imageUrl: item.imageUrl?.default || null,
+                      priceLabel: item.priceCents != null ? formatPrice(item.priceCents) : null,
+                      note: 'Held against your account.',
+                    })}
                     aria-label={`Save ${item.name}`}
                   >
                     ♡ Save

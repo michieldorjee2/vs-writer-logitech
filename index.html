@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Optimizely Web Experimentation snippet — must load synchronously and
+         as early as possible in <head> to avoid flicker. Do not add async/defer. -->
+    <script src="https://cdn.optimizely.com/public/26942930964/s/infinite.js"></script>
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.ico" />
@@ -30,9 +33,18 @@
     <link rel="dns-prefetch" href="https://www.optimizely.com" />
 
     <!-- Google Fonts - async loaded to avoid render-blocking -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" /></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..700&family=JetBrains+Mono:wght@400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap" /></noscript>
+
+    <!-- Greenfield brand display/body fonts (self-hosted) — preload the two most-visible cuts -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/vc-nudge/NudgeSemiNormal-SemiNormalExtraBold.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/die-grotesk/die-grotesk-b-regular.woff2" crossorigin />
+
+    <!-- Brightstream (finserv template) fonts — Playfair Display + Jost, matching financial-services.optidemo.com -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Jost:wght@300;400;500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Jost:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Jost:wght@300;400;500;600&display=swap" /></noscript>
 
     <!-- ODP (Optimizely Data Platform) tracking SDK — async, non-blocking -->
     <script>window.zaius=window.zaius||[];</script>

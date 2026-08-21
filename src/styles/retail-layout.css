@@ -13,7 +13,8 @@
   overflow-x: clip;
 }
 
-/* ===== Top bar — minimal, fades into the page ===== */
+/* ===== Top bar — always visible, paper-toned with a subtle backdrop
+   so the masthead reads on both cream and dark-image heroes ===== */
 .retail-topbar {
   position: fixed;
   top: 0;
@@ -22,18 +23,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem var(--rail);
+  padding: 1rem var(--rail);
   z-index: 50;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity var(--dur) var(--ease-fade), transform var(--dur) var(--ease-fade);
+  pointer-events: auto;
+  /* Cream paper-tone with translucency + blur so we never lose the
+     wordmark / customer name on dark hero photography. */
+  background: rgba(245, 239, 230, 0.88);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  border-bottom: 1px solid var(--rule);
+  transition: background var(--dur) var(--ease-fade),
+              border-color var(--dur) var(--ease-fade),
+              padding var(--dur) var(--ease-fade);
 }
 
+/* is-visible state (set by GSAP once scrolled past the hero) — tighten
+   the band slightly so it feels lighter once the user is reading. */
 .retail-topbar.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  background: rgba(245, 239, 230, 0.94);
 }
 
 .retail-wordmark {
@@ -42,17 +51,67 @@
   font-size: var(--type-md);
   letter-spacing: var(--track-snug);
   color: var(--type-primary);
+  flex: 0 0 auto;
+}
+
+/* Center block — "For [Name] · I.C." personalises the masthead */
+.retail-topbar__center {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  justify-content: center;
+  font-family: var(--font-serif);
+  color: var(--type-primary);
+  padding: 0 1.25rem;
+}
+
+.retail-topbar__for {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: var(--track-marquee);
+  text-transform: uppercase;
+  color: var(--type-quiet);
+}
+
+.retail-topbar__name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.45rem;
+  letter-spacing: -0.005em;
+  color: var(--type-primary);
+}
+
+.retail-topbar__initials {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  color: var(--gold);
+}
+
+@media (max-width: 760px) {
+  .retail-topbar__center { display: none; }
 }
 
 .retail-topbar__right {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.1rem;
   font-family: var(--font-sans);
   font-size: var(--type-xs);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--type-secondary);
+  flex: 0 0 auto;
+}
+
+.retail-topbar__locale {
+  letter-spacing: var(--track-caps);
+}
+
+@media (max-width: 880px) {
+  .retail-topbar__locale:first-of-type { display: none; }
 }
 
 /* ===== Scroll progress hairline (left rail) ===== */
@@ -780,7 +839,7 @@
   top: 1rem;
   left: 1rem;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 0.85rem;
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: rgba(245, 239, 230, 0.7);
@@ -792,7 +851,7 @@
   left: 1rem;
   right: 1rem;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 0.85rem;
   line-height: 1.4;
   letter-spacing: 0.02em;
   color: rgba(245, 239, 230, 0.6);
@@ -918,7 +977,7 @@
 
 .retail-worn__tag {
   font-family: var(--font-sans);
-  font-size: 0.65rem;
+  font-size: 0.85rem;
   letter-spacing: var(--track-marquee);
   text-transform: uppercase;
   color: var(--type-quiet);
@@ -944,7 +1003,7 @@
 
 .retail-worn__season {
   font-family: var(--font-sans);
-  font-size: 0.65rem;
+  font-size: 0.85rem;
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--type-quiet);
@@ -980,9 +1039,9 @@
   background: var(--type-primary);
   color: var(--ground);
   border: none;
-  padding: 0.55rem 0.9rem;
+  padding: 0.85rem 1.2rem;
   font-family: var(--font-sans);
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   cursor: pointer;
@@ -1062,6 +1121,56 @@
   font-size: var(--type-xs);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
+}
+
+.retail-stylistnote__form {
+  display: grid;
+  gap: 0.85rem;
+  text-align: left;
+  margin-top: 0.5rem;
+}
+
+.retail-stylistnote__textarea {
+  appearance: none;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  padding: 1rem 1.25rem;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  color: var(--type-primary);
+  resize: vertical;
+  min-height: 7rem;
+  transition: border-color 200ms;
+}
+.retail-stylistnote__textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.retail-stylistnote__form-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.retail-stylistnote__sent {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  padding-top: 1rem;
+}
+
+.retail-stylistnote__sent p {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  color: var(--type-secondary);
+  margin: 0;
+  max-width: 32rem;
 }
 
 /* ===== Closing reflection ===== */
@@ -1169,10 +1278,10 @@
 
 .retail-demo-toast__pill {
   font-family: var(--font-sans);
-  font-size: 0.6rem;
+  font-size: 0.85rem;
   letter-spacing: var(--track-marquee);
   text-transform: uppercase;
-  padding: 0.2rem 0.55rem;
+  padding: 0.3rem 0.7rem;
   background: var(--gold);
   color: #1a1614;
   border-radius: 2px;
@@ -1194,9 +1303,9 @@
   background: var(--type-primary);
   color: var(--ground);
   border: none;
-  padding: 0.65rem 1.05rem;
+  padding: 0.85rem 1.2rem;
   font-family: var(--font-sans);
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   cursor: pointer;
@@ -1348,7 +1457,7 @@
 
 .retail-questions__panel-q {
   font-family: var(--font-sans);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--gold);
@@ -1381,7 +1490,7 @@
 .retail-heldforyou__btn,
 .retail-worn__cta,
 .retail-look__btn {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   padding: 0.85rem 1.2rem;
 }
 
@@ -1423,16 +1532,16 @@
 /* Rotation card */
 .retail-worn__name { font-size: 1.2rem; }
 .retail-worn__qualifier { font-size: 0.95rem; }
-.retail-worn__season { font-size: 0.72rem; }
-.retail-worn__tag { font-size: 0.72rem; }
+.retail-worn__season { font-size: 0.85rem; }
+.retail-worn__tag { font-size: 0.85rem; }
 .retail-worn__note { font-size: 1rem; line-height: 1.6; }
 
 /* Lightbox */
-.retail-look__name { font-size: 1.15rem; }
-.retail-look__qualifier { font-size: 0.95rem; }
-.retail-look__price { font-size: 0.8rem; }
-.retail-look__picks-deck { font-size: 1.05rem; line-height: 1.6; }
-.retail-look__caption { font-size: 1.25rem; }
+.retail-look__name { font-size: 1.25rem; }
+.retail-look__qualifier { font-size: 1.05rem; }
+.retail-look__price { font-size: 0.95rem; }
+.retail-look__picks-deck { font-size: 1.15rem; line-height: 1.6; }
+.retail-look__caption { font-size: 1.3rem; }
 
 /* Questions module */
 .retail-questions__chip { font-size: 1.05rem; padding: 0.85rem 1.15rem 0.85rem 1.3rem; }

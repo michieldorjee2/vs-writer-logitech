@@ -70,14 +70,14 @@ const AccordionItem: React.FC<AccordionItemProps> = (props) => {
                             >
                                 <path
                                     d="M9.00008 1V17"
-                                    stroke="#e9ebf1"
+                                    stroke="#eff6e9"
                                     strokeWidth="2"
                                     strokeLinecap="square"
                                     className={`origin-center transition duration-300 ${isActive ? 'rotate-90' : ''}`}
                                 />
                                 <path
                                     d="M1 9L17 9"
-                                    stroke="#e9ebf1"
+                                    stroke="#eff6e9"
                                     strokeWidth="2"
                                     strokeLinecap="square"
                                 />

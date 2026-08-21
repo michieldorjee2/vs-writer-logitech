@@ -4,13 +4,14 @@
    ============================================================ */
 
 :root {
-  --xray-accent: #00e5ff;
-  --xray-accent-soft: rgba(0, 229, 255, 0.22);
-  --xray-accent-glow: rgba(0, 229, 255, 0.55);
-  --xray-scan-fg: #9ef2ff;
-  --xray-bg-deep: rgba(7, 12, 22, 0.88);
-  --xray-card-bg: rgba(13, 19, 32, 0.85);
-  --xray-card-border: rgba(0, 229, 255, 0.35);
+  /* X-ray glow → brand green; surfaces → neutral fir (de-cyan'd) */
+  --xray-accent: #abff44;
+  --xray-accent-soft: rgba(171, 255, 68, 0.22);
+  --xray-accent-glow: rgba(171, 255, 68, 0.55);
+  --xray-scan-fg: #c8ff8f;
+  --xray-bg-deep: rgba(8, 37, 26, 0.9);
+  --xray-card-bg: rgba(13, 58, 41, 0.85);
+  --xray-card-border: rgba(171, 255, 68, 0.35);
 }
 
 /* ------------ Floating action column ------------ */
@@ -26,14 +27,14 @@
   gap: 10px;
   padding: 10px;
   border-radius: 18px;
-  background: rgba(10, 14, 22, 0.72);
+  background: rgba(13, 58, 41, 0.72);
   backdrop-filter: saturate(140%) blur(18px);
   -webkit-backdrop-filter: saturate(140%) blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  color: #e9ebf1;
+  color: #eff6e9;
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
   transition:
     opacity 240ms ease,
@@ -113,7 +114,7 @@ body.xray-active .sticky-cta {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
-  color: #e9ebf1;
+  color: #eff6e9;
   border-radius: 12px;
   width: 60px;
   height: 60px;
@@ -167,9 +168,9 @@ body.xray-active .sticky-cta {
 }
 
 @keyframes xray-btn-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); }
-  50%      { box-shadow: 0 0 0 6px rgba(0, 229, 255, 0); }
-  60%      { box-shadow: 0 0 0 6px rgba(0, 229, 255, 0.18); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(171, 255, 68, 0); }
+  50%      { box-shadow: 0 0 0 6px rgba(171, 255, 68, 0); }
+  60%      { box-shadow: 0 0 0 6px rgba(171, 255, 68, 0.18); }
 }
 
 /* Scan-icon laser line — gentle vertical sweep so the button reads as
@@ -194,7 +195,7 @@ body.xray-active .sticky-cta {
 .xray-sidebar__btn--xray:hover {
   color: var(--xray-accent);
   border-color: var(--xray-accent-soft);
-  background: rgba(0, 229, 255, 0.06);
+  background: rgba(171, 255, 68, 0.06);
 }
 
 .xray-sidebar__btn--active {
@@ -236,7 +237,7 @@ body.xray-active .sticky-cta {
   pointer-events: none;
   /* width + height applied inline to match documentElement.scrollWidth/Height */
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  color: #e9ebf1;
+  color: #eff6e9;
 }
 
 .xray-fixed-layer {
@@ -245,7 +246,7 @@ body.xray-active .sticky-cta {
   z-index: 1001;
   pointer-events: none;
   font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  color: #e9ebf1;
+  color: #eff6e9;
 }
 
 .xray-fixed-layer .xray-overlay__grid,
@@ -258,8 +259,8 @@ body.xray-active .sticky-cta {
 
 .xray-fixed-layer .xray-overlay__grid {
   background-image:
-    linear-gradient(rgba(0, 229, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 255, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(171, 255, 68, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(171, 255, 68, 0.06) 1px, transparent 1px);
   background-size: 44px 44px;
   opacity: 0;
   transition: opacity 600ms ease 160ms;
@@ -308,11 +309,11 @@ body.xray-active .sticky-cta {
 /* Traced rectangle — sharp corners (rx=0 in JSX) so the corner brackets
  * sit cleanly at the geometric corners instead of overlapping a curve. */
 .xray-trace__rect {
-  fill: rgba(0, 229, 255, 0.035);
-  stroke: rgba(0, 229, 255, 0.65);
+  fill: rgba(171, 255, 68, 0.035);
+  stroke: rgba(171, 255, 68, 0.65);
   stroke-width: 1;
   stroke-linejoin: miter;
-  filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.35));
+  filter: drop-shadow(0 0 5px rgba(171, 255, 68, 0.35));
   opacity: 0;
   animation: xray-trace-fade 320ms ease-out forwards;
   animation-delay: calc(var(--reveal-index, 0) * 80ms + 80ms);
@@ -353,7 +354,7 @@ body.xray-active .sticky-cta {
 /* Connector wire — solid faint glowing line that anchors the balloon. */
 .xray-trace__connector-wire {
   fill: none;
-  stroke: rgba(0, 229, 255, 0.55);
+  stroke: rgba(171, 255, 68, 0.55);
   stroke-width: 1.1;
   stroke-linecap: round;
   filter: drop-shadow(0 0 3px var(--xray-accent-glow));
@@ -425,8 +426,8 @@ body.xray-active .sticky-cta {
   height: 200px;
   background: linear-gradient(
     to bottom,
-    rgba(0, 229, 255, 0.25) 0%,
-    rgba(0, 229, 255, 0.08) 40%,
+    rgba(171, 255, 68, 0.25) 0%,
+    rgba(171, 255, 68, 0.08) 40%,
     transparent 100%
   );
   mix-blend-mode: screen;
@@ -541,7 +542,7 @@ body.xray-active .sticky-cta {
   appearance: none;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e9ebf1;
+  color: #eff6e9;
   padding: 6px 12px;
   border-radius: 999px;
   display: inline-flex;
@@ -593,8 +594,8 @@ body.xray-active .sticky-cta {
   border-radius: 14px;
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(0, 229, 255, 0.08),
-    0 0 30px rgba(0, 229, 255, 0.12);
+    0 0 0 1px rgba(171, 255, 68, 0.08),
+    0 0 30px rgba(171, 255, 68, 0.12);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   overflow: hidden;
@@ -635,11 +636,11 @@ body.xray-active .sticky-cta {
 
 .xray-card--open .xray-card__header {
   border-bottom-color: rgba(255, 255, 255, 0.08);
-  background: rgba(0, 229, 255, 0.05);
+  background: rgba(171, 255, 68, 0.05);
 }
 
 .xray-card__header:hover {
-  background: rgba(0, 229, 255, 0.05);
+  background: rgba(171, 255, 68, 0.05);
 }
 
 .xray-card__badge {
@@ -649,8 +650,8 @@ body.xray-active .sticky-cta {
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: rgba(0, 229, 255, 0.1);
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  background: rgba(171, 255, 68, 0.1);
+  border: 1px solid rgba(171, 255, 68, 0.35);
   color: var(--xray-accent);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
@@ -679,7 +680,7 @@ body.xray-active .sticky-cta {
 .xray-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #f1f3f8;
+  color: #eff6e9;
   line-height: 1.2;
 }
 
@@ -720,7 +721,7 @@ body.xray-active .sticky-cta {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #8d95a7;
+  color: #a1ac8d;
   margin-bottom: 6px;
   font-weight: 600;
 }
@@ -742,7 +743,7 @@ body.xray-active .sticky-cta {
   letter-spacing: 0.02em;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d9dde6;
+  color: #d8e4cb;
 }
 
 .xray-card__chip svg {
@@ -751,8 +752,8 @@ body.xray-active .sticky-cta {
 }
 
 .xray-card__chip--tool {
-  background: rgba(0, 229, 255, 0.1);
-  border-color: rgba(0, 229, 255, 0.3);
+  background: rgba(171, 255, 68, 0.1);
+  border-color: rgba(171, 255, 68, 0.3);
   color: #c9f4ff;
 }
 
@@ -767,7 +768,7 @@ body.xray-active .sticky-cta {
 
 .xray-card__list li {
   font-size: 12.5px;
-  color: #c5ccd9;
+  color: #c3ceaf;
   line-height: 1.4;
   padding-left: 14px;
   position: relative;
@@ -788,11 +789,11 @@ body.xray-active .sticky-cta {
   margin: 10px 0 0;
   font-size: 11.5px;
   font-style: italic;
-  color: #9fa8bb;
+  color: #a1ac8d;
   line-height: 1.4;
   padding: 8px 10px;
   border-left: 2px solid var(--xray-accent-soft);
-  background: rgba(0, 229, 255, 0.03);
+  background: rgba(171, 255, 68, 0.03);
   border-radius: 0 6px 6px 0;
 }
 

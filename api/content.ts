@@ -1,6 +1,73 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
+
+// FinServPage (Brightstream). The content type + instances exist in the
+// showcase CMS; until Optimizely Graph finishes propagating the schema, a query
+// against the not-yet-synced type returns { errors, data:null } (HTTP 200), so
+// the items check below simply skips and we fall back to demo synthesis. Fields
+// mirror the registered FinServPage type exactly.
+const FINSERV_PAGE_QUERY = `
+query GetFinServPage($slug: String!) {
+  FinServPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { key url { default hierarchical } published }
+      template
+      PageTitle MetaDescription
+      brand tagline audience targetSlug targetName
+      heroImageUrl navLinks
+      headerCta { label href note }
+      hero { eyebrow headline subhead highlights cta { label href note } }
+      stats { value label }
+      scenario { label title paragraphs pullLine }
+      problems { label heading items { stat title description } }
+      howItWorks { label heading steps { title description } }
+      profile { quote attribution role company initials }
+      savings { defaultDeposit products { id name apy benefit } }
+      meeting { contactName company slots }
+      footer { legal badges }
+      generatedAt generatedBy
+    }
+  }
+}
+`;
+
+const PERSON_PAGE_QUERY = `
+query GetPersonPage($slug: String!) {
+  PersonPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { key url { default hierarchical } published }
+      template
+      PageTitle MetaDescription noIndex
+      companySlug companyName personSlug crmContactId
+      personName personTitle personInitials
+      personLinkedIn { default }
+      personAvatarColor
+      companyLogo { default }
+      brandAccentColor
+      heroEyebrow heroHeadline heroSubheadline heroCtaText heroCtaUrl { default }
+      engagementTier engagementHeadline engagementSummary
+      touchpoints { Date Kind Summary OptimizelyPerson }
+      openOpportunityName openOpportunityStage openOpportunityDetail
+      remitHeadline remitIntro
+      remitPoints { Title Description Metric }
+      peerProofHeadline
+      peerProof { Quote PersonName PersonTitle Company SourceUrl { default } }
+      teamHeadline
+      team { Initials Name Role Email AvatarColor AlreadyMet }
+      ctaTitle ctaBody ctaButtonText meetingUrl { default }
+      footerLine generatedAt generatedBy
+    }
+  }
+}
+`;
 
 const RETAIL_PAGE_QUERY = `
 query GetRetailPage($slug: String!) {
@@ -149,6 +216,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       retailTries.push(`/${stripped}/`);
       retailTries.push(`/en/${stripped}/`);
     }
+    // PersonPage dispatch. Person pages are the only nested route
+    // (/{company}/{person}), so a two-segment slug can only be one of these —
+    // try it first and skip the flat-type queries entirely when it hits.
+    const personTries = [normalizedSlug];
+    if (!slug.startsWith('en/')) personTries.push(`/en/${slug}/`);
+    for (const s of personTries) {
+      const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
+      const items = (pJson as any)?.data?.PersonPage?.items;
+      if (items && items.length > 0) {
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        return res.status(200).json({ ...items[0], __template: 'person' });
+      }
+    }
+
     for (const s of retailTries) {
       const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
       const items = (json as any)?.data?.RetailCustomerPage?.items;
@@ -156,6 +238,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
         return res.status(200).json(mergeRetailJson({ ...items[0], __template: 'retail' }));
+      }
+    }
+
+    // FinServ dispatch: try Graph (no-op if the type isn't registered), then
+    // synthesize from demo content for known FS slugs.
+    const finservTries = [normalizedSlug];
+    if (!slug.startsWith('en/')) finservTries.push(`/en/${slug}/`);
+    for (const s of finservTries) {
+      const fsJson = await queryGraph(authKey, FINSERV_PAGE_QUERY, { slug: s });
+      const items = (fsJson as any)?.data?.FinServPage?.items;
+      if (items && items.length > 0) {
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        return res.status(200).json({ ...items[0], __template: 'finserv' });
+      }
+    }
+    if (isFinServDemoSlug(slug)) {
+      const synth = synthFinServPageFromDemo(slug);
+      if (synth) {
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        return res.status(200).json({ ...synth, __template: 'finserv' });
       }
     }
 

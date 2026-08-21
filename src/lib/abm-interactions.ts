@@ -127,7 +127,7 @@ function initPainPointEffects(): void {
   // Read brand accent from CSS variable, lighten for accessibility on dark bg
   const rawAccent = getComputedStyle(document.querySelector('.abm-page') || document.documentElement)
     .getPropertyValue('--brand-accent').trim();
-  const accentColor = rawAccent ? lightenHex(rawAccent, 0.4) : '#6366f1';
+  const accentColor = rawAccent ? lightenHex(rawAccent, 0.4) : '#abff44';
 
   function lightenHex(hex: string, amount: number): string {
     const r = parseInt(hex.slice(1, 3), 16);

@@ -6,7 +6,7 @@
 
 import SlatePlate from './SlatePlate';
 import type { SmallInvitationBlock, RetailRegister } from '../../lib/graph-types';
-import { demoToast } from '../../lib/retail-demo-toast';
+import { useCart, slugifyName } from '../../lib/retail-cart';
 
 interface Props {
   block: SmallInvitationBlock;
@@ -14,6 +14,7 @@ interface Props {
 }
 
 export default function SmallInvitation({ block, register }: Props) {
+  const { saveForLater } = useCart();
   return (
     <section className="retail-invitation">
       <div className="retail-invitation__inner">
@@ -38,7 +39,14 @@ export default function SmallInvitation({ block, register }: Props) {
           <button
             type="button"
             className="retail-link"
-            onClick={() => demoToast(`Opal will set out the ${block.itemName} for your next visit.`, 'note')}
+            onClick={() => saveForLater({
+              id: `invitation-${slugifyName(block.itemName)}`,
+              name: block.itemName,
+              qualifier: null,
+              imageUrl: (block.itemImageUrl?.default ?? block.imageUrl?.default) || null,
+              priceLabel: null,
+              note: 'Set out for your next visit at the atelier.',
+            })}
             data-retail-reveal
             data-retail-delay="360"
           >

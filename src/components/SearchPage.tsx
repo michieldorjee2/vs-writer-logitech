@@ -60,7 +60,7 @@ const RECENT_KEY = 'showcase.recent-searches.v1';
 const MAX_RECENT = 6;
 
 function hexToRgb(hex: string | null): [number, number, number] {
-  const fallback: [number, number, number] = [0, 55, 255];
+  const fallback: [number, number, number] = [171, 255, 68];
   if (!hex) return fallback;
   const m = hex.trim().match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
   if (!m) return fallback;
@@ -107,7 +107,7 @@ function toEntry(item: IndexItem): Entry {
   const industry = item.competitorName
     ? `vs ${item.competitorName}`
     : item.eyebrow || 'Comparison page';
-  const color = item.brandAccentColor || '#0037ff';
+  const color = item.brandAccentColor || '#abff44';
   // Prefer the square brand *icon* over the wordmark — fills the circular/
   // squircle chip without leaving whitespace bars around it.
   const logoUrl =
@@ -292,7 +292,7 @@ function SearchPage() {
   /* Starfield lifecycle. */
   useEffect(() => {
     if (!canvasRef.current) return;
-    const ctrl = startSearchStarfield(canvasRef.current, [[0, 55, 255]]);
+    const ctrl = startSearchStarfield(canvasRef.current, [[171, 255, 68]]);
     starRef.current = ctrl;
     return () => {
       ctrl.destroy();
@@ -305,9 +305,9 @@ function SearchPage() {
     [entries, query, recentSlugs],
   );
 
-  /* Build the accent palette from the user's recent picks. The default
-   * Aldus blue anchors the palette so the field doesn't lose its identity
-   * before anyone has searched. */
+  /* Build the accent palette from the user's recent picks. The brand
+   * lime/grass/teal triad anchors the palette so the field reads as the
+   * Optimizely 2026 "living field" even before anyone has searched. */
   const palette = useMemo<[number, number, number][]>(() => {
     const byId = new Map(entries.map((e) => [e.slug, e]));
     const recentColors = recentSlugs
@@ -316,7 +316,12 @@ function SearchPage() {
       .map((e) => hexToRgb(e.color));
     // Dedupe exact colour matches so accent distribution stays even.
     const seen = new Set<string>();
-    const combined: [number, number, number][] = [[0, 55, 255], ...recentColors];
+    const brandAnchors: [number, number, number][] = [
+      [171, 255, 68],   // lime
+      [125, 221, 61],   // grass
+      [145, 219, 218],  // teal
+    ];
+    const combined: [number, number, number][] = [...brandAnchors, ...recentColors];
     return combined.filter((rgb) => {
       const key = rgb.join(',');
       if (seen.has(key)) return false;

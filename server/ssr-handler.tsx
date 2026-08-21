@@ -3,6 +3,9 @@ import { renderToString } from 'react-dom/server';
 import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
 import ABMHyperPageServer from '../src/components/ABMHyperPage.server';
 import RetailCustomerPageServer from '../src/components/RetailCustomerPage.server';
+import FinServPageServer from '../src/components/FinServPage.server';
+import PersonPageServer from '../src/components/PersonPage.server';
+import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content';
 
 // ---------------------------------------------------------------------------
 // Content Graph – fetch page data
@@ -11,44 +14,147 @@ import RetailCustomerPageServer from '../src/components/RetailCustomerPage.serve
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
 // Query matches the registered RetailCustomerPage schema in Optimizely Graph.
-// Fields the CMS doesn't yet expose (descriptor on items, imageDirection on
-// every block, privateProvenance, customerDisplayName) are excluded here —
-// the agent writes them in propertiesJson but they're dropped server-side.
-// `_json` captures the raw write blob so we can recover descriptors / image
-// directions client-side until those fields are added to the content type.
-const RETAIL_PAGE_QUERY = `
+// New per-customer fields (letter, polaroids, wornAnchors, questions,
+// stylistName, neighborhood, initials, personalHeroLine{1,2}) are added
+// via a probe-then-extend pattern below: we first introspect the live
+// schema, then run a query that only includes fields that exist. This
+// lets us deploy before Graph finishes propagating the schema changes
+// and lights up the new fields automatically the moment they appear.
+const BASE_RETAIL_FIELDS = `
+  _metadata { key url { default hierarchical } published }
+  template
+  PageTitle MetaDescription CanonicalUrl { default }
+  customerSlug customerDisplayName register monthStamp
+  editorialIntro stylistNoteBody stylistNoteSignedBy closingReflection
+  hero { imageUrl { default } line1 line2 linkTo { default } }
+  heldForYou {
+    header dynamic
+    items { name priceCents priceVisibility imageUrl { default } }
+  }
+  setAside {
+    primaryAction secondaryAction dynamic
+    items { name imageUrl { default } }
+  }
+  atelierNote { title body cta imageUrl { default } }
+  smallInvitation { itemName line cta itemImageUrl { default } }
+  appointment {
+    variant boutique stylistName slotPhrase slots
+    primaryAction secondaryAction dynamic
+  }
+  footerLine
+  deviceDegraded generatedAt generatedBy canvasVersion
+`;
+
+const EXTENDED_RETAIL_FIELDS_BY_NAME: Record<string, string> = {
+  primaryCity: 'primaryCity',
+  neighborhood: 'neighborhood',
+  stylistName: 'stylistName',
+  stylistBoutique: 'stylistBoutique',
+  initials: 'initials',
+  personalHeroLine1: 'personalHeroLine1',
+  personalHeroLine2: 'personalHeroLine2',
+  letter: 'letter { dateLine greeting paragraphs signoff }',
+  polaroids: 'polaroids { imageUrl { default } caption rotate }',
+  wornLabel: 'wornLabel',
+  wornAnchors: 'wornAnchors { name qualifier season ownedImageUrl { default } pairedName pairedQualifier pairedImageUrl { default } pairedPriceLabel }',
+  questions: 'questions { question answer }',
+  careLabel: 'careLabel',
+  careTimeline: 'careTimeline { itemName kind dueLine status note maker imageUrl { default } }',
+  makerNote: 'makerNote',
+};
+
+let _retailQueryCache: { fields: string; query: string } | null = null;
+
+async function getRetailQuery(authKey: string): Promise<string> {
+  if (_retailQueryCache) return _retailQueryCache.query;
+  // Probe the live schema once per cold start.
+  const introspection = await queryGraph(
+    authKey,
+    `{ __type(name: "RetailCustomerPage") { fields { name } } }`,
+    {},
+  );
+  const present = new Set<string>(
+    ((introspection as any)?.data?.__type?.fields || []).map((f: any) => f.name),
+  );
+  const extras = Object.entries(EXTENDED_RETAIL_FIELDS_BY_NAME)
+    .filter(([name]) => present.has(name))
+    .map(([, frag]) => frag)
+    .join('\n      ');
+  const fields = `${BASE_RETAIL_FIELDS}\n      ${extras}`;
+  const query = `
 query GetRetailPage($slug: String!) {
   RetailCustomerPage(
     where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
-      template
-      PageTitle MetaDescription CanonicalUrl { default }
-      customerSlug customerDisplayName register monthStamp
-      editorialIntro stylistNoteBody stylistNoteSignedBy closingReflection
-      hero { imageUrl { default } line1 line2 linkTo { default } }
-      heldForYou {
-        header dynamic
-        items { name priceCents priceVisibility imageUrl { default } }
-      }
-      setAside {
-        primaryAction secondaryAction dynamic
-        items { name imageUrl { default } }
-      }
-      atelierNote { title body cta imageUrl { default } }
-      smallInvitation { itemName line cta itemImageUrl { default } }
-      appointment {
-        variant boutique stylistName slotPhrase slots
-        primaryAction secondaryAction dynamic
-      }
-      footerLine
-      deviceDegraded generatedAt generatedBy canvasVersion
+      ${fields}
     }
   }
 }
 `;
+  _retailQueryCache = { fields, query };
+  return query;
+}
+
+// ---------------------------------------------------------------------------
+// FinServPage (Brightstream) query. getFinServQuery() probes the live schema
+// and returns null when the type isn't synced into Graph yet — callers then
+// fall back to demo synthesis. The field set mirrors the registered FinServPage
+// content type exactly (created in the showcase CMS), so CMS content flows the
+// moment Graph finishes propagating the schema.
+// ---------------------------------------------------------------------------
+
+const FINSERV_FIELDS = `
+  _metadata { key url { default hierarchical } published }
+  template
+  PageTitle MetaDescription
+  brand tagline audience targetSlug targetName
+  heroImageUrl navLinks
+  headerCta { label href note }
+  hero { eyebrow headline subhead highlights cta { label href note } }
+  stats { value label }
+  scenario { label title paragraphs pullLine }
+  problems { label heading items { stat title description } }
+  howItWorks { label heading steps { title description } }
+  profile { quote attribution role company initials }
+  savings { defaultDeposit products { id name apy benefit } }
+  meeting { contactName company slots }
+  footer { legal badges }
+  generatedAt generatedBy
+`;
+
+let _finservQueryCache: { query: string } | null = null;
+let _finservTypeAbsent = false;
+
+async function getFinServQuery(authKey: string): Promise<string | null> {
+  if (_finservQueryCache) return _finservQueryCache.query;
+  if (_finservTypeAbsent) return null;
+  const introspection = await queryGraph(
+    authKey,
+    `{ __type(name: "FinServPage") { name } }`,
+    {},
+  );
+  const exists = !!(introspection as any)?.data?.__type?.name;
+  if (!exists) {
+    _finservTypeAbsent = true;
+    return null;
+  }
+  const query = `
+query GetFinServPage($slug: String!) {
+  FinServPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      ${FINSERV_FIELDS}
+    }
+  }
+}
+`;
+  _finservQueryCache = { query };
+  return query;
+}
 
 const PAGE_QUERY = `
 query GetPage($slug: String!) {
@@ -152,6 +258,42 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return res.json();
 }
 
+// PersonPage — the 1:1 buyer page, the only nested route on the site
+// (/{company}/{person}). Probed first in fetchPageContent: a slug with two
+// segments cannot be any of the flat types.
+const PERSON_PAGE_QUERY = `
+query GetPersonPage($slug: String!) {
+  PersonPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { key url { default hierarchical } published }
+      template
+      PageTitle MetaDescription noIndex
+      companySlug companyName personSlug crmContactId
+      personName personTitle personInitials
+      personLinkedIn { default }
+      personAvatarColor
+      companyLogo { default }
+      brandAccentColor
+      heroEyebrow heroHeadline heroSubheadline heroCtaText heroCtaUrl { default }
+      engagementTier engagementHeadline engagementSummary
+      touchpoints { Date Kind Summary OptimizelyPerson }
+      openOpportunityName openOpportunityStage openOpportunityDetail
+      remitHeadline remitIntro
+      remitPoints { Title Description Metric }
+      peerProofHeadline
+      peerProof { Quote PersonName PersonTitle Company SourceUrl { default } }
+      teamHeadline
+      team { Initials Name Role Email AvatarColor AlreadyMet }
+      ctaTitle ctaBody ctaButtonText meetingUrl { default }
+      footerLine generatedAt generatedBy
+    }
+  }
+}
+`;
+
 async function fetchPageContent(authKey: string, slug: string) {
   const normalizedSlug = `/${slug}/`;
 
@@ -167,12 +309,45 @@ async function fetchPageContent(authKey: string, slug: string) {
     retailTries.push(`/${stripped}/`);
     retailTries.push(`/en/${stripped}/`);
   }
+  // Person pages are the only nested route, so try them before the flat
+  // types; a two-segment slug can only be one of these.
+  const personTries = [normalizedSlug];
+  if (!slug.startsWith('en/')) personTries.push(`/en/${slug}/`);
+  for (const s of personTries) {
+    const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
+    const items = (pJson as any)?.data?.PersonPage?.items;
+    if (items && items.length > 0) {
+      return { ...items[0], __template: 'person' as const };
+    }
+  }
+
+  const retailQuery = await getRetailQuery(authKey);
   for (const s of retailTries) {
-    const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
+    const json = await queryGraph(authKey, retailQuery, { slug: s });
     const items = (json as any)?.data?.RetailCustomerPage?.items;
     if (items && items.length > 0) {
       return mergeRetailJson({ ...items[0], __template: 'retail' as const });
     }
+  }
+
+  // FinServ dispatch (Meridian Bank). Query Graph if the content type exists;
+  // otherwise (or on miss) synthesize from demo content for known FS slugs so
+  // the demo renders before the CMS content type is registered.
+  const finservTries = [normalizedSlug];
+  if (!slug.startsWith('en/')) finservTries.push(`/en/${slug}/`);
+  const finservQuery = await getFinServQuery(authKey);
+  if (finservQuery) {
+    for (const s of finservTries) {
+      const fsJson = await queryGraph(authKey, finservQuery, { slug: s });
+      const items = (fsJson as any)?.data?.FinServPage?.items;
+      if (items && items.length > 0) {
+        return { ...items[0], __template: 'finserv' as const };
+      }
+    }
+  }
+  if (isFinServDemoSlug(slug)) {
+    const synth = synthFinServPageFromDemo(slug);
+    if (synth) return { ...synth, __template: 'finserv' as const };
   }
 
   let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
@@ -210,6 +385,54 @@ function buildHeadHtml(page: any): string {
   const canonicalHref =
     page.CanonicalUrl?.default || `${SITE_URL}${page._metadata.url.hierarchical}`;
   parts.push(`<link rel="canonical" href="${escapeHtml(canonicalHref)}" />`);
+
+  // Social card tags. Retail pages reuse the hero image; ABM and comparison
+  // pages fall back to whatever featured image they expose. og:image is
+  // required for clean Slack / iMessage / LinkedIn previews.
+  const isPersonPage = (page as any).__template === 'person' || page.template === 'person';
+  const isRetailPage = (page as any).__template === 'retail' || page.template === 'retail';
+  const isFinServPage = (page as any).__template === 'finserv' || page.template === 'finserv';
+  let socialImage: string | null = null;
+  if (isRetailPage) {
+    socialImage =
+      page.hero?.imageUrl?.default ||
+      page.hero?.imageUrl ||
+      page.atelierNote?.imageUrl?.default ||
+      page.atelierNote?.imageUrl ||
+      null;
+  } else if (isFinServPage) {
+    // No hero image on the FinServ template — fall back to a summary card.
+    socialImage = null;
+  } else {
+    socialImage =
+      page.heroImageUrl?.default ||
+      page.heroImageUrl ||
+      page.challengeScreenshotUrl?.default ||
+      null;
+  }
+  const siteName = isRetailPage
+    ? 'Maison Aurelle'
+    : isFinServPage
+      ? page.brand || 'Meridian Bank'
+      : isPersonPage
+        ? page.companyName || 'Optimizely Showcase'
+        : 'Optimizely Showcase';
+
+  parts.push(`<meta property="og:type" content="website" />`);
+  parts.push(`<meta property="og:site_name" content="${escapeHtml(siteName)}" />`);
+  parts.push(`<meta property="og:title" content="${escapeHtml(page.PageTitle)}" />`);
+  parts.push(`<meta property="og:description" content="${escapeHtml(page.MetaDescription)}" />`);
+  parts.push(`<meta property="og:url" content="${escapeHtml(canonicalHref)}" />`);
+  if (socialImage) {
+    parts.push(`<meta property="og:image" content="${escapeHtml(socialImage)}" />`);
+    parts.push(`<meta property="og:image:alt" content="${escapeHtml(page.PageTitle)}" />`);
+  }
+  parts.push(`<meta name="twitter:card" content="${socialImage ? 'summary_large_image' : 'summary'}" />`);
+  parts.push(`<meta name="twitter:title" content="${escapeHtml(page.PageTitle)}" />`);
+  parts.push(`<meta name="twitter:description" content="${escapeHtml(page.MetaDescription)}" />`);
+  if (socialImage) {
+    parts.push(`<meta name="twitter:image" content="${escapeHtml(socialImage)}" />`);
+  }
 
   const webPageLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -386,14 +609,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ---- Render React component tree to HTML ----
     // Three templates: retail (luxury fashion), abm (B2B account-based), comparison (B2B vs-X).
     // Retail is tagged in fetchPageContent; ABM is signal-detected.
-    const isRetail = (page as any).__template === 'retail' || page.template === 'retail';
-    const isABM = !isRetail && !!(page.intelEyebrow || page.customerLogo);
+    const isPerson = (page as any).__template === 'person' || page.template === 'person';
+    const isRetail =
+      !isPerson && ((page as any).__template === 'retail' || page.template === 'retail');
+    const isFinServ =
+      !isPerson && !isRetail && ((page as any).__template === 'finserv' || page.template === 'finserv');
+    const isABM =
+      !isPerson && !isRetail && !isFinServ && !!(page.intelEyebrow || page.customerLogo);
 
-    const appHtml = isRetail
-      ? renderToString(<RetailCustomerPageServer page={page} />)
-      : isABM
-        ? renderToString(<ABMHyperPageServer page={page} />)
-        : renderToString(<DynamicComparisonPageServer page={page} />);
+    const appHtml = isPerson
+      ? renderToString(<PersonPageServer page={page} />)
+      : isRetail
+        ? renderToString(<RetailCustomerPageServer page={page} />)
+        : isFinServ
+          ? renderToString(<FinServPageServer page={page} />)
+          : isABM
+            ? renderToString(<ABMHyperPageServer page={page} />)
+            : renderToString(<DynamicComparisonPageServer page={page} />);
 
     // ---- Build SEO head tags ----
     const headHtml = buildHeadHtml(page);

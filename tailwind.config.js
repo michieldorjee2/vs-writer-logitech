@@ -12,6 +12,10 @@ module.exports = {
             fontFamily: {
                 sans: '"Figtree", Arial, sans-serif',
                 mono: 'NBI Pro Mono, Arial, sans-serif',
+                // Greenfield (2026 brand) — competitive-takeout family + search
+                display: '"VC Nudge", "Die Grotesk B", Arial, sans-serif',
+                grotesk: '"Die Grotesk B", system-ui, sans-serif',
+                'roboto-mono': '"Roboto Mono", ui-monospace, monospace',
             },
             animation: {
                 background: 'background 7s ease infinite'
@@ -66,21 +70,21 @@ module.exports = {
         },
         colors: {
             'optimizely-blue': {
-                DEFAULT: '#0037ff',
-                '20-tint': '#ccd7ff',
-                '40-tint': '#99afff',
-                '60-tint': '#6687ff',
-                '80-tint': '#194bff',
-                '80-shade': '#002ccc',
-                '60-shade': '#002199',
-                '40-shade': '#001666',
-                '20-shade': '#000b33'
+                DEFAULT: '#abff44',
+                '20-tint': '#e4f0da',
+                '40-tint': '#d8e4cb',
+                '60-tint': '#c8ff8f',
+                '80-tint': '#7ddd3d',
+                '80-shade': '#3ab533',
+                '60-shade': '#2f8f2a',
+                '40-shade': '#197050',
+                '20-shade': '#0d3a29'
             },
             'dark-blue': {
-                DEFAULT: '#080736',
+                DEFAULT: '#08251a',
             },
             'light-blue': {
-                DEFAULT: '#00ccff',
+                DEFAULT: '#91dbda',
             },
             orange: {
                 DEFAULT: '#ff8110',
@@ -104,6 +108,28 @@ module.exports = {
                 '600': '#484f61',
                 '900': '#111827'
             },
+            // Greenfield (2026 brand) palette — used by .cmp-takeout + search
+            fir: {
+                dark: '#08251a',
+                DEFAULT: '#0d3a29',
+                2: '#114a35',
+                light: '#197050'
+            },
+            lime: {
+                DEFAULT: '#abff44',
+                grass: '#7ddd3d',
+                go: '#3ab533'
+            },
+            teal: {
+                lt: '#91dbda',
+                dk: '#007b79'
+            },
+            cream: '#eff6e9',
+            'fir-n3': '#e4f0da',
+            'fir-n4': '#d8e4cb',
+            'fir-n5': '#c3ceaf',
+            'fir-n6': '#a1ac8d',
+            'fir-n7': '#717863',
             black: '#000',
             dust: '#F1ECE6',
             white: '#fff',

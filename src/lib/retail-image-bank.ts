@@ -76,7 +76,7 @@ const BANK: ImageEntry[] = [
     keywords: ['clutch', 'sera', 'python', 'evening bag', 'oxblood'],
     registers: ['discovery'],
     alt: 'An evening clutch in saturated leather' },
-  { url: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=1400&q=80',
+  { url: 'https://images.unsplash.com/photo-1545194445-dddb8f4487c6?auto=format&fit=crop&w=1400&q=80',
     keywords: ['wallet', 'card case', 'cardholder', 'zip wallet', 'ardoise'],
     alt: 'A small leather wallet on a stone surface' },
 
@@ -94,7 +94,7 @@ const BANK: ImageEntry[] = [
   { url: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=1400&q=80',
     keywords: ['earring', 'plis', 'gold', 'brushed gold', '18k'],
     alt: 'A pair of gold earrings on linen' },
-  { url: 'https://images.unsplash.com/photo-1633555715049-0c7a01fce108?auto=format&fit=crop&w=1400&q=80',
+  { url: 'https://images.unsplash.com/photo-1620207418302-439b387441b0?auto=format&fit=crop&w=1400&q=80',
     keywords: ['necklace', 'volute', 'pendant', 'double-drop'],
     registers: ['discovery'],
     alt: 'A delicate gold necklace' },
@@ -130,7 +130,7 @@ const BANK: ImageEntry[] = [
     alt: 'A vintage dress watch in soft light' },
 
   // ── Atelier / capsule (numbered) ──
-  { url: 'https://images.unsplash.com/photo-1605518215584-eb9f86f0e80c?auto=format&fit=crop&w=1400&q=80',
+  { url: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&w=1400&q=80',
     keywords: ['capsule', 'numbered', 'atelier jacket', 'sculpted'],
     registers: ['atelier'],
     alt: 'A sculpted atelier piece' },
@@ -143,7 +143,7 @@ const DEFAULT_BY_REGISTER: Record<RetailRegister, string> = {
   minimal:   'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=1400&q=80',
   archive:   'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=1400&q=80',
   discovery: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=1400&q=80',
-  atelier:   'https://images.unsplash.com/photo-1605518215584-eb9f86f0e80c?auto=format&fit=crop&w=1400&q=80',
+  atelier:   'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&w=1400&q=80',
   family:    'https://images.unsplash.com/photo-1485518882345-15568b007407?auto=format&fit=crop&w=1400&q=80',
 };
 

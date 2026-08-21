@@ -1,0 +1,350 @@
+/* ============================================================
+   Greenfield — Optimizely 2026 brand, applied to the
+   competitive-takeout family (DynamicComparisonPage / VsWriterPage).
+
+   Scoped under `.cmp-takeout` so the ABM / Retail / FinServ
+   templates keep their own identities untouched. The /search page
+   carries the same palette via its own --sp-* tokens in search.css.
+
+   Brand source of truth: ../../OptimizelyHeadless (optimizely.com).
+   ============================================================ */
+
+/* ---- Brand fonts (self-hosted, copied from the new optimizely.com) ---- */
+@font-face {
+  font-family: 'VC Nudge';
+  src: url('/fonts/vc-nudge/NudgeSemiNormal-SemiNormalRegular.woff2') format('woff2'),
+       url('/fonts/vc-nudge/NudgeSemiNormal-SemiNormalRegular.woff') format('woff');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'VC Nudge';
+  src: url('/fonts/vc-nudge/NudgeSemiNormal-SemiNormalSemiBold.woff2') format('woff2'),
+       url('/fonts/vc-nudge/NudgeSemiNormal-SemiNormalSemiBold.woff') format('woff');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'VC Nudge';
+  src: url('/fonts/vc-nudge/NudgeSemiNormal-SemiNormalExtraBold.woff2') format('woff2'),
+       url('/fonts/vc-nudge/NudgeSemiNormal-SemiNormalExtraBold.woff') format('woff');
+  font-weight: 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Die Grotesk B';
+  src: url('/fonts/die-grotesk/die-grotesk-b-regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Die Grotesk B';
+  src: url('/fonts/die-grotesk/die-grotesk-b-italic.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Die Grotesk B';
+  src: url('/fonts/die-grotesk/die-grotesk-b-medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Die Grotesk B';
+  src: url('/fonts/die-grotesk/die-grotesk-b-bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+/* ---- Brand tokens (shared by takeout + search) ---- */
+:root {
+  --gf-fir-dark: #08251a;   /* deepest background          */
+  --gf-fir:      #0d3a29;   /* raised surfaces / cards      */
+  --gf-fir-2:    #114a35;   /* hover surface                */
+  --gf-fir-light:#197050;   /* hairlines / tactile shadow   */
+  --gf-lime:     #abff44;   /* primary accent — rationed    */
+  --gf-grass:    #7ddd3d;
+  --gf-go:       #3ab533;   /* "good to go" check green     */
+  --gf-teal-lt:  #91dbda;
+  --gf-teal-dk:  #007b79;
+  --gf-cream:    #eff6e9;   /* primary text on fir          */
+  --gf-n3:       #e4f0da;
+  --gf-n4:       #d8e4cb;
+  --gf-n5:       #c3ceaf;   /* muted body                   */
+  --gf-n6:       #a1ac8d;   /* meta / captions              */
+  --gf-n7:       #717863;
+  --gf-error:    #f13030;
+  --gf-display: 'VC Nudge', 'Die Grotesk B', Arial, sans-serif;
+  --gf-body: 'Die Grotesk B', system-ui, -apple-system, sans-serif;
+  --gf-mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* ---- Brand emphasized-text treatment (headless: text-stroke utilities) ----
+   Lime fill + 0.8px dark-fir stroke, paint-order stroke fill — the way the
+   brand highlights a word inside a headline. Also the extrusion palette for
+   layered/stacked display numbers. */
+.gf-text-stroke-lime {
+  -webkit-text-stroke: 0.8px var(--gf-fir-dark);
+  -webkit-text-fill-color: var(--gf-lime);
+  color: var(--gf-lime);
+  paint-order: stroke fill;
+}
+.gf-text-stroke-cream {
+  -webkit-text-stroke: 0.8px var(--gf-fir-dark);
+  -webkit-text-fill-color: var(--gf-cream);
+  color: var(--gf-cream);
+  paint-order: stroke fill;
+}
+:root {
+  /* Headless design tokens (semantic names) — so ported components can use the
+     same var() references as the optimizely.com source. */
+  --color-primary-1: #ffffff;
+  --color-primary-lfgreen: #abff44;
+  --color-lfgreen-100: #abff44;
+  --color-primary-grass: #7ddd3d;
+  --color-primary-goodtogo: #3ab533;
+  --color-green-goodtogo: #3ab533;
+  --color-secondary-darkfir: #08251a;
+  --color-secondary-ltblue: #91dbda;
+  --color-fir-midfir: #0d3a29;
+  --color-tertiary-midfir: #0d3a29;
+  --color-fir-lightfir: #197050;
+  --color-tertiary-2: #eff6e9;
+  --color-tertiary-4: #d8e4cb;
+  --color-tertiary-5: #c3ceaf;
+  --color-tertiary-6: #a1ac8d;
+  --color-tertiary-7: #717863;
+  --color-extrusion-1: #abff44;
+  --color-extrusion-2: #3ab533;
+  --color-error-darkred: #f13030;
+  /* radii */
+  --radius-form-field: 16px;
+  --radius-cta-sml: 12px;
+  --radius-module-sm: 16px;
+  --radius-module-med: 24px;
+  --radius-icon-sm: 8px;
+  --radius-xxs: 8px;
+
+  /* Stacked-heading extrusion ramp (brightest → darkest), from the brand */
+  --gf-ex-1: #abff44;
+  --gf-ex-2: #3ab533;
+  --gf-ex-3: #40a142;
+  --gf-ex-4: #2e8c45;
+  --gf-ex-5: #227d47;
+  --gf-ex-6: #166e49;
+  --gf-ex-7: #116344;
+  --gf-ex-8: #0d593e;
+}
+
+/* ============================================================
+   .cmp-takeout — the scoped brand skin
+   ============================================================ */
+.cmp-takeout {
+  background-color: var(--gf-fir-dark);
+  color: var(--gf-cream);
+  font-family: var(--gf-body);
+}
+
+/* Display headings → VC Nudge. Specificity beats the global .rte clamps.
+   Bare card titles stay in Die Grotesk; opt headlines in with .font-display. */
+.cmp-takeout .rte h1, .cmp-takeout .t-heading-1,
+.cmp-takeout .rte h2, .cmp-takeout .t-heading-2,
+.cmp-takeout .rte h3, .cmp-takeout .t-heading-3,
+.cmp-takeout .font-display {
+  font-family: var(--gf-display);
+  color: var(--gf-cream);
+  /* Brand headings use letter-spacing:0 — VC Nudge is already semi-normal
+     width; negative tracking is what made it look squished. */
+  letter-spacing: 0;
+}
+.cmp-takeout .rte h1, .cmp-takeout .t-heading-1 { font-weight: 800; line-height: 1; }
+.cmp-takeout .rte h2, .cmp-takeout .t-heading-2 { font-weight: 600; line-height: 1.02; }
+.cmp-takeout .rte h3, .cmp-takeout .t-heading-3 { font-weight: 600; line-height: 1.04; }
+
+/* Body copy → Die Grotesk on soft cream-green. */
+.cmp-takeout .rte p, .cmp-takeout .rte li { color: var(--gf-n4); font-weight: 400; }
+.cmp-takeout .t-subtitle { color: var(--gf-cream); font-weight: 400; font-family: var(--gf-body); }
+
+/* Overline → Roboto Mono, lime, wider tracking (brand label register). */
+.cmp-takeout .t-overline,
+.cmp-takeout .rte .t-overline {
+  font-family: var(--gf-mono);
+  color: var(--gf-lime);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+
+/* Links inside copy pick up lime. */
+.cmp-takeout .rte a { color: var(--gf-lime); text-underline-offset: 3px; }
+
+/* ---- Surfaces: fir cards with 24px radius ---- */
+.cmp-takeout .gf-card {
+  background: var(--gf-fir);
+  border: 1px solid color-mix(in srgb, var(--gf-fir-light) 50%, transparent);
+  border-radius: 24px;
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.cmp-takeout .gf-card--hover:hover {
+  border-color: var(--gf-fir-light);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- The signature "lift": tactile hard-offset shadow buttons ----
+   Overrides the shared Button's tailwind utilities via higher
+   specificity (.cmp-takeout .button = 0,2,0 beats .bg-* = 0,1,0). */
+.cmp-takeout .button {
+  font-family: var(--gf-body);
+  font-weight: 500;
+  border-radius: 14px;
+  padding: 0.9rem 1.6rem;
+  border: 2px solid transparent;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background-color 0.18s ease;
+}
+/* primary variant (.bg-gray-200) → lime, fir text, lifts up-right */
+.cmp-takeout .button.bg-gray-200 {
+  background: var(--gf-lime) !important;
+  color: var(--gf-fir-dark) !important;
+  border-color: var(--gf-lime);
+  box-shadow: -2px 2px 0 0 var(--gf-fir-light);
+}
+.cmp-takeout .button.bg-gray-200:hover,
+.cmp-takeout .button.bg-gray-200:focus {
+  background: var(--gf-grass) !important;
+  transform: translate(2px, -2px);
+  box-shadow: -4px 4px 0 0 var(--gf-fir-light);
+}
+.cmp-takeout .button.bg-gray-200:active { transform: translate(0, 0); box-shadow: -1px 1px 0 0 var(--gf-fir-light); }
+.cmp-takeout .button.bg-gray-200 .icon-arrowRight,
+.cmp-takeout .button.bg-gray-200 svg { color: var(--gf-fir-dark); }
+
+/* emphasized variant (.bg-theme-color) → lime as well */
+.cmp-takeout .button.bg-theme-color {
+  background: var(--gf-lime) !important;
+  color: var(--gf-fir-dark) !important;
+  border-color: var(--gf-lime);
+  box-shadow: -2px 2px 0 0 var(--gf-fir-light);
+}
+.cmp-takeout .button.bg-theme-color:hover,
+.cmp-takeout .button.bg-theme-color:focus {
+  background: var(--gf-grass) !important;
+  transform: translate(2px, -2px);
+  box-shadow: -4px 4px 0 0 var(--gf-fir-light);
+}
+
+/* secondary variant (.bg-vulcan-90) → outlined fir, cream text */
+.cmp-takeout .button.bg-vulcan-90 {
+  background: transparent !important;
+  color: var(--gf-cream) !important;
+  border-color: var(--gf-fir-light);
+  box-shadow: -2px 2px 0 0 color-mix(in srgb, var(--gf-fir-light) 60%, transparent);
+}
+.cmp-takeout .button.bg-vulcan-90:hover,
+.cmp-takeout .button.bg-vulcan-90:focus {
+  background: var(--gf-fir) !important;
+  transform: translate(2px, -2px);
+  box-shadow: -4px 4px 0 0 var(--gf-fir-light);
+}
+
+/* ============================================================
+   ABMHyperPage (.abm-page) — the LIVE competitive-takeout surface.
+   Every published comparison page routes here. Its CSS is fully
+   token-driven (abm-variables.css), so we only need to repoint the
+   PRIMITIVE tokens scoped to .abm-page; the mapped tokens
+   (--accent-primary, --bg-primary, --text-primary, --gradient-accent…)
+   are var() indirections and inherit these at the use site.
+
+   The per-page --brand-accent (the customer's own colour, e.g. Toyota
+   red) is intentionally left alone — that's the personalization hook.
+   ============================================================ */
+.abm-page {
+  /* primary accent: electric blue → lime */
+  --optimizely-blue: #abff44;
+  --optimizely-blue-80: #7ddd3d;
+  --optimizely-blue-60: #c8ff8f;
+  --optimizely-blue-40: #d8e4cb;
+  --optimizely-blue-20: #e4f0da;
+
+  /* dark backgrounds: vulcan → fir */
+  --vulcan: #08251a;
+  --vulcan-95: #0d3a29;
+  --vulcan-90: #114a35;
+  --vulcan-85: #197050;
+  --ebony: #061d14;
+  --dark-blue: #061d14;
+  --dark-blue-90: #0d3a29;
+
+  /* text: cool grays → warm green-neutrals */
+  --bright-gray: #eff6e9;
+  --mischka: #d8e4cb;
+  --santas-gray: #a1ac8d;
+  --pale-sky: #717863;
+
+  /* glows + accent border keyed to lime (literal rgba — override directly) */
+  --accent-glow: rgba(171, 255, 68, 0.22);
+  --accent-glow-strong: rgba(171, 255, 68, 0.45);
+  --border-accent: rgba(171, 255, 68, 0.30);
+
+  /* check/positive green → brand "good to go" */
+  --green: #abff44;
+  /* secondary cyan accent → brand teal */
+  --light-blue: #91dbda;
+
+  /* type → brand faces */
+  --font-sans: 'Die Grotesk B', 'Figtree', Arial, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  background-color: #08251a;
+}
+/* Display headings → VC Nudge (the brand's display face). */
+.abm-page .hero__title,
+.abm-page .section__title,
+.abm-page .stat__value,
+.abm-page .cta__title {
+  font-family: 'VC Nudge', 'Die Grotesk B', Arial, sans-serif;
+  letter-spacing: -0.015em;
+}
+/* Eyebrow / label register → Roboto Mono, lime. */
+.abm-page .section__label,
+.abm-page .hero__badge {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+}
+
+/* ---- CarouselLogos — seamless silhouette marquee (dark variant) ---- */
+.abm-page .proof__carousel {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  padding: 8px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.abm-page .proof__carousel-track {
+  display: flex;
+  align-items: center;
+  gap: 72px;
+  width: max-content;
+  animation: gf-marquee 38s linear infinite;
+}
+.abm-page .proof__carousel-item img {
+  height: 30px;
+  width: auto;
+  display: block;
+  /* brightness-0 → silhouette; invert → white silhouette on dark */
+  filter: brightness(0) invert(1);
+  opacity: 0.62;
+}
+@keyframes gf-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .abm-page .proof__carousel-track { animation: none; flex-wrap: wrap; justify-content: center; }
+}
+
+/* ---- Lime hairline grid motif (replaces the white grid overlay) ---- */
+.cmp-takeout .gf-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--gf-lime) 6%, transparent) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(0deg,  color-mix(in srgb, var(--gf-lime) 6%, transparent) 0 1px, transparent 1px 96px);
+  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(120% 80% at 50% 0%, #000 0%, transparent 70%);
+}

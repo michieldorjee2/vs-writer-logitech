@@ -94,18 +94,18 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
   };
   addEventListener('resize', resizeHandler);
 
-  // ---- Display P3 colors ----
+  // ---- Display P3 colors — brand green/teal laser spectrum ----
   const COLORS = [
-    'color(display-p3 0 0.2 1)',
-    'color(display-p3 0.1 0.5 1)',
-    'color(display-p3 0 0.85 1)',
-    'color(display-p3 0.4 0.1 1)',
-    'color(display-p3 0.65 0.2 1)',
-    'color(display-p3 0.8 0.85 1)',
-    'color(display-p3 0.05 0.6 1)',
-    'color(display-p3 0 0.1 0.9)',
-    'color(display-p3 0.3 0.05 1)',
-    'color(display-p3 0 0.7 1)',
+    'color(display-p3 0.67 1 0.27)',     // lime
+    'color(display-p3 0.49 0.87 0.24)',  // grass
+    'color(display-p3 0.23 0.71 0.2)',   // good-to-go
+    'color(display-p3 0.8 1 0.55)',      // light lime
+    'color(display-p3 0.57 0.86 0.85)',  // light teal
+    'color(display-p3 0 0.48 0.47)',     // dark teal
+    'color(display-p3 0.94 0.96 0.91)',  // cream
+    'color(display-p3 0.1 0.44 0.27)',   // forest
+    'color(display-p3 0.3 0.78 0.35)',   // mid green
+    'color(display-p3 0.4 0.85 0.8)',    // teal
   ];
 
   // Inject brand accent color into ~30% of lasers
@@ -405,10 +405,10 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
 
     if (expandR > 0 && bgAlpha > 0) {
       const bgGrad = wCtx!.createRadialGradient(cx, cy, 0, cx, cy, expandR);
-      bgGrad.addColorStop(0, `rgba(3, 6, 18, ${bgAlpha})`);
-      bgGrad.addColorStop(0.65, `rgba(3, 6, 18, ${bgAlpha * 0.97})`);
-      bgGrad.addColorStop(0.9, `rgba(3, 6, 18, ${bgAlpha * 0.7})`);
-      bgGrad.addColorStop(1, `rgba(3, 6, 18, 0)`);
+      bgGrad.addColorStop(0, `rgba(6, 26, 18, ${bgAlpha})`);
+      bgGrad.addColorStop(0.65, `rgba(6, 26, 18, ${bgAlpha * 0.97})`);
+      bgGrad.addColorStop(0.9, `rgba(6, 26, 18, ${bgAlpha * 0.7})`);
+      bgGrad.addColorStop(1, `rgba(6, 26, 18, 0)`);
       wCtx!.fillStyle = bgGrad;
       wCtx!.fillRect(0, 0, W, H);
     }
@@ -563,7 +563,7 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
       if (flash > 0) {
         const fGrad = wCtx!.createRadialGradient(cx, cy, 0, cx, cy, 200);
         fGrad.addColorStop(0, `rgba(255, 255, 255, ${flash})`);
-        fGrad.addColorStop(0.3, `rgba(200, 220, 255, ${flash * 0.4})`);
+        fGrad.addColorStop(0.3, `rgba(210, 255, 180, ${flash * 0.4})`);
         fGrad.addColorStop(1, 'rgba(0,0,0,0)');
         wCtx!.fillStyle = fGrad;
         wCtx!.fillRect(cx - 200, cy - 200, 400, 400);
@@ -572,13 +572,13 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
       const grad = wCtx!.createRadialGradient(cx, cy, 0, cx, cy, glowR);
       grad.addColorStop(
         0,
-        `color(display-p3 0.7 0.8 1 / ${0.45 * alpha})`
+        `color(display-p3 0.8 1 0.55 / ${0.45 * alpha})`
       );
       grad.addColorStop(
         0.4,
-        `color(display-p3 0 0.3 1 / ${0.22 * alpha})`
+        `color(display-p3 0.4 0.85 0.3 / ${0.22 * alpha})`
       );
-      grad.addColorStop(1, `color(display-p3 0 0.1 1 / 0)`);
+      grad.addColorStop(1, `color(display-p3 0.2 0.5 0.2 / 0)`);
       wCtx!.fillStyle = grad;
       wCtx!.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
     }

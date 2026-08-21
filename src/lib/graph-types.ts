@@ -227,6 +227,15 @@ export interface CompetitorComparisonPage {
         Role: string;
         LinkedInUrl: { default: string | null } | null;
         AvatarColor: string | null;
+        /* Engagement fields, sourced from Salesforce by the account_page
+           agent. All optional — pages written before these existed simply
+           render the card as it always looked. */
+        EngagementTier?: EngagementTier | null;
+        EngagementNote?: string | null;
+        /** Set once a person page exists; the card links to
+         *  /{companySlug}/{PersonSlug} when present. */
+        PersonSlug?: string | null;
+        CrmContactId?: string | null;
     }> | null;
     techStack: Array<{ Name: string; ColorTag: string | null }> | null;
     investments: Array<{ Name: string; IsPrimary: boolean | null }> | null;
@@ -351,6 +360,49 @@ export interface AppointmentBlock {
     dynamic?: boolean;
 }
 
+// ----- per-customer components (added 2026-05-12) ------------------------
+
+export interface RetailLetterBlock {
+    dateLine?: string | null;
+    greeting: string;
+    paragraphs: string[];
+    signoff?: string | null;
+}
+
+export interface RetailPolaroid {
+    /** Graph returns ContentUrl as { default: "..." }. Code that consumes
+     * a polaroid should call resolveUrl(p.imageUrl) for portability. */
+    imageUrl: string | { default: string };
+    caption: string;
+    rotate?: number | null;
+}
+
+export interface RetailWornAnchor {
+    name: string;
+    qualifier?: string | null;
+    season?: string | null;
+    ownedImageUrl?: string | { default: string } | null;
+    pairedName?: string | null;
+    pairedQualifier?: string | null;
+    pairedImageUrl?: string | { default: string } | null;
+    pairedPriceLabel?: string | null;
+}
+
+export interface OpalQuestion {
+    question: string;
+    answer: string;
+}
+
+export interface CareTimelineEntry {
+    itemName: string;
+    kind?: string | null;
+    dueLine?: string | null;
+    status?: string | null;
+    note?: string | null;
+    maker?: string | null;
+    imageUrl?: string | { default: string } | null;
+}
+
 export interface RetailCustomerPage {
     _metadata: {
         key: string;
@@ -365,20 +417,290 @@ export interface RetailCustomerPage {
     customerDisplayName?: string | null;
     register: RetailRegister;
     monthStamp?: string | null;
-    // v3 editorial fields
+    // Personalization scaffolding (per customer)
+    primaryCity?: string | null;
+    neighborhood?: string | null;
+    stylistName?: string | null;
+    stylistBoutique?: string | null;
+    initials?: string | null;
+    personalHeroLine1?: string | null;
+    personalHeroLine2?: string | null;
+    // Editorial copy
     editorialIntro?: string | null;
     stylistNoteBody?: string | null;
     stylistNoteSignedBy?: string | null;
     closingReflection?: string | null;
+    // Composed components
     hero?: RetailHeroBlock | null;
+    letter?: RetailLetterBlock | null;
+    polaroids?: RetailPolaroid[] | null;
     heldForYou?: HeldForYouBlock | null;
     setAside?: SetAsideBlock | null;
     atelierNote?: AtelierNoteBlock | null;
     smallInvitation?: SmallInvitationBlock | null;
     appointment?: AppointmentBlock | null;
+    wornLabel?: string | null;
+    wornAnchors?: RetailWornAnchor[] | null;
+    questions?: OpalQuestion[] | null;
+    careLabel?: string | null;
+    careTimeline?: CareTimelineEntry[] | null;
+    makerNote?: string | null;
     footerLine?: string | null;
     deviceDegraded?: boolean;
     generatedAt?: string;
     generatedBy?: string;
     canvasVersion?: number;
 }
+
+// ============================================================================
+// FinServPage — Meridian Bank financial-services template
+// ============================================================================
+
+/** Which audience the page is personalized for. B2B → "book a meeting",
+ *  B2C → "open an account online". Drives CTA + profile-callout register. */
+export type FinServAudience = 'b2b' | 'b2c';
+
+export interface FinServCTA {
+    label: string;
+    href: string;
+    /** Optional reassurance line (e.g. "No phone call required"). */
+    note?: string | null;
+}
+
+export interface FinServHeroBlock {
+    /** Personalized eyebrow — "For Carlos Freeman". */
+    eyebrow?: string | null;
+    headline: string;
+    subhead?: string | null;
+    cta?: FinServCTA | null;
+    /** Reassurance chips under the CTA (e.g. "FDIC insured", "Opens in 3 min"). */
+    highlights?: string[] | null;
+}
+
+export interface FinServScenarioBlock {
+    label?: string | null;
+    title: string;
+    paragraphs: string[];
+    /** Emphasised line pulled out of the narrative. */
+    pullLine?: string | null;
+}
+
+export interface FinServProblem {
+    title: string;
+    description: string;
+    /** Optional figure shown above the title (e.g. "4.6%", "11 days"). */
+    stat?: string | null;
+}
+
+export interface FinServProblemsBlock {
+    label?: string | null;
+    heading?: string | null;
+    items: FinServProblem[];
+}
+
+export interface FinServStep {
+    title: string;
+    description: string;
+}
+
+export interface FinServHowItWorksBlock {
+    label?: string | null;
+    heading?: string | null;
+    steps: FinServStep[];
+}
+
+export interface FinServProfileBlock {
+    quote: string;
+    attribution?: string | null;
+    role?: string | null;
+    company?: string | null;
+    /** Initials for the avatar chip (e.g. "C.F."). */
+    initials?: string | null;
+}
+
+export interface FinServFooterBlock {
+    legal?: string | null;
+    /** Trust badges — "FDIC Member", "Equal Housing Lender", … */
+    badges?: string[] | null;
+}
+
+export interface FinServStat {
+    value: string;
+    label: string;
+}
+
+/** A selectable account in the B2C savings-application modal. */
+export interface FinServSavingsProduct {
+    id?: string | null;
+    name: string;
+    apy: string;
+    benefit: string;
+}
+
+export interface FinServSavingsConfig {
+    products: FinServSavingsProduct[];
+    defaultDeposit?: string | null;
+}
+
+/** B2B "book a meeting" modal config. */
+export interface FinServMeetingConfig {
+    contactName?: string | null;
+    company?: string | null;
+    slots?: string[] | null;
+}
+
+export interface FinServPage {
+    _metadata: {
+        key: string;
+        url: { default: string; hierarchical: string };
+        published?: string | null;
+    };
+    template: 'finserv';
+    PageTitle: string;
+    MetaDescription: string;
+    CanonicalUrl?: { default: string } | null;
+    /** Institution brand — "Meridian Bank". */
+    brand: string;
+    /** Wordmark tagline shown in header / footer. */
+    tagline?: string | null;
+    audience: FinServAudience;
+    /** Flat slug used for routing + demo lookup. */
+    targetSlug: string;
+    /** Person the page is personalized for ("Carlos Freeman" / "Jordan Miller"). */
+    targetName?: string | null;
+    /** Header bar CTA. */
+    headerCta?: FinServCTA | null;
+    /** Brightstream nav links shown in the sticky header. */
+    navLinks?: string[] | null;
+    /** Full-bleed hero background image (photographic, Brightstream identity). */
+    heroImageUrl?: string | null;
+    /** Hero trust stats row ("2M+ customers", "$45B AUM", …). */
+    stats?: FinServStat[] | null;
+    /** B2C: drives the multi-step savings-application modal. */
+    savings?: FinServSavingsConfig | null;
+    /** B2B: drives the "book a meeting" modal. */
+    meeting?: FinServMeetingConfig | null;
+    // Composed blocks
+    hero: FinServHeroBlock;
+    scenario?: FinServScenarioBlock | null;
+    problems?: FinServProblemsBlock | null;
+    howItWorks?: FinServHowItWorksBlock | null;
+    profile?: FinServProfileBlock | null;
+    footer?: FinServFooterBlock | null;
+    generatedAt?: string;
+    generatedBy?: string;
+}
+
+// ============================================================================
+// PersonPage — 1:1 page for one named buyer at a target account.
+// Lives as a child of that account's CompetitorComparisonPage:
+//   /{companySlug}/{personSlug}
+// ============================================================================
+
+/** How far into a relationship this person already is, per Salesforce.
+ *  `key`     — named on an open opportunity, or an identified champion.
+ *  `engaged` — real logged activity in the last 6 months.
+ *  `known`   — appears in CRM or research, no recent activity.
+ *  The tier decides whether the page continues a conversation or opens one. */
+export type EngagementTier = 'key' | 'engaged' | 'known';
+
+export interface PersonTouchpoint {
+    Date: string | null;
+    Kind: 'meeting' | 'call' | 'email' | 'demo' | 'event' | null;
+    Summary: string | null;
+    OptimizelyPerson: string | null;
+}
+
+export interface PersonRemitPoint {
+    Title: string | null;
+    Description: string | null;
+    Metric: string | null;
+}
+
+export interface PersonPeerProof {
+    Quote: string | null;
+    PersonName: string | null;
+    PersonTitle: string | null;
+    Company: string | null;
+    SourceUrl: { default: string } | string | null;
+}
+
+export interface PersonTeamMember {
+    Initials: string | null;
+    Name: string | null;
+    Role: string | null;
+    Email: string | null;
+    AvatarColor: string | null;
+    AlreadyMet: boolean | null;
+}
+
+export interface PersonPage {
+    _metadata: {
+        key: string;
+        url: { default: string; hierarchical: string };
+        published?: string | null;
+    };
+    template?: string | null;
+    __template?: string | null;
+
+    companySlug: string | null;
+    companyName: string | null;
+    personSlug: string | null;
+    crmContactId?: string | null;
+
+    PageTitle?: string | null;
+    MetaDescription?: string | null;
+    /** Person pages name a real individual, so they default to noindex. */
+    noIndex?: boolean | null;
+
+    personName: string | null;
+    personTitle: string | null;
+    personInitials: string | null;
+    personLinkedIn?: { default: string } | string | null;
+    personAvatarColor?: string | null;
+    companyLogo?: { default: string } | string | null;
+    brandAccentColor?: string | null;
+
+    heroEyebrow?: string | null;
+    heroHeadline?: string | null;
+    heroSubheadline?: string | null;
+    heroCtaText?: string | null;
+    heroCtaUrl?: { default: string } | string | null;
+
+    engagementTier?: EngagementTier | null;
+    engagementHeadline?: string | null;
+    engagementSummary?: string | null;
+    touchpoints?: PersonTouchpoint[] | null;
+    openOpportunityName?: string | null;
+    openOpportunityStage?: string | null;
+    openOpportunityDetail?: string | null;
+
+    remitHeadline?: string | null;
+    remitIntro?: string | null;
+    remitPoints?: PersonRemitPoint[] | null;
+
+    peerProofHeadline?: string | null;
+    peerProof?: PersonPeerProof[] | null;
+
+    teamHeadline?: string | null;
+    team?: PersonTeamMember[] | null;
+
+    ctaTitle?: string | null;
+    ctaBody?: string | null;
+    ctaButtonText?: string | null;
+    meetingUrl?: { default: string } | string | null;
+    footerLine?: string | null;
+
+    generatedAt?: string | null;
+    generatedBy?: string | null;
+}
+
+/** Normalize ContentUrl-or-string into a plain string. Graph returns
+ *  `{ default: "..." }` for url-typed properties; demo content uses bare
+ *  strings. Components consume strings only via this helper. */
+export function resolveUrl(u: string | { default: string } | null | undefined): string | null {
+  if (!u) return null;
+  if (typeof u === "string") return u;
+  return u.default || null;
+}
+
