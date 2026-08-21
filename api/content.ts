@@ -130,7 +130,7 @@ query GetPage($slug: String!) {
       ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
       footerTagline footerLegal
       intelStats { Value Label }
-      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor }
+      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor EngagementTier EngagementNote PersonSlug CrmContactId }
       techStack { Name ColorTag }
       investments { Name IsPrimary }
       newsItems { Date Headline Url { default } }
