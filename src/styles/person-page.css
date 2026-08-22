@@ -93,16 +93,31 @@
    plate tinted with their employer's brand colour. */
 .person__hero {
   position: relative;
+  min-height: 82vh;
+  min-height: 82svh;
+  display: flex;
+  align-items: center;
   padding: var(--space-20) var(--space-8) var(--space-24);
   background:
     radial-gradient(
-      120% 120% at 12% 0%,
-      color-mix(in srgb, var(--brand-accent, var(--optimizely-blue)) 16%, transparent) 0%,
+      130% 120% at 50% 45%,
+      color-mix(in srgb, var(--brand-accent, var(--optimizely-blue)) 13%, transparent) 0%,
       transparent 62%
     ),
     var(--gradient-hero);
   overflow: hidden;
 }
+/* The zoomed system sits behind the note. Purely decorative — the page reads
+   complete with the canvas absent or blank. */
+.person__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.person__hero-inner { position: relative; z-index: 1; width: 100%; max-width: var(--max-width); margin: 0 auto; }
 
 /* A single hairline of the target's brand colour across the top — the one
    place their colour is allowed to lead. */
@@ -141,7 +156,7 @@
 .person__crumb-sep { color: var(--text-tertiary); }
 .person__crumb-here { color: var(--text-primary); }
 
-.person__plate { display: flex; align-items: flex-start; gap: var(--space-8); }
+.person__ident { margin-bottom: var(--space-10); }
 
 /* Same idiom as .intel__avatar on the company page: a translucent tint of the
    colour with the colour itself as the text. A solid fill breaks the moment an
@@ -478,4 +493,204 @@
   .person__avatar { --size: 72px; }
   .person__crumb { margin-bottom: var(--space-10); }
   .person__rail { grid-auto-columns: minmax(200px, 1fr); }
+}
+
+/* ===== 01 · The note =====
+   A message, not a value proposition. Set on a plate so it reads as something
+   written rather than something laid out. */
+.person__frame {
+  display: inline-block;
+  margin-left: var(--space-4);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.person__note {
+  max-width: 60ch;
+  padding: var(--space-8);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-fir-midfir) 88%, transparent);
+  backdrop-filter: blur(6px);
+  border-left: 2px solid var(--brand-accent, var(--color-primary-lfgreen));
+  margin-bottom: var(--space-8);
+}
+.person__note-body {
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+}
+.person__sig { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.person__sig-mark {
+  width: 36px; height: 36px; flex: 0 0 36px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  color: color-mix(in srgb, var(--light-blue) 62%, white);
+  background: color-mix(in srgb, var(--light-blue) 16%, transparent);
+}
+.person__sig-who { display: flex; flex-direction: column; font-size: var(--text-sm); color: var(--text-secondary); }
+.person__sig-who strong { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+.person__sig-date { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }
+
+/* ===== 02 · Provenance =====
+   The register is the whole point: told / read / assumed, colour-coded so the
+   reader can see at a glance which claims are their own words and which are
+   our inference. */
+.person__section--research { background: var(--bg-secondary); }
+.person__prov { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+.person__prov-item {
+  --reg: var(--santas-gray);
+  background: var(--color-fir-midfir);
+  border-radius: 16px;
+  padding: var(--space-6);
+  border-top: 2px solid var(--reg);
+}
+.person__prov-item[data-register="told"]    { --reg: var(--color-primary-lfgreen); }
+.person__prov-item[data-register="read"]    { --reg: var(--light-blue); }
+.person__prov-item[data-register="assumed"] { --reg: var(--yellow); }
+.person__prov-reg {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--reg);
+  margin-bottom: var(--space-3);
+}
+.person__prov-text { margin: 0; font-size: var(--text-base); line-height: var(--leading-normal); }
+.person__prov-src {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.person__prov-src a { color: var(--light-blue); text-decoration: none; }
+.person__prov-src a:hover { text-decoration: underline; }
+
+/* ===== 03 · Scorecard ===== */
+.person__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+.person__card {
+  position: relative;
+  background: var(--color-fir-midfir);
+  border-radius: 16px;
+  padding: var(--space-8) var(--space-6) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.person__card-n {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  color: color-mix(in srgb, var(--brand-accent, var(--text-tertiary)) 60%, white);
+  opacity: 0.35;
+}
+.person__card-measure { margin: 0; padding-right: var(--space-10); font-size: var(--text-lg); font-weight: var(--font-weight-semibold); line-height: var(--leading-snug); }
+.person__card-why, .person__card-change { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); line-height: var(--leading-relaxed); }
+.person__card-tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+.person__card-tag--go { color: var(--color-primary-lfgreen); }
+.person__card-metric {
+  align-self: flex-start;
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-primary-lfgreen) 12%, transparent);
+  color: var(--color-primary-lfgreen);
+}
+
+/* ===== 04 · Solutions in orbit =====
+   Numbered by relevance, because the order IS the argument — it mirrors the
+   orbit in the hero. */
+.person__solutions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.person__solution {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-8);
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--border-subtle);
+  align-items: start;
+}
+.person__solution:last-child { border-bottom: 1px solid var(--border-subtle); }
+.person__solution-badge {
+  display: inline-grid;
+  place-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-primary-lfgreen) 14%, transparent);
+  color: var(--color-primary-lfgreen);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.person__solution-headline { margin: 0 0 var(--space-3); font-size: var(--text-xl); font-weight: var(--font-weight-semibold); line-height: var(--leading-snug); }
+.person__solution-body p { margin: 0 0 var(--space-3); max-width: 68ch; font-size: var(--text-base); color: var(--text-secondary); line-height: var(--leading-relaxed); }
+.person__solution-why {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs) !important;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--brand-accent, var(--accent-secondary)) !important;
+}
+
+/* ===== 06 · The one number =====
+   Gradient-clipped, the same treatment the company page gives its ROI metric. */
+.person__section--number { text-align: center; background: var(--bg-secondary); }
+.person__bignum {
+  margin: var(--space-6) 0 var(--space-4);
+  font-size: clamp(4rem, 12vw, 9rem);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(
+    135deg,
+    var(--brand-accent, var(--color-primary-lfgreen)),
+    color-mix(in srgb, var(--brand-accent, var(--light-blue)) 55%, white)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.person__bignum-fix { font-size: 0.5em; }
+.person__bignum-label { font-size: var(--text-xl); color: var(--text-primary); margin: 0 auto var(--space-4); max-width: 34ch; }
+.person__bignum-detail { font-size: var(--text-sm); color: var(--text-tertiary); margin: 0 auto; max-width: 56ch; }
+.person__bignum-detail a { color: var(--accent-primary); text-decoration: none; }
+.person__bignum-detail a:hover { text-decoration: underline; }
+
+/* ===== 07 · Closing ===== */
+.person__closing .person__team { justify-content: center; margin: var(--space-8) auto var(--space-10); max-width: 720px; }
+.person__closing .person__member { text-align: left; }
+
+@media (max-width: 760px) {
+  .person__solution { grid-template-columns: 1fr; gap: var(--space-4); }
+  .person__note { padding: var(--space-6); }
+  .person__hero { min-height: auto; }
 }

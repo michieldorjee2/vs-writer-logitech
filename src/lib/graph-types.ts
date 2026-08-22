@@ -634,6 +634,30 @@ export interface PersonTeamMember {
     AlreadyMet: boolean | null;
 }
 
+
+export type ProvenanceRegister = 'told' | 'read' | 'assumed';
+
+export interface PersonProvenance {
+    Register: ProvenanceRegister | null;
+    Text: string | null;
+    SourceLabel: string | null;
+    SourceUrl: { default: string } | string | null;
+}
+
+export interface PersonScorecardItem {
+    Measure: string | null;
+    WhyHard: string | null;
+    WhatChanges: string | null;
+    Metric: string | null;
+}
+
+export interface PersonSolution {
+    Product: string | null;
+    Headline: string | null;
+    Body: string | null;
+    WhyFirst: string | null;
+}
+
 export interface PersonPage {
     _metadata: {
         key: string;
@@ -684,6 +708,35 @@ export interface PersonPage {
 
     teamHeadline?: string | null;
     team?: PersonTeamMember[] | null;
+
+    /** The seat this page argues to, derived from the title rather than
+     *  looked up — a third of real stakeholder titles match no archetype. */
+    roleFrame?: string | null;
+
+    noteBody?: string | null;
+    noteSignedBy?: string | null;
+    noteSignedByRole?: string | null;
+    noteSignedByInitials?: string | null;
+    noteDate?: string | null;
+
+    researchHeadline?: string | null;
+    researchClaim?: string | null;
+    provenance?: PersonProvenance[] | null;
+
+    scorecardHeadline?: string | null;
+    scorecardIntro?: string | null;
+    scorecard?: PersonScorecardItem[] | null;
+
+    solutionsHeadline?: string | null;
+    solutionsIntro?: string | null;
+    solutions?: PersonSolution[] | null;
+
+    keyNumberValue?: string | null;
+    keyNumberPrefix?: string | null;
+    keyNumberSuffix?: string | null;
+    keyNumberLabel?: string | null;
+    keyNumberDetail?: string | null;
+    keyNumberCitationUrl?: { default: string } | string | null;
 
     ctaTitle?: string | null;
     ctaBody?: string | null;
