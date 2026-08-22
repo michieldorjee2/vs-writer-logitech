@@ -47,6 +47,7 @@ function countUp(el: HTMLElement, target: number, duration = 1800): () => void {
 
 export default function PersonPage({ page }: Props) {
     const rootRef = useRef<HTMLElement>(null);
+    const solutionKey = (page.solutions ?? []).map((s) => s.Product ?? '').join('|');
 
     // ---- the zoomed system canvas ----
     useEffect(() => {
@@ -69,7 +70,9 @@ export default function PersonPage({ page }: Props) {
             accent: page.brandAccentColor,
         });
         return () => cleanupPersonSystem();
-    }, [page.solutions, page.companyName, page.brandAccentColor]);
+        // Depend on a stable key, not the array identity — page.solutions is a
+        // fresh reference every render, which would re-init the canvas each time.
+    }, [solutionKey, page.companyName, page.brandAccentColor]);
 
     // ---- reveal + counters ----
     useEffect(() => {

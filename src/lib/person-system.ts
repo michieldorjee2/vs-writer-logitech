@@ -75,6 +75,11 @@ export function initPersonSystem(
   solutions: SolutionNode[],
   opts: { companyLabel?: string | null; accent?: string | null } = {},
 ): void {
+  // Idempotent: module-level rafId means a second init would orphan the first
+  // loop, which then draws to the same canvas forever. Two or three re-renders
+  // and the main thread is saturated.
+  cleanupPersonSystem();
+
   const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
   if (!canvas) return;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
@@ -252,7 +257,13 @@ export function initPersonSystem(
   }
 
   layout();
-  resizeHandler = () => layout();
+  // Debounced: layout() reallocates the star field and forces a reflow, so
+  // running it per resize event during a drag is wasteful.
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  resizeHandler = () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layout, 120);
+  };
   window.addEventListener('resize', resizeHandler);
 
   // Stop drawing once the hero scrolls away — same courtesy the company hero
