@@ -64,11 +64,25 @@ const KIND_LABEL: Record<string, string> = {
     event: 'Event',
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "2026-03-14" -> "14 Mar 2026", parsed off the string rather than through a
+ * Date. `toLocaleDateString` resolves against the runtime's timezone and
+ * locale, so the server (UTC) and the reader's browser can format the same ISO
+ * date differently — which React reports as a hydration mismatch and then
+ * throws away the server-rendered tree to recover from.
+ *
+ * Anything that isn't a plain ISO date passes through untouched, so a
+ * hand-entered value never renders as "Invalid Date".
+ */
 function formatDate(iso: string | null | undefined): string {
     if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+    if (!m) return iso;
+    const month = MONTHS[Number(m[2]) - 1];
+    if (!month) return iso;
+    return `${Number(m[3])} ${month} ${m[1]}`;
 }
 
 function LinkedInIcon() {
