@@ -283,6 +283,16 @@ query GetPersonPage($slug: String!) {
       openOpportunityName openOpportunityStage openOpportunityDetail
       remitHeadline remitIntro
       remitPoints { Title Description Metric }
+      roleFrame
+      noteBody noteSignedBy noteSignedByRole noteSignedByInitials noteDate
+      researchHeadline researchClaim
+      provenance { Register Text SourceLabel SourceUrl { default } }
+      scorecardHeadline scorecardIntro
+      scorecard { Measure WhyHard WhatChanges Metric }
+      solutionsHeadline solutionsIntro
+      solutions { Product Headline Body WhyFirst }
+      keyNumberValue keyNumberPrefix keyNumberSuffix keyNumberLabel keyNumberDetail
+      keyNumberCitationUrl { default }
       peerProofHeadline
       peerProof { Quote PersonName PersonTitle Company SourceUrl { default } }
       teamHeadline
