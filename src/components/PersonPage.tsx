@@ -17,6 +17,7 @@ import { useEffect, useRef } from 'react';
 import type { PersonPage as PersonPageType } from '../lib/graph-types';
 import PersonPageView from './PersonPageView';
 import { initPersonSystem, cleanupPersonSystem, type SolutionNode } from '../lib/person-system';
+import { initStarfield, cleanupStarfield } from '../lib/starfield';
 
 interface Props {
     page: PersonPageType;
@@ -65,11 +66,17 @@ export default function PersonPage({ page }: Props) {
                   { label: 'Exp', rank: 2 },
               ];
 
+        // The company page's own starfield, fixed behind the whole page — not a
+        // hero backdrop. Both surfaces are then set in the same sky.
+        initStarfield({ accent: page.brandAccentColor });
         initPersonSystem('person-system', nodes, {
             companyLabel: page.companyName,
             accent: page.brandAccentColor,
         });
-        return () => cleanupPersonSystem();
+        return () => {
+            cleanupPersonSystem();
+            cleanupStarfield();
+        };
         // Depend on a stable key, not the array identity — page.solutions is a
         // fresh reference every render, which would re-init the canvas each time.
     }, [solutionKey, page.companyName, page.brandAccentColor]);

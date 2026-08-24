@@ -5,8 +5,9 @@
  * orbiting: two organisations meeting in open space. This is the same universe
  * one level closer in. We have flown into that company's system, so:
  *
- *   - stars are fewer, larger, and drift slower, which is what "closer" looks
- *     like without saying it;
+ *   - the sky is the company page's own starfield (src/lib/starfield.ts),
+ *     fixed behind the whole page, so the two surfaces are literally set in
+ *     the same space rather than in a lookalike;
  *   - the company's own mark sits still at the centre as the star — established,
  *     dim, not the subject;
  *   - what orbits it are the Optimizely solutions that matter to THIS seat,
@@ -25,16 +26,6 @@ export interface SolutionNode {
   label: string;
   /** 0 = most relevant to this seat. Drives size, brightness and orbit radius. */
   rank: number;
-}
-
-interface Star {
-  x: number;
-  y: number;
-  r: number;
-  depth: number;
-  alpha: number;
-  twinkle: number;
-  phase: number;
 }
 
 interface Body {
@@ -90,7 +81,6 @@ export function initPersonSystem(
   const accent = opts.accent || PALETTE.cyan;
   const companyLabel = (opts.companyLabel || '').trim();
 
-  let stars: Star[] = [];
   let bodies: Body[] = [];
   let w = 0;
   let h = 0;
@@ -110,23 +100,6 @@ export function initPersonSystem(
     canvas!.height = Math.round(h * dpr);
     ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Sparse and large. The company hero runs hundreds of 1px stars; a dozen
-    // and a half at 1.5-3.5px is the whole difference between "out there" and
-    // "in here".
-    const count = Math.round((w * h) / 42000);
-    stars = Array.from({ length: Math.max(14, Math.min(count, 46)) }, () => {
-      const depth = Math.random();
-      return {
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r: 1.5 + depth * 2,
-        depth,
-        alpha: 0.25 + depth * 0.45,
-        twinkle: 0.4 + Math.random() * 1.1,
-        phase: Math.random() * Math.PI * 2,
-      };
-    });
-
     bodies = solutions.slice(0, 4).map((s, i) => {
       const o = orbitFor(s.rank, w, h);
       return {
@@ -143,15 +116,6 @@ export function initPersonSystem(
     });
   }
 
-  function drawStar(s: Star, time: number): void {
-    const flicker = Math.sin(time * s.twinkle + s.phase) * 0.18;
-    ctx!.globalAlpha = Math.max(0.08, Math.min(1, s.alpha + flicker));
-    ctx!.fillStyle = s.depth > 0.7 ? PALETTE.paper : PALETTE.limeSoft;
-    ctx!.beginPath();
-    ctx!.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx!.fill();
-  }
-
   function draw(): void {
     const now = performance.now();
     const dt = Math.min(now - last, 120);
@@ -166,11 +130,6 @@ export function initPersonSystem(
     }
 
     ctx!.clearRect(0, 0, w, h);
-    const time = t * 0.001;
-
-    for (const s of stars) drawStar(s, time);
-    ctx!.globalAlpha = 1;
-
     const cx = w * 0.5;
     const cy = h * 0.52;
 

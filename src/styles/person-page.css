@@ -98,15 +98,34 @@
   display: flex;
   align-items: center;
   padding: var(--space-20) var(--space-8) var(--space-24);
-  background:
-    radial-gradient(
-      130% 120% at 50% 45%,
-      color-mix(in srgb, var(--brand-accent, var(--optimizely-blue)) 13%, transparent) 0%,
-      transparent 62%
-    ),
-    var(--gradient-hero);
+  /* Transparent so the fixed starfield shows through, exactly as
+     .section--hero does on the company page. The accent wash below is a
+     low-alpha overlay rather than a background, so it tints the sky instead
+     of hiding it. */
+  background: transparent;
   overflow: hidden;
 }
+.person__hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 120% 70% at 50% 55%,
+    color-mix(in srgb, var(--brand-accent, var(--optimizely-blue)) 10%, transparent) 0%,
+    transparent 68%
+  );
+}
+
+/* Sections below the hero are opaque, so the starfield reads as sky above the
+   fold rather than as texture behind body copy. Same division the company
+   page draws. */
+.person__section { background: var(--bg-primary); }
+.person__section--research,
+.person__section--number,
+.person__closing { background: var(--bg-secondary); }
+.person__footer { background: var(--bg-primary); }
 /* The zoomed system sits behind the note. Purely decorative — the page reads
    complete with the canvas absent or blank. */
 .person__canvas {
@@ -115,9 +134,9 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
 }
-.person__hero-inner { position: relative; z-index: 1; width: 100%; max-width: var(--max-width); margin: 0 auto; }
+.person__hero-inner { position: relative; z-index: 3; width: 100%; max-width: var(--max-width); margin: 0 auto; }
 
 /* A single hairline of the target's brand colour across the top — the one
    place their colour is allowed to lead. */
@@ -125,6 +144,7 @@
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
+  z-index: 2;
   height: 3px;
   background: linear-gradient(
     90deg,
