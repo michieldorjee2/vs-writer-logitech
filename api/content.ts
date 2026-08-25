@@ -202,6 +202,57 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return res.json();
 }
 
+/**
+ * The person page shows the company page's screenshot of the customer's
+ * current site in its hero galaxy. That asset lives on the PARENT
+ * CompetitorComparisonPage, not on PersonPage — pulling it across rather than
+ * duplicating it onto the person content type means the two heroes can never
+ * drift, and an editor who reshoots the company page's screenshot updates
+ * every person page under it for free.
+ */
+const PARENT_SHOT_QUERY = `
+query GetParentShot($slug: String!) {
+  CompetitorComparisonPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      challengeScreenshotUrl { default }
+      challengeScreenshotAlt
+      challengeBrowserUrl
+    }
+  }
+}
+`;
+/**
+ * Fetch the parent company page's site screenshot for a person page.
+ * Best-effort: a person page whose parent has no screenshot (or whose parent
+ * query fails) renders its galaxy without one, so this never blocks the page.
+ */
+async function fetchParentShot(
+  authKey: string,
+  companySlug: string | null | undefined,
+): Promise<Record<string, unknown>> {
+  const slug = (companySlug || '').replace(/^\/+|\/+$/g, '');
+  if (!slug) return {};
+  try {
+    for (const s of [`/${slug}/`, `/en/${slug}/`]) {
+      const json = await queryGraph(authKey, PARENT_SHOT_QUERY, { slug: s });
+      const item = (json as any)?.data?.CompetitorComparisonPage?.items?.[0];
+      if (item?.challengeScreenshotUrl?.default) {
+        return {
+          siteScreenshotUrl: item.challengeScreenshotUrl.default,
+          siteScreenshotAlt: item.challengeScreenshotAlt ?? null,
+          siteScreenshotDomain: item.challengeBrowserUrl ?? null,
+        };
+      }
+    }
+  } catch {
+    /* the galaxy is decorative — never fail the page over it */
+  }
+  return {};
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const slug = req.query.slug;
   const authKey = process.env.GRAPH_AUTH_KEY;
@@ -235,9 +286,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
       const items = (pJson as any)?.data?.PersonPage?.items;
       if (items && items.length > 0) {
+        const shot = await fetchParentShot(authKey, items[0]?.companySlug);
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-        return res.status(200).json({ ...items[0], __template: 'person' });
+        return res.status(200).json({ ...items[0], ...shot, __template: 'person' });
       }
     }
 

@@ -18,11 +18,28 @@
  *   your team       — faces, with the ones you have already met marked
  *   one question    — a single ask
  *
- * Motion matches the ABM page's grammar (24px rise, --ease-out, the same
- * durations) but is gated behind .person--anim, which only appears once JS
- * boots. The ABM page's `[data-animate] { opacity: 0 }` leaves content
- * invisible if GSAP never runs; a page this small should not inherit that.
+ * Motion is the ABM page's own grammar on the ABM page's own engine — GSAP +
+ * ScrollTrigger, 24px rise, power3.out, fired at 'top 95%' — but gated behind
+ * .person--anim, which only appears once JS boots. The ABM page's global
+ * `[data-animate] { opacity: 0 }` leaves content invisible if GSAP never runs;
+ * a page this small should not inherit that.
+ *
+ * Everything else here is deliberately the company page's: the same fixed
+ * starfield under transparent sections, the same centred section headers, the
+ * same brand faces (greenfield.css now scopes .person alongside .abm-page),
+ * the same warp CTA, the same extruded neon figure, the same sticky bar.
  */
+
+/* Every token in abm-variables.css is rem-based against a 16px root, and
+   Tailwind's base-font-size plugin sets the root to 10px. The company page
+   resets it with `html:has(.abm-page)`; without the same reset here the whole
+   page rendered at 62.5% — 31px section titles against the company page's
+   44px, 60px section padding against 96px, 7.5px labels. That single missing
+   line was most of the reason the two surfaces did not read as one product. */
+html:has(.person) {
+  font-size: 16px !important;
+  overflow-x: clip;
+}
 
 .person {
   --tier-color: var(--color-tertiary-4);
@@ -31,8 +48,17 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  font-size: var(--text-base);
   font-weight: var(--font-weight-regular);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+}
+
+.person :focus-visible {
+  outline: 2px solid var(--optimizely-blue);
+  outline-offset: 2px;
 }
 
 /* The tier is the page's emotional register: a live deal reads warm and
@@ -41,24 +67,43 @@
 .person[data-tier="engaged"] { --tier-color: var(--light-blue); }
 .person[data-tier="known"] { --tier-color: var(--color-tertiary-4); }
 
-/* ===== Motion ===== */
-.person--anim [data-person-anim] {
+/* ===== Motion =====
+   The company page's grammar, run through the same GSAP + ScrollTrigger it
+   uses: a 24px rise on power3.out fired at 'top 95%', with card grids
+   cascading child by child rather than arriving as one slab.
+
+   The hidden state stays gated behind `.person--anim`, which the script adds
+   only once it boots — the company page's global `[data-animate] { opacity: 0 }`
+   leaves the page blank if GSAP never runs, and a page written to one person
+   should not inherit that. No transition here on purpose: the tween writes
+   inline styles and owns the interpolation. */
+.person--anim [data-person-anim],
+.person--anim [data-person-stagger] > * {
   opacity: 0;
-  transform: translateY(24px);
-  transition:
-    opacity var(--duration-slower) var(--ease-out),
-    transform var(--duration-slower) var(--ease-out);
 }
-.person--anim [data-person-anim="fade-right"] { transform: translateX(-24px); }
-.person--anim [data-person-anim].is-visible { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
-  .person--anim [data-person-anim] { opacity: 1; transform: none; transition: none; }
+  .person--anim [data-person-anim],
+  .person--anim [data-person-stagger] > * { opacity: 1; }
 }
 
 /* ===== Section scaffolding — same names and rhythm as the ABM page ===== */
 .person__section { position: relative; padding: var(--space-24) var(--space-8); }
 .person__inner { width: 100%; max-width: var(--max-width); margin: 0 auto; }
 .person__inner--narrow { max-width: var(--max-width-narrow); }
+
+/* The company page centres every section header — eyebrow, title, description —
+   over left-aligned content beneath it. Matching that is what makes the two
+   pages scroll to the same rhythm; the argument below each header stays
+   linear and left-aligned, which is still the shape of a conversation. */
+.person__head {
+  text-align: center;
+  max-width: var(--max-width-narrow);
+  margin: 0 auto var(--space-16);
+}
+.person__head .person__lede {
+  max-width: 600px;
+  margin: 0 auto;
+}
 
 .person__label {
   display: inline-block;
@@ -87,17 +132,22 @@
   margin: 0 0 var(--space-10);
 }
 
-/* ===== Identity plate =====
-   Stands in for the company page's 3D hero. A person does not get a canvas
-   of orbiting geometry; they get their own name, set at hero scale, on a
-   plate tinted with their employer's brand colour. */
+/* ===== The opening spread =====
+   The company page's hero is a full viewport of sky with orbiting geometry in
+   it. This one is the same viewport and the same sky, flown one level in — but
+   laid out as a spread rather than a stack: the introduction reads down the
+   left column, and the galaxy (person-galaxy.ts) owns the right one outright.
+
+   That split is deliberate and load-bearing. The canvas used to be absolutely
+   positioned across the whole hero, which put the company's own mark behind
+   the copy. A canvas that owns a grid column cannot land behind anything. */
 .person__hero {
   position: relative;
-  min-height: 82vh;
-  min-height: 82svh;
+  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
-  padding: var(--space-20) var(--space-8) var(--space-24);
+  padding: var(--space-24) var(--space-8) var(--space-32);
   /* Transparent so the fixed starfield shows through, exactly as
      .section--hero does on the company page. The accent wash below is a
      low-alpha overlay rather than a background, so it tints the sky instead
@@ -118,25 +168,83 @@
   );
 }
 
-/* Sections below the hero are opaque, so the starfield reads as sky above the
-   fold rather than as texture behind body copy. Same division the company
-   page draws. */
-.person__section { background: var(--bg-primary); }
-.person__section--research,
-.person__section--number,
-.person__closing { background: var(--bg-secondary); }
-.person__footer { background: var(--bg-primary); }
-/* The zoomed system sits behind the note. Purely decorative — the page reads
-   complete with the canvas absent or blank. */
-.person__canvas {
-  position: absolute;
+/* Every section is transparent, exactly as `.section` is on the company page,
+   so the fixed starfield is the ground under the whole page rather than a
+   backdrop that stops at the fold. The opaque fills this replaces — and the
+   alternating --bg-secondary bands — cut the sky off and split the page into
+   light and dark slabs the company page never has. Plates carry content. */
+.person__section { background: transparent; }
+.person__hero-inner { position: relative; z-index: 3; width: 100%; max-width: var(--max-width); margin: 0 auto; }
+
+.person__hero-grid {
+  display: grid;
+  /* The galaxy gets the slightly larger share — it is carrying the customer's
+     own site, and a cramped column crops the slab. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.person__intro { min-width: 0; }
+
+/* An empty reserved box, not a canvas host. It defines where in the hero the
+   slab and its products should appear; person-galaxy.ts projects this rect
+   into the scene each frame. Because the rect moves as the page scrolls, the
+   objects scroll away with the hero on their own. */
+.person__galaxy {
+  position: relative;
+  width: 100%;
+  min-height: 420px;
+  height: clamp(420px, 58svh, 620px);
+}
+
+/* The sky. Fixed to the viewport for the whole page, and first in the article
+   so every section paints over it — the same trick the 2D starfield uses.
+   `.person` is unpositioned, so this sits in the root stacking context at
+   z-index 0 and the position:relative sections land above it. */
+.person__sky {
+  position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
+  display: block;
+  z-index: 0;
+  /* The scene is lit; nothing in it responds to a click. */
   pointer-events: none;
-  z-index: 1;
 }
-.person__hero-inner { position: relative; z-index: 3; width: 100%; max-width: var(--max-width); margin: 0 auto; }
+
+/* The company page's cinematic light sweep, on the same radial and the same
+   scrubbed fade. It is what keeps the hero from reading as a flat starfield;
+   GSAP brings it up on load and scrubs it out as the hero leaves. */
+.person__sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* Lighter than the company page's 0.12: the galaxy behind it is now a real
+     light source, and the two together turned the whole column green. */
+  background: radial-gradient(ellipse 120% 60% at 50% 50%, rgba(171, 255, 68, 0.07), transparent 70%);
+  opacity: 0;
+}
+
+/* Same affordance, same bounce, same place as the company page's. */
+.person__scroll {
+  position: absolute;
+  bottom: var(--space-10);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  z-index: 3;
+  opacity: 0;
+}
+.person__scroll-arrow { animation: bounce 2s ease-in-out infinite; }
 
 /* A single hairline of the target's brand colour across the top — the one
    place their colour is allowed to lead. */
@@ -175,8 +283,6 @@
 .person__crumb a:hover { color: var(--text-primary); }
 .person__crumb-sep { color: var(--text-tertiary); }
 .person__crumb-here { color: var(--text-primary); }
-
-.person__ident { margin-bottom: var(--space-10); }
 
 /* Same idiom as .intel__avatar on the company page: a translucent tint of the
    colour with the colour itself as the text. A solid fill breaks the moment an
@@ -235,20 +341,31 @@
   margin: var(--space-3) 0 var(--space-5);
 }
 
+/* The company page's hero badge, keyed to the tier instead of the brand: same
+   pill, same hairline border, same pulsing dot. It is the first thing above
+   the fold on both pages, so it should be the same object. */
 .person__tier {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  font-family: var(--font-mono);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--tier-color) 30%, transparent);
   font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--tier-color);
-  background: color-mix(in srgb, var(--tier-color) 12%, transparent);
+  color: color-mix(in srgb, var(--tier-color) 70%, white);
+  background: color-mix(in srgb, var(--tier-color) 8%, transparent);
 }
-.person__tier-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tier-color); }
+.person__tier-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tier-color);
+  box-shadow: 0 0 6px var(--tier-color);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
 
 .person__pitch {
   margin: var(--space-12) 0 0;
@@ -269,183 +386,14 @@
   max-width: 58ch;
 }
 
-.person__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-8);
-  border-radius: var(--radius-full);
-  background: var(--color-primary-lfgreen);
-  color: var(--color-secondary-darkfir);
-  font-weight: var(--font-weight-semibold);
+/* The ask is the company page's warp button (.warp-btn, abm-layout.css) —
+   the spinning conic ring, the breathing glow, the stacked eyebrow/label.
+   Here it is an anchor onto a real calendar rather than a button that opens a
+   modal, so it only needs the link reset and the spin driver in
+   person-animations.ts. */
+.person .warp-btn {
   text-decoration: none;
-  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
-}
-.person__cta:hover { transform: translateY(-2px); box-shadow: var(--shadow-glow); }
-.person__cta-arrow { transition: transform var(--duration-fast) var(--ease-out); }
-.person__cta:hover .person__cta-arrow { transform: translateX(3px); }
-
-/* ===== The thread — horizontal engagement rail =====
-   The company page runs a vertical timeline for the migration plan. This one
-   runs horizontally, because it is history rather than a plan, and because
-   "how far along are we" reads better left-to-right. */
-.person__opp {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  padding: var(--space-5) var(--space-6);
-  border-radius: 16px;
-  background: var(--plate);
-  margin-bottom: var(--space-12);
-  border-left: 3px solid var(--tier-color);
-}
-.person__opp-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--tier-color);
-}
-.person__opp-name { font-size: var(--text-lg); font-weight: var(--font-weight-semibold); }
-.person__opp-stage {
-  font-size: var(--text-xs);
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--tier-color) 16%, transparent);
-  color: var(--tier-color);
-}
-.person__opp-detail { font-size: var(--text-sm); color: var(--text-secondary); }
-
-.person__rail {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(220px, 1fr);
-  gap: var(--space-6);
-  padding-top: var(--rail);
-  position: relative;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-/* The track runs behind the markers, fading out toward "now". */
-.person__rail::before {
-  content: "";
-  position: absolute;
-  top: calc(var(--rail) / 2 - 1px);
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--tier-color) 45%, transparent),
-    color-mix(in srgb, var(--tier-color) 10%, transparent)
-  );
-}
-
-.person__stop { position: relative; min-width: 0; }
-.person__stop-marker {
-  position: absolute;
-  top: calc(var(--rail) / -1 + 6px);
-  left: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-secondary-darkfir);
-  background: var(--tier-color);
-  outline: 3px solid color-mix(in srgb, var(--tier-color) 26%, transparent);
-}
-.person__stop-card { background: var(--plate); border-radius: 16px; padding: var(--space-5); height: 100%; }
-.person__stop-date {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--accent-secondary);
-  margin-bottom: var(--space-2);
-}
-.person__stop-kind {
-  display: inline-block;
-  font-size: var(--text-xs);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-3);
-}
-.person__stop-summary { font-size: var(--text-sm); line-height: var(--leading-normal); margin: 0; }
-.person__stop-who { font-size: var(--text-xs); color: var(--text-tertiary); margin: var(--space-3) 0 0; }
-
-/* ===== Cold open — what a 'known' contact gets instead of a fake history ===== */
-.person__coldopen { background: var(--plate); border-radius: var(--radius-lg); padding: var(--space-10); }
-.person__coldopen .person__lede { margin-bottom: var(--space-6); }
-.person__sources { display: flex; gap: var(--space-3); flex-wrap: wrap; }
-.person__source {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-secondary);
-}
-
-/* ===== The ledger =====
-   The core of the page, and the reason it is not a card grid: each row is a
-   claim about this person's job, answered. Reading across is the argument. */
-.person__ledger { display: flex; flex-direction: column; }
-.person__row {
-  display: grid;
-  /* A fixed title column rather than a fraction: remit titles are short, and
-     a 1fr column left a dead gap before the answer that read as a mistake
-     rather than as a table. */
-  grid-template-columns: 3rem minmax(0, 300px) minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: start;
-  padding: var(--space-8) 0;
-  border-top: 1px solid var(--border-subtle);
-}
-.person__row:last-child { border-bottom: 1px solid var(--border-subtle); }
-
-.person__row-num {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xl);
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  color: color-mix(in srgb, var(--brand-accent, var(--text-tertiary)) 70%, white);
-  opacity: 0.65;
-}
-.person__row-own { font-size: var(--text-xl); font-weight: var(--font-weight-semibold); line-height: var(--leading-snug); }
-/* The hairline is the argument: what you own, then what changes. */
-.person__row-answer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-left: var(--space-6);
-  border-left: 1px solid var(--border-subtle);
-}
-/* Cap the measure — the answer column can run to 840px at full width, which
-   is well past a comfortable line length. */
-.person__row-answer p { margin: 0; max-width: 68ch; font-size: var(--text-base); color: var(--text-secondary); line-height: var(--leading-relaxed); }
-.person__row-metric {
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-primary-lfgreen) 12%, transparent);
-  color: var(--color-primary-lfgreen);
+  color: #fff;
 }
 
 /* ===== Peer proof ===== */
@@ -483,8 +431,279 @@
   color: var(--tier-color);
 }
 
+/* ===== Product chrome =====
+   A real nav, so the page reads as Optimizely showing you something rather
+   than as a one-off built in a deck. Sits above the fixed sky. */
+.person__nav {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-8) 0;
+}
+.person__nav-brand {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.person__nav-links {
+  display: flex;
+  gap: var(--space-6);
+  margin-right: auto;
+  flex-wrap: wrap;
+}
+.person__nav-links a {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.person__nav-links a:hover { color: var(--text-primary); }
+.person__nav-cta {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-lfgreen);
+  text-decoration: none;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--color-primary-lfgreen) 40%, transparent);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.person__nav-cta:hover { background: color-mix(in srgb, var(--color-primary-lfgreen) 14%, transparent); }
+@media (max-width: 900px) {
+  .person__nav-links { display: none; }
+  .person__nav { padding-top: var(--space-4); }
+}
+
+/* ===== 02 · What the job is scored on =====
+   The old scorecard was three tall cards of our conclusions. Same substance,
+   a third of the words: the measure leads, the difficulty is one line under
+   it, and the metric is a chip. */
+.person__measures {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.person__measure {
+  position: relative;
+  background: var(--color-fir-midfir);
+  border-radius: 16px;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.person__measure-n {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-wide);
+  color: color-mix(in srgb, var(--brand-accent, var(--text-tertiary)) 65%, white);
+}
+.person__measure-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+}
+.person__measure-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+.person__measure-metric {
+  align-self: flex-start;
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-primary-lfgreen) 12%, transparent);
+  color: var(--color-primary-lfgreen);
+}
+
+/* ===== 03 · Your operation =====
+   The same material the provenance cards carried, reframed. No "WE READ"
+   label and no register stripe — these are the conditions the product has to
+   work inside, and the source is an attribution, not the headline. */
+.person__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-4);
+}
+.person__fact {
+  background: var(--color-fir-midfir);
+  border-radius: 16px;
+  padding: var(--space-6);
+}
+.person__fact-text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+.person__fact-src {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.person__fact-src a { color: var(--light-blue); text-decoration: none; }
+.person__fact-src a:hover { text-decoration: underline; }
+
+/* ===== 04 · In practice ===== */
+.person__practice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+.person__case {
+  background: var(--color-fir-midfir);
+  border-radius: 16px;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.person__case-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.person__case-badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-primary-lfgreen) 14%, transparent);
+  color: var(--color-primary-lfgreen);
+}
+.person__case-link {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.person__case-link:hover { color: var(--accent-primary); text-decoration: underline; }
+.person__case-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+}
+.person__case-body {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+.person__case-answers {
+  margin: auto 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--brand-accent, var(--accent-secondary));
+}
+
+/* ===== 05 · How it works =====
+   Numbered because it genuinely is a sequence — this is the one section that
+   describes an order of operations rather than a set of things. */
+.person__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-6);
+}
+.person__step { display: flex; flex-direction: column; gap: var(--space-3); }
+.person__step-n {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-secondary-darkfir);
+  background: var(--color-primary-lfgreen);
+}
+.person__step-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+}
+.person__step-body {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* ===== 08 · Why you're seeing this =====
+   The working, demoted. Quiet by design: it should be findable and honest,
+   not the subject of the page. */
+.person__section--working { padding-top: var(--space-16); padding-bottom: var(--space-16); }
+.person__working { list-style: none; margin: var(--space-5) 0 0; padding: 0; }
+.person__working-item {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+}
+.person__working-reg {
+  flex: 0 0 auto;
+  min-width: 8.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.person__working-item[data-register="assumed"] .person__working-reg { color: var(--yellow); }
+.person__working-item[data-register="told"] .person__working-reg { color: var(--color-primary-lfgreen); }
+.person__working-src a { color: var(--light-blue); text-decoration: none; }
+.person__working-src a:hover { text-decoration: underline; }
+.person__working-note {
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+@media (max-width: 640px) {
+  .person__working-item { flex-direction: column; gap: var(--space-2); }
+  .person__working-reg { min-width: 0; }
+}
+
+/* A second header inside a section that already has one (proof carries both
+   the figure and the peer quotes). */
+.person__head--tight { margin-top: var(--space-20); margin-bottom: var(--space-10); }
+
 /* ===== One question ===== */
-.person__closing { background: var(--bg-secondary); text-align: center; }
+.person__closing { text-align: center; }
 .person__closing .person__lede { margin-left: auto; margin-right: auto; }
 .person__question {
   font-size: var(--text-section);
@@ -495,10 +714,12 @@
   max-width: 20ch;
 }
 
-/* ===== Footer ===== */
-.person__footer { padding: var(--space-10) var(--space-8) var(--space-20); color: var(--text-tertiary); font-size: var(--text-sm); }
-.person__footer .person__inner { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.person__back { color: var(--accent-primary); text-decoration: none; }
+/* ===== Footer =====
+   The company page's .footer (abm-layout.css): hairline rule, brand block
+   left, links right. The person page's own footer was a thin grey line that
+   ended the page a beat early. Only the back-link colour is added here. */
+.person .footer__links a { text-decoration: none; }
+.person__back { color: var(--accent-primary) !important; }
 .person__back:hover { text-decoration: underline; }
 
 /* ===== Responsive ===== */
@@ -506,6 +727,36 @@
   .person__row { grid-template-columns: 2.5rem minmax(0, 1fr); }
   .person__row-answer { grid-column: 2; padding-left: 0; border-left: none; }
 }
+/* The company page steps its display type down at 768px (abm-layout.css);
+   until the root reset above landed, this page's 10px root was doing that job
+   by accident, so it never carried a scale of its own. These are the company
+   page's clamps, on the person page's headings. */
+/* Below the point where two readable columns fit, the spread stacks: the
+   introduction first, because it is the page talking, then the galaxy. */
+@media (max-width: 1024px) {
+  .person__hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-10);
+  }
+  .person__galaxy { height: clamp(320px, 46svh, 460px); min-height: 320px; }
+  .person__hero { min-height: auto; }
+}
+
+@media (max-width: 768px) {
+  .person__name { font-size: clamp(2.4rem, 8vw, 3.6rem); }
+  .person__opening-body { font-size: var(--text-base); }
+  .person__galaxy { height: clamp(280px, 40svh, 380px); min-height: 280px; }
+  .person__title,
+  .person__question { font-size: clamp(1.8rem, 6vw, 2.4rem); }
+  .person__role { font-size: var(--text-lg); }
+  .person__lede { font-size: var(--text-base); }
+  .person__head { margin-bottom: var(--space-10); }
+  .person__scroll { bottom: var(--space-6); }
+  .person .roi__value-stage { padding: var(--space-10) 0 var(--space-8); }
+  .person .roi__extrude,
+  .person .roi__face { font-size: clamp(3rem, 16vw, 5.5rem); }
+}
+
 @media (max-width: 640px) {
   .person__section { padding: var(--space-16) var(--space-5); }
   .person__hero { padding: var(--space-12) var(--space-5) var(--space-16); }
@@ -532,22 +783,28 @@
   vertical-align: middle;
 }
 
-.person__note {
-  max-width: 60ch;
-  padding: var(--space-8);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-fir-midfir) 88%, transparent);
-  backdrop-filter: blur(6px);
-  border-left: 2px solid var(--brand-accent, var(--color-primary-lfgreen));
-  margin-bottom: var(--space-8);
+/* No plate, no border, no blur. Set as running prose it reads as the first
+   paragraph of the page — which is what it is — rather than as a compliment
+   slip taped over the hero. The only remaining device is the hairline above
+   the signature, which is doing the work a signature block actually needs. */
+.person__opening {
+  max-width: 52ch;
+  margin: var(--space-8) 0;
 }
-.person__note-body {
+.person__opening-body {
   margin: 0 0 var(--space-6);
   font-size: var(--text-lg);
   line-height: var(--leading-relaxed);
   color: var(--text-primary);
 }
-.person__sig { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.person__sig {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
 .person__sig-mark {
   width: 36px; height: 36px; flex: 0 0 36px;
   border-radius: 50%;
@@ -561,146 +818,24 @@
 .person__sig-who strong { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 .person__sig-date { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }
 
-/* ===== 02 · Provenance =====
-   The register is the whole point: told / read / assumed, colour-coded so the
-   reader can see at a glance which claims are their own words and which are
-   our inference. */
-.person__section--research { background: var(--bg-secondary); }
-.person__prov { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
-.person__prov-item {
-  --reg: var(--santas-gray);
-  background: var(--color-fir-midfir);
-  border-radius: 16px;
-  padding: var(--space-6);
-  border-top: 2px solid var(--reg);
-}
-.person__prov-item[data-register="told"]    { --reg: var(--color-primary-lfgreen); }
-.person__prov-item[data-register="read"]    { --reg: var(--light-blue); }
-.person__prov-item[data-register="assumed"] { --reg: var(--yellow); }
-.person__prov-reg {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--reg);
-  margin-bottom: var(--space-3);
-}
-.person__prov-text { margin: 0; font-size: var(--text-base); line-height: var(--leading-normal); }
-.person__prov-src {
-  margin: var(--space-4) 0 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-}
-.person__prov-src a { color: var(--light-blue); text-decoration: none; }
-.person__prov-src a:hover { text-decoration: underline; }
-
-/* ===== 03 · Scorecard ===== */
-.person__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
-.person__card {
-  position: relative;
-  background: var(--color-fir-midfir);
-  border-radius: 16px;
-  padding: var(--space-8) var(--space-6) var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.person__card-n {
-  position: absolute;
-  top: var(--space-5);
-  right: var(--space-6);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xl);
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  color: color-mix(in srgb, var(--brand-accent, var(--text-tertiary)) 60%, white);
-  opacity: 0.35;
-}
-.person__card-measure { margin: 0; padding-right: var(--space-10); font-size: var(--text-lg); font-weight: var(--font-weight-semibold); line-height: var(--leading-snug); }
-.person__card-why, .person__card-change { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); line-height: var(--leading-relaxed); }
-.person__card-tag {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  margin-bottom: var(--space-2);
-}
-.person__card-tag--go { color: var(--color-primary-lfgreen); }
-.person__card-metric {
-  align-self: flex-start;
-  margin-top: auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-primary-lfgreen) 12%, transparent);
-  color: var(--color-primary-lfgreen);
-}
-
-/* ===== 04 · Solutions in orbit =====
-   Numbered by relevance, because the order IS the argument — it mirrors the
-   orbit in the hero. */
-.person__solutions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.person__solution {
-  display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr);
-  gap: var(--space-8);
-  padding: var(--space-8) 0;
-  border-top: 1px solid var(--border-subtle);
-  align-items: start;
-}
-.person__solution:last-child { border-bottom: 1px solid var(--border-subtle); }
-.person__solution-badge {
-  display: inline-grid;
-  place-items: center;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-primary-lfgreen) 14%, transparent);
-  color: var(--color-primary-lfgreen);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.person__solution-headline { margin: 0 0 var(--space-3); font-size: var(--text-xl); font-weight: var(--font-weight-semibold); line-height: var(--leading-snug); }
-.person__solution-body p { margin: 0 0 var(--space-3); max-width: 68ch; font-size: var(--text-base); color: var(--text-secondary); line-height: var(--leading-relaxed); }
-.person__solution-why {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs) !important;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--brand-accent, var(--accent-secondary)) !important;
-}
-
 /* ===== 06 · The one number =====
-   Gradient-clipped, the same treatment the company page gives its ROI metric. */
-.person__section--number { text-align: center; background: var(--bg-secondary); }
-.person__bignum {
-  margin: var(--space-6) 0 var(--space-4);
-  font-size: clamp(4rem, 12vw, 9rem);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--tracking-tight);
-  line-height: 1;
+   Literally the company page's projection figure: the same .roi__value-3d
+   stack from abm-layout.css — twenty extrusion layers, the lime neon face,
+   the float and the trailing lag — reused rather than approximated. A flat
+   gradient tinted with the customer's accent (blue, for a blue brand) was the
+   single loudest thing telling a reader these were two different products.
+
+   Only the scale is tuned: the company page sizes this for "46.7K" at
+   15vw; one person's number gets a shade less room. */
+.person__section--number { text-align: center; }
+.person .roi__value-stage { padding: var(--space-16) 0 var(--space-10); }
+.person .roi__extrude,
+.person .roi__face {
+  font-size: clamp(3.5rem, 11vw, 8.5rem);
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(
-    135deg,
-    var(--brand-accent, var(--color-primary-lfgreen)),
-    color-mix(in srgb, var(--brand-accent, var(--light-blue)) 55%, white)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
-.person__bignum-fix { font-size: 0.5em; }
 .person__bignum-label { font-size: var(--text-xl); color: var(--text-primary); margin: 0 auto var(--space-4); max-width: 34ch; }
+.person__bignum-cite { display: block; margin-top: var(--space-2); }
 .person__bignum-detail { font-size: var(--text-sm); color: var(--text-tertiary); margin: 0 auto; max-width: 56ch; }
 .person__bignum-detail a { color: var(--accent-primary); text-decoration: none; }
 .person__bignum-detail a:hover { text-decoration: underline; }
@@ -711,6 +846,6 @@
 
 @media (max-width: 760px) {
   .person__solution { grid-template-columns: 1fr; gap: var(--space-4); }
-  .person__note { padding: var(--space-6); }
-  .person__hero { min-height: auto; }
+  .person__solution-badge { justify-self: start; }
+  .person__hero { min-height: auto; padding: var(--space-20) var(--space-5) var(--space-24); }
 }

@@ -2,146 +2,163 @@
  * PersonPage — client entry for the 1:1 buyer page.
  *
  * Markup lives in PersonPageView so the SSR entry renders the identical tree.
- * This wrapper adds the three things that only make sense in a browser:
+ * This wrapper adds the things that only make sense in a browser:
  *
- *   - the zoomed system canvas behind the note;
- *   - scroll reveal, in the company page's motion grammar;
- *   - the count-up on the one number, matching the company page's counters.
+ *   - the company page's fixed starfield, and the WebGL galaxy over it;
+ *   - the company page's motion, from person-animations.ts;
+ *   - the sticky bar, on the company page's own component.
  *
- * All three are enhancement. The hidden state sits behind `.person--anim`,
+ * All of it is enhancement. The hidden state sits behind `.person--anim`,
  * added only once this effect runs, so a visitor without JS gets the complete
  * page rather than the blank one the company page would give them.
+ *
+ * three.js is imported dynamically. It is by some distance the heaviest thing
+ * this page loads and nothing above the fold needs it to be readable, so the
+ * hero paints first and the galaxy arrives into it.
  */
 
 import { useEffect, useRef } from 'react';
 import type { PersonPage as PersonPageType } from '../lib/graph-types';
-import PersonPageView from './PersonPageView';
-import { initPersonSystem, cleanupPersonSystem, type SolutionNode } from '../lib/person-system';
+import PersonPageView, { PRODUCT_LABEL } from './PersonPageView';
 import { initStarfield, cleanupStarfield } from '../lib/starfield';
+import {
+    initPersonAnimations,
+    settlePersonStatic,
+    cleanupPersonAnimations,
+} from '../lib/person-animations';
+import { initStickyCTA, cleanupStickyCTA } from '../lib/abm-sticky-cta';
 
 interface Props {
     page: PersonPageType;
 }
 
-const PRODUCT_LABEL: Record<string, string> = {
-    cms: 'CMS',
-    opal: 'Opal',
-    experimentation: 'Exp',
-    cmp: 'CMP',
-    commerce: 'Com',
-};
-
-/** Count from 0 to target over ~1.8s on an ease-out, close enough to the
- *  company page's counters that the two read as one product. */
-function countUp(el: HTMLElement, target: number, duration = 1800): () => void {
-    let raf = 0;
-    const start = performance.now();
-    const step = (now: number) => {
-        const t = Math.min(1, (now - start) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        el.textContent = Math.round(target * eased).toLocaleString();
-        if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-}
-
 export default function PersonPage({ page }: Props) {
     const rootRef = useRef<HTMLElement>(null);
+    /* How long the copy waits for the galaxy's opening. Set once the galaxy
+       chunk resolves; 0 if it never does. */
+    const heroDelay = useRef(0);
+    const started_ref = useRef<(() => void) | null>(null);
+    const startAnimations = () => started_ref.current?.();
     const solutionKey = (page.solutions ?? []).map((s) => s.Product ?? '').join('|');
 
-    // ---- the zoomed system canvas ----
+    // ---- the sky, and the galaxy in it ----
     useEffect(() => {
-        const solutions: SolutionNode[] = (page.solutions ?? []).slice(0, 4).map((s, i) => ({
-            label: PRODUCT_LABEL[s.Product ?? ''] ?? (s.Product ?? 'Opti'),
-            rank: i,
-        }));
-        // With no solutions written yet the system would be a bare star, so
-        // fall back to the core three rather than an empty orbit.
-        const nodes = solutions.length
-            ? solutions
-            : [
-                  { label: 'CMS', rank: 0 },
-                  { label: 'Opal', rank: 1 },
-                  { label: 'Exp', rank: 2 },
-              ];
-
         // The company page's own starfield, fixed behind the whole page — not a
         // hero backdrop. Both surfaces are then set in the same sky.
         initStarfield({ accent: page.brandAccentColor });
-        initPersonSystem('person-system', nodes, {
-            companyLabel: page.companyName,
-            accent: page.brandAccentColor,
-        });
+
+        const products = (page.solutions ?? []).slice(0, 5).map((s, i) => ({
+            label: PRODUCT_LABEL[s.Product ?? ''] ?? (s.Product ?? 'Optimizely'),
+            rank: i,
+        }));
+        // With no solutions written yet the orbit would be empty, so fall back
+        // to the three every conversation starts from.
+        const orbit = products.length
+            ? products
+            : [
+                  { label: 'Content Management', rank: 0 },
+                  { label: 'Experimentation', rank: 1 },
+                  { label: 'Opal', rank: 2 },
+              ];
+
+        let dispose: (() => void) | null = null;
+        let cancelled = false;
+
+        import('../lib/person-galaxy')
+            .then(({ initPersonGalaxy, cleanupPersonGalaxy, HERO_INTRO_SECONDS }) => {
+                if (cancelled) return;
+                initPersonGalaxy('person-galaxy', orbit, {
+                    accent: page.brandAccentColor,
+                    screenshotUrl: page.siteScreenshotUrl,
+                    domain: page.siteScreenshotDomain || page.companySlug,
+                });
+                dispose = cleanupPersonGalaxy;
+                heroDelay.current = HERO_INTRO_SECONDS;
+                startAnimations();
+
+                /* TEMPORARY — waypoint editor, opened with ?galaxy=edit.
+                   Delete this block and src/lib/person-galaxy-controls.ts to
+                   remove it; nothing else depends on either. */
+                if (new URLSearchParams(window.location.search).get('galaxy') === 'edit') {
+                    import('../lib/person-galaxy-controls').then((ctl) => {
+                        if (cancelled) return;
+                        ctl.initGalaxyControls();
+                        const prev = dispose;
+                        dispose = () => { ctl.cleanupGalaxyControls(); prev?.(); };
+                    });
+                }
+            })
+            .catch(() => {
+                // No galaxy to wait for — bring the copy in immediately rather
+                // than holding an empty hero for a sweep that will never play.
+                heroDelay.current = 0;
+                startAnimations();
+            });
+
         return () => {
-            cleanupPersonSystem();
+            cancelled = true;
+            dispose?.();
             cleanupStarfield();
         };
         // Depend on a stable key, not the array identity — page.solutions is a
-        // fresh reference every render, which would re-init the canvas each time.
-    }, [solutionKey, page.companyName, page.brandAccentColor]);
+        // fresh reference every render, which would re-init the scene each time.
+    }, [
+        solutionKey,
+        page.companySlug,
+        page.brandAccentColor,
+        page.siteScreenshotUrl,
+        page.siteScreenshotDomain,
+    ]);
 
-    // ---- reveal + counters ----
+    /* ---- motion + the sticky bar ----
+       The hidden state goes on immediately so there is no flash of content,
+       but the timeline itself waits for the galaxy's opening sweep. Whichever
+       of the two paths above resolves first calls startAnimations, and a
+       backstop timer runs it regardless — a hero that stays blank because a
+       chunk failed to load would be far worse than an un-choreographed one. */
     useEffect(() => {
         const root = rootRef.current;
         if (!root) return;
-        const counters = Array.from(root.querySelectorAll<HTMLElement>('[data-person-count]'));
 
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-            counters.forEach((el) => {
-                el.textContent = Number(el.dataset.personCount || 0).toLocaleString();
-            });
+            settlePersonStatic(root);
             return;
         }
 
         root.classList.add('person--anim');
-        const cancels: Array<() => void> = [];
-
-        const targets = Array.from(root.querySelectorAll<HTMLElement>('[data-person-anim]'));
-        const revealObserver = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
-                    entry.target.classList.add('is-visible');
-                    revealObserver.unobserve(entry.target);
-                }
-            },
-            { rootMargin: '0px 0px -10% 0px', threshold: 0.08 },
-        );
-        targets.forEach((t) => revealObserver.observe(t));
-
-        const countObserver = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
-                    const el = entry.target as HTMLElement;
-                    const target = Number(el.dataset.personCount || 0);
-                    if (Number.isFinite(target)) cancels.push(countUp(el, target));
-                    countObserver.unobserve(el);
-                }
-            },
-            { threshold: 0.4 },
-        );
-        counters.forEach((c) => countObserver.observe(c));
-
-        // Anything already above the fold is revealed synchronously, so there
-        // is no flash of hidden content on first paint.
-        requestAnimationFrame(() => {
-            targets.forEach((t) => {
-                if (t.getBoundingClientRect().top < window.innerHeight) {
-                    t.classList.add('is-visible');
-                    revealObserver.unobserve(t);
-                }
-            });
-        });
+        let started = false;
+        started_ref.current = () => {
+            if (started || !rootRef.current) return;
+            started = true;
+            initPersonAnimations(rootRef.current, heroDelay.current);
+        };
+        const backstop = window.setTimeout(() => started_ref.current?.(), 3000);
 
         return () => {
-            revealObserver.disconnect();
-            countObserver.disconnect();
-            cancels.forEach((c) => c());
+            window.clearTimeout(backstop);
+            cleanupPersonAnimations();
             root.classList.remove('person--anim');
         };
     }, []);
+
+    // The sticky bar reads section offsets, so it re-initialises whenever the
+    // sections it keys off change.
+    useEffect(() => {
+        initStickyCTA(page.companyName ?? undefined, {
+            barId: 'person-sticky-cta',
+            textId: 'person-sticky-cta-text',
+            heroId: 'person-hero',
+            ctaId: 'next',
+            phases: [
+                { id: 'person-problem', text: 'What the job is scored on' },
+                { id: 'person-operation', text: `What ${page.companyName || 'your team'} is running today` },
+                { id: 'person-practice', text: 'What changes for your team' },
+                { id: 'person-how', text: 'How it works' },
+                { id: 'person-proof', text: 'Proof from the same seat' },
+            ],
+        });
+        return () => cleanupStickyCTA();
+    }, [page.companyName]);
 
     return <PersonPageView page={page} rootRef={rootRef} />;
 }

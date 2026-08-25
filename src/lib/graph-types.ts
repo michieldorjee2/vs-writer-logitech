@@ -742,6 +742,13 @@ export interface PersonPage {
     ctaBody?: string | null;
     ctaButtonText?: string | null;
     meetingUrl?: { default: string } | string | null;
+    /* Pulled across from the parent company page at resolve time (see
+       fetchParentShot in api/content.ts) — the screenshot of the customer's
+       current site that the company page argues against, reused as the
+       centrepiece of this page's hero galaxy. */
+    siteScreenshotUrl?: string | null;
+    siteScreenshotAlt?: string | null;
+    siteScreenshotDomain?: string | null;
     footerLine?: string | null;
 
     generatedAt?: string | null;

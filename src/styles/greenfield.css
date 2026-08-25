@@ -240,17 +240,25 @@
 }
 
 /* ============================================================
-   ABMHyperPage (.abm-page) — the LIVE competitive-takeout surface.
-   Every published comparison page routes here. Its CSS is fully
-   token-driven (abm-variables.css), so we only need to repoint the
-   PRIMITIVE tokens scoped to .abm-page; the mapped tokens
-   (--accent-primary, --bg-primary, --text-primary, --gradient-accent…)
-   are var() indirections and inherit these at the use site.
+   The showcase surfaces — the company page (.abm-page) and the 1:1
+   buyer page nested under it (.person). Every published comparison
+   page and every person page routes through one of the two. Their CSS
+   is fully token-driven (abm-variables.css), so we only need to
+   repoint the PRIMITIVE tokens; the mapped tokens (--accent-primary,
+   --bg-primary, --text-primary, --gradient-accent…) are var()
+   indirections and inherit these at the use site.
+
+   .person is listed here for a reason: scoped to .abm-page alone, the
+   person page silently fell back to the pre-Greenfield stack — Figtree
+   instead of Die Grotesk B, a --font-mono ('NBI Pro Mono') that is not
+   shipped and so resolved to Arial, and --green: #3ab533 against the
+   company page's lime. It was the same layout in a different brand.
 
    The per-page --brand-accent (the customer's own colour, e.g. Toyota
    red) is intentionally left alone — that's the personalization hook.
    ============================================================ */
-.abm-page {
+.abm-page,
+.person {
   /* primary accent: electric blue → lime */
   --optimizely-blue: #abff44;
   --optimizely-blue-80: #7ddd3d;
@@ -289,17 +297,27 @@
 
   background-color: #08251a;
 }
-/* Display headings → VC Nudge (the brand's display face). */
+/* Display headings → VC Nudge (the brand's display face). The person
+   page's name, section titles and closing question are the same beat in
+   the same place, so they take the same face. */
 .abm-page .hero__title,
 .abm-page .section__title,
 .abm-page .stat__value,
-.abm-page .cta__title {
+.abm-page .cta__title,
+.person .person__name,
+.person .person__title,
+.person .person__question,
+.person .roi__face,
+.person .roi__extrude {
   font-family: 'VC Nudge', 'Die Grotesk B', Arial, sans-serif;
   letter-spacing: -0.015em;
 }
 /* Eyebrow / label register → Roboto Mono, lime. */
 .abm-page .section__label,
-.abm-page .hero__badge {
+.abm-page .hero__badge,
+.person .person__label,
+.person .person__eyebrow,
+.person .person__tier {
   font-family: 'Roboto Mono', ui-monospace, monospace;
 }
 

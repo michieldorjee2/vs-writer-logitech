@@ -14,21 +14,42 @@ let scrollElHandler: (() => void) | null = null;
 let resizeHandler: (() => void) | null = null;
 let scrollElRef: Element | null = null;
 
+export interface StickyCTAPhase {
+  /** id of the section that owns this copy */
+  id: string;
+  text: string;
+}
+
+export interface StickyCTAOptions {
+  barId?: string;
+  textId?: string;
+  heroId?: string;
+  ctaId?: string;
+  /** Section-keyed copy, ordered by vertical position on the page. */
+  phases?: StickyCTAPhase[];
+}
+
 /**
  * Initialise the sticky CTA bar.
+ *
+ * The company page and the person page run the same bar over different
+ * section ids, so every element it reaches for is addressable. The defaults
+ * are the company page's, which is why its call site never had to change.
  *
  * @param customerName  Title-cased name of the company the page is
  *                      personalised for. Inserted into the ROI-section
  *                      phase ("See what this means for {customerName}")
  *                      so each page reads as bespoke. Falls back to
  *                      "your team" when the caller doesn't supply one.
+ * @param options       Element ids and phase copy, for surfaces other than
+ *                      the company page.
  */
-export function initStickyCTA(customerName?: string): void {
+export function initStickyCTA(customerName?: string, options: StickyCTAOptions = {}): void {
   const subject = customerName?.trim() || 'your team';
-  const bar = document.getElementById('sticky-cta');
-  const textEl = document.getElementById('sticky-cta-text');
-  const hero = document.getElementById('hero');
-  const ctaSec = document.getElementById('cta');
+  const bar = document.getElementById(options.barId || 'sticky-cta');
+  const textEl = document.getElementById(options.textId || 'sticky-cta-text');
+  const hero = document.getElementById(options.heroId || 'hero');
+  const ctaSec = document.getElementById(options.ctaId || 'cta');
   if (!bar || !textEl || !hero || !ctaSec) return;
 
   // Detect the actual scroll container -- body when html has overflow-x:clip
@@ -43,7 +64,7 @@ export function initStickyCTA(customerName?: string): void {
   }
 
   // Section-keyed copy -- ordered by vertical position on the page
-  const phases = [
+  const phases: StickyCTAPhase[] = options.phases ?? [
     { id: 'intel', text: 'Explore what Optimizely can do' },
     { id: 'challenge', text: 'See how we solve your challenges' },
     { id: 'comparison', text: 'Compare the platforms side by side' },
@@ -51,6 +72,7 @@ export function initStickyCTA(customerName?: string): void {
     { id: 'roi', text: `See what this means for ${subject}` },
     { id: 'migration', text: 'Your migration path is ready' },
   ];
+  if (phases.length === 0) return;
 
   // Cache section elements
   const sectionEls = phases
