@@ -573,7 +573,11 @@ export default function PersonPageView({ page, rootRef }: Props) {
                                 const assumed = (p.Register ?? 'assumed') === 'assumed';
                                 return (
                                     <li key={i} className="person__working-item" data-register={p.Register ?? 'assumed'}>
-                                        <span className="person__working-reg">{assumed ? 'We assumed' : 'You told us'}</span>
+                                        {/* "You said", not "You told us": the `told` register
+                                            now covers anything in their own words — a line from
+                                            a published interview as much as something said on a
+                                            call. "Told us" would be wrong for the former. */}
+                                        <span className="person__working-reg">{assumed ? 'We assumed' : 'You said'}</span>
                                         <span className="person__working-text">
                                             {p.Text}
                                             {p.SourceLabel && !assumed && (
