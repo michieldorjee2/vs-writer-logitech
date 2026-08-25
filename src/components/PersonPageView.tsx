@@ -108,6 +108,20 @@ const HOW_IT_WORKS = [
     },
 ];
 
+/**
+ * When the generator can't find a real named contact it falls back to a
+ * role-title as the person's Name, which renders as a card reading
+ * "Solutions Architect / Solutions Architect". The company page has filtered
+ * these out since it shipped; the person page never did, so the placeholder
+ * reached production. Same list, same reason.
+ */
+const GENERIC_CONTACT_NAMES = new Set([
+    'solutions architect', 'solution architect', 'migration engineer',
+    'customer success manager', 'account executive', 'technical lead',
+]);
+const isRealPerson = (name?: string | null) =>
+    !!name && !GENERIC_CONTACT_NAMES.has(name.trim().toLowerCase());
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
@@ -169,8 +183,15 @@ export default function PersonPageView({ page, rootRef }: Props) {
 
     const provenance = page.provenance ?? [];
     const solutions = page.solutions ?? [];
-    const peerProof = page.peerProof ?? [];
-    const team = page.team ?? [];
+
+    /* One voice per card. The generator will happily return two quotes from the
+       same customer, which renders as the same name and title twice in a row
+       and reads as a mistake rather than as weight of evidence. */
+    const peerProof = (page.peerProof ?? []).filter(
+        (p, i, all) => all.findIndex((q) => q.PersonName === p.PersonName) === i,
+    );
+
+    const team = (page.team ?? []).filter((m) => isRealPerson(m.Name));
 
     /* What a seat like theirs is scored on. `scorecard` is the current shape;
        `remitPoints` is the previous generation's, and it is still the only
