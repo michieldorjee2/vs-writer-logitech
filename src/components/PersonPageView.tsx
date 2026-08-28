@@ -117,6 +117,12 @@ const HOW_IT_WORKS = [
  * these out since it shipped; the person page never did, so the placeholder
  * reached production. Same list, same reason.
  */
+/* ISO codes the agent occasionally writes where the symbol belongs. Anything
+   not listed passes through untouched — a prefix like "hrs" or "x" is fine. */
+const CURRENCY_SYMBOL: Record<string, string> = {
+    EUR: '€', USD: '$', GBP: '£', JPY: '¥', CHF: 'CHF ', SEK: 'kr', NOK: 'kr', DKK: 'kr',
+};
+
 const GENERIC_CONTACT_NAMES = new Set([
     'solutions architect', 'solution architect', 'migration engineer',
     'customer success manager', 'account executive', 'technical lead',
@@ -221,8 +227,15 @@ export default function PersonPageView({ page, rootRef, editMode }: Props) {
        at the foot of the page. */
     const working = provenance.filter((p) => (p.Register ?? 'assumed') !== 'read');
 
+    /* The prefix is set as one display glyph in front of a very large numeral,
+       so a three-letter ISO code reads as "EUR4M+" where the rest of the site
+       reads "€4M". The agent is told to use the symbol, but the numeral is too
+       prominent to leave to the prompt alone. */
+    const keyNumberPrefix = CURRENCY_SYMBOL[(page.keyNumberPrefix ?? '').trim().toUpperCase()]
+        ?? page.keyNumberPrefix ?? '';
+
     const keyNumberText =
-        `${page.keyNumberPrefix ?? ''}${Number(page.keyNumberValue ?? 0).toLocaleString('en-US')}${page.keyNumberSuffix ?? ''}`;
+        `${keyNumberPrefix}${Number(page.keyNumberValue ?? 0).toLocaleString('en-US')}${page.keyNumberSuffix ?? ''}`;
 
     const ctaEyebrow = meetingHref ? 'Straight to a calendar' : 'One step';
 
@@ -491,7 +504,7 @@ export default function PersonPageView({ page, rootRef, editMode }: Props) {
                                         <span
                                             className="roi__face"
                                             data-person-count={page.keyNumberValue}
-                                            data-person-count-prefix={page.keyNumberPrefix || ''}
+                                            data-person-count-prefix={keyNumberPrefix}
                                             data-person-count-suffix={page.keyNumberSuffix || ''}
                                         >
                                             {keyNumberText}
