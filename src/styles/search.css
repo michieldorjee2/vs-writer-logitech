@@ -783,3 +783,14 @@
   transform: translate(2px, -2px);
   box-shadow: -4px 4px 0 0 #3ab533;
 }
+
+/* Secondary empty-state action: request a 1:1 person page instead of the
+   account page. Quieter than the primary so the default stays obvious. */
+.search-page__empty-cta--person {
+  margin-top: 6px;
+  opacity: 0.72;
+  font-weight: 400;
+}
+.search-page__empty-cta--person:hover {
+  opacity: 1;
+}

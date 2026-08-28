@@ -11,12 +11,20 @@ import {
 import '../styles/search.css';
 
 const CREATE_PAGE_ENDPOINT = '/api/opal-create-page';
+const CREATE_PERSON_PAGE_ENDPOINT = '/api/opal-create-person-page';
 const MAX_COMPANY_NAME_LEN = 120;
 const COOLDOWN_MS = 60 * 1000;
 const COOLDOWN_KEY = 'opti.add-new.last-sent.v1';
 
 /** Inline "add new" phases: replaces the search input + Open button while active. */
-type AddPhase = null | 'email' | 'company' | 'sent';
+type AddPhase = null | 'email' | 'company' | 'person' | 'sent';
+
+/* Which kind of page the rep is asking for. An account page is the company
+   pitch we have always offered; a person page is the 1:1 one built for a named
+   buyer, and it needs one more field. The workflow behind it creates the
+   account page first when the company has none, so "person" is safe to pick
+   even for a company we have never touched. */
+type AddKind = 'account' | 'person';
 
 function readLastSent(): number {
   if (typeof window === 'undefined') return 0;
@@ -204,6 +212,8 @@ function SearchPage() {
 
   // "Add new" flow — inline takeover of the search bar.
   const [addPhase, setAddPhase] = useState<AddPhase>(null);
+  const [addKind, setAddKind] = useState<AddKind>('account');
+  const [addPerson, setAddPerson] = useState('');
   const [addCompany, setAddCompany] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
@@ -429,9 +439,11 @@ function SearchPage() {
    * `presetCompany` lets us pre-fill the company name from the user's
    * search query when they hit "Create page" in the empty-state CTA.
    */
-  const enterAddMode = useCallback((presetCompany?: string) => {
+  const enterAddMode = useCallback((presetCompany?: string, kind: AddKind = 'account') => {
     if (inCooldown) return;
     const stored = loadStoredEmail();
+    setAddKind(kind);
+    setAddPerson('');
     setAddCompany(presetCompany?.trim() || '');
     setAddError(null);
     setSubmitting(false);
@@ -482,6 +494,13 @@ function SearchPage() {
       return;
     }
 
+    // A person request needs one more field before it can go anywhere.
+    if (addKind === 'person') {
+      setAddError(null);
+      setAddPhase('person');
+      return;
+    }
+
     setSubmitting(true);
     setAddError(null);
     try {
@@ -508,7 +527,51 @@ function SearchPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [addCompany, addEmail]);
+  }, [addCompany, addEmail, addKind]);
+
+  const submitAddPerson = useCallback(async () => {
+    const person = addPerson.trim();
+    const company = addCompany.trim();
+    if (!person) {
+      setAddError("Enter the person's name");
+      return;
+    }
+    const email = (loadStoredEmail() || addEmail).trim();
+    if (!isValidOptimizelyEmail(email)) {
+      setAddEmail('');
+      setAddPhase('email');
+      setAddError('Use your @optimizely.com email');
+      return;
+    }
+
+    setSubmitting(true);
+    setAddError(null);
+    try {
+      const r = await fetch(CREATE_PERSON_PAGE_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: company,
+          person_name: person,
+          edit_user_email: email,
+        }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      const t = Date.now();
+      setLastSent(t);
+      setNowMs(t);
+      writeLastSent(t);
+      setAddPhase('sent');
+      window.setTimeout(() => {
+        setAddPhase(null);
+        setAddError(null);
+      }, 2400);
+    } catch {
+      setAddError("Couldn't reach Opal. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [addPerson, addCompany, addEmail]);
 
   /* ---- Focus the active add-mode input on phase change ---- */
   useEffect(() => {
@@ -709,12 +772,25 @@ function SearchPage() {
                     spellCheck={false}
                     maxLength={addPhase === 'company' ? MAX_COMPANY_NAME_LEN : undefined}
                     placeholder={
-                      addPhase === 'email' ? 'you@optimizely.com' : 'Company name'
+                      addPhase === 'email'
+                        ? 'you@optimizely.com'
+                        : addPhase === 'person'
+                          ? `Who at ${addCompany || 'this company'}?`
+                          : addKind === 'person'
+                            ? 'Company they work at'
+                            : 'Company name'
                     }
-                    value={addPhase === 'email' ? addEmail : addCompany}
+                    value={
+                      addPhase === 'email'
+                        ? addEmail
+                        : addPhase === 'person'
+                          ? addPerson
+                          : addCompany
+                    }
                     disabled={submitting}
                     onChange={(e) => {
                       if (addPhase === 'email') setAddEmail(e.target.value);
+                      else if (addPhase === 'person') setAddPerson(e.target.value);
                       else setAddCompany(e.target.value);
                       if (addError) setAddError(null);
                     }}
@@ -722,6 +798,7 @@ function SearchPage() {
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         if (addPhase === 'email') submitAddEmail();
+                        else if (addPhase === 'person') submitAddPerson();
                         else submitAddCompany();
                       } else if (e.key === 'Escape') {
                         e.preventDefault();
@@ -834,6 +911,38 @@ function SearchPage() {
                         </span>
                       </>
                     )}
+                  </button>
+                )}
+                {/* The account page is the default because it is what most
+                    searches are after. But a rep often has a named buyer rather
+                    than just a logo, and the workflow behind this creates the
+                    account page first when the company has none — so asking for
+                    a person is safe even for a company we have never built. */}
+                {query.trim() && !inCooldown && (
+                  <button
+                    type="button"
+                    className="search-page__empty-cta search-page__empty-cta--person"
+                    onClick={() => enterAddMode(query, 'person')}
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M19 8v6M22 11h-6" />
+                    </svg>
+                    <span>
+                      Or build one for a <b>person</b> there
+                    </span>
                   </button>
                 )}
               </div>
