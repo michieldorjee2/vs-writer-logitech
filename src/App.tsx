@@ -127,7 +127,7 @@ function PageLoader() {
     return (
         <Suspense fallback={<RouteSpinner />}>
             {isPersonPage(data)
-                ? <PersonPage page={data as any} />
+                ? <PersonPage page={data as any} editMode={searchParams.get('ctx') === 'edit'} />
                 : isRetailPage(data)
                     ? <RetailCustomerPage page={data as any} />
                     : isFinServPage(data)
@@ -135,10 +135,10 @@ function PageLoader() {
                         : isABMPage(data)
                             ? <ABMHyperPage page={data} />
                             : <DynamicComparisonPage page={data} />}
-            {fromSearch && !isRetailPage(data) && !isFinServPage(data) && !isPersonPage(data) && (
+            {fromSearch && !isRetailPage(data) && !isFinServPage(data) && (
                 <FloatingSidebar
                     page={data}
-                    variant={isABMPage(data) ? 'abm' : 'dynamic'}
+                    variant={isPersonPage(data) ? 'person' : isABMPage(data) ? 'abm' : 'dynamic'}
                 />
             )}
         </Suspense>

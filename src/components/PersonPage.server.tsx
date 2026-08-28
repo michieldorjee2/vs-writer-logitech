@@ -10,8 +10,9 @@ import PersonPageView from './PersonPageView';
 
 interface Props {
     page: PersonPageType;
+    editMode?: boolean;
 }
 
-export default function PersonPageServer({ page }: Props) {
-    return <PersonPageView page={page} />;
+export default function PersonPageServer({ page, editMode }: Props) {
+    return <PersonPageView page={page} editMode={editMode} />;
 }

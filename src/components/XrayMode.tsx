@@ -4,6 +4,7 @@ import type { CompetitorComparisonPage } from '../lib/graph-types';
 import {
   ABM_XRAY_DEFAULTS,
   DYNAMIC_XRAY_DEFAULTS,
+  PERSON_XRAY_DEFAULTS,
   resolveXraySections,
   type XraySectionInfo,
 } from '../lib/xray-defaults';
@@ -13,7 +14,7 @@ interface Props {
   active: boolean;
   onClose: () => void;
   page: CompetitorComparisonPage;
-  variant: 'abm' | 'dynamic';
+  variant: 'abm' | 'dynamic' | 'person';
 }
 
 type CardSide = 'above' | 'below' | 'left' | 'right';
@@ -269,7 +270,10 @@ const emptyDom = (): AnchorDom => ({
 });
 
 function XrayMode({ active, onClose, page, variant }: Props) {
-  const defaults = variant === 'abm' ? ABM_XRAY_DEFAULTS : DYNAMIC_XRAY_DEFAULTS;
+  const defaults =
+    variant === 'abm' ? ABM_XRAY_DEFAULTS
+      : variant === 'person' ? PERSON_XRAY_DEFAULTS
+        : DYNAMIC_XRAY_DEFAULTS;
   const sections = resolveXraySections(defaults, page.xraySections);
 
   const [phase, setPhase] = useState<'idle' | 'scanning' | 'revealed'>('idle');

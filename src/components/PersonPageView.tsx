@@ -46,6 +46,8 @@ import { readableAccentOnFir } from '../lib/brand-accent';
 interface Props {
     page: PersonPageType;
     rootRef?: React.Ref<HTMLElement>;
+    /** Adds data-epi-edit hooks so the CMS on-page editor can target fields. */
+    editMode?: boolean;
 }
 
 /**
@@ -161,18 +163,24 @@ function ArrowRight() {
  * The company page's section header — label, title, description, centred — so
  * both surfaces open every section on the same beat.
  */
-function SectionHead({ label, title, lede }: { label: string; title: string; lede?: string | null }) {
+function SectionHead(
+    { label, title, lede, edit }:
+    { label: string; title: string; lede?: string | null; edit?: Record<string, string> },
+) {
     return (
         <div className="person__head" data-person-anim>
             <span className="person__label">{label}</span>
-            <h2 className="person__title">{title}</h2>
+            <h2 className="person__title" {...(edit ?? {})}>{title}</h2>
             {lede && <p className="person__lede">{lede}</p>}
         </div>
     );
 }
 
-export default function PersonPageView({ page, rootRef }: Props) {
+export default function PersonPageView({ page, rootRef, editMode }: Props) {
     const tier: EngagementTier = page.engagementTier ?? 'known';
+
+    // Same helper the company page uses: the attribute exists only in edit mode.
+    const epi = (prop: string) => (editMode ? { 'data-epi-edit': prop } : {});
 
     const accent = page.brandAccentColor ? readableAccentOnFir(page.brandAccentColor) : undefined;
     const companyHref = page.companySlug ? `/${page.companySlug}` : null;
@@ -264,10 +272,10 @@ export default function PersonPageView({ page, rootRef }: Props) {
 
                     <div className="person__hero-grid">
                         <div className="person__intro">
-                            <p className="person__eyebrow">
+                            <p className="person__eyebrow" {...epi('heroEyebrow')}>
                                 {page.heroEyebrow || `Written for ${page.personName}`}
                             </p>
-                            <h1 className="person__name">
+                            <h1 className="person__name" {...epi('personName')}>
                                 {page.personName}
                                 {linkedIn && (
                                     <a href={linkedIn} target="_blank" rel="noopener noreferrer"
@@ -277,14 +285,14 @@ export default function PersonPageView({ page, rootRef }: Props) {
                                     </a>
                                 )}
                             </h1>
-                            <p className="person__role">
+                            <p className="person__role" {...epi('personTitle')}>
                                 {page.personTitle}
                                 {page.roleFrame && <span className="person__frame">{page.roleFrame}</span>}
                             </p>
 
                             {page.noteBody && (
                                 <div className="person__opening">
-                                    <p className="person__opening-body">{page.noteBody}</p>
+                                    <p className="person__opening-body" {...epi('noteBody')}>{page.noteBody}</p>
                                     <div className="person__sig">
                                         <span className="person__sig-mark" aria-hidden="true">
                                             {page.noteSignedByInitials}
@@ -345,6 +353,7 @@ export default function PersonPageView({ page, rootRef }: Props) {
                         <SectionHead
                             label="What the job is scored on"
                             title={page.scorecardHeadline || page.remitHeadline || 'Where this gets hard'}
+                            edit={epi('scorecardHeadline')}
                         />
                         <ol className="person__measures" data-person-stagger>
                             {measures.map((m, i) => (
@@ -406,6 +415,7 @@ export default function PersonPageView({ page, rootRef }: Props) {
                             label="In practice"
                             title={page.solutionsHeadline || 'What changes for your team'}
                             lede={page.solutionsIntro}
+                            edit={epi('solutionsHeadline')}
                         />
                         <div className="person__practice" data-person-stagger>
                             {solutions.map((s, i) => {
@@ -538,8 +548,8 @@ export default function PersonPageView({ page, rootRef }: Props) {
                 <section className="person__section person__closing" id="next">
                     <div className="person__inner person__inner--narrow">
                         <div data-person-anim>
-                            {page.ctaTitle && <h2 className="person__question">{page.ctaTitle}</h2>}
-                            {page.ctaBody && <p className="person__lede">{page.ctaBody}</p>}
+                            {page.ctaTitle && <h2 className="person__question" {...epi('ctaTitle')}>{page.ctaTitle}</h2>}
+                            {page.ctaBody && <p className="person__lede" {...epi('ctaBody')}>{page.ctaBody}</p>}
                         </div>
 
                         {team.length > 0 && (

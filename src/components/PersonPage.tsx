@@ -30,9 +30,10 @@ import { initStickyCTA, cleanupStickyCTA } from '../lib/abm-sticky-cta';
 
 interface Props {
     page: PersonPageType;
+    editMode?: boolean;
 }
 
-export default function PersonPage({ page }: Props) {
+export default function PersonPage({ page, editMode }: Props) {
     const rootRef = useRef<HTMLElement>(null);
     /* How long the copy waits for the galaxy's opening. Set once the galaxy
        chunk resolves; 0 if it never does. */
@@ -160,5 +161,5 @@ export default function PersonPage({ page }: Props) {
         return () => cleanupStickyCTA();
     }, [page.companyName]);
 
-    return <PersonPageView page={page} rootRef={rootRef} />;
+    return <PersonPageView page={page} rootRef={rootRef} editMode={editMode} />;
 }

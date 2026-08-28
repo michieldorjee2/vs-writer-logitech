@@ -4,6 +4,7 @@ import type { CompetitorComparisonPage } from '../lib/graph-types';
 import {
   ABM_XRAY_DEFAULTS,
   DYNAMIC_XRAY_DEFAULTS,
+  PERSON_XRAY_DEFAULTS,
   resolveXraySections,
   type XraySectionInfo,
 } from '../lib/xray-defaults';
@@ -24,7 +25,7 @@ interface Props {
    */
   onSent?: () => void;
   page: CompetitorComparisonPage;
-  variant: 'abm' | 'dynamic';
+  variant: 'abm' | 'dynamic' | 'person';
 }
 
 type DocSize = { w: number; h: number };
@@ -167,7 +168,10 @@ function clamp(v: number, lo: number, hi: number): number {
 type Phase = 'editing' | 'working' | 'thanks';
 
 function EditMode({ active, onClose, onSent, page, variant }: Props) {
-  const defaults = variant === 'abm' ? ABM_XRAY_DEFAULTS : DYNAMIC_XRAY_DEFAULTS;
+  const defaults =
+    variant === 'abm' ? ABM_XRAY_DEFAULTS
+      : variant === 'person' ? PERSON_XRAY_DEFAULTS
+        : DYNAMIC_XRAY_DEFAULTS;
   const sections = useMemo(
     () => resolveXraySections(defaults, page.xraySections),
     [defaults, page.xraySections],

@@ -7,7 +7,7 @@ import '../styles/floating-sidebar.css';
 interface Props {
   page: CompetitorComparisonPage;
   /** Which default section registry to use when CMS hasn't set overrides. */
-  variant: 'abm' | 'dynamic';
+  variant: 'abm' | 'dynamic' | 'person';
 }
 
 /* ------------ "Working…" countdown helpers ------------

@@ -44,6 +44,12 @@ export function getPageSlug(page: CompetitorComparisonPage): string {
  * product (Sitecore, Adobe), not the customer.
  */
 export function deriveCustomerName(page: CompetitorComparisonPage): string {
+  /* 0. Person pages carry the company name outright, and the slug fallback
+        below would otherwise turn "/becton-dickinson/tom-polen" into
+        "Becton Dickinson Tom Polen" — a company that does not exist. */
+  const personCompany = (page as { companyName?: string }).companyName;
+  if (personCompany?.trim()) return personCompany.trim();
+
   // 1. Author-tagged inside intelHeadline.
   const em = page.intelHeadline?.match(/<em>([^<]+)<\/em>/i);
   const fromEm = em?.[1]?.trim();
