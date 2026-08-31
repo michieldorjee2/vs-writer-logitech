@@ -156,6 +156,17 @@ query GetFinServPage($slug: String!) {
   return query;
 }
 
+/**
+ * Six fields the flat content model never had — CanonicalUrl, FeatureSection and
+ * FaqSection on the page, OurHighlight/CompetitorHighlight on ComparisonRow, Weeks
+ * on ABMTimelinePhase — were carried forward from the pre-flat nested-block query
+ * (a4a6fe7) and sat in this selection returning null on every page for months.
+ * Optimizely Graph kept advertising the legacy names in its schema, so the query
+ * still parsed; when that schema refreshed, the whole query 400'd and all 2,676
+ * account pages 404'd. A selection on one unknown field fails the entire query —
+ * check the registered type before adding a field here, and run
+ * `npm run check:graph`.
+ */
 const PAGE_QUERY = `
 query GetPage($slug: String!) {
   CompetitorComparisonPage(
@@ -164,17 +175,15 @@ query GetPage($slug: String!) {
   ) {
     items {
       _metadata { key url { default hierarchical } published }
-      PageTitle MetaDescription CanonicalUrl { default }
+      PageTitle MetaDescription
       eyebrow headline subheadline cta link { default }
       comparisonHeadline
-      comparisonTableRows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight }
+      comparisonTableRows { Category OurValue CompetitorValue }
       analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
       promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
       endHeadline endSubheadline endCTA endCTALink { default }
       testimonial1 testimonial1JobTitle testimonial1Company
       testimonial2 testimonial2JobTitle testimonial2Company
-      FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
-      FaqSection { __typename _json }
       customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
       challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
       comparisonDescription logoWallCustomerSlot
@@ -189,7 +198,7 @@ query GetPage($slug: String!) {
       newsItems { Date Headline Url { default } }
       painPoints { Title Description }
       roiCards { Metric Unit Label CitationText }
-      timelinePhases { Weeks Title Description MarkerColor }
+      timelinePhases { Title Description MarkerColor }
       teamMembers { Initials Name Role Email }
       footerLinks { Text Url { default } }
       analystCards { Badge Source Category Url { default } }
@@ -255,7 +264,20 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
-  return res.json();
+  const json = await res.json();
+  // A selection on a field Graph does not know fails the WHOLE query: `data`
+  // comes back null, and every caller below reads that as "no such page". That
+  // is how one schema drift 404'd all 2,676 account pages for days without
+  // producing a single log line. Say it out loud instead.
+  const errors = (json as { errors?: Array<{ message: string }> })?.errors;
+  if (errors?.length) {
+    const op = /query\s+(\w+)/.exec(query)?.[1] ?? 'anonymous';
+    console.error(
+      `[graph] ${op} failed (HTTP ${res.status}) for ${JSON.stringify(variables)}: ` +
+        errors.map((e) => e.message).join(' | '),
+    );
+  }
+  return json;
 }
 
 // PersonPage — the 1:1 buyer page, the only nested route on the site

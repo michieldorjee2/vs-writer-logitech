@@ -4,6 +4,17 @@ const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
 // Query _Content (base interface) so we can resolve ANY content type by key —
 // pages AND individual blocks. The __typename tells the frontend what it got.
+/**
+ * Six fields the flat content model never had — CanonicalUrl, FeatureSection and
+ * FaqSection on the page, OurHighlight/CompetitorHighlight on ComparisonRow, Weeks
+ * on ABMTimelinePhase — were carried forward from the pre-flat nested-block query
+ * (a4a6fe7) and sat in this selection returning null on every page for months.
+ * Optimizely Graph kept advertising the legacy names in its schema, so the query
+ * still parsed; when that schema refreshed, the whole query 400'd and all 2,676
+ * account pages 404'd. A selection on one unknown field fails the entire query —
+ * check the registered type before adding a field here, and run
+ * `npm run check:graph`.
+ */
 const PREVIEW_QUERY = `
 query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
   _Content(
@@ -14,17 +25,15 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
       __typename
       _metadata { key version url { default hierarchical } published }
       ... on CompetitorComparisonPage {
-        PageTitle MetaDescription CanonicalUrl { default }
+        PageTitle MetaDescription
         eyebrow headline subheadline cta link { default }
         comparisonHeadline
-        comparisonTableRows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight }
+        comparisonTableRows { Category OurValue CompetitorValue }
         analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
         promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
         endHeadline endSubheadline endCTA endCTALink { default }
         testimonial1 testimonial1JobTitle testimonial1Company
         testimonial2 testimonial2JobTitle testimonial2Company
-        FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
-        FaqSection { __typename _json }
         customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
         challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
         comparisonDescription logoWallCustomerSlot
@@ -39,7 +48,7 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
         newsItems { Date Headline Url { default } }
         painPoints { Title Description }
         roiCards { Metric Unit Label CitationText }
-        timelinePhases { Weeks Title Description MarkerColor }
+        timelinePhases { Title Description MarkerColor }
         teamMembers { Initials Name Role Email }
         footerLinks { Text Url { default } }
         analystCards { Badge Source Category Url { default } }
@@ -47,7 +56,7 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
       ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
       ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } }
       ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } }
-      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight } }
+      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue CompetitorValue } }
       ... on AnalystSectionBlock { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
       ... on TestimonialBlock { Quote AuthorName AuthorTitle }
       ... on PromoCardBlock { Eyebrow Heading Description CtaText CtaUrl { default } }

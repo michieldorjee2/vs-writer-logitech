@@ -115,9 +115,9 @@ export type PreviewContent = CompetitorComparisonPage | PreviewBlock;
 export interface ComparisonRow {
     Category: string;
     OurValue: string | null;
-    OurHighlight: boolean | null;
+    OurHighlight?: boolean | null;
     CompetitorValue: string | null;
-    CompetitorHighlight: boolean | null;
+    CompetitorHighlight?: boolean | null;
 }
 
 // --- Page type (flat content model) ---
@@ -131,7 +131,7 @@ export interface CompetitorComparisonPage {
     };
     PageTitle: string;
     MetaDescription: string;
-    CanonicalUrl: { default: string } | null;
+    CanonicalUrl?: { default: string } | null;
 
     // Hero section (flat fields)
     eyebrow: string | null;
@@ -175,8 +175,9 @@ export interface CompetitorComparisonPage {
     // Logos (single content reference)
     Logos: { _metadata: { url: { default: string }; displayName?: string } } | null;
 
-    // Feature section (still block-based)
-    FeatureSection: {
+    // Feature section — not on the registered type; never selected. Optional so
+    // no reader may assume it is present. See the note above PAGE_QUERY.
+    FeatureSection?: {
         Headline: RichText | null;
         Features: Array<{
             Title: string;
@@ -184,8 +185,8 @@ export interface CompetitorComparisonPage {
         }>;
     } | null;
 
-    // FAQ section (still block-based list)
-    FaqSection: Array<{
+    // FAQ section — not on the registered type; never selected.
+    FaqSection?: Array<{
         _metadata?: { key: string };
         __typename?: string;
         _json?: unknown;
@@ -252,7 +253,7 @@ export interface CompetitorComparisonPage {
         CitationText: string | null;
     }> | null;
     timelinePhases: Array<{
-        Weeks: string;
+        Weeks?: string;
         Title: string;
         Description: string;
         MarkerColor: string | null;
