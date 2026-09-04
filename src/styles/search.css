@@ -486,8 +486,18 @@
   display: block;
 }
 
+/* Both actions share one centred row, so the primary's offset shadow has
+ * somewhere to fall instead of tucking under the secondary. Wraps to two
+ * lines on a narrow panel. */
+.search-page__empty-actions {
+  margin: 16px 0 2px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
 .search-page__empty-cta {
-  margin: 14px 0 4px;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -498,7 +508,7 @@
   color: #08251a;
   font-family: var(--sp-font-body);
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.005em;
   cursor: pointer;
   box-shadow: -2px 2px 0 0 #3ab533;
@@ -513,7 +523,11 @@
   box-shadow: -4px 4px 0 0 #3ab533;
 }
 
+/* Die Grotesk B ships 400/500/700, so the query term earns its emphasis
+ * from the 500 -> 700 step, not from colour: `.search-page__empty b` would
+ * otherwise paint it cream, and cream on lime is unreadable. */
 .search-page__empty-cta b {
+  color: inherit;
   font-weight: 700;
 }
 
@@ -785,12 +799,24 @@
 }
 
 /* Secondary empty-state action: request a 1:1 person page instead of the
-   account page. Quieter than the primary so the default stays obvious. */
+   account page. A ghost button, not a faded copy of the primary — dimming
+   the lime fill dragged the dark ink down with it. Same border box and
+   padding, so the two stay level on the row; the lime fill stays unique
+   to the default action. */
 .search-page__empty-cta--person {
-  margin-top: 6px;
-  opacity: 0.72;
-  font-weight: 400;
+  background: rgba(171, 255, 68, 0.06);
+  border-color: rgba(171, 255, 68, 0.3);
+  color: var(--sp-fg-1);
+  box-shadow: none;
 }
-.search-page__empty-cta--person:hover {
-  opacity: 1;
+.search-page__empty-cta--person:hover:not(:disabled) {
+  background: rgba(171, 255, 68, 0.12);
+  border-color: rgba(171, 255, 68, 0.55);
+  color: var(--sp-fg-1);
+  transform: none;
+  box-shadow: none;
+}
+.search-page__empty-cta--person b,
+.search-page__empty-cta--person svg {
+  color: var(--sp-accent);
 }

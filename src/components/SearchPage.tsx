@@ -862,88 +862,90 @@ function SearchPage() {
                   No match for <b>{query}</b>.
                 </div>
                 {query.trim() && (
-                  <button
-                    type="button"
-                    className={
-                      'search-page__empty-cta' +
-                      (inCooldown ? ' search-page__empty-cta--cooldown' : '')
-                    }
-                    onClick={() => enterAddMode(query)}
-                    disabled={inCooldown}
-                    onMouseDown={(e) => e.preventDefault()}
-                  >
-                    {inCooldown ? (
-                      <>
+                  <div className="search-page__empty-actions">
+                    <button
+                      type="button"
+                      className={
+                        'search-page__empty-cta' +
+                        (inCooldown ? ' search-page__empty-cta--cooldown' : '')
+                      }
+                      onClick={() => enterAddMode(query)}
+                      disabled={inCooldown}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      {inCooldown ? (
+                        <>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 7v5l3 2" />
+                          </svg>
+                          <span>One company per minute — try again in {cooldownRemaining}s</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M12 5v14" />
+                            <path d="M5 12h14" />
+                          </svg>
+                          <span>
+                            Create a page for <b>{query.trim()}</b>
+                          </span>
+                        </>
+                      )}
+                    </button>
+                    {/* The account page is the default because it is what most
+                        searches are after. But a rep often has a named buyer rather
+                        than just a logo, and the workflow behind this creates the
+                        account page first when the company has none — so asking for
+                        a person is safe even for a company we have never built. */}
+                    {!inCooldown && (
+                      <button
+                        type="button"
+                        className="search-page__empty-cta search-page__empty-cta--person"
+                        onClick={() => enterAddMode(query, 'person')}
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
                         <svg
                           width="16"
                           height="16"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="2.2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           aria-hidden="true"
                         >
-                          <circle cx="12" cy="12" r="9" />
-                          <path d="M12 7v5l3 2" />
-                        </svg>
-                        <span>One company per minute — try again in {cooldownRemaining}s</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.4"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M12 5v14" />
-                          <path d="M5 12h14" />
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M19 8v6M22 11h-6" />
                         </svg>
                         <span>
-                          Create a page for <b>{query.trim()}</b>
+                          Or build one for a <b>person</b> there
                         </span>
-                      </>
+                      </button>
                     )}
-                  </button>
-                )}
-                {/* The account page is the default because it is what most
-                    searches are after. But a rep often has a named buyer rather
-                    than just a logo, and the workflow behind this creates the
-                    account page first when the company has none — so asking for
-                    a person is safe even for a company we have never built. */}
-                {query.trim() && !inCooldown && (
-                  <button
-                    type="button"
-                    className="search-page__empty-cta search-page__empty-cta--person"
-                    onClick={() => enterAddMode(query, 'person')}
-                    onMouseDown={(e) => e.preventDefault()}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M19 8v6M22 11h-6" />
-                    </svg>
-                    <span>
-                      Or build one for a <b>person</b> there
-                    </span>
-                  </button>
+                  </div>
                 )}
               </div>
             ) : (
