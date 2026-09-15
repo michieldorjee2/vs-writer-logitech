@@ -106,11 +106,18 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
         return;
       }
 
-      // FAQ accordion item
+      // FAQ accordion item.
+      //
+      // Sent as `label`, NOT `title`: `title` is ODP's own page-title field
+      // ("The title of the page from which the event was sent"), so sending the
+      // FAQ question under that name overwrote the page title on the event row
+      // — corrupting the one field that identifies which account page a visit
+      // belongs to. `label` is already the registered field for "visible text
+      // of the clicked element" and `element` distinguishes faq from cta.
       const faqTrigger = target.closest('[class*="accordion"]') as HTMLElement | null;
       if (faqTrigger) {
-        const title = faqTrigger.textContent?.trim().slice(0, 80) || '';
-        odpEvent('click', 'faq_click', { element: 'faq', title });
+        const label = faqTrigger.textContent?.trim().slice(0, 80) || '';
+        odpEvent('click', 'faq_click', { element: 'faq', label });
       }
     }
 
