@@ -290,7 +290,10 @@
   transform: translateY(-6px);
   pointer-events: none;
   transition: opacity 0.2s var(--sp-ease-out), transform 0.2s var(--sp-ease-out);
-  max-height: 440px;
+  /* The ceiling, not the height: `fitDropdown` in SearchPage.tsx lowers
+     `--sp-dd-max` to whatever room is left under the bar so the panel — and
+     the create actions at the end of it — never fall past the fold. */
+  max-height: var(--sp-dd-max, 440px);
   overflow-y: auto;
   z-index: 10;
 }
@@ -819,4 +822,44 @@
 .search-page__empty-cta--person b,
 .search-page__empty-cta--person svg {
   color: var(--sp-accent);
+}
+
+/* Create actions pinned under a hit list. A short query ("ERM") is a
+   substring of plenty of real company names, so the list is never empty and
+   the empty-state CTA never appears — the rep scrolls past the matches to
+   these instead. Divider + quiet label so it reads as the end of the list
+   rather than one more result. */
+.search-page__create-footer {
+  border-top: 1px solid var(--sp-border-subtle);
+  margin-top: 8px;
+  padding: 14px 14px 6px;
+  text-align: center;
+}
+.search-page__create-footer-line {
+  font-family: var(--sp-font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--sp-fg-3);
+}
+.search-page__create-footer .search-page__empty-actions {
+  margin: 12px 0 2px;
+}
+
+/* Arrow-key selection. The offset shadow is the primary's resting state, so
+   the ring is added to it rather than replacing it — and no transform, which
+   would shift a row the keyboard just scrolled into place. */
+.search-page__empty-cta--active {
+  background: var(--sp-accent-hover);
+  box-shadow: -2px 2px 0 0 #3ab533, 0 0 0 3px rgba(171, 255, 68, 0.28);
+}
+.search-page__empty-cta--person.search-page__empty-cta--active {
+  background: rgba(171, 255, 68, 0.12);
+  border-color: rgba(171, 255, 68, 0.55);
+  box-shadow: 0 0 0 3px rgba(171, 255, 68, 0.16);
+}
+
+/* Keep a keyboard-scrolled row off the panel's rounded edge. */
+.search-page__dropdown [data-nav-idx] {
+  scroll-margin-block: 10px;
 }

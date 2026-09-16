@@ -67,6 +67,16 @@ type Entry = {
 const RECENT_KEY = 'showcase.recent-searches.v1';
 const MAX_RECENT = 6;
 
+/* Dropdown sizing. The panel hangs off the bottom of the search bar, which
+   sits low in a vertically centred hero — on a laptop the old flat 440px
+   already ran a pixel past the fold, taking the create actions with it. The
+   hero is exactly one viewport tall and the page does not scroll, so there
+   is no floor here on purpose: a short window gets a cramped panel that
+   scrolls internally, never one whose bottom is unreachable. 12px of gutter
+   keeps the panel's shadow off the edge. */
+const DROPDOWN_MAX_H = 440;
+const DROPDOWN_GUTTER = 12;
+
 function hexToRgb(hex: string | null): [number, number, number] {
   const fallback: [number, number, number] = [171, 255, 68];
   if (!hex) return fallback;
@@ -185,9 +195,130 @@ function PillLogo({ entry }: { entry: Entry }) {
   );
 }
 
+/** The "we don't have this one — build it" pair.
+ *
+ *  Shown in the empty state and again pinned under a hit list. A short query
+ *  like "ERM" is a substring of half a dozen real company names, so the list
+ *  is never empty and the create actions would otherwise be unreachable —
+ *  exactly when a rep needs them. `baseIdx` is where the pair sits in the
+ *  arrow-key walk: straight after the last result.
+ */
+function CreateActions({
+  query,
+  inCooldown,
+  cooldownRemaining,
+  baseIdx,
+  activeIdx,
+  onHover,
+  onPick,
+}: {
+  query: string;
+  inCooldown: boolean;
+  cooldownRemaining: number;
+  baseIdx: number;
+  activeIdx: number;
+  onHover: (idx: number) => void;
+  onPick: (kind: AddKind) => void;
+}) {
+  // The countdown pill is inert, so it never takes the selection with it.
+  const cls = (extra: string, idx: number) =>
+    'search-page__empty-cta' +
+    extra +
+    (!inCooldown && activeIdx === idx ? ' search-page__empty-cta--active' : '');
+
+  return (
+    <div className="search-page__empty-actions">
+      <button
+        type="button"
+        data-nav-idx={inCooldown ? undefined : baseIdx}
+        className={cls(inCooldown ? ' search-page__empty-cta--cooldown' : '', baseIdx)}
+        onClick={() => onPick('account')}
+        disabled={inCooldown}
+        onMouseEnter={() => onHover(baseIdx)}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        {inCooldown ? (
+          <>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            <span>One company per minute — try again in {cooldownRemaining}s</span>
+          </>
+        ) : (
+          <>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            <span>
+              Create a page for <b>{query.trim()}</b>
+            </span>
+          </>
+        )}
+      </button>
+      {/* The account page is the default because it is what most
+          searches are after. But a rep often has a named buyer rather
+          than just a logo, and the workflow behind this creates the
+          account page first when the company has none — so asking for
+          a person is safe even for a company we have never built. */}
+      {!inCooldown && (
+        <button
+          type="button"
+          data-nav-idx={baseIdx + 1}
+          className={cls(' search-page__empty-cta--person', baseIdx + 1)}
+          onClick={() => onPick('person')}
+          onMouseEnter={() => onHover(baseIdx + 1)}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M19 8v6M22 11h-6" />
+          </svg>
+          <span>
+            Or build one for a <b>person</b> there
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SearchPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const starRef = useRef<{
     destroy: () => void;
     setPalette: (rgbs: [number, number, number][]) => void;
@@ -376,17 +507,32 @@ function SearchPage() {
     return { typed: query, rest: top.name.slice(query.length) };
   }, [query, results, activeIdx]);
 
+  /* Move the selection and keep it inside the scroll port. The list is
+     capped at a few rows and the create actions sit under the last hit, so
+     arrowing down there has to bring them into view. */
+  const focusNav = (next: number) => {
+    setActiveIdx(next);
+    dropdownRef.current
+      ?.querySelector<HTMLElement>(`[data-nav-idx="${next}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIdx((i) => Math.min(results.length - 1, i + 1));
+      focusNav(Math.min(Math.max(0, navCount - 1), activeIdx + 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIdx((i) => Math.max(0, i - 1));
+      focusNav(Math.max(0, activeIdx - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const entry = results[activeIdx];
-      if (entry) select(entry);
+      if (activeIdx < results.length) {
+        const entry = results[activeIdx];
+        if (entry) select(entry);
+      } else if (createActionCount) {
+        // Past the last hit: the create pair, account page first.
+        enterAddMode(query, activeIdx - results.length === 1 ? 'person' : 'account');
+      }
     } else if (e.key === 'Tab' && ghostText) {
       // Tab-complete the ghost suggestion
       e.preventDefault();
@@ -416,6 +562,43 @@ function SearchPage() {
 
   const showSearchResults = focused || query.length > 0;
 
+  /* Keep the panel inside the fold. iOS reports the soft keyboard through
+     `visualViewport` and not through `innerHeight`, so on a booth iPad with
+     the keyboard up that is the only measurement that sees the real room. */
+  useEffect(() => {
+    const el = dropdownRef.current;
+    if (!el) return;
+
+    const fitDropdown = () => {
+      const vv = window.visualViewport;
+      const viewportH = vv?.height ?? window.innerHeight;
+      const offsetTop = vv?.offsetTop ?? 0;
+      // Measure the panel's layout position, not its rect: it opens with a
+      // -6px translate that is still mid-transition when this first runs,
+      // which would report 6px more room than the panel actually has.
+      const anchor = el.offsetParent as HTMLElement | null;
+      const layoutTop = (anchor ? anchor.getBoundingClientRect().top : 0) + el.offsetTop;
+      const top = layoutTop - offsetTop;
+      const room = viewportH - top - DROPDOWN_GUTTER;
+      const h = Math.max(0, Math.min(DROPDOWN_MAX_H, Math.round(room)));
+      el.style.setProperty('--sp-dd-max', `${h}px`);
+    };
+
+    fitDropdown();
+    window.addEventListener('resize', fitDropdown);
+    window.addEventListener('scroll', fitDropdown, { passive: true });
+    window.visualViewport?.addEventListener('resize', fitDropdown);
+    window.visualViewport?.addEventListener('scroll', fitDropdown);
+    return () => {
+      window.removeEventListener('resize', fitDropdown);
+      window.removeEventListener('scroll', fitDropdown);
+      window.visualViewport?.removeEventListener('resize', fitDropdown);
+      window.visualViewport?.removeEventListener('scroll', fitDropdown);
+    };
+    // Re-measure when the bar swaps into add-mode (its height changes) and
+    // when the panel opens, which is when the number has to be right.
+  }, [showSearchResults, addPhase]);
+
   /* ---- Cooldown bookkeeping ----
    *
    * We persist the last successful submission so a refresh doesn't bypass
@@ -433,6 +616,14 @@ function SearchPage() {
     const id = window.setInterval(() => setNowMs(Date.now()), 500);
     return () => window.clearInterval(id);
   }, [inCooldown]);
+
+  /* The create actions are part of the list the arrow keys walk: the indices
+     at and past `results.length` address them (account page, then person).
+     Mid-cooldown the primary is an inert countdown pill and the secondary is
+     hidden, so there is nothing to walk into. */
+  const showCreateActions = query.trim().length > 0;
+  const createActionCount = showCreateActions && !inCooldown ? 2 : 0;
+  const navCount = results.length + createActionCount;
 
   /* ---- Add-mode (inline) handlers ----
    *
@@ -851,6 +1042,7 @@ function SearchPage() {
           </div>
 
           <div
+            ref={dropdownRef}
             className={
               'search-page__dropdown' +
               (showSearchResults && !addPhase ? ' search-page__dropdown--open' : '')
@@ -862,90 +1054,15 @@ function SearchPage() {
                   No match for <b>{query}</b>.
                 </div>
                 {query.trim() && (
-                  <div className="search-page__empty-actions">
-                    <button
-                      type="button"
-                      className={
-                        'search-page__empty-cta' +
-                        (inCooldown ? ' search-page__empty-cta--cooldown' : '')
-                      }
-                      onClick={() => enterAddMode(query)}
-                      disabled={inCooldown}
-                      onMouseDown={(e) => e.preventDefault()}
-                    >
-                      {inCooldown ? (
-                        <>
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <circle cx="12" cy="12" r="9" />
-                            <path d="M12 7v5l3 2" />
-                          </svg>
-                          <span>One company per minute — try again in {cooldownRemaining}s</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M12 5v14" />
-                            <path d="M5 12h14" />
-                          </svg>
-                          <span>
-                            Create a page for <b>{query.trim()}</b>
-                          </span>
-                        </>
-                      )}
-                    </button>
-                    {/* The account page is the default because it is what most
-                        searches are after. But a rep often has a named buyer rather
-                        than just a logo, and the workflow behind this creates the
-                        account page first when the company has none — so asking for
-                        a person is safe even for a company we have never built. */}
-                    {!inCooldown && (
-                      <button
-                        type="button"
-                        className="search-page__empty-cta search-page__empty-cta--person"
-                        onClick={() => enterAddMode(query, 'person')}
-                        onMouseDown={(e) => e.preventDefault()}
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                          <circle cx="9" cy="7" r="4" />
-                          <path d="M19 8v6M22 11h-6" />
-                        </svg>
-                        <span>
-                          Or build one for a <b>person</b> there
-                        </span>
-                      </button>
-                    )}
-                  </div>
+                  <CreateActions
+                    query={query}
+                    inCooldown={inCooldown}
+                    cooldownRemaining={cooldownRemaining}
+                    baseIdx={0}
+                    activeIdx={activeIdx}
+                    onHover={setActiveIdx}
+                    onPick={(kind) => enterAddMode(query, kind)}
+                  />
                 )}
               </div>
             ) : (
@@ -958,6 +1075,7 @@ function SearchPage() {
                     key={entry.slug}
                     role="button"
                     tabIndex={-1}
+                    data-nav-idx={i}
                     className={
                       'search-page__opt' + (i === activeIdx ? ' search-page__opt--active' : '')
                     }
@@ -982,6 +1100,22 @@ function SearchPage() {
                     <span className="search-page__opt-chip">{query ? 'Open' : 'Reopen'}</span>
                   </div>
                 ))}
+                {showCreateActions && (
+                  <div className="search-page__create-footer">
+                    <div className="search-page__create-footer-line">
+                      Not seeing the right one?
+                    </div>
+                    <CreateActions
+                      query={query}
+                      inCooldown={inCooldown}
+                      cooldownRemaining={cooldownRemaining}
+                      baseIdx={results.length}
+                      activeIdx={activeIdx}
+                      onHover={setActiveIdx}
+                      onPick={(kind) => enterAddMode(query, kind)}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
