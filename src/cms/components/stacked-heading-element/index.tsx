@@ -309,7 +309,13 @@ function Layer({
   return (
     <motion.span
       className={cn(
-        'inline-block whitespace-pre',
+        // D4 fix — `whitespace-pre` forbade wrapping, so a long ##emphasised## run stayed on
+        // one line no matter how narrow the viewport, forcing this inline-block wider than the
+        // page and causing horizontal scroll. `pre-wrap` still preserves the run's own spaces
+        // (unlike `whitespace-normal`, which would collapse them) but lets it break. Every
+        // layer gets the identical text, font and `inset-0` box (sized off the one in-flow
+        // layer below), so they all wrap at the same point and stay in register.
+        'inline-block whitespace-pre-wrap',
         isFirstLayer ? 'relative' : 'absolute inset-0',
         !isTopLayer && 'pointer-events-none select-none'
       )}
@@ -552,10 +558,11 @@ function CurvedCharacter({
     )
   }
 
-  // Non-stacked character - single layer, dark color
+  // Non-stacked character - single layer. `text-current` per the D1 fix below: this must
+  // never hardcode a color that can match its own band's background.
   return (
     <span
-      className="text-fir-darkfir absolute bottom-0 left-1/2 z-10 inline-block origin-bottom"
+      className="text-current absolute bottom-0 left-1/2 z-10 inline-block origin-bottom"
       style={{
         transform: `translateX(-50%) rotate(${rotationDeg}deg) translateY(-${radius}px)`,
       }}
@@ -769,6 +776,28 @@ const ALIGNMENT_CLASSES: Record<TextAlignment, string> = {
 }
 
 /**
+ * D2 fix — the opticom type scale. Upstream renders every `HeadingLevel` through the
+ * identical `text-5xl md:text-7xl lg:text-9xl` ladder (see this file's header, point 4) and
+ * only `as` picks the tag; on optimizely.com no page composes an h1 and an h4 through this
+ * component side by side, so the shared size never shows. `abm-takeout`'s hero does — headline
+ * (h1) next to eyebrow (h4) — so here the level also picks a size, one step down the
+ * `text-body-*` scale per level, h1 unchanged from what this file always shipped. The
+ * tag/level decoupling this folder documents (see `StackedHeadingProps.as` above) is
+ * untouched: `as` still only ever picks the element; `HeadingLevel` (narrowed to h1-h4) is
+ * what picks the size, so a heading can still be an `h2` sized like an `h1` for a11y reasons
+ * without this map getting in the way — that path just isn't exercised by the CMS today. A
+ * caller outside `h1`-`h4` (the `##"##` quote-mark reuse in `abm-thesis-element`, `as="span"`)
+ * falls back to the h1 ladder and overrides it wholesale via its own `className`, which
+ * `cn()`'s tailwind-merge always wins per breakpoint — unchanged from before this fix.
+ */
+const HEADING_LEVEL_TEXT_SIZE: Record<HeadingLevel, string> = {
+  h1: 'text-body-xxl md:text-7xl lg:text-9xl', // 32 / 40 / 56
+  h2: 'text-body-lg md:text-body-xxl lg:text-7xl', // 25 / 32 / 40
+  h3: 'text-body-med md:text-body-lg lg:text-body-xxl', // 20 / 25 / 32
+  h4: 'text-body-xs md:text-body-s lg:text-body-base', // 16 / 18 / 22
+}
+
+/**
  * The heading itself, exported so a sibling treatment can reuse the extrusion mechanic the
  * way upstream's `blockquote-block` does (`<StackedHeading text='##"##' … />`).
  */
@@ -785,12 +814,38 @@ export function StackedHeading({
 }: StackedHeadingProps) {
   const lines = text.split('\n').filter((line) => line.trim() !== '')
   const Tag = as as ElementType
+  const sizeClasses =
+    HEADING_LEVEL_TEXT_SIZE[as as HeadingLevel] ?? HEADING_LEVEL_TEXT_SIZE.h1
+
+  /**
+   * D3 fix. Only the non-curved path below needs it: `CurvedLine` already reserves its own
+   * box (it measures the arc and sets an explicit `height`), but the plain `StackedText` path
+   * does not — only the bottom (first) extrusion layer is in flow; every other layer is
+   * `absolute inset-0` and then deliberately transformed OFF that box, which is the effect,
+   * not a bug. Nothing ever grew the box to still CONTAIN that ink, so with no gap of its own
+   * the next element in the column painted straight over the heading's descenders. Reserve
+   * room only on the side the layers can actually travel to (`invertExtrusion` flips the
+   * direction — see `directionY` in `Layer` above) and only when a line has a stacked run to
+   * travel with; a heading with no `##…##` renders no extra layers and needs no extra room.
+   */
+  const hasStackedRun = !curved && lines.some((line) => /##(.+?)##/.test(line))
 
   return (
     <Tag
       className={cn(
-        'font-nudge text-fir-darkfir text-body-xxl leading-[0.9] font-extrabold tracking-[-0.01em] md:text-7xl lg:text-9xl',
+        // D1 fix. `text-current` inherits the SECTION's own foreground instead of a hardcoded
+        // guess: `BlankSection`'s `dark_forest` variant sets `text-white` on the band itself
+        // (src/vendor/opticom/components/section/blank-section), every other band leaves the
+        // app's default in place (`text-secondary-darkfir`, set once on the `/vb` route
+        // wrapper — see VisualBuilderPage.tsx). The `text-fir-darkfir` this replaced is, by
+        // value, the EXACT color `dark_forest` uses for its own background — so a heading
+        // dropped into that band rendered at ~1.0 contrast, invisible with no error. A heading
+        // must never again hardcode a color that can equal the color of its own band; inherit
+        // it from the section instead, so a future band color cannot reintroduce this.
+        'font-nudge text-current leading-[0.9] font-extrabold tracking-[-0.01em]',
+        sizeClasses,
         alignment && ALIGNMENT_CLASSES[alignment],
+        hasStackedRun && (invertExtrusion ? 'pt-8' : 'pb-8'),
         className
       )}
     >
