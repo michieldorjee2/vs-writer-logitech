@@ -18,10 +18,10 @@
  *    selections in this repo's own `vite.config.ts` query), so neither upstream read is right
  *    for both. `resolveUrl` below accepts all three shapes and is the only place that knows.
  *
- * 2. `max-w-card`. Upstream declares `--max-width-card: 622px` in its own `app/globals.css`
- *    `@theme`; this app's `src/index.css` does not, so the utility compiles to nothing here
- *    (measured against the repo's real Tailwind pipeline). The literal keeps upstream's
- *    measured width until the token exists.
+ * 2. `max-w-card`, used directly. It compiles against `--max-width-card: 622px`, now vendored
+ *    from upstream's `app/globals.css` (`src/vendor/opticom/app/globals.css`, imported by
+ *    `src/index.css`). This card previously hard-coded `max-w-[622px]` because that token did
+ *    not exist here yet — see `src/vendor/opticom/UPSTREAM.md`, "The CSS entry point".
  */
 import { CardBottomBar, CardResourceDetails } from '@/components/_ui/card'
 import type { CardCustomerQuoteBlockProps } from './types'
@@ -64,7 +64,7 @@ export default function CardCustomerQuoteBlock({
       // bg-[#061c14] is upstream's literal. It is one step darker than
       // --color-secondary-darkfir (the card body) and exists to draw the 1px edge around it;
       // no token carries that shade, and substituting the nearest one would erase the edge.
-      className="group max-w-[622px] block rounded-[26px] bg-[#061c14] p-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      className="group max-w-card block rounded-[26px] bg-[#061c14] p-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
     >
       <div className="overflow-clip rounded-[25px] bg-(--color-secondary-darkfir) px-1.5 pt-1.5 transition-all duration-200 ease-out group-hover:translate-x-1 group-hover:-translate-y-1 group-active:translate-x-0 group-active:translate-y-0 group-active:bg-[#061c14]">
         <div className="flex flex-col gap-8 rounded-[20px] bg-(--color-fir-lightfir) p-6">

@@ -8,10 +8,10 @@
  *    `ResourceUrl?.url?.default`. A content reference is a 400 on an `elementEnabled`
  *    content type, so the property IS the href here — see DIVERGENCE.md.
  *
- * 2. `max-w-card` -> `max-w-[622px]`. That utility comes from `--max-width-card: 622px` in
- *    upstream's `app/globals.css`, which is not part of the vendored slice. Compiling this
- *    repo's theme with the class present emits no rule at all, so keeping it would have
- *    silently dropped the card's width cap. 622px is upstream's own value, not a guess.
+ * 2. `max-w-card`, used directly. It compiles against `--max-width-card: 622px`, now vendored
+ *    from upstream's `app/globals.css` (`src/vendor/opticom/app/globals.css`, imported by
+ *    `src/index.css`). This card previously hard-coded `max-w-[622px]` because that token did
+ *    not exist here yet — see `src/vendor/opticom/UPSTREAM.md`, "The CSS entry point".
  *
  * 3. Nothing reads `displaySettings`, because `display-settings.ts` declares a default
  *    template with `settings: []` — upstream's card has exactly one appearance and takes its
@@ -44,7 +44,7 @@ export default function CardCustomerBlock({
   return (
     <a
       href={href}
-      className="group block max-w-[622px] rounded-[26px] bg-(--color-tertiary-5) p-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-secondary-darkfir)"
+      className="group block max-w-card rounded-[26px] bg-(--color-tertiary-5) p-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-secondary-darkfir)"
     >
       <div className="overflow-clip rounded-[25px] bg-(--color-tertiary-4) px-1.5 pt-1.5 transition-all duration-200 ease-out group-hover:-translate-y-1 group-hover:translate-x-1 group-active:translate-x-0 group-active:translate-y-0 group-active:bg-(--color-tertiary-5)">
         <div className="flex flex-col rounded-[20px] bg-white">

@@ -105,6 +105,21 @@
       in the compiled file. */
 @import 'tailwindcss/utilities.css';
 
+/* 6. optimizely.com's own CSS entry point (`app/globals.css`), vendored — not hand-written —
+      into `src/vendor/opticom/app/globals.css`. It is a PATCH, not a plain copy: it drops
+      every import (a second real `@import 'tailwindcss'` would fight steps 1-5 above; the
+      token file and `@tailwindcss/typography` are already imported/registered at step 2 and
+      just above; `fonts.css`'s brand faces are already self-hosted by `greenfield.css`; and
+      `material-symbols/rounded.css` — the actual D1 fix — breaks Vite's asset handling for
+      its relative woff2 `url()` when routed through Tailwind's own `@import` resolution, so
+      it is imported as a plain JS side effect in `src/main.tsx` instead) and two LIVE,
+      unscoped rules that would reach the legacy templates (`.prose`'s reset, a plain
+      `body { font-family }`). What is left, and does land here: the `--max-width-card` token
+      three CMS card renderers previously hard-coded as `622px`, and two `@keyframes` the
+      vendored checkbox/radio already reference. Full patch rationale in
+      `src/vendor/opticom/UPSTREAM.md`, "The CSS entry point". */
+@import './vendor/opticom/app/globals.css';
+
 /* The v3 theme, kept as-is. `@config` is v4's supported escape hatch for a
    legacy JS config, and it coexists with the `@theme` block above: the four
    live templates keep resolving against exactly the colours, screens, fonts
@@ -258,6 +273,77 @@
     --breakpoint-xl: 1200px;
     --breakpoint-xxl: 1400px;
     --breakpoint-2xl: 1600px;
+}
+
+/* ---------------------------------------------------------------------------
+   D4 fix — theme names the vendored Radix `_ui` primitives need but nothing here declared.
+
+   Two different reasons, one theme block. Both are ADDITIVE (new names; nothing above
+   collides, and neither bucket is used by any legacy template — grepped for every
+   `(bg|text|border|outline|ring)-<name>` call site outside `src/vendor/`/`src/cms/`, zero
+   hits), and every component that needs them is vendored per UPSTREAM.md's MANIFEST but NOT
+   currently imported by any Showcase renderer (`grep -rhoE "@/components/_ui/[a-z-]+"
+   src/cms` names only `avatar`/`button`/`card`/`icons`/`taxonomy-tag`) — so this is pure
+   completeness, not a fix to anything currently on screen.
+
+   1. THE SHADCN SEMANTIC VOCABULARY (`background` / `card` / `popover` / `primary` /
+      `secondary` / `muted` / `accent` / `destructive` / `border` / `input` / `ring`, each
+      with a `-foreground` pair). `tooltip`, `dialog`, `alert-dialog`, `dropdown-menu`,
+      `context-menu`, `menubar`, `navigation-menu`, `hover-card`, `popover`, `toast`,
+      `toggle-group`, `toolbar`, `progress` and `scroll-area` are all written against it.
+      Upstream's OWN `app/globals.css` declares the identical 24-variable `:root`/`.dark`
+      block this vocabulary needs — but entirely inside the commented-out `@layer base { ... }`
+      seen in `src/vendor/opticom/app/globals.css` (see UPSTREAM.md, "The CSS entry
+      point"), so upstream never wires it up as real values either. There is no upstream
+      value to copy faithfully, so the values below are this app's OWN existing tokens
+      (re-used, not invented) mapped onto the shadcn names they play the same role as — every
+      hex here already appears verbatim elsewhere in this file or `styles/greenfield.css`.
+   2. LITERAL TAILWIND-DEFAULT-PALETTE SHADES (`gray-700/800/950`, `green-500/600`,
+      `red-50/300/400/600`, `yellow-500`) plus one Radix Colors value (`blackA6`, scroll-area's
+      thumb). `label`, `progress`, `slider`, `scroll-area`, `tooltip` and `toast` (its
+      `group-[.destructive]` hover state) reach for these directly, bypassing the semantic
+      vocabulary. This app's `tailwind.config.js` REPLACES Tailwind's default palette with its
+      own closed, legacy-protecting colour list (see that file's own `theme.colors` — it has
+      no numbered `gray`/`green`/`red`/`yellow` scale), so touching that file to restore the
+      full default palette was rejected as a far bigger, riskier lever than 15 named tokens
+      here. Values are Tailwind's own current default-theme oklch() values (read out of the
+      installed `tailwindcss` package, not approximated) except `blackA6`, an approximation of
+      Radix Colors' own value (this project does not depend on `@radix-ui/colors` to check it
+      exactly against, and the one call site, `scroll-area`'s unreachable thumb, cannot make
+      the approximation visible).
+   --------------------------------------------------------------------------- */
+@theme {
+    --color-background: var(--color-secondary-darkfir);
+    --color-foreground: #eff6e9;
+    --color-card: var(--color-secondary-darkfir);
+    --color-card-foreground: #eff6e9;
+    --color-popover: var(--color-secondary-darkfir);
+    --color-popover-foreground: #eff6e9;
+    --color-primary: var(--color-primary-lfgreen);
+    --color-primary-foreground: var(--color-secondary-darkfir);
+    --color-secondary: var(--color-secondary-ltblue);
+    --color-secondary-foreground: var(--color-secondary-darkfir);
+    --color-muted: var(--color-tertiary-7);
+    --color-muted-foreground: var(--color-tertiary-5);
+    --color-accent: var(--color-fir-lightfir);
+    --color-accent-foreground: #eff6e9;
+    --color-destructive: var(--color-error-darkred);
+    --color-destructive-foreground: #fff;
+    --color-border: var(--color-tertiary-6);
+    --color-input: var(--color-tertiary-6);
+    --color-ring: var(--color-primary-lfgreen);
+
+    --color-gray-700: oklch(37.3% 0.034 259.733);
+    --color-gray-800: oklch(27.8% 0.033 256.848);
+    --color-gray-950: oklch(13% 0.028 261.692);
+    --color-green-500: oklch(72.3% 0.219 149.579);
+    --color-green-600: oklch(62.7% 0.194 149.214);
+    --color-red-50: oklch(97.1% 0.013 17.38);
+    --color-red-300: oklch(80.8% 0.114 19.571);
+    --color-red-400: oklch(70.4% 0.191 22.216);
+    --color-red-600: oklch(57.7% 0.245 27.325);
+    --color-yellow-500: oklch(79.5% 0.184 86.047);
+    --color-blackA6: rgb(0 0 0 / 11.4%);
 }
 
 

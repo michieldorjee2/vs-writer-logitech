@@ -277,6 +277,22 @@ module.exports = {
         },
         function ({ addVariant }) {
             addVariant('hocus', ['&:hover', '&:focus']);
-        }
+        },
+        /*
+         * D4 fix. The vendored Radix `_ui` primitives (`tooltip`, `dialog`, `alert-dialog`,
+         * `dropdown-menu`, `context-menu`, `menubar`, `navigation-menu`, `hover-card`,
+         * `popover`, `toast`, `select`) are written against this plugin's `animate-in` /
+         * `fade-in-0` / `zoom-in-95` / `slide-in-from-*` vocabulary, and upstream's own
+         * package.json never installs it either (verified against the unpacked zip) — these
+         * classes compile to nothing in optimizely.com's real build too. None of these
+         * components is currently imported by any Showcase renderer (`grep -rhoE
+         * "@/components/_ui/[a-z-]+" src/cms` names only `avatar`/`button`/`card`/`icons`/
+         * `taxonomy-tag`), so this has zero effect on anything that renders today; it closes
+         * out the D4 audit's remaining unresolved-class bucket rather than leaving ~35 dead
+         * classes silently unstyled the moment one of these components is ever wired up. Pure
+         * addition — a v3-shaped `addUtilities`/`matchUtilities` plugin, exactly like the
+         * three above it that v4 already runs fine through `@config`.
+         */
+        require('tailwindcss-animate')
     ]
 };

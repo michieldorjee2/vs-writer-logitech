@@ -12,10 +12,10 @@
  * 2. `PublishDate` is a real `dateTime`, not upstream's pre-formatted display string, so it
  *    is formatted at render time through the vendored `formatDate` — see `displayDate`.
  *
- * 3. `max-w-card` -> `max-w-[622px]`. That utility comes from `--max-width-card: 622px` in
- *    upstream's `app/globals.css`, which is not part of the vendored slice; compiling this
- *    repo's theme with the class present emits no rule, so keeping it would have silently
- *    dropped the card's width cap. 622px is upstream's own value.
+ * 3. `max-w-card`, used directly. It compiles against `--max-width-card: 622px`, now vendored
+ *    from upstream's `app/globals.css` (`src/vendor/opticom/app/globals.css`, imported by
+ *    `src/index.css`). This card previously hard-coded `max-w-[622px]` because that token did
+ *    not exist here yet — see `src/vendor/opticom/UPSTREAM.md`, "The CSS entry point".
  *
  * 4. `if (!Headline) return null`. Upstream renders the shell regardless; a press card with
  *    no headline is an empty box, and this phase's convention is to render nothing rather
@@ -76,7 +76,7 @@ export default function CardPressBlock({
   const href = ResourceUrl
 
   const card = (
-    <div className="group block max-w-[622px] rounded-[26px] bg-(--color-secondary-darkfir) p-px">
+    <div className="group block max-w-card rounded-[26px] bg-(--color-secondary-darkfir) p-px">
       <div className="overflow-clip rounded-[25px] border border-(--color-secondary-darkfir) bg-(--color-tertiary-lightfir) px-1.5 pt-1.5 transition-all duration-200 ease-out group-hover:-translate-y-1 group-hover:translate-x-1 group-active:translate-x-0 group-active:translate-y-0 group-active:bg-(--color-secondary-darkfir)">
         <div className="flex flex-col gap-8 rounded-[20px] bg-(--color-tertiary-midfir) p-6">
           <div className="flex flex-col gap-5 pr-8 text-(--color-primary-1)">
