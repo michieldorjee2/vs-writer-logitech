@@ -1,0 +1,46 @@
+{
+  "font": {
+    "weight": {
+      "thin": {
+        "value": 100,
+        "type": "number"
+      },
+      "extralight": {
+        "value": 200,
+        "type": "number"
+      },
+      "light": {
+        "value": 300,
+        "type": "number"
+      },
+      "regular": {
+        "value": 400,
+        "type": "number"
+      },
+      "normal": {
+        "value": 400,
+        "type": "number"
+      },
+      "medium": {
+        "value": 500,
+        "type": "number"
+      },
+      "semibold": {
+        "value": 600,
+        "type": "number"
+      },
+      "bold": {
+        "value": 700,
+        "type": "number"
+      },
+      "extrabold": {
+        "value": 800,
+        "type": "number"
+      },
+      "black": {
+        "value": 900,
+        "type": "number"
+      }
+    }
+  }
+}

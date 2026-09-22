@@ -40,7 +40,7 @@ const AccordionItem: React.FC<AccordionItemProps> = (props) => {
         >
             <div
                 className={`relative
-                ${backgroundStyle ? 'mb-5 rounded-lg border border-vulcan-85 lg:mb-3' : 'border-b-2 border-white border-opacity-20'}
+                ${backgroundStyle ? 'mb-5 rounded-lg border border-vulcan-85 lg:mb-3' : 'border-b-2 border-white/20'}
                 `}
             >
                 <h3 className="not-rte no-toc">
