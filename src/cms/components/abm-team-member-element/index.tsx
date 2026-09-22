@@ -8,10 +8,11 @@
  *
  * ALIGNING WITH SIBLINGS WITHOUT KNOWING THEM. Each member is an independent element in its
  * own column and cannot see the others, so the alignment is baked into a fixed template
- * rather than negotiated: `grid-cols-[2.5rem_minmax(0,1fr)]` puts every name at the same x,
- * and `grid-rows-[2.5rem_auto]` puts every email on the same y whether or not the person
- * above has a Role. `truncate` keeps a long name or title inside that fixed first row; the
- * full string stays in `title`.
+ * rather than negotiated: `grid-cols-[theme(spacing.10)_minmax(0,1fr)]` puts every name at
+ * the same x (theme step 10 = 2.5rem at this app's rescaled root — see tailwind.config.js's
+ * rem-scale-mismatch comment), and `grid-rows-[theme(spacing.10)_auto]` puts every email on
+ * the same y whether or not the person above has a Role. `truncate` keeps a long name or
+ * title inside that fixed first row; the full string stays in `title`.
  */
 import { cva } from 'class-variance-authority'
 import { Mail } from 'lucide-react'
@@ -41,7 +42,7 @@ type DisplaySettingValues = {
 type Scheme = NonNullable<DisplaySettingValues['colorScheme']>
 
 const cardVariants = cva(
-  'grid h-full grid-cols-[2.5rem_minmax(0,1fr)] grid-rows-[2.5rem_auto] gap-x-3 gap-y-2',
+  'grid h-full grid-cols-[theme(spacing.10)_minmax(0,1fr)] grid-rows-[theme(spacing.10)_auto] gap-x-3 gap-y-2',
   {
     variants: {
       colorScheme: {

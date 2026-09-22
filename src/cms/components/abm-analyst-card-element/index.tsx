@@ -16,7 +16,12 @@
  *
  *   row 1  1.25rem   the source overline — a FIXED band, not `auto`. `auto` collapses to zero
  *                    on a card whose Source is empty, which drops that card's badge half a
- *                    line above its neighbours'. 20px clears Roboto Mono at 14px/1.2.
+ *                    line above its neighbours'. 20px clears Roboto Mono at 14px/1.2. Spelled
+ *                    `theme(spacing.5)` rather than the bare `1.25rem` literal: this app's root
+ *                    font-size is rescaled 1.6x (tailwind.config.js's rem-scale-mismatch
+ *                    comment), so a literal `1.25rem` in an arbitrary value renders at 12.5px
+ *                    here, not the 20px this row depends on, while `theme(spacing.5)` resolves
+ *                    through that same rescaled theme.
  *   row 2  1fr       the badge. Absorbs every difference in claim length, so the row below it
  *                    is pinned to the bottom edge instead of floating at the end of the text.
  *   row 3  auto      the chip + arrow, bottom-anchored on every card.
@@ -52,7 +57,7 @@ function resolveUrl(value: unknown): string | undefined {
 }
 
 const card = cva(
-  'grid h-full grid-rows-[1.25rem_1fr_auto] gap-5 rounded-(--radius-module-med) border p-6 transition-colors duration-200 ease-out',
+  'grid h-full grid-rows-[theme(spacing.5)_1fr_auto] gap-5 rounded-(--radius-module-med) border p-6 transition-colors duration-200 ease-out',
   {
     variants: {
       colorScheme: {

@@ -5,10 +5,16 @@
  * a timeline, and each is an independent element node: it cannot see the phase above it, the
  * phase below it, or how many there are. So the markers can only line up if every phase
  * measures the rail the same way, regardless of its own content or its own settings. Hence
- * one FIXED internal grid — `grid-cols-[3rem_minmax(0,1fr)]`, a 2.5rem marker box at the
- * start of that 3rem track, and the spine at `left-5` — written as literals that no prop can
- * reach. `markerStyle` changes what is drawn INSIDE the marker box and never its size, so a
- * `number` phase and a `dot` phase put their centres on the same 1.25rem line. Those numbers
+ * one FIXED internal grid — `grid-cols-[theme(spacing.12)_minmax(0,1fr)]`, a 2.5rem marker box
+ * (`h-10 w-10`) at the start of that 3rem track, and the spine at `left-5` — written as
+ * literals that no prop can reach. The grid track is spelled `theme(spacing.12)` rather than
+ * the bare `3rem` literal because this app's root font-size is rescaled 1.6x from the
+ * standard 16px (see tailwind.config.js's rem-scale-mismatch comment): a literal `3rem` in an
+ * arbitrary Tailwind value renders at 30px here, not the 48px every other measurement in this
+ * file assumes, while `theme(spacing.12)` resolves through the same rescaled theme `h-10` and
+ * `left-5` already read from, landing on the correct 48px. `markerStyle` changes what is drawn
+ * INSIDE the marker box and never its size, so a `number` phase and a `dot` phase put their
+ * centres on the same 1.25rem line. Those numbers
  * are the ones the Showcase's own hand-written timeline already uses (`.timeline`,
  * `.timeline__marker`, `.timeline__track` in `src/styles/abm-layout.css`: 48px rail, 40px
  * marker, 2px track at 19-20px), so a ported phase sits where the CSS one did.
@@ -197,7 +203,7 @@ export default function AbmTimelinePhaseElement({
   return (
     <div
       className={cn(
-        'element abm-timeline-phase-element relative grid grid-cols-[3rem_minmax(0,1fr)]',
+        'element abm-timeline-phase-element relative grid grid-cols-[theme(spacing.12)_minmax(0,1fr)]',
         // Only outside draft mode: see the header. In preview EditableBlock adds a wrapper
         // div, so `:last-child` would be true for every phase.
         !preview && 'group'
@@ -211,7 +217,7 @@ export default function AbmTimelinePhaseElement({
           // Start at the marker's centre on the first phase, at the top edge on the rest.
           isFirst ? 'top-5' : 'top-0',
           // Stop at the last marker's centre rather than running past it.
-          'bottom-0 group-last:bottom-[calc(100%_-_1.25rem)]'
+          'bottom-0 group-last:bottom-[calc(100%_-_theme(spacing.5))]'
         )}
       />
 

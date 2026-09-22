@@ -36,9 +36,16 @@ import type { AbmNewsItemElementProps } from './types'
  * The fixed grid. The date column is a length, not `auto` — `auto` would size to this row's
  * own date and break alignment with its siblings, which is the whole failure mode this
  * component has to design around.
+ *
+ * The three lengths are spelled `theme(spacing.N)` rather than bare rem literals (5rem,
+ * 1.5rem, 7.5rem) because this app's root font-size is rescaled 1.6x (tailwind.config.js's
+ * rem-scale-mismatch comment): a literal `5rem` in an arbitrary value renders at 50px here,
+ * not the 80px a 16px-root reading of "5rem" means, while `theme(spacing.20)` resolves
+ * through that same rescaled theme. `spacing.30` (7.5rem) is a custom step added there for
+ * exactly this line — Tailwind's own default scale has no step between 7rem and 8rem.
  */
 const ROW =
-  'grid grid-cols-[5rem_1fr_1.5rem] items-baseline gap-x-4 py-4 sm:grid-cols-[7.5rem_1fr_1.5rem]'
+  'grid grid-cols-[theme(spacing.20)_1fr_theme(spacing.6)] items-baseline gap-x-4 py-4 sm:grid-cols-[theme(spacing.30)_1fr_theme(spacing.6)]'
 
 export default function AbmNewsItemElement({
   NewsDate,

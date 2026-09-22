@@ -349,6 +349,30 @@ function ContentAreaMapper(props: ComponentProps<typeof LazyContentAreaMapper>) 
         '  MenubarPrimitive.Menu as { displayName?: string }\n' +
         ').displayName',
     },
+    {
+      why:
+        'rem-scale mismatch (see UPSTREAM.md and tailwind.config.js\'s rem-scale-mismatch ' +
+        'comment): this app rescales every NAMED Tailwind scale step by 16/10 to compensate ' +
+        'for its 10px root, but a raw arbitrary value is invisible to that rescale. ' +
+        'Upstream\'s `min-w-[12rem]` would render at 120px here instead of the 192px it means ' +
+        'at a standard 16px root. `min-w-48` is Tailwind\'s own non-arbitrary step for 12rem ' +
+        'and reads from the same rescaled theme every other themed utility in this file does.',
+      find:
+        "'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[12rem] overflow-hidden rounded-md border p-1 shadow-md',",
+      replace:
+        // No leading spaces on this first line: `find` starts at the `'`, so the 10 spaces of
+        // original indentation before it are preserved untouched and this line continues them.
+        '/*\n' +
+        '           * PATCH (rem-scale-mismatch, see src/vendor/opticom/UPSTREAM.md): upstream spells\n' +
+        '           * this utility as an arbitrary bracketed value of 12 rem, which is invisible to\n' +
+        "           * this app's root-font-size rescale (tailwind.config.js's rem-scale-mismatch\n" +
+        '           * comment) and would render at 120px here instead of the 192px that value means at\n' +
+        "           * a standard 16px root. `min-w-48` is Tailwind's own non-arbitrary scale step for\n" +
+        '           * 12rem and reads from the same rescaled theme every other themed utility in this\n' +
+        '           * file does.\n' +
+        '           */\n' +
+        "          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-48 overflow-hidden rounded-md border p-1 shadow-md',",
+    },
   ],
 
   'components/_ui/navigation-menu/index.tsx': [
@@ -364,6 +388,34 @@ function ContentAreaMapper(props: ComponentProps<typeof LazyContentAreaMapper>) 
         "is.",
       find: "'origin-top-center bg-popover",
       replace: "'origin-top bg-popover",
+    },
+  ],
+
+  'components/_ui/toolbar/index.tsx': [
+    {
+      why:
+        'rem-scale mismatch (see UPSTREAM.md and tailwind.config.js\'s rem-scale-mismatch ' +
+        'comment): this app rescales every NAMED Tailwind scale step by 16/10 to compensate ' +
+        'for its 10px root, but a raw arbitrary value is invisible to that rescale. ' +
+        'Upstream\'s `min-h-[2.5rem]` would render at 25px here instead of the 40px it means ' +
+        'at a standard 16px root. `min-h-10` is Tailwind\'s own non-arbitrary step for 2.5rem ' +
+        'and reads from the same rescaled theme every other themed utility in this file does.',
+      // `find` starts at `const toolbarVariants`, not the class string, because the patched
+      // file puts the comment ABOVE the declaration rather than inside the `cva(` call.
+      find:
+        "const toolbarVariants = cva(\n" +
+        "  'flex min-h-[2.5rem] w-full items-center gap-1 rounded-md border bg-background p-1',",
+      replace:
+        '/*\n' +
+        ' * PATCH (rem-scale-mismatch, see src/vendor/opticom/UPSTREAM.md): upstream spells this\n' +
+        ' * utility as an arbitrary bracketed value of 2.5 rem, which is invisible to this app\'s\n' +
+        " * root-font-size rescale (tailwind.config.js's rem-scale-mismatch comment) and would render\n" +
+        ' * at 25px here instead of the 40px that value means at a standard 16px root. `min-h-10` is\n' +
+        " * Tailwind's own non-arbitrary scale step for 2.5rem and reads from the same rescaled theme\n" +
+        ' * every other themed utility in this file does.\n' +
+        ' */\n' +
+        "const toolbarVariants = cva(\n" +
+        "  'flex min-h-10 w-full items-center gap-1 rounded-md border bg-background p-1',",
     },
   ],
 

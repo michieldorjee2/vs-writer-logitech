@@ -13,11 +13,12 @@
  * to line up across them therefore lines up because the template is FIXED, not because the
  * cards agreed:
  *
- *   - `grid-cols-[3rem_minmax(0,1fr)]` — the avatar column is exactly 3rem wide on every
- *     card, so every name starts at the same x.
- *   - `grid-rows-[3rem_1fr]` — the header band is exactly 3rem tall on every card, so the
- *     engagement badge below it starts at the same y whether or not a person has a Role.
- *     `truncate` on the name and the role is the price of that: a two-line name would
+ *   - `grid-cols-[theme(spacing.12)_minmax(0,1fr)]` — the avatar column is exactly 3rem wide
+ *     (theme step 12 at this app's rescaled root — see tailwind.config.js's rem-scale-mismatch
+ *     comment) on every card, so every name starts at the same x.
+ *   - `grid-rows-[theme(spacing.12)_1fr]` — the header band is exactly 3rem tall on every
+ *     card, so the engagement badge below it starts at the same y whether or not a person has
+ *     a Role. `truncate` on the name and the role is the price of that: a two-line name would
  *     overflow a fixed row, so long text ellipses and the full string stays in `title`.
  *   - `h-full` + `mt-auto` on the footer — the column stretches to the row's height (both
  *     Row display modes stretch their items), so the footer sits on the card's own bottom
@@ -72,7 +73,7 @@ type Tier = AbmStakeholderEngagementTier
  * ramp and the one state worth looking for.
  */
 const cardVariants = cva(
-  'grid h-full grid-cols-[3rem_minmax(0,1fr)] grid-rows-[3rem_1fr] gap-x-4 gap-y-4 rounded-[12px] p-5',
+  'grid h-full grid-cols-[theme(spacing.12)_minmax(0,1fr)] grid-rows-[theme(spacing.12)_1fr] gap-x-4 gap-y-4 rounded-[12px] p-5',
   {
     variants: {
       tier: {

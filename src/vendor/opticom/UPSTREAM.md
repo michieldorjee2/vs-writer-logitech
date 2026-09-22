@@ -101,6 +101,30 @@ CMS-facing copy `src/cms/blueprints/internal/compose.ts` validates blueprint `co
 overrides against (that file is outside this directory and outside the sync script's reach;
 see its own header comment). The two must be kept in sync by hand.
 
+## Rem-scale patches (this app's own root-font-size rescale, not upstream's bug)
+
+Two patches exist because of a mismatch that is specific to THIS app, not upstream: this
+repo's `html { font-size: 10px }` plus its 16/10 rescale of every NAMED Tailwind scale step
+(`tailwind.base-font-size.cjs`; see also `tailwind.config.js`'s own rem-scale-mismatch
+comment). That rescale reaches every themed utility (`p-3`, `w-12`, `min-h-10`) but is
+invisible to a raw arbitrary value — Tailwind emits `[2.5rem]` byte-for-byte, so it renders at
+this app's 10px-root 0.625x of what the same literal means at upstream's standard 16px root.
+Upstream is correct as written; only vendoring it unmodified into this app is not.
+
+| file | change | why |
+| --- | --- | --- |
+| `components/_ui/menubar/index.tsx` | `min-w-[12rem]` → `min-w-48` | `min-w-48` is Tailwind's own non-arbitrary scale step for 12rem and reads from the same rescaled theme every other themed utility in this file does; the arbitrary literal rendered at 120px here instead of the 192px it means at a 16px root |
+| `components/_ui/toolbar/index.tsx` | `min-h-[2.5rem]` → `min-h-10` | same reason; `min-h-10` is the non-arbitrary step for 2.5rem, and the arbitrary literal rendered at 25px here instead of 40px |
+
+Both are single fixed-dimension values with an exact non-arbitrary Tailwind step, so that
+step is used directly rather than an arbitrary `theme(spacing.N)` reference — the same
+preference order `src/cms/components`'s own analyst-card/stakeholder/team-member/timeline/
+news-item elements follow for the handful of compound `grid-cols-[fixed_1fr]`-shaped values
+that have no non-arbitrary utility to fall back to. `scripts/check-rem-scale.mjs` fails the
+build the moment a bare arbitrary rem (or a non-tracking/leading/indent arbitrary em) literal
+reappears in either this directory or `src/cms/components`, so a future sync pulling a new
+arbitrary rem literal from upstream is caught rather than silently reintroducing this.
+
 ## Bug-fix patches (upstream's own bugs, not ours)
 
 One patch fixes something broken in upstream's own source, confirmed against the zip rather

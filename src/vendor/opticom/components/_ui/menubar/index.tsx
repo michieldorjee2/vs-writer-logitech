@@ -127,7 +127,16 @@ const MenubarContent = React.forwardRef<
         alignOffset={alignOffset}
         sideOffset={sideOffset}
         className={cn(
-          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[12rem] overflow-hidden rounded-md border p-1 shadow-md',
+          /*
+           * PATCH (rem-scale-mismatch, see src/vendor/opticom/UPSTREAM.md): upstream spells
+           * this utility as an arbitrary bracketed value of 12 rem, which is invisible to
+           * this app's root-font-size rescale (tailwind.config.js's rem-scale-mismatch
+           * comment) and would render at 120px here instead of the 192px that value means at
+           * a standard 16px root. `min-w-48` is Tailwind's own non-arbitrary scale step for
+           * 12rem and reads from the same rescaled theme every other themed utility in this
+           * file does.
+           */
+          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-48 overflow-hidden rounded-md border p-1 shadow-md',
           className
         )}
         {...props}

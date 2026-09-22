@@ -4,8 +4,16 @@ import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
 
+/*
+ * PATCH (rem-scale-mismatch, see src/vendor/opticom/UPSTREAM.md): upstream spells this
+ * utility as an arbitrary bracketed value of 2.5 rem, which is invisible to this app's
+ * root-font-size rescale (tailwind.config.js's rem-scale-mismatch comment) and would render
+ * at 25px here instead of the 40px that value means at a standard 16px root. `min-h-10` is
+ * Tailwind's own non-arbitrary scale step for 2.5rem and reads from the same rescaled theme
+ * every other themed utility in this file does.
+ */
 const toolbarVariants = cva(
-  'flex min-h-[2.5rem] w-full items-center gap-1 rounded-md border bg-background p-1',
+  'flex min-h-10 w-full items-center gap-1 rounded-md border bg-background p-1',
   {
     variants: {
       orientation: {

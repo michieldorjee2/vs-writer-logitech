@@ -88,6 +88,39 @@ module.exports = {
             fontSize: {
                 '5xl': '4.8rem'
             },
+            /*
+             * REM-SCALE MISMATCH FIX. `tailwind.base-font-size.cjs` rescales every NAMED
+             * step of the default spacing/height/width/etc. scale by 16/10 so a themed
+             * utility (`p-3`, `min-h-10`, ...) renders the same pixels a 16px-root author
+             * intended. It does NOT and cannot touch a raw arbitrary value written inside
+             * a component (`grid-rows-[3rem_1fr]`) — Tailwind treats bracket contents as
+             * opaque CSS, so that literal `3rem` renders at 10px-root's 30px instead of
+             * the 48px a 16px-root author meant. Measured on abm-stakeholder-element's
+             * header band: 218px intended, 143px rendered.
+             *
+             * The fix used across src/cms/components and src/vendor/opticom is to spell
+             * every such value as `theme(spacing.N)` (N = the *unscaled*, 16px-root
+             * Tailwind spacing step the number would be if you looked it up in Tailwind's
+             * own default scale — 3rem is step 12, 1.25rem is step 5, 5rem is step 20,
+             * 1.5rem is step 6, 12rem is step 48) instead of the literal. `theme()`
+             * resolves against the SAME already-rescaled theme every named utility reads,
+             * so `theme(spacing.12)` and `w-12`/`p-12` land on the identical 4.8rem this
+             * app already treats as "3rem, correctly scaled" — one factor, one place
+             * (this rescale plugin) governs both, and the divergence from upstream's
+             * literal-rem intent disappears rather than getting hidden in a second copy
+             * of the number. See scripts/check-rem-scale.mjs, which fails the build the
+             * moment a bare arbitrary rem/em literal reappears in either directory.
+             *
+             * Tailwind's default scale has real gaps (nothing lands on 7.5rem — the
+             * closest steps are 28=7rem and 32=8rem). `30` is not a stock Tailwind key;
+             * it is added here, pre-scaled by the SAME 16/10 factor as every entry in
+             * RESCALED_THEME (7.5rem * 1.6 = 12rem), purely so `theme(spacing.30)` stays
+             * available as a drop-in for the one literal (abm-news-item-element's
+             * `sm:` column template) that the stock scale has no step for.
+             */
+            spacing: {
+                '30': '12rem'
+            },
             fontWeight: {
                 regular: 320,
                 medium: 500,
