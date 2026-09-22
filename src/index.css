@@ -23,6 +23,9 @@
 @import './styles/finserv-layout.css';
 @import './styles/person-page.css';
 
+/* Use-case account page (the `use-case-default` ladder rung) */
+@import './styles/use-case-layout.css';
+
 /* Greenfield — Optimizely 2026 brand for the competitive-takeout family.
    Scoped via .cmp-takeout. Brand fonts (VC Nudge / Die Grotesk B) self-hosted. */
 @import './styles/greenfield.css';

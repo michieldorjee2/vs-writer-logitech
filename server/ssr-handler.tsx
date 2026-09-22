@@ -6,6 +6,17 @@ import RetailCustomerPageServer from '../src/components/RetailCustomerPage.serve
 import FinServPageServer from '../src/components/FinServPage.server';
 import PersonPageServer from '../src/components/PersonPage.server';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content';
+/*
+ * UseCasePage is imported DIRECTLY, not through a `.server.tsx` twin like the
+ * five above it. Those twins exist for two reasons — React.lazy does not work
+ * with renderToString, and the tracking hook has to come out — and neither
+ * applies here: this renderer lazy-loads nothing, and useOdpTracking does all
+ * its work inside useEffect, which never runs on the server. Duplicating it
+ * would only buy the drift the existing twins already have (the server copy of
+ * DynamicComparisonPage has quietly lost the hero's `id="hero"` anchor).
+ */
+import UseCasePage from '../src/components/UseCasePage';
+import { includes, resolveComponentPlan } from '../src/lib/limitless/component-plan';
 
 // ---------------------------------------------------------------------------
 // Content Graph – fetch page data
@@ -699,8 +710,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       !isPerson && ((page as any).__template === 'retail' || page.template === 'retail');
     const isFinServ =
       !isPerson && !isRetail && ((page as any).__template === 'finserv' || page.template === 'finserv');
+    /*
+     * The use-case arm must exist HERE as well as in src/App.tsx.
+     *
+     * The two dispatches are independent copies, and a page that server-renders
+     * as ABM while the client renders it as use-case is a hydration failure on
+     * a public URL. It cannot fire yet — `componentPlan` is not a registered
+     * field and is not in PAGE_QUERY, so the plan resolves `derived` and this is
+     * false for all 2,695 pages — but it has to be wired before the field is,
+     * not after. Keep the two in step; see
+     * aldus-ui/docs/limitless-use-case-template.md.
+     */
+    const componentPlan = !isPerson && !isRetail && !isFinServ ? resolveComponentPlan(page as any) : null;
+    const isUseCase = !!componentPlan && includes(componentPlan, 'use-case-matrix');
     const isABM =
-      !isPerson && !isRetail && !isFinServ && !!(page.intelEyebrow || page.customerLogo);
+      !isPerson && !isRetail && !isFinServ && !isUseCase && !!(page.intelEyebrow || page.customerLogo);
 
     const appHtml = isPerson
       ? renderToString(<PersonPageServer page={page} />)
@@ -708,9 +732,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? renderToString(<RetailCustomerPageServer page={page} />)
         : isFinServ
           ? renderToString(<FinServPageServer page={page} />)
-          : isABM
-            ? renderToString(<ABMHyperPageServer page={page} />)
-            : renderToString(<DynamicComparisonPageServer page={page} />);
+          : isUseCase
+            ? renderToString(<UseCasePage page={page as any} plan={componentPlan!} />)
+            : isABM
+              ? renderToString(<ABMHyperPageServer page={page} />)
+              : renderToString(<DynamicComparisonPageServer page={page} />);
 
     // ---- Build SEO head tags ----
     const headHtml = buildHeadHtml(page);

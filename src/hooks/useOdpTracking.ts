@@ -26,6 +26,16 @@ const ABM_SECTIONS = [
   'hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta',
 ];
 
+/**
+ * Sections tracked on UseCasePage. A SUPERSET of what any one page renders —
+ * the plan decides which of these exist in the DOM, and observing an id that
+ * is not there is a no-op (getElementById returns null). Keep it in step with
+ * the sectionIds in src/lib/limitless/component-plan.ts.
+ */
+const USE_CASE_SECTIONS = [
+  'hero', 'use-cases', 'why', 'gaps', 'close', 'promo', 'comparison', 'testimonials',
+];
+
 /** Send an ODP event via the client SDK (queued if SDK still loading) */
 function odpEvent(eventType: string, action: string, data?: Record<string, string | number>) {
   try {
@@ -37,7 +47,7 @@ function odpEvent(eventType: string, action: string, data?: Record<string, strin
   }
 }
 
-export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
+export function useOdpTracking(pageType: 'comparison' | 'abm' | 'use-case', slug?: string) {
   const viewedSections = useRef(new Set<string>());
   const startTime = useRef(Date.now());
   const maxScrollPct = useRef(0);
@@ -59,7 +69,8 @@ export function useOdpTracking(pageType: 'comparison' | 'abm', slug?: string) {
     });
 
     // ── Section visibility ─────────────────────────────────────────
-    const sectionIds = pageType === 'abm' ? ABM_SECTIONS : COMPARISON_SECTIONS;
+    const sectionIds =
+      pageType === 'abm' ? ABM_SECTIONS : pageType === 'use-case' ? USE_CASE_SECTIONS : COMPARISON_SECTIONS;
 
     const observer = new IntersectionObserver(
       (entries) => {
