@@ -11,6 +11,7 @@
  */
 import * as esbuild from 'esbuild';
 import { readFileSync } from 'fs';
+import path from 'node:path';
 
 // Read the Vite-built HTML template and bake it into the bundle.
 // This eliminates the need for Vercel's includeFiles + fs.readFileSync at runtime.
@@ -41,6 +42,15 @@ await esbuild.build({
     'react-use/lib/useRafLoop': './server/stubs/useRafLoop.ts',
     'react-use/lib/useMouseHovered': './server/stubs/useMouseHovered.ts',
     'react-use-measure': './server/stubs/useMeasure.ts',
+    /*
+     * Mirrors vite.config.ts's '@/' alias (-> src/vendor/opticom). The Visual Builder render
+     * chain server/ssr-handler.tsx pulls in (layout/column, layout/row, blank-section, the
+     * draft-mode shims, display-defaults' cn/draftClass helpers) all import through this
+     * alias, exactly as authored for the client bundle. Without it esbuild fails the build
+     * with "Could not resolve @/lib/...", not a runtime error — caught here, at build time,
+     * rather than in production.
+     */
+    '@': path.resolve('src/vendor/opticom'),
   },
 
   // JSX transform (matches tsconfig jsx: react-jsx)

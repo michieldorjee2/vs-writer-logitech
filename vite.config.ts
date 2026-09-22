@@ -3,9 +3,14 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 /*
  * The Visual Builder queries are IMPORTED rather than copied. Every other query in this file
- * is a second copy of one in `api/content.ts`, and the copies have already drifted — the
- * PAGE_QUERY below still selects CanonicalUrl, FeatureSection, OurHighlight and Weeks, the
- * four fields whose removal from the schema 404'd 2,676 pages. One module, two callers.
+ * is a second copy of one in `api/content.ts`, and the copies HAD drifted: PAGE_QUERY and
+ * PREVIEW_QUERY below used to still select CanonicalUrl, FeatureSection, FaqSection,
+ * ComparisonRowProperty.OurHighlight/CompetitorHighlight and ABMTimelinePhaseProperty.Weeks —
+ * the same six dead selections whose removal from the schema 404'd 2,676 pages, reintroduced
+ * here even after api/content.ts and server/ssr-handler.tsx were fixed. `npm run check:graph`
+ * did not catch it because this file was not in its SOURCES list; it is now (see
+ * scripts/check-graph-queries.mjs), which is what makes a future reintroduction here fail the
+ * same way it already fails for the other two files. One module, two callers.
  */
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries'
 
@@ -19,17 +24,15 @@ query GetPage($slug: String!) {
   ) {
     items {
       _metadata { key url { default hierarchical } published }
-      PageTitle MetaDescription CanonicalUrl { default }
+      PageTitle MetaDescription
       eyebrow headline subheadline cta link { default }
       comparisonHeadline
-      comparisonTableRows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight }
+      comparisonTableRows { Category OurValue CompetitorValue }
       analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
       promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
       endHeadline endSubheadline endCTA endCTALink { default }
       testimonial1 testimonial1JobTitle testimonial1Company
       testimonial2 testimonial2JobTitle testimonial2Company
-      FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
-      FaqSection { __typename _json }
       customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
       challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
       comparisonDescription logoWallCustomerSlot
@@ -44,7 +47,7 @@ query GetPage($slug: String!) {
       newsItems { Date Headline Url { default } }
       painPoints { Title Description }
       roiCards { Metric Unit Label CitationText }
-      timelinePhases { Weeks Title Description MarkerColor }
+      timelinePhases { Title Description MarkerColor }
       teamMembers { Initials Name Role Email }
       footerLinks { Text Url { default } }
       analystCards { Badge Source Category Url { default } }
@@ -88,17 +91,15 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
       __typename
       _metadata { key version url { default hierarchical } published }
       ... on CompetitorComparisonPage {
-        PageTitle MetaDescription CanonicalUrl { default }
+        PageTitle MetaDescription
         eyebrow headline subheadline cta link { default }
         comparisonHeadline
-        comparisonTableRows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight }
+        comparisonTableRows { Category OurValue CompetitorValue }
         analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
         promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
         endHeadline endSubheadline endCTA endCTALink { default }
         testimonial1 testimonial1JobTitle testimonial1Company
         testimonial2 testimonial2JobTitle testimonial2Company
-        FeatureSection { ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } } }
-        FaqSection { __typename _json }
         customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
         challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
         comparisonDescription logoWallCustomerSlot
@@ -113,7 +114,7 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
         newsItems { Date Headline Url { default } }
         painPoints { Title Description }
         roiCards { Metric Unit Label CitationText }
-        timelinePhases { Weeks Title Description MarkerColor }
+        timelinePhases { Title Description MarkerColor }
         teamMembers { Initials Name Role Email }
         footerLinks { Text Url { default } }
         analystCards { Badge Source Category Url { default } }
@@ -121,7 +122,7 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
       ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
       ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } }
       ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } }
-      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue OurHighlight CompetitorValue CompetitorHighlight } }
+      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue CompetitorValue } }
       ... on AnalystSectionBlock { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
       ... on TestimonialBlock { Quote AuthorName AuthorTitle }
       ... on PromoCardBlock { Eyebrow Heading Description CtaText CtaUrl { default } }

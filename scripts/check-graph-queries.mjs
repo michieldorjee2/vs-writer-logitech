@@ -33,6 +33,11 @@ const FILES = [
   // The Visual Builder experience queries. They live in one module because api/content.ts
   // and vite.config.ts both serve them, so scanning the module covers both callers.
   'src/lib/experience-queries.ts',
+  // The dev server's own copies of PAGE_QUERY and PREVIEW_QUERY. Missing from this list is
+  // exactly how they were free to drift from api/content.ts's fixed versions and still ship:
+  // `check:graph` was green while `npm run dev` 400'd on every page. See the comment at the
+  // top of vite.config.ts.
+  'vite.config.ts',
 ];
 
 function authKey() {
@@ -135,10 +140,20 @@ for (const file of FILES) {
     const res = await fetch(`${ENDPOINT}?auth=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Variables every query in this repo takes, supersets are ignored.
+      // Variables every query in this repo takes, supersets are ignored — a query that
+      // doesn't declare a given name simply never looks it up. `limit`/`skip` cover
+      // vite.config.ts's SEARCH_INDEX_QUERY, the one shipped query pagination-shaped rather
+      // than slug/key-shaped.
       body: JSON.stringify({
         query,
-        variables: { slug: '/__schema_check__/', key: '__schema_check__', ver: null, loc: null },
+        variables: {
+          slug: '/__schema_check__/',
+          key: '__schema_check__',
+          ver: null,
+          loc: null,
+          limit: 1,
+          skip: 0,
+        },
       }),
     });
     const json = await res.json();

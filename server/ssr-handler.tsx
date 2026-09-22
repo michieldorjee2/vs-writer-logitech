@@ -17,6 +17,136 @@ import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-
  */
 import UseCasePage from '../src/components/UseCasePage';
 import { includes, resolveComponentPlan } from '../src/lib/limitless/component-plan';
+import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries';
+
+/*
+ * Visual Builder (/vb/:slug) render chain — imported directly rather than through
+ * `src/cms/rendering/visual-builder.tsx`.
+ *
+ * That file's `Component` dispatch (`./component-factory.tsx`) pulls in THREE vendored lane
+ * registries — `content-area/section.tsx`, `content-area/element.tsx`, `content-area/block.tsx`
+ * — and every one of them calls `import.meta.glob(...)` UNGUARDED at module scope (no
+ * try/catch, unlike `src/cms/rendering/registry.ts` and `src/cms/rendering/display-defaults.ts`,
+ * which both wrap the same call). Confirmed by bundling each with esbuild/node18 exactly as
+ * `scripts/build-ssr.mjs` does and importing the result: `content-area/section.tsx` throws
+ * "import.meta.glob is not a function" at import time, before any request is even served.
+ * Because this handler's imports are static, that throw would happen at COLD START — it would
+ * take down SSR for every route on the site, not just `/vb/:slug`, which is exactly the
+ * regression rule 2 (touch nothing that serves the 2,709 live pages) exists to prevent.
+ *
+ * The 27 element renderers themselves have no such problem — `src/cms/rendering/registry.ts`
+ * is the only thing standing between them and a server render, and it fails soft (its glob IS
+ * try/caught, so it resolves to an empty registry rather than throwing — confirmed the same
+ * way: `repoRenderers` comes back `{}` under this bundler). So they are imported directly here,
+ * by name, and dispatched by a small SSR-only copy of `visual-builder.tsx`'s tree walk (nodes
+ * -> rows -> columns -> elements) that never touches `component-factory.tsx` or the three
+ * vendored lane files. `BlankSection` — the one section type any Visual Builder blueprint on
+ * this CMS uses — is imported the same way, straight from its own folder, which has no glob of
+ * its own: it only lazy-imports `content-area/mapper` via `React.lazy`, and that import is
+ * never triggered because a section with rows gets its `children` prop pre-rendered by
+ * `VbRows` below, never a `rows` prop — see `visual-builder.tsx`'s own header comment for why
+ * that shape avoids upstream's mapper.
+ *
+ * Kept in exact structural lockstep with `visual-builder.tsx` (same wrapper elements, same
+ * conditional children/rows handling, same displaySettings defaulting calls) so a client that
+ * ever hydrates this markup has as little to reconcile as possible. `withContentTypeDefaults`
+ * and `withNodeTypeDefaults` resolve to empty maps under this same glob limitation — a real,
+ * separate gap in `src/cms/rendering/display-defaults.ts` (repo-side display-setting DEFAULTS
+ * for a node the CMS never customised are a browser-only concept today) — so they are called
+ * here anyway, for parity and so a future fix to that file benefits both render paths, but a
+ * node that relies purely on a repo default rather than a CMS-stored value can render with a
+ * different class list server-side than client-side until that file grows the same kind of
+ * Node fallback `src/cms/registry.ts` already has. It does not affect whether an element's own
+ * CONTENT renders — every field below comes from Graph, not from a display-setting default.
+ *
+ * `src/components/VisualBuilderPage.tsx`'s `useExperience` hook also does not yet consume
+ * `window.__SSR_DATA__` the way `usePageContent` does for the legacy templates — this handler
+ * writes it (see the /vb/ branch below) for forward-compatibility, but until that hook is
+ * updated the client still re-fetches over `/api/content` on mount and replaces this markup,
+ * which will produce a hydration mismatch console warning rather than a clean hydrate. That is
+ * a client-side change outside this file's scope; the markup this handler sends is real,
+ * complete HTML either way, which is what /vb/:slug lacked entirely before this.
+ */
+import Column from '../src/vendor/opticom/components/layout/column';
+import Row from '../src/vendor/opticom/components/layout/row';
+import BlankSection from '../src/vendor/opticom/components/section/blank-section';
+import { EditableBlock } from '../src/vendor/opticom/lib/optimizely/features/draft';
+import { withContentTypeDefaults, withNodeTypeDefaults } from '../src/cms/rendering/display-defaults';
+// The same shapes `visual-builder.tsx` types its own walk against — reused here so the SSR
+// copy of that walk (below) takes the real composition shape instead of `any`.
+import type {
+  Column as ColumnNode,
+  ExperienceElement,
+  Row as RowNode,
+  SafeVisualBuilderExperience,
+  VisualBuilderNode,
+} from '../src/vendor/opticom/lib/optimizely/types/experience';
+// Type only — erased at compile time, so this never runs `registry.ts`'s own module body
+// (the empty-under-Node `repoRenderers` the big comment above describes). Just borrowing the
+// shape it declares for a renderer component.
+import type { Renderer } from '../src/cms/rendering/registry';
+import { cn } from '../src/vendor/opticom/lib/utils';
+import { draftClass } from '../src/vendor/opticom/lib/utils/draft-helpers';
+
+// The 27 Visual Builder element renderers, one static import each — see the block comment
+// above for why these cannot be discovered through the registry's glob under this bundler.
+import AbmAnalystCardElement from '../src/cms/components/abm-analyst-card-element';
+import AbmChallengeShotElement from '../src/cms/components/abm-challenge-shot-element';
+import AbmClosingCtaElement from '../src/cms/components/abm-closing-cta-element';
+import AbmComparisonRowElement from '../src/cms/components/abm-comparison-row-element';
+import AbmFrictionPointElement from '../src/cms/components/abm-friction-point-element';
+import AbmNavRailElement from '../src/cms/components/abm-nav-rail-element';
+import AbmNewsItemElement from '../src/cms/components/abm-news-item-element';
+import AbmRoiCardElement from '../src/cms/components/abm-roi-card-element';
+import AbmStakeholderElement from '../src/cms/components/abm-stakeholder-element';
+import AbmStickyCtaElement from '../src/cms/components/abm-sticky-cta-element';
+import AbmTeamMemberElement from '../src/cms/components/abm-team-member-element';
+import AbmTechStackItemElement from '../src/cms/components/abm-tech-stack-item-element';
+import AbmThesisElement from '../src/cms/components/abm-thesis-element';
+import AbmTimelinePhaseElement from '../src/cms/components/abm-timeline-phase-element';
+import AbmUseCaseLaneElement from '../src/cms/components/abm-use-case-lane-element';
+import BlockquoteBlock from '../src/cms/components/blockquote-block';
+import ButtonBlock from '../src/cms/components/button-block';
+import CalloutBlock from '../src/cms/components/callout-block';
+import CardCustomerBlock from '../src/cms/components/card-customer-block';
+import CardCustomerQuoteBlock from '../src/cms/components/card-customer-quote-block';
+import CardPressBlock from '../src/cms/components/card-press-block';
+import ImageDisplayElement from '../src/cms/components/image-display-element';
+import LinkItemElement from '../src/cms/components/link-item-element';
+import SpacerBlock from '../src/cms/components/spacer-block';
+import StackedHeadingElement from '../src/cms/components/stacked-heading-element';
+import StatBlock from '../src/cms/components/stat-block';
+import TextContentElement from '../src/cms/components/text-content-element';
+
+const SSR_ELEMENT_RENDERERS: Record<string, Renderer> = {
+  AbmAnalystCardElement,
+  AbmChallengeShotElement,
+  AbmClosingCtaElement,
+  AbmComparisonRowElement,
+  AbmFrictionPointElement,
+  AbmNavRailElement,
+  AbmNewsItemElement,
+  AbmRoiCardElement,
+  AbmStakeholderElement,
+  AbmStickyCtaElement,
+  AbmTeamMemberElement,
+  AbmTechStackItemElement,
+  AbmThesisElement,
+  AbmTimelinePhaseElement,
+  AbmUseCaseLaneElement,
+  BlockquoteBlock,
+  ButtonBlock,
+  CalloutBlock,
+  CardCustomerBlock,
+  CardCustomerQuoteBlock,
+  CardPressBlock,
+  ImageDisplayElement,
+  LinkItemElement,
+  SpacerBlock,
+  StackedHeadingElement,
+  StatBlock,
+  TextContentElement,
+};
 
 // ---------------------------------------------------------------------------
 // Content Graph – fetch page data
@@ -631,6 +761,179 @@ function buildHeadHtml(page: any): string {
 }
 
 // ---------------------------------------------------------------------------
+// Visual Builder (/vb/:slug) — data fetch, composition walk, head tags
+// ---------------------------------------------------------------------------
+
+/** What `fetchExperienceContent` resolves to — same shape `VisualBuilderPage.tsx` types its own state as. */
+type ExperienceItem = SafeVisualBuilderExperience & Record<string, unknown>;
+
+/**
+ * The `kind=experience` dispatch, server-side. Mirrors `api/content.ts`'s branch of the same
+ * name exactly — same two queries (`EXPERIENCE_QUERIES`, from `src/lib/experience-queries.ts`,
+ * the one copy both callers share), same slug tries, same normalisation — because that is what
+ * `VisualBuilderPage.tsx` calls client-side, and the two must agree on what a slug resolves to.
+ */
+async function fetchExperienceContent(authKey: string, expSlug: string): Promise<ExperienceItem | null> {
+  const normalizedSlug = `/${expSlug}/`;
+  const tries = [normalizedSlug];
+  if (!expSlug.startsWith('en/')) tries.push(`/en/${expSlug}/`);
+
+  for (const s of tries) {
+    for (const { typeName, query, template } of EXPERIENCE_QUERIES) {
+      const json = await queryGraph(authKey, query, { slug: s });
+      const items = (json as { data?: Record<string, { items?: unknown[] }> })?.data?.[typeName]?.items;
+      if (items && items.length > 0) {
+        return normalizeExperienceItem({ ...(items[0] as object), __typename: typeName, __template: template }) as ExperienceItem;
+      }
+    }
+  }
+  return null;
+}
+
+interface VbLevelProps {
+  locale?: string;
+  preview?: boolean;
+}
+
+/*
+ * eslint-plugin-react-refresh's `only-export-components` flags every JSX-returning function
+ * below, even though none of them are exported — it treats a capitalised, JSX-returning
+ * declaration as "a component this file should export alone" the moment the file also default-
+ * exports something else, which this file's `handler` always has. The premise the rule
+ * protects — Vite's Fast Refresh needs a component-only module to preserve state across an
+ * edit — does not apply here: this file is never served through Vite. It is bundled once, by
+ * esbuild, into a Vercel serverless function (see scripts/build-ssr.mjs); nothing about it is
+ * hot-reloaded, ever. Scoped to this composition-walk block rather than the whole file so a
+ * genuine future violation elsewhere still gets caught.
+ */
+/* eslint-disable react-refresh/only-export-components */
+
+/** One element inside a column — the leaf of the tree. Ported from `visual-builder.tsx`'s `Element`. */
+function VbElement({
+  element,
+  index,
+  locale,
+  preview,
+}: VbLevelProps & { element: ExperienceElement; index: number }) {
+  const typeName = element.component?.__typename;
+  if (!typeName) return null;
+  const Renderer = SSR_ELEMENT_RENDERERS[typeName];
+  // A type this SSR walk carries no renderer for renders nothing — the same miss behaviour
+  // `component-factory.tsx` has for an unroutable type. There is no such type on this CMS
+  // today: every element content type it can produce is one of the 27 registered above.
+  if (!Renderer) return null;
+  return (
+    <EditableBlock blockId={element.key}>
+      <Renderer
+        {...element.component}
+        displaySettings={withContentTypeDefaults(typeName, element.displaySettings)}
+        isFirst={index === 0}
+        locale={locale}
+        preview={preview}
+      />
+    </EditableBlock>
+  );
+}
+
+function VbColumns({ columns, locale, preview }: VbLevelProps & { columns?: ColumnNode[] }) {
+  if (!columns?.length) return null;
+  return (
+    <>
+      {columns.map((column) => (
+        <Column
+          key={column.key}
+          displaySettings={withNodeTypeDefaults('column', column.displaySettings)}
+          preview={preview}
+        >
+          {column.elements?.map((element, index) => (
+            <VbElement key={element.key} element={element} index={index} locale={locale} preview={preview} />
+          )) ?? null}
+        </Column>
+      ))}
+    </>
+  );
+}
+
+function VbRows({ rows, locale, preview }: VbLevelProps & { rows?: RowNode[] }) {
+  if (!rows?.length) return null;
+  return (
+    <>
+      {rows.map((row) => (
+        <Row key={row.key} displaySettings={withNodeTypeDefaults('row', row.displaySettings)} preview={preview}>
+          <VbColumns columns={row.columns} locale={locale} preview={preview} />
+        </Row>
+      ))}
+    </>
+  );
+}
+
+/** A `_Section`/`BlankSection` node — the only section type any blueprint on this CMS places. */
+function VbSectionNode({ node, locale, preview }: VbLevelProps & { node: VisualBuilderNode }) {
+  const typeName = node.section?.__typename;
+  if (typeName !== 'BlankSection') return null;
+  const hasRows = Boolean(node.rows?.length);
+  return (
+    <EditableBlock blockId={node.key} className="relative w-full" visualBuilderClass="vb:section">
+      <div className={draftClass(preview, 'vb:grid')}>
+        <BlankSection displaySettings={withContentTypeDefaults(typeName, node.displaySettings)} preview={preview}>
+          {/* undefined, never [], for an empty section — BlankSection's own "no rows and no
+              children" early return only fires when `children` is falsy. */}
+          {hasRows ? <VbRows rows={node.rows} locale={locale} preview={preview} /> : undefined}
+        </BlankSection>
+      </div>
+    </EditableBlock>
+  );
+}
+
+/** The experience root. Structurally identical to `visual-builder.tsx`'s default export. */
+function VisualBuilderExperienceSSR({
+  experience,
+  locale,
+  preview = false,
+}: VbLevelProps & { experience?: ExperienceItem | null }) {
+  const nodes = experience?.composition?.nodes;
+  if (!nodes?.length) return null;
+  return (
+    <div className={cn('relative w-full flex-1', draftClass(preview, 'vb:outline'))}>
+      {nodes.map((node) => {
+        if (node.nodeType === 'section' && node.section) {
+          return <VbSectionNode key={node.key} node={node} locale={locale} preview={preview} />;
+        }
+        // No blueprint places a component directly on the experience today (see
+        // visual-builder.tsx's TopLevelComponent) — nothing to port until one does.
+        return null;
+      })}
+    </div>
+  );
+}
+
+/* eslint-enable react-refresh/only-export-components */
+
+/**
+ * `<head>` tags for an experience page. Deliberately separate from `buildHeadHtml` above,
+ * which is written against the flat page model's fields (`CanonicalUrl`, `testimonial1`,
+ * `analystCards`, …) — none of which an experience has; its copy lives entirely inside
+ * `composition`. Mirrors exactly what `VisualBuilderPage.tsx`'s `useExperienceHead` sets
+ * client-side (title, description, robots), so the tags this handler sends are the same ones
+ * the client would otherwise inject after its fetch resolves.
+ */
+function buildExperienceHeadHtml(item: ExperienceItem): string {
+  const parts: string[] = [];
+  const title = typeof item.PageTitle === 'string' && item.PageTitle ? item.PageTitle : 'Optimizely Showcase';
+  parts.push(`<title>${escapeHtml(title)}</title>`);
+  if (typeof item.MetaDescription === 'string' && item.MetaDescription) {
+    parts.push(`<meta name="description" content="${escapeHtml(item.MetaDescription)}" />`);
+  }
+  const canonicalHref = `${SITE_URL}${item._metadata?.url?.hierarchical ?? ''}`;
+  parts.push(`<link rel="canonical" href="${escapeHtml(canonicalHref)}" />`);
+  // Same rule as useExperienceHead: noindex unless the CMS explicitly says otherwise.
+  if (item.noIndex !== false) {
+    parts.push(`<meta name="robots" content="noindex, nofollow" />`);
+  }
+  return parts.join('\n    ');
+}
+
+// ---------------------------------------------------------------------------
 // HTML template – baked in at build time by esbuild (see scripts/build-ssr.mjs)
 // ---------------------------------------------------------------------------
 
@@ -690,6 +993,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.warn('[ssr] GRAPH_AUTH_KEY not set, serving SPA shell');
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(template);
+  }
+
+  /*
+   * Visual Builder experiences (/vb/:slug) — dispatched here, ahead of `fetchPageContent`, so
+   * a request for one never runs that function's six-query chain (person x2, retail x2,
+   * finserv, comparison): no legacy content type is ever registered at a `vb/`-prefixed URL,
+   * so every one of those queries was guaranteed to come back empty for this slug shape.
+   */
+  if (slug.startsWith('vb/')) {
+    const expSlug = slug.slice('vb/'.length);
+    try {
+      const item = expSlug ? await fetchExperienceContent(authKey, expSlug) : null;
+
+      if (!item) {
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+        return res.status(200).send(template);
+      }
+
+      const preview = url.searchParams.get('ctx') === 'edit';
+      const appHtml = renderToString(
+        <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
+          <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
+        </div>,
+      );
+
+      const headHtml = buildExperienceHeadHtml(item);
+      const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`;
+
+      let html = template;
+      html = html.replace(/^\s*<title>[^<]*<\/title>\s*$/m, '');
+      html = html.replace(/^\s*<meta name="description" content="[^"]*"\s*\/?>\s*$/m, '');
+      html = html.replace(/\n{3,}/g, '\n\n');
+      html = html.replace('</head>', `    ${headHtml}\n  </head>`);
+      html = html.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
+      html = html.replace('<script type="module"', `${ssrDataScript}\n    <script type="module"`);
+
+      res.setHeader('Content-Type', 'text/html');
+      const wantsFresh = url.searchParams.has('refresh');
+      res.setHeader(
+        'Cache-Control',
+        wantsFresh ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=300',
+      );
+      if (!wantsFresh && item._metadata?.key) {
+        res.setHeader('Cache-Tag', `page:${item._metadata.key}`);
+      }
+      if (item.noIndex !== false) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      }
+      return res.status(200).send(html);
+    } catch (err) {
+      console.error('[ssr] vb handler error:', err);
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(template);
+    }
   }
 
   try {
