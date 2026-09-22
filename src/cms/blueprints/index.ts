@@ -26,17 +26,17 @@
  * three fields. A slot with several element types in its column — `account-intel` has four —
  * carries all of them in `feeds`, in render order.
  *
- * THE DEFAULT EXPORT IS NOT A DESIGN CHOICE. `registry.ts` discovers blueprints by globbing
- * `blueprints/*.ts` (eagerly under Vite, by `readdir` under tsx) and treats EVERY file
- * directly in this directory as a blueprint module, requiring a default-exported definition
- * with a `blueprintId`, a `contentType` and a `displayName`. A barrel with no default export
- * would therefore be reported as a broken blueprint and would make `apply.ts` exit non-zero.
- * So this file re-exports `abmTakeout` as its default, which is discovered a second time
- * under the same `blueprintId` — and therefore under the same `md5` key, so it reconciles to
- * the same blueprint and the second pass reports `unchanged`. The cost is one extra row in
- * the apply table; the fix, when someone owns `registry.ts`, is to skip `index.ts` in the two
- * discovery paths, after which this line can go. Helper modules avoid the problem entirely by
- * living in `internal/` — the glob is single-level and does not descend.
+ * THIS BARREL HAS NO DEFAULT EXPORT, AND MUST NOT GET ONE. `registry.ts` discovers
+ * blueprints by globbing `blueprints/*.ts` (eagerly under Vite, by `readdir` under tsx) and
+ * treats every file directly in this directory as a blueprint module, requiring a
+ * default-exported definition with a `blueprintId`, a `contentType` and a `displayName`.
+ * Both discovery paths skip `index.ts` by name (`BARREL_FILENAME`), so a barrel is not a
+ * blueprint. An earlier version of this file re-exported `abmTakeout` as its default to
+ * satisfy a discovery pass that did not yet skip it; that made the takeout appear twice in
+ * the apply table, reconciling to the same `md5` key and reporting `unchanged` on the second
+ * pass. The skip removed the need, and the export is gone — adding one back would resurrect
+ * the duplicate row. Helper modules avoid the question entirely by living in `internal/`:
+ * the glob is single-level and does not descend.
  */
 
 import abmTakeout from './abm-takeout'
@@ -159,10 +159,3 @@ const duplicateKeys = keys.filter((key, index) => keys.indexOf(key) !== index)
 if (duplicateKeys.length > 0) {
   throw new Error(`md5 key collision across blueprint ids: ${duplicateKeys.join(', ')}`)
 }
-
-/**
- * Discovery bait, not API. See the note at the top of this file: `registry.ts` requires a
- * default-exported blueprint from every module in this directory, and `abm-takeout` is the
- * canonical one. Import `BLUEPRINTS` or a named blueprint instead of this.
- */
-export default abmTakeout

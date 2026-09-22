@@ -1,0 +1,4 @@
+# Vite needs this directory to exist for the eager import.meta.glob in
+# lib/optimizely/rendering/content-area/block.tsx. Upstream fills it with ~60 block
+# renderers; we ship none of them, so the glob resolves to an empty map and every
+# Block-lane type falls through to the repo registry in src/cms/rendering/registry.ts.

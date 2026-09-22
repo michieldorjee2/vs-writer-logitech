@@ -428,6 +428,16 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@components': path.resolve(__dirname, 'src/components'),
         '@assets': path.resolve(__dirname, 'src/assets'),
+        /*
+         * Upstream's own alias, pointed at the vendored slice. Keeping it means the files
+         * under src/vendor/opticom stay byte-comparable to optimizely.com and
+         * `node scripts/sync-opticom.mjs --check` keeps working.
+         *
+         * The trailing slash on BOTH sides is not cosmetic. Vite matches a string alias by
+         * prefix and takes the first hit, so a bare '@' would also swallow '@components/…'
+         * and '@assets/…'. '@/' cannot.
+         */
+        '@/': path.resolve(__dirname, 'src/vendor/opticom') + '/',
       },
     },
     css: {

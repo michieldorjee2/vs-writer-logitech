@@ -27,10 +27,12 @@
  *                             template and the `row` / `column` layout templates
  *   - `blueprints/*.ts`       one blueprint per file
  *
- * `index.ts` IS SKIPPED in every single-file path. A barrel re-exporting one of its siblings as
- * its default (which `blueprints/index.ts` does) would otherwise be discovered a second time
- * under the same id, and every barrel added later would silently inflate the counts. Helper
- * modules belong in `internal/`; the globs are single-level and do not descend.
+ * `index.ts` IS SKIPPED in every single-file path. A barrel re-exporting one of its siblings
+ * as its default would otherwise be discovered a second time under the same id, and every
+ * barrel added later would silently inflate the counts. `blueprints/index.ts` used to carry
+ * exactly such an export to satisfy a discovery pass that did not skip it; the skip is why
+ * that export could be removed. Helper modules belong in `internal/`; the globs are
+ * single-level and do not descend.
  */
 
 import type { ContentTypeDefinition } from './property-builders'
@@ -121,7 +123,7 @@ export interface RegistrySnapshot {
 
 /**
  * A barrel is not a definition. Every single-file discovery path skips this name, so a
- * `blueprints/index.ts` that re-exports a sibling as its default is not counted twice.
+ * barrel that re-exports a sibling as its default is not counted twice.
  */
 export const BARREL_FILENAME = 'index.ts'
 

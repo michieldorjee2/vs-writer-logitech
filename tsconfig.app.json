@@ -10,6 +10,15 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "moduleDetection": "force",
+    /*
+     * Mirrors the '@/' alias in vite.config.ts. Upstream's imports are kept as-authored so
+     * the vendored slice stays byte-comparable and scripts/sync-opticom.mjs keeps working.
+     * "@/*" is an exact-prefix pattern, so it cannot shadow "@components/…" the way a bare
+     * "@" alias would in Vite.
+     */
+    "paths": {
+      "@/*": ["./src/vendor/opticom/*"]
+    },
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": false,
