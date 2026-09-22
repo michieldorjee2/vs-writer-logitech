@@ -216,6 +216,25 @@ const ROUTES = [
         ],
         noiseFloorPct: 30,
     },
+    /*
+     * The Visual Builder route. Unlike every route above it, the markup here is not a
+     * hand-written template — it is a composition walked node by node, so this capture is
+     * the only one that can show a band rendering as nothing. The dev proxy CAN serve it
+     * (its `kind=experience` branch imports the same query module api/content.ts does), so
+     * it works with --no-sidecar too.
+     */
+    {
+        name: 'vb-sample',
+        url: '/vb/vb-sample',
+        ready: '.vb-experience',
+        template: 'ABMExperience -> VisualBuilderPage -> the composition',
+        note: 'Northwind Traders, composed from the abm-takeout blueprint: 13 sections, 59 element nodes.',
+        nondeterministic: [
+            'Two placeholder images are fetched from placehold.co — the challenge screenshot ' +
+                'and the logo-wall slot. An offline capture renders both as broken images.',
+        ],
+        noiseFloorPct: 0.5,
+    },
     {
         name: 'use-case-preview',
         url: '/use-case-preview',

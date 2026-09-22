@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content.js';
+import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -288,6 +289,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const normalizedSlug = `/${slug}/`;
+
+  /*
+   * Visual Builder experiences (`/vb/:slug`), behind an explicit opt-in.
+   *
+   * A SEPARATE OPERATION, NOT EXTRA FIELDS ON PAGE_QUERY, and a separate branch rather than
+   * another arm of the dispatch chain below. Both halves of that are deliberate: a selection
+   * on a field Graph does not know fails the WHOLE query, so a composition selection bolted
+   * onto PAGE_QUERY would take the 2,695 CompetitorComparisonPage pages down with it the
+   * first time the experience schema moved — and an unconditional extra Graph round trip on
+   * the catch-all path would cost every one of those pages latency to answer a question only
+   * `/vb/:slug` asks. `kind=experience` keeps the legacy path byte-for-byte what it was.
+   */
+  if (req.query.kind === 'experience') {
+    const tries = [normalizedSlug];
+    if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`);
+    try {
+      for (const s of tries) {
+        for (const { typeName, query, template } of EXPERIENCE_QUERIES) {
+          const json = await queryGraph(authKey, query, { slug: s });
+          const items = json?.data?.[typeName]?.items;
+          if (items && items.length > 0) {
+            res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+            res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+            return res
+              .status(200)
+              .json(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template }));
+          }
+        }
+      }
+      return res.status(404).json({ error: 'Experience not found' });
+    } catch (err) {
+      console.error('[api/content] experience fetch failed:', err);
+      return res.status(500).json({ error: 'Failed to fetch content' });
+    }
+  }
 
   try {
     // Retail dispatch: try RetailCustomerPage first on every request (CMS

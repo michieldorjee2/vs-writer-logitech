@@ -23,10 +23,17 @@
  * They would fail this check for the same reason; delete them rather than fix
  * them.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 
 const ENDPOINT = 'https://cg.optimizely.com/content/v2';
-const FILES = ['api/content.ts', 'api/preview.ts', 'server/ssr-handler.tsx'];
+const FILES = [
+  'api/content.ts',
+  'api/preview.ts',
+  'server/ssr-handler.tsx',
+  // The Visual Builder experience queries. They live in one module because api/content.ts
+  // and vite.config.ts both serve them, so scanning the module covers both callers.
+  'src/lib/experience-queries.ts',
+];
 
 function authKey() {
   if (process.env.GRAPH_AUTH_KEY) return process.env.GRAPH_AUTH_KEY;
@@ -40,18 +47,88 @@ function authKey() {
   process.exit(2);
 }
 
-// Every `const NAME_QUERY = ` … ` ` template literal. Queries assembled at
-// runtime (the retail probe-then-extend builder) are skipped by design: they
-// only ever include fields introspected from the live schema.
+// Every `const NAME = ` … ` ` template literal in a file, exported or not.
+const TEMPLATE_CONSTS = /(?:export\s+)?const (\w+)\s*=\s*`([\s\S]*?)`;?\n/g;
+
+/**
+ * Resolve `${OTHER_CONST}` references against the other template literals in the same file.
+ *
+ * A composition query is ~120 lines of which 30 are a fragment shared with a second query,
+ * so the experience queries are assembled from three consts. Sending the unresolved text
+ * would be sending nothing; skipping it, as this script used to, would mean the two queries
+ * that actually carry the Visual Builder pages are the two the check does not cover.
+ *
+ * Only plain `${IDENT}` is substituted — an expression is still a runtime-assembled query
+ * and still skipped, which keeps the retail probe-then-extend builder out of scope. The loop
+ * is bounded so a const that references itself cannot hang the check.
+ */
+function resolveInterpolations(text, consts) {
+  let out = text;
+  for (let depth = 0; depth < 8 && out.includes('${'); depth++) {
+    const next = out.replace(/\$\{\s*(\w+)\s*\}/g, (match, name) =>
+      Object.prototype.hasOwnProperty.call(consts, name) ? consts[name] : match,
+    );
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+// Every `const NAME_QUERY = ` … ` ` template literal, with sibling consts substituted in.
+// Queries still holding a `${…}` after that are assembled at runtime and skipped by design:
+// they only ever include fields introspected from the live schema.
 function queries(file) {
   const src = readFileSync(file, 'utf8');
-  return [...src.matchAll(/const (\w*QUERY) = `([\s\S]*?)`;/g)]
-    .map(([, name, query]) => ({ name, query }))
+  const consts = Object.fromEntries(
+    [...src.matchAll(TEMPLATE_CONSTS)].map(([, name, body]) => [name, body]),
+  );
+  return Object.entries(consts)
+    .filter(([name]) => name.endsWith('QUERY'))
+    .map(([name, body]) => ({ name, query: resolveInterpolations(body, consts) }))
     .filter(({ query }) => !query.includes('${'));
 }
 
+/**
+ * Every Visual Builder component type must appear in the composition fragment.
+ *
+ * A type the fragment does not name is not a query error and not a Graph error. The node
+ * comes back as `{"__typename": "_Component"}` with none of its fields, the factory finds no
+ * renderer for `_Component`, and that element renders as NOTHING — on a page whose other
+ * twelve bands are perfect. It cost an hour on the first sample page: `TextContentElement`
+ * was the one type of twenty-seven missing from the fragment, and the four body-copy nodes
+ * it drew were simply absent. There is no error anywhere to find that by.
+ *
+ * So the check is structural: the component folders are the source of truth for what can be
+ * placed, and every one of their content type keys has to be named in the fragment.
+ */
+function checkFragmentCoverage() {
+  const dir = 'src/cms/components';
+  if (!existsSync(dir)) return 0;
+
+  const source = readFileSync('src/lib/experience-queries.ts', 'utf8');
+  const missing = [];
+  for (const folder of readdirSync(dir)) {
+    const file = `${dir}/${folder}/content-type.ts`;
+    if (!existsSync(file)) continue;
+    const contentTypeKey = /key:\s*'([^']+)'/.exec(readFileSync(file, 'utf8'))?.[1];
+    if (!contentTypeKey) continue;
+    if (!new RegExp(`\\.\\.\\. on ${contentTypeKey}\\b`).test(source)) missing.push(contentTypeKey);
+  }
+
+  if (missing.length === 0) {
+    console.log('ok    src/lib/experience-queries.ts → every component type is in the fragment');
+    return 0;
+  }
+  console.error(
+    `FAIL  src/lib/experience-queries.ts → ${missing.length} component type(s) missing from ` +
+      `CompositionElement: ${missing.join(', ')}`,
+  );
+  console.error('        Each renders as an EMPTY element node — no error, no fields, no output.');
+  return 1;
+}
+
 const key = authKey();
-let failed = 0;
+let failed = checkFragmentCoverage();
 
 for (const file of FILES) {
   for (const { name, query } of queries(file)) {

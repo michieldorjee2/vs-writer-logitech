@@ -179,6 +179,62 @@
 }
 
 /* ---------------------------------------------------------------------------
+   BRAND COLOURS, PUT BACK AS THEME NAMES — at the app's own hex.
+
+   The block above clears eleven colour names with `initial` because the token
+   file's value differed from the app's. For a type scale or a radius that is
+   exactly right: clearing restores the app's `:root` value AND puts the utility
+   back on the @config scale, because `tailwind.config.js` declares a fontSize
+   and a borderRadius scale for the utility to fall back to.
+
+   IT IS NOT RIGHT FOR A COLOUR, because there is nothing to fall back to. The
+   legacy config's `theme.extend.colors` names are `optimizely-blue`,
+   `dark-blue`, `light-blue` — it has never held `secondary-darkfir`. So
+   `--color-secondary-darkfir: initial` does not move the utility onto another
+   value; it DELETES `bg-secondary-darkfir`, `text-secondary-darkfir` and
+   `border-secondary-darkfir` from the stylesheet altogether. The class name
+   survives in the markup, matches no rule, and paints nothing.
+
+   Measured on the first Visual Builder page: every band the blueprint marks
+   `dark_forest` — the hero, the signal-pill strip, the ROI projection and the
+   closing CTA — rendered WHITE, with `bg-secondary-darkfir` sitting in the
+   class attribute doing nothing. `light_teal` (`bg-secondary-ltblue`) the same.
+   The vendored `blank-section` maps a background choice straight onto these
+   utility names, so a section's background is the thing that silently stops
+   existing.
+
+   Re-declaring them here restores the utilities and changes nothing else: each
+   value below is the app's OWN hex, read off its `:root` in
+   `src/styles/greenfield.css` and `abm-variables.css`, so the `@theme` layer
+   and the `legacy` layer now agree to the byte instead of the token file's
+   hsl() round-trip (#abff44 -> #aaff42) overriding the app.
+
+   BLAST RADIUS, checked rather than assumed: no file outside `src/vendor/` and
+   `src/cms/` uses any of these names as a utility (grep for
+   `(bg|text|border|outline|ring)-<name>`), so no legacy template can move. Two
+   of the eleven are deliberately left cleared: `--color-red`, which the app
+   defines as `var(--red)` rather than a literal, and `--color-lfgreen-100`,
+   which is a genuinely different colour upstream (#91ec41 vs #abff44) and
+   whose only callers are vendored.
+   --------------------------------------------------------------------------- */
+@theme {
+    --color-primary-lfgreen: #abff44;
+    --color-primary-grass: #7ddd3d;
+    --color-primary-goodtogo: #3ab533;
+    --color-green-goodtogo: #3ab533;
+    --color-secondary-darkfir: #08251a;
+    --color-secondary-ltblue: #91dbda;
+    --color-fir-lightfir: #197050;
+    --color-tertiary-4: #d8e4cb;
+    --color-tertiary-5: #c3ceaf;
+    --color-tertiary-6: #a1ac8d;
+    --color-tertiary-7: #717863;
+    --color-extrusion-1: #abff44;
+    --color-extrusion-2: #3ab533;
+    --color-error-darkred: #f13030;
+}
+
+/* ---------------------------------------------------------------------------
    The token file sets `--breakpoint-sm: 640px / md: 768 / lg: 1024 / xl: 1280
    / 2xl: 1376`. This app's breakpoints are `sm: 576 / md: 768 / lg: 992 /
    xl: 1200 / xxl: 1400 / 2xl: 1600`. A `@theme` block wins over a legacy config's

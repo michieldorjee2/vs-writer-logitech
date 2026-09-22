@@ -1,6 +1,13 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+/*
+ * The Visual Builder queries are IMPORTED rather than copied. Every other query in this file
+ * is a second copy of one in `api/content.ts`, and the copies have already drifted — the
+ * PAGE_QUERY below still selects CanonicalUrl, FeatureSection, OurHighlight and Weeks, the
+ * four fields whose removal from the schema 404'd 2,676 pages. One module, two callers.
+ */
+import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries'
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2'
 
@@ -304,6 +311,44 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
         if (url.pathname === '/api/content') {
           const slug = url.searchParams.get('slug')
           if (!slug) return jsonResponse(res, 400, { error: 'Missing slug parameter' })
+
+          /*
+           * `/vb/:slug` — a Visual Builder experience. Mirrors the `kind=experience` branch
+           * in api/content.ts, including the normalisation, so dev and prod hand the browser
+           * the same JSON. Graph errors are printed rather than collapsed into a 404: a
+           * composition query that stops matching the schema returns `data: null`, which is
+           * indistinguishable from "no such page" unless someone says so out loud.
+           */
+          if (url.searchParams.get('kind') === 'experience') {
+            const tries = [`/${slug}/`]
+            if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`)
+            try {
+              for (const s of tries) {
+                for (const { typeName, query, template } of EXPERIENCE_QUERIES) {
+                  const json = await fetchGraph(authKey, query, { slug: s })
+                  if (json?.errors?.length) {
+                    console.error(
+                      `[graph-dev-proxy] ${typeName} query failed for ${s}: ` +
+                        json.errors.map((e: { message: string }) => e.message).join(' | '),
+                    )
+                    continue
+                  }
+                  const item = json?.data?.[typeName]?.items?.[0]
+                  if (item) {
+                    return jsonResponse(
+                      res,
+                      200,
+                      normalizeExperienceItem({ ...item, __typename: typeName, __template: template }),
+                    )
+                  }
+                }
+              }
+              return jsonResponse(res, 404, { error: 'Experience not found' })
+            } catch (err) {
+              console.error('[graph-dev-proxy] experience fetch failed', err)
+              return jsonResponse(res, 500, { error: 'Graph fetch failed' })
+            }
+          }
 
           try {
             const item = await queryGraph(authKey, PAGE_QUERY, { slug: `/${slug}/` }, 'CompetitorComparisonPage')

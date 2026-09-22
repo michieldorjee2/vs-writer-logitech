@@ -40,6 +40,12 @@ const UseCasePreview = lazy(() => import('./components/UseCasePreview'));
  * this lazy boundary).
  */
 const FloatingSidebar = lazy(() => import('./components/FloatingSidebar'));
+/*
+ * Visual Builder experiences — /vb/:slug. Lazy for the same reason as the renderers above:
+ * it pulls the whole vendored opticom render chain plus one chunk per component renderer,
+ * and no legacy page should download a byte of it.
+ */
+const VisualBuilderPage = lazy(() => import('./components/VisualBuilderPage'));
 
 function RouteSpinner() {
     return (
@@ -279,6 +285,17 @@ function App() {
                             </Suspense>
                         }
                         path="/use-case-preview/:accountId"
+                    />
+                    {/* Visual Builder experiences. Ahead of the catch-all, and on its own
+                        prefix so it cannot collide with the 2,695 single-segment company
+                        slugs PageLoader serves. See VisualBuilderPage.tsx. */}
+                    <Route
+                        element={
+                            <Suspense fallback={<RouteSpinner />}>
+                                <VisualBuilderPage />
+                            </Suspense>
+                        }
+                        path="/vb/:slug"
                     />
                     {/* Dynamic catch-all: any slug resolves to Graph content */}
                     <Route path="/*" element={<PageLoader />} />
