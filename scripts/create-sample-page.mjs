@@ -115,7 +115,10 @@ const MEETING_URL = 'https://www.optimizely.com/contact-sales/';
  * `src/cms/components/<folder>/content-type.ts` declares them — `NewsDate` not `Date`,
  * `Description` not `StatDescription`, `ScreenshotUrl` not `challengeScreenshotUrl`.
  *
- * `##phrase##` in a `StackedHeadingElement` marks the run the renderer draws as stacked
+ * `##phrase##` in a `StackedHeadingElement` marks the run the renderer draws as stacked.
+ * ONE per page, on the hero — the brand's rule ("extrude exactly one part of a headline") and
+ * what optimizely.com's own pages do. Section headings are plain Dark Fir.
+ *
  * extruded type. It is the same marker optimizely.com uses and it is parsed, not printed.
  */
 const CONTENT = {
@@ -149,7 +152,7 @@ const CONTENT = {
 
   // ---- account-intel ----------------------------------------------------
   intelEyebrow: { Text: 'Account intelligence', HeadingLevel: 'h4' },
-  intelHeadline: { Text: 'What we found ##before we wrote this##', HeadingLevel: 'h2' },
+  intelHeadline: { Text: 'What we found before we wrote this', HeadingLevel: 'h2' },
   techStack: [
     { Name: 'Adobe Experience Manager 6.5', ColorTag: 'darkpink' },
     { Name: 'Adobe Target', ColorTag: 'pink' },
@@ -222,7 +225,7 @@ const CONTENT = {
   },
 
   // ---- comparison-table -------------------------------------------------
-  comparisonHeadline: { Text: 'Northwind on Optimizely vs ##Adobe Experience Manager##', HeadingLevel: 'h2' },
+  comparisonHeadline: { Text: 'Northwind on Optimizely vs Adobe Experience Manager', HeadingLevel: 'h2' },
   comparisonDescription: {
     MainBody:
       'Scored against the four things your own FY27 platform review asks for. Where AEM can do ' +
@@ -275,7 +278,7 @@ const CONTENT = {
   },
 
   // ---- roi-projection ---------------------------------------------------
-  roiTitle: { Text: 'What eleven weeks ##costs you a year##', HeadingLevel: 'h2' },
+  roiTitle: { Text: 'What eleven weeks costs you a year', HeadingLevel: 'h2' },
   roiDescription: {
     MainBody:
       'Modelled on your own numbers: 26 campaign pages a year, the 11-week median from your ' +
@@ -313,7 +316,7 @@ const CONTENT = {
   ],
 
   // ---- migration-timeline -----------------------------------------------
-  migrationTitle: { Text: 'How the move ##actually happens##', HeadingLevel: 'h2' },
+  migrationTitle: { Text: 'How the move actually happens', HeadingLevel: 'h2' },
   migrationDescription: {
     MainBody:
       'Three phases, and the first one does not touch AEM. Northwind keeps publishing on the ' +
@@ -345,7 +348,7 @@ const CONTENT = {
   ],
 
   // ---- analyst-proof ----------------------------------------------------
-  analystHeadline: { Text: 'Says who? ##Third parties, mostly##', HeadingLevel: 'h2' },
+  analystHeadline: { Text: 'Says who? Third parties, mostly', HeadingLevel: 'h2' },
   analystQuote: {
     Quote:
       'Optimizely is a Leader in the 2026 Gartner Magic Quadrant for Digital Experience Platforms, ' +

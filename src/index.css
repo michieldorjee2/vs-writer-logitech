@@ -579,3 +579,30 @@ a:hover .arrow-animated,
 
 /* No-op marker class used by components */
 .no-toc { display: block; }
+
+/* ---------------------------------------------------------------------------
+   PROD LAYOUT (src/cms/layout-prod) — two pieces the lifted class maps need.
+
+   --spacing: v4's off-scale spacing utilities (pb-27, pt-42 — prod's px_108 and
+   px_168) compute calc(var(--spacing) * N). Prod runs a 16px root with the default
+   0.25rem = 4px. Showcase runs a 10px root, so 0.25rem would render those at 62.5%.
+   0.4rem = 4px here, exactly prod's step. The legacy templates are unaffected: their
+   utilities sit on the @config scale, which v4 inlines and never computes from
+   --spacing.
+
+   vb-container: prod's `container` (width 100%, max-width 640/768/1024/1280/1376).
+   In Showcase `.container` belongs to tailwind-bootstrap-grid with different widths,
+   and the legacy DynamicComparisonPage uses it, so prod's gets its own name.
+   --------------------------------------------------------------------------- */
+@theme {
+    --spacing: 0.4rem;
+}
+
+@utility vb-container {
+    width: 100%;
+    @media (min-width: 640px) { max-width: 640px; }
+    @media (min-width: 768px) { max-width: 768px; }
+    @media (min-width: 1024px) { max-width: 1024px; }
+    @media (min-width: 1280px) { max-width: 1280px; }
+    @media (min-width: 1376px) { max-width: 1376px; }
+}

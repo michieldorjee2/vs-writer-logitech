@@ -30,8 +30,6 @@
  * so `BlankSection`'s own "no rows and no children" early return still fires and an empty
  * band does not paint a background.
  */
-import Column from '@/components/layout/column'
-import Row from '@/components/layout/row'
 import { EditableBlock } from '@/lib/optimizely/features/draft'
 import type {
   Column as ColumnNode,
@@ -45,6 +43,7 @@ import { draftClass } from '@/lib/utils/draft-helpers'
 import Component from './component-factory'
 import { withContentTypeDefaults, withNodeTypeDefaults } from './display-defaults'
 import { bandOf } from './band'
+import { ProdColumn as Column, ProdRow as Row, ProdSection } from '../layout-prod'
 
 export interface VisualBuilderExperienceProps {
   experience?: SafeVisualBuilderExperience | null
@@ -147,20 +146,28 @@ function SectionNode({ node, locale, preview }: LevelProps & { node: VisualBuild
           card paints dark ink on the dark band (measured at 1.00:1 on the closing CTA).
           Elements adapt with a `[[data-band=dark]_&]:` variant instead of guessing. */}
       <div className={draftClass(preview, 'vb:grid')} data-band={bandOf(sectionSettings)}>
-        <Component
-          typeName={typeName}
-          props={{
-            ...node.section,
-            displaySettings: sectionSettings,
-            locale,
-            preview,
-            // See the header: children, never `rows`. An empty section passes undefined so
-            // BlankSection's own early return still fires.
-            children: hasRows ? (
-              <Rows rows={node.rows} locale={locale} preview={preview} />
-            ) : undefined,
-          }}
-        />
+        {typeName === 'BlankSection' ? (
+          // optimizely.com's CURRENT section (src/cms/layout-prod) — the vendored zip's is older
+          // than production and lacks per-breakpoint padding, radius and the newer colours.
+          <ProdSection displaySettings={sectionSettings}>
+            {hasRows ? <Rows rows={node.rows} locale={locale} preview={preview} /> : undefined}
+          </ProdSection>
+        ) : (
+          <Component
+            typeName={typeName}
+            props={{
+              ...node.section,
+              displaySettings: sectionSettings,
+              locale,
+              preview,
+              // See the header: children, never `rows`. An empty section passes undefined so
+              // BlankSection's own early return still fires.
+              children: hasRows ? (
+                <Rows rows={node.rows} locale={locale} preview={preview} />
+              ) : undefined,
+            }}
+          />
+        )}
       </div>
     </EditableBlock>
   )

@@ -23,6 +23,7 @@
  */
 
 import { defineBlueprint } from './internal/compose'
+import { CLOSE_CARD, COL_BODY, COL_HERO, HERO_CARD, ROW_GRID, sheet } from './internal/layouts'
 
 export default defineBlueprint({
   blueprintId: 'person',
@@ -37,14 +38,9 @@ export default defineBlueprint({
       slotId: 'hero',
       displayName: 'Hero',
       why: 'Names them and the seat, not the company. The screenshot behind it comes from the parent page.',
-      section: {
-        containerWidth: 'full',
-        backgroundColor: 'dark_forest',
-        backgroundTreatment: 'gradient_galaxy',
-        paddingY: 'extra_loose',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: HERO_CARD,
+      row: ROW_GRID,
+      column: COL_HERO,
       feeds: [
         { contentType: 'StackedHeadingElement', flatKey: 'heroHeadline', cardinality: 'one', note: 'heroHeadline -> Text at HeadingLevel h1.' },
         { contentType: 'StackedHeadingElement', flatKey: 'heroEyebrow', cardinality: 'one' },
@@ -56,12 +52,9 @@ export default defineBlueprint({
       slotId: 'signal-pills',
       displayName: 'The key number',
       why: 'One number with a citation, not a row of pills. A person page that quotes five statistics reads as a brochure.',
-      section: {
-        backgroundColor: 'dark_forest',
-        paddingY: 'compact',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'StatBlock',
@@ -75,8 +68,9 @@ export default defineBlueprint({
       slotId: 'friction-points',
       displayName: 'Where this gets hard',
       why: 'What a seat like theirs is scored on. The section that proves we understand the job.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmFrictionPointElement',
@@ -92,8 +86,9 @@ export default defineBlueprint({
       slotId: 'proof-wall',
       displayName: 'Others who hold a seat like yours',
       why: 'Peer proof rather than a logo wall: at this altitude the relevant question is who like me has done this.',
-      section: { backgroundColor: 'light_gray', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'CardCustomerQuoteBlock',
@@ -108,8 +103,9 @@ export default defineBlueprint({
       slotId: 'contact-close',
       displayName: 'The ask',
       why: 'One ask, and the people on our side who would be in the room.',
-      section: { backgroundColor: 'dark_forest', paddingY: 'extra_loose', roundedCorners: 'top' },
-      column: { colSpan: 'full' },
+      section: CLOSE_CARD,
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmClosingCtaElement',

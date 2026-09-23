@@ -67,9 +67,9 @@ import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experien
  * a client-side change outside this file's scope; the markup this handler sends is real,
  * complete HTML either way, which is what /vb/:slug lacked entirely before this.
  */
-import Column from '../src/vendor/opticom/components/layout/column';
-import Row from '../src/vendor/opticom/components/layout/row';
-import BlankSection from '../src/vendor/opticom/components/section/blank-section';
+// optimizely.com's CURRENT layout components — must match src/cms/rendering/visual-builder.tsx,
+// or hydration keeps the server's markup. See src/cms/layout-prod.
+import { ProdColumn as Column, ProdRow as Row, ProdSection as BlankSection } from '../src/cms/layout-prod';
 import { EditableBlock } from '../src/vendor/opticom/lib/optimizely/features/draft';
 import { withContentTypeDefaults, withNodeTypeDefaults } from '../src/cms/rendering/display-defaults';
 // The same shapes `visual-builder.tsx` types its own walk against — reused here so the SSR

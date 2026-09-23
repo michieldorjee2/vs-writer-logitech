@@ -35,6 +35,7 @@
  */
 
 import { defineBlueprint } from './internal/compose'
+import { CLOSE_CARD, COL_BODY, COL_HERO, HERO_CARD, ROW_GRID, cards, sheet } from './internal/layouts'
 
 export default defineBlueprint({
   blueprintId: 'use-case-default',
@@ -49,13 +50,9 @@ export default defineBlueprint({
       slotId: 'nav-rail',
       displayName: 'Navigation rail',
       why: 'Chrome. A fixed rail with the section anchors and three lines of page meta.',
-      section: {
-        backgroundColor: 'transparent',
-        paddingY: 'none',
-        paddingX: 'none',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmNavRailElement',
@@ -69,14 +66,9 @@ export default defineBlueprint({
       slotId: 'hero',
       displayName: 'Hero',
       why: 'Same hero as the takeout, different argument: what we would do, not who we would replace.',
-      section: {
-        containerWidth: 'full',
-        backgroundColor: 'dark_forest',
-        backgroundTreatment: 'gradient_galaxy',
-        paddingY: 'extra_loose',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: HERO_CARD,
+      row: ROW_GRID,
+      column: COL_HERO,
       feeds: [
         {
           contentType: 'StackedHeadingElement',
@@ -93,12 +85,9 @@ export default defineBlueprint({
       slotId: 'signal-pills',
       displayName: 'Signal pills',
       why: 'The evidence, as phrases. On this template they are the only numbers on the page.',
-      section: {
-        backgroundColor: 'dark_forest',
-        paddingY: 'compact',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'StatBlock',
@@ -112,8 +101,9 @@ export default defineBlueprint({
       slotId: 'use-case-matrix',
       displayName: 'In-market use cases',
       why: 'The centre of the template: the account\'s need on top, what we would use underneath.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmUseCaseLaneElement',
@@ -130,8 +120,9 @@ export default defineBlueprint({
       slotId: 'why-now-thesis',
       displayName: 'Why now',
       why: 'The argument the page makes, in prose. The second shape the flat type had nowhere to put.',
-      section: { backgroundColor: 'light_green', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmThesisElement',
@@ -145,8 +136,9 @@ export default defineBlueprint({
       slotId: 'friction-points',
       displayName: 'Where it breaks',
       why: 'Early here, late on the takeout: without a comparison table this IS the argument.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         { contentType: 'AbmFrictionPointElement', flatKey: 'painPoints', cardinality: 'many', note: 'Title / Description, one node per point.' },
       ],
@@ -155,8 +147,9 @@ export default defineBlueprint({
       slotId: 'contact-close',
       displayName: 'Who to talk to',
       why: 'The ask. The only conversion point on the template — there is no sticky CTA here.',
-      section: { backgroundColor: 'dark_forest', paddingY: 'extra_loose', roundedCorners: 'top' },
-      column: { colSpan: 'full' },
+      section: CLOSE_CARD,
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmClosingCtaElement',
@@ -164,7 +157,7 @@ export default defineBlueprint({
           cardinality: 'one',
           note: 'ctaTitle -> Title, ctaDescription -> Description, ctaButtonText -> ButtonText, modalScheduleUrl -> ScheduleUrl.',
         },
-        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side. teamMembers[0].Email is also the mailto target.', row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' }, column: { colSpan: 'auto' } },
+        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side. teamMembers[0].Email is also the mailto target.', ...cards('cols_3', 'cols_2'), },
         {
           contentType: 'AbmStakeholderElement',
           flatKey: 'stakeholders',

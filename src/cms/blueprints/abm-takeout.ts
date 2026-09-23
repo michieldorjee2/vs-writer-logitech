@@ -13,12 +13,13 @@
  * SECTION RHYTHM. The bands alternate deliberately: a dark hero and pill strip open the page
  * as one unit (both `dark_forest`, square corners, so the seam is invisible), then light and
  * white bands alternate down the argument, and the page closes on dark again. The two
- * `backgroundTreatment` values are used exactly twice — `gradient_galaxy` on the hero and
- * `extrusion` on the ROI band, the two places the brand's own motion language earns its keep.
- * Everything else stays `plain`, which is optimizely.com's flat band.
+ * Layout settings come from ./internal/layouts (prod's vocabulary, modelled on optimizely.com's
+ * AI Marketing Certificate page). The zip-era `backgroundTreatment` setting is gone: no renderer
+ * ever read it, and prod has no such setting.
  */
 
 import { defineBlueprint } from './internal/compose'
+import { CHROME, CLOSE_CARD, COL_BODY, COL_FULL, COL_HERO, HERO_CARD, ROW_GRID, cards, sheet } from './internal/layouts'
 
 export default defineBlueprint({
   blueprintId: 'abm-takeout',
@@ -32,14 +33,9 @@ export default defineBlueprint({
       slotId: 'hero',
       displayName: 'Hero',
       why: 'Names the account and the argument. The one section no blueprint omits.',
-      section: {
-        containerWidth: 'full',
-        backgroundColor: 'dark_forest',
-        backgroundTreatment: 'gradient_galaxy',
-        paddingY: 'extra_loose',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: HERO_CARD,
+      row: ROW_GRID,
+      column: COL_HERO,
       // Render order (eyebrow above headline) and PRIMARY (still the headline — the write
       // Phase 3 mirrors onto this slot's binding) are separate now: see SlotFeed.primary.
       // This was one of the five slots where feeds[0]-as-both disagreed with itself.
@@ -70,13 +66,9 @@ export default defineBlueprint({
       slotId: 'signal-pills',
       displayName: 'Signal pills',
       why: 'The evidence the page was written from, as short phrases directly under the hero.',
-      section: {
-        backgroundColor: 'dark_forest',
-        paddingY: 'compact',
-        roundedCorners: 'none',
-        marginTop: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'StatBlock',
@@ -94,12 +86,8 @@ export default defineBlueprint({
           // "Mar 2027" overflowed its own ~180px column and forced the page 162px wider than
           // the viewport — a phone-width horizontal scrollbar, worse than the stacking bug
           // this slot exists to fix. techStack below is small tag text and stays 2-up.
-          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_4', gap: 'sm' },
-          // MEASURED: without this, each item's column still carries the slot's `colSpan:
-          // 'full'` base, and `col-span-full` spans every track of the row's own grid —
-          // stacking one per line regardless of `gridColumns` above. `auto` is what lets an
-          // item occupy exactly one of the row's cells.
-          column: { colSpan: 'auto' },
+          // Base (phone) is still 1-up — see above; 2-up on tablets, 4-up on desktop.
+          ...cards('cols_4', 'cols_2'),
         },
       ],
     },
@@ -107,8 +95,9 @@ export default defineBlueprint({
       slotId: 'account-intel',
       displayName: 'Account intelligence',
       why: 'What we found: the stack, the news, the people. Five element types, five columns, one row.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'StackedHeadingElement',
@@ -123,8 +112,7 @@ export default defineBlueprint({
           cardinality: 'many',
           note: 'Name / ColorTag',
           // A dense tag strip, same treatment as signal-pills.
-          row: { displayMode: 'grid', gridColumns: 'cols_2', gridColumnsMd: 'cols_4', gap: 'sm' },
-          column: { colSpan: 'auto' }, // see signal-pills' note: 'full' would span every track
+          ...cards('cols_4', 'cols_2'),
         },
         { contentType: 'AbmNewsItemElement', flatKey: 'newsItems', cardinality: 'many', note: 'Date / Headline / Url' },
         {
@@ -134,8 +122,7 @@ export default defineBlueprint({
           note: 'Initials / Name / Role / LinkedInUrl / AvatarColor, plus the Salesforce engagement fields (EngagementTier, EngagementNote, PersonSlug, CrmContactId).',
           // 3-up from md; full width on a phone, where a 3rd of the width is too narrow for
           // a name, a role and an engagement note.
-          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
-          column: { colSpan: 'auto' }, // see signal-pills' note: 'full' would span every track
+          ...cards('cols_3', 'cols_2'),
         },
       ],
     },
@@ -143,8 +130,9 @@ export default defineBlueprint({
       slotId: 'challenge-shot',
       displayName: 'The challenge',
       why: "A framed screenshot of the customer's own site, and what is wrong with it.",
-      section: { backgroundColor: 'light_gray', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmChallengeShotElement',
@@ -158,8 +146,9 @@ export default defineBlueprint({
       slotId: 'comparison-table',
       displayName: 'Comparison table',
       why: 'Only present when a competitor is confirmed. The whole point of the takeout shape.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       // Another of the five slots where the primary feed (the rows — the whole point of
       // this slot) does not render first; its heading does.
       feeds: [
@@ -180,8 +169,9 @@ export default defineBlueprint({
       slotId: 'proof-wall',
       displayName: 'Proof wall',
       why: 'The logo wall. Shown unconditionally today — it has no content gate of its own.',
-      section: { backgroundColor: 'light_gray', paddingY: 'default' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'ImageDisplayElement',
@@ -195,12 +185,9 @@ export default defineBlueprint({
       slotId: 'roi-projection',
       displayName: 'ROI projection',
       why: 'The number the page is arguing for, with its citations.',
-      section: {
-        backgroundColor: 'dark_forest',
-        backgroundTreatment: 'extrusion',
-        paddingY: 'loose',
-      },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       // Another of the five: the cards are primary, but the headline number renders above
       // them.
       feeds: [
@@ -219,8 +206,7 @@ export default defineBlueprint({
           primary: true,
           note: 'Metric / Unit / Label / CitationText',
           // 3-up from md; a citation needs the full width of a phone screen to stay legible.
-          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
-          column: { colSpan: 'auto' }, // see signal-pills' note: 'full' would span every track
+          ...cards('cols_3', 'cols_2'),
         },
       ],
     },
@@ -228,8 +214,9 @@ export default defineBlueprint({
       slotId: 'migration-timeline',
       displayName: 'Migration timeline',
       why: 'How the move happens. Answers the objection the comparison table creates.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('dark_forest'),
+      row: ROW_GRID,
+      column: COL_BODY,
       // Another of the five: the phases are primary, but the title renders above them.
       feeds: [
         { contentType: 'StackedHeadingElement', flatKey: 'migrationTitle', cardinality: 'one' },
@@ -249,8 +236,9 @@ export default defineBlueprint({
       slotId: 'analyst-proof',
       displayName: 'Analyst recognition',
       why: 'Third-party proof, which is the only kind that answers "says who?".',
-      section: { backgroundColor: 'light_teal', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       // Another of the five: the badge cards are primary, but the headline and quote render
       // above them.
       feeds: [
@@ -267,8 +255,7 @@ export default defineBlueprint({
           cardinality: 'many',
           primary: true,
           note: 'Badge / Source / Category / Url',
-          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
-          column: { colSpan: 'auto' },
+          ...cards('cols_3', 'cols_2'),
         },
         { contentType: 'ButtonBlock', flatKey: 'analystCTA', cardinality: 'one', note: 'analystCTA -> ButtonText, analystCTALink -> ButtonUrl' },
       ],
@@ -276,13 +263,14 @@ export default defineBlueprint({
     {
       slotId: 'customer-stories',
       displayName: 'Customer stories',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
+      section: sheet('neutral'),
       // TWO DIFFERENT feeds side by side, not one feed's own items — the one case that needs
       // `sharedRow`. No slot-level colSpan override: `colSpan: 'full'` on both columns would
       // make the second always wrap to its own line; `auto` (the column default) lets each
       // take one of the row's two grid cells instead.
       sharedRow: true,
-      row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_2', gap: 'lg' },
+      row: cards('cols_2', 'cols_1').row,
+      column: cards('cols_2', 'cols_1').column,
       feeds: [
         {
           contentType: 'CardCustomerQuoteBlock',
@@ -302,16 +290,16 @@ export default defineBlueprint({
       slotId: 'friction-points',
       displayName: 'Where it breaks',
       why: 'The gaps, in the account\'s own language. Late on a takeout page, early on a use-case page.',
-      section: { backgroundColor: 'light_gray', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmFrictionPointElement',
           flatKey: 'painPoints',
           cardinality: 'many',
           note: 'Title / Description, one node per point.',
-          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
-          column: { colSpan: 'auto' }, // see signal-pills' note: 'full' would span every track
+          ...cards('cols_3', 'cols_2'),
         },
       ],
     },
@@ -319,8 +307,9 @@ export default defineBlueprint({
       slotId: 'contact-close',
       displayName: 'Who to talk to',
       why: 'The ask, and the named humans on both sides of it.',
-      section: { backgroundColor: 'dark_forest', paddingY: 'extra_loose', roundedCorners: 'top' },
-      column: { colSpan: 'full' },
+      section: CLOSE_CARD,
+      row: ROW_GRID,
+      column: COL_BODY,
       // ctaTitle is both the first feed and the primary one — no disagreement to record here,
       // unlike its five siblings above. Only the two `many` feeds' relative order changes:
       // stakeholders (who to talk to) reads before teamMembers (who is asking).
@@ -336,23 +325,18 @@ export default defineBlueprint({
           flatKey: 'stakeholders',
           cardinality: 'many',
           note: 'The same people as account-intel, shown here as who to talk to. PersonSlug is what makes the card link to that person\'s own page.',
-          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
-          column: { colSpan: 'auto' }, // see signal-pills' note: 'full' would span every track
+          ...cards('cols_3', 'cols_2'),
         },
-        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side.', row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' }, column: { colSpan: 'auto' } },
+        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side.', ...cards('cols_3', 'cols_2'), },
       ],
     },
     {
       slotId: 'sticky-cta',
       displayName: 'Sticky CTA',
       why: 'Chrome, not content: it floats over the page rather than occupying a band.',
-      section: {
-        backgroundColor: 'transparent',
-        paddingY: 'none',
-        paddingX: 'none',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: CHROME,
+      row: ROW_GRID,
+      column: COL_FULL,
       feeds: [
         {
           contentType: 'AbmStickyCtaElement',

@@ -16,6 +16,7 @@
  */
 
 import { defineBlueprint } from './internal/compose'
+import { COL_BODY, COL_HERO, HERO_CARD, ROW_GRID, cards, sheet } from './internal/layouts'
 
 export default defineBlueprint({
   blueprintId: 'comparison',
@@ -29,14 +30,9 @@ export default defineBlueprint({
       slotId: 'hero',
       displayName: 'Hero',
       why: 'States the comparison. Shorter than the takeout hero — there is no account to introduce.',
-      section: {
-        containerWidth: 'full',
-        backgroundColor: 'dark_forest',
-        backgroundTreatment: 'gradient_galaxy',
-        paddingY: 'loose',
-        roundedCorners: 'none',
-      },
-      column: { colSpan: 'full' },
+      section: HERO_CARD,
+      row: ROW_GRID,
+      column: COL_HERO,
       feeds: [
         { contentType: 'StackedHeadingElement', flatKey: 'headline', cardinality: 'one', note: 'headline -> Text at HeadingLevel h1.' },
         { contentType: 'StackedHeadingElement', flatKey: 'eyebrow', cardinality: 'one' },
@@ -48,8 +44,9 @@ export default defineBlueprint({
       slotId: 'comparison-table',
       displayName: 'Comparison table',
       why: 'The page. Unlike the takeout, this blueprint is nothing without it.',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'AbmComparisonRowElement',
@@ -65,10 +62,11 @@ export default defineBlueprint({
       slotId: 'analyst-proof',
       displayName: 'Analyst recognition',
       why: 'On a category page this is the only third-party voice, so it sits directly under the table.',
-      section: { backgroundColor: 'light_teal', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
-        { contentType: 'AbmAnalystCardElement', flatKey: 'analystCards', cardinality: 'many', note: 'Badge / Source / Category / Url', row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' }, column: { colSpan: 'auto' } },
+        { contentType: 'AbmAnalystCardElement', flatKey: 'analystCards', cardinality: 'many', note: 'Badge / Source / Category / Url', ...cards('cols_3', 'cols_2'), },
         { contentType: 'BlockquoteBlock', flatKey: 'analystQuote', cardinality: 'one', note: 'analystSource -> the attribution.' },
         { contentType: 'StackedHeadingElement', flatKey: 'analystHeadline', cardinality: 'one' },
         { contentType: 'ButtonBlock', flatKey: 'analystCTA', cardinality: 'one', note: 'analystCTA -> ButtonText, analystCTALink -> ButtonUrl' },
@@ -77,8 +75,9 @@ export default defineBlueprint({
     {
       slotId: 'customer-stories',
       displayName: 'Customer stories',
-      section: { backgroundColor: 'white', paddingY: 'loose' },
-      column: { colSpan: 'full' },
+      section: sheet('white'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         { contentType: 'CardCustomerQuoteBlock', flatKey: 'testimonial1', cardinality: 'one', note: 'testimonial1JobTitle / testimonial1Company -> the attribution.' },
         { contentType: 'CardCustomerQuoteBlock', flatKey: 'testimonial2', cardinality: 'one', note: 'One node per quote, so a third quote is a node rather than four more properties.' },
@@ -88,13 +87,9 @@ export default defineBlueprint({
       slotId: 'offer-card',
       displayName: 'Offer card',
       why: 'The named next step. A section of its own here because it is the page\'s only conversion point.',
-      section: {
-        containerWidth: 'contained_bg',
-        backgroundColor: 'light_green',
-        paddingY: 'loose',
-        marginBottom: 'm_2xl',
-      },
-      column: { colSpan: 'full' },
+      section: sheet('neutral'),
+      row: ROW_GRID,
+      column: COL_BODY,
       feeds: [
         {
           contentType: 'CalloutBlock',

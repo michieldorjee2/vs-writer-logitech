@@ -11,8 +11,9 @@
  * if only one of them set `data-band` the served page would lose it. Both import this.
  */
 
-/** Section backgrounds that need light ink. Every other BlankSection background is light. */
-const DARK_BANDS = new Set(['dark_forest'])
+import { DARK_BACKGROUNDS as DARK_BANDS } from '../layout-prod'
+// prod's `darkSectionBackgroundColors`: dark_forest, dark_green, mid_dark_green, light_dark_green,
+// dark_pink, dark_blue.
 
 export function bandOf(settings: unknown): 'dark' | 'light' {
   const list = Array.isArray(settings) ? (settings as Array<{ key?: string; value?: string }>) : []
