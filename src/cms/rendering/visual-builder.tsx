@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils'
 import { draftClass } from '@/lib/utils/draft-helpers'
 import Component from './component-factory'
 import { withContentTypeDefaults, withNodeTypeDefaults } from './display-defaults'
+import { bandOf } from './band'
 
 export interface VisualBuilderExperienceProps {
   experience?: SafeVisualBuilderExperience | null
@@ -125,15 +126,6 @@ function Rows({ rows, locale, preview }: LevelProps & { rows?: RowNode[] }) {
       ))}
     </>
   )
-}
-
-/** Section backgrounds that need light ink. Every other BlankSection background is light. */
-const DARK_BANDS = new Set(['dark_forest'])
-
-function bandOf(settings: unknown): 'dark' | 'light' {
-  const list = Array.isArray(settings) ? (settings as Array<{ key?: string; value?: string }>) : []
-  const bg = list.find((s) => s?.key === 'backgroundColor')?.value
-  return bg && DARK_BANDS.has(bg) ? 'dark' : 'light'
 }
 
 function SectionNode({ node, locale, preview }: LevelProps & { node: VisualBuilderNode }) {

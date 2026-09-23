@@ -117,6 +117,7 @@ import SpacerBlock from '../src/cms/components/spacer-block';
 import StackedHeadingElement from '../src/cms/components/stacked-heading-element';
 import StatBlock from '../src/cms/components/stat-block';
 import TextContentElement from '../src/cms/components/text-content-element';
+import { bandOf } from '../src/cms/rendering/band';
 
 const SSR_ELEMENT_RENDERERS: Record<string, Renderer> = {
   AbmAnalystCardElement,
@@ -874,7 +875,8 @@ function VbSectionNode({ node, locale, preview }: VbLevelProps & { node: VisualB
   const hasRows = Boolean(node.rows?.length);
   return (
     <EditableBlock blockId={node.key} className="relative w-full" visualBuilderClass="vb:section">
-      <div className={draftClass(preview, 'vb:grid')}>
+      {/* data-band must match the client renderer's or hydration keeps the server's. See src/cms/rendering/band.ts. */}
+      <div className={draftClass(preview, 'vb:grid')} data-band={bandOf(withContentTypeDefaults(typeName, node.displaySettings))}>
         <BlankSection displaySettings={withContentTypeDefaults(typeName, node.displaySettings)} preview={preview}>
           {/* undefined, never [], for an empty section — BlankSection's own "no rows and no
               children" early return only fires when `children` is falsy. */}
