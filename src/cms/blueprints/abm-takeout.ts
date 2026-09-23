@@ -267,6 +267,8 @@ export default defineBlueprint({
           cardinality: 'many',
           primary: true,
           note: 'Badge / Source / Category / Url',
+          row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
+          column: { colSpan: 'auto' },
         },
         { contentType: 'ButtonBlock', flatKey: 'analystCTA', cardinality: 'one', note: 'analystCTA -> ButtonText, analystCTALink -> ButtonUrl' },
       ],
@@ -337,7 +339,7 @@ export default defineBlueprint({
           row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' },
           column: { colSpan: 'auto' }, // see signal-pills' note: 'full' would span every track
         },
-        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side.' },
+        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side.', row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' }, column: { colSpan: 'auto' } },
       ],
     },
     {

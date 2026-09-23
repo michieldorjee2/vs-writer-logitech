@@ -164,7 +164,7 @@ export default defineBlueprint({
           cardinality: 'one',
           note: 'ctaTitle -> Title, ctaDescription -> Description, ctaButtonText -> ButtonText, modalScheduleUrl -> ScheduleUrl.',
         },
-        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side. teamMembers[0].Email is also the mailto target.' },
+        { contentType: 'AbmTeamMemberElement', flatKey: 'teamMembers', cardinality: 'many', note: 'Initials / Name / Role / Email — our side. teamMembers[0].Email is also the mailto target.', row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' }, column: { colSpan: 'auto' } },
         {
           contentType: 'AbmStakeholderElement',
           flatKey: 'stakeholders',

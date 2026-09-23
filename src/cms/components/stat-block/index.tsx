@@ -384,7 +384,11 @@ export default function StatBlock({
   const invert = invertExtrusion === 'true'
 
   return (
-    <div className="flex flex-col items-start rounded-3xl bg-(--color-neutral-2) p-8">
+    // `overflow-x-clip` + `min-w-0`: the extrusion layers are absolutely positioned and travel
+    // up to 30px right of the glyph box. In a 4-up grid a wide value ("Mar 2027") pushed them
+    // past the viewport — measured +11px at 360/768 and +17px at 1024. Clip at the card edge,
+    // which is the card's own rounded boundary, without creating a scroll container.
+    <div className="flex min-w-0 flex-col items-start overflow-x-clip rounded-3xl bg-(--color-neutral-2) p-8">
       <StackedValue
         text={StatValue}
         animationMode={mode}

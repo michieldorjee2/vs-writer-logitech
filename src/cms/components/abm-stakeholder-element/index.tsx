@@ -151,6 +151,27 @@ function avatarBackground(raw?: string): string | undefined {
   return SAFE_CSS_COLOR.test(value) ? value : undefined
 }
 
+/**
+ * Avatars whose own colour is dark need LIGHT initials. The fallback used to hard-code Dark
+ * Fir initials for every authored colour, which put #08251A on a #0D3A29 midfir disc —
+ * measured at 1.28:1, a blank circle. Tokens are classified by name; a hex by luminance.
+ */
+const DARK_AVATAR_TOKENS = new Set(['midfir', 'darkfir'])
+
+function avatarNeedsLightInk(raw?: string): boolean {
+  const value = raw?.trim().toLowerCase()
+  if (!value) return false
+  if (DARK_AVATAR_TOKENS.has(value)) return true
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(value)?.[1]
+  if (!hex) return false
+  const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex
+  const lin = (i: number) => {
+    const c = parseInt(full.slice(i, i + 2), 16) / 255
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4) < 0.18
+}
+
 /** Upstream `card-author-card.tsx`, verbatim. */
 function getInitials(name: string): string {
   return name
@@ -251,7 +272,9 @@ export default function AbmStakeholderElement({
           className={cn(
             'font-headline text-body-xs leading-none font-(--font-weight-headline-extrabold)',
             avatarBg
-              ? 'bg-transparent text-(--color-secondary-darkfir)'
+              ? avatarNeedsLightInk(AvatarColor)
+                ? 'bg-transparent text-(--color-primary-1)'
+                : 'bg-transparent text-(--color-secondary-darkfir)'
               : isLight
                 ? 'bg-(--color-tertiary-4) text-(--color-tertiary-midfir)'
                 : 'bg-(--color-secondary-darkfir) text-(--color-tertiary-4)'

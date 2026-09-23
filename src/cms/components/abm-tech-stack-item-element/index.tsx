@@ -62,9 +62,9 @@ const tagVariants = cva(
   {
     variants: {
       tagStyle: {
-        outline: 'border border-(--tag-accent) text-(--tag-accent)',
+        outline: 'border border-(--tag-accent) text-(--tag-text)',
         solid: 'border border-(--tag-accent) bg-(--tag-accent) text-(--tag-ink)',
-        subtle: 'border border-transparent bg-(--tag-surface) text-(--tag-accent)',
+        subtle: 'border border-transparent bg-(--tag-surface) text-(--tag-text)',
       } satisfies Record<TagStyle, string>,
       textCase: {
         uppercase: 'uppercase',
@@ -183,6 +183,9 @@ export default function AbmTechStackItemElement({ Name, ColorTag, displaySetting
       ? 'var(--color-secondary-darkfir)'
       : 'var(--color-primary-1)',
     '--tag-surface': `color-mix(in srgb, ${accent.color} 14%, transparent)`,
+    // A light accent (lime, aqua) cannot be the TEXT colour on a light surface — measured at
+    // 1.23:1 and 1.57:1 on white. It stays the border/surface; the label drops to Dark Fir ink.
+    '--tag-text': accent.light ? 'var(--color-secondary-darkfir)' : accent.color,
   } as CSSProperties
 
   return (

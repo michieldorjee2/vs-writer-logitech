@@ -68,7 +68,7 @@ export default defineBlueprint({
       section: { backgroundColor: 'light_teal', paddingY: 'loose' },
       column: { colSpan: 'full' },
       feeds: [
-        { contentType: 'AbmAnalystCardElement', flatKey: 'analystCards', cardinality: 'many', note: 'Badge / Source / Category / Url' },
+        { contentType: 'AbmAnalystCardElement', flatKey: 'analystCards', cardinality: 'many', note: 'Badge / Source / Category / Url', row: { displayMode: 'grid', gridColumns: 'cols_1', gridColumnsMd: 'cols_3', gap: 'md' }, column: { colSpan: 'auto' } },
         { contentType: 'BlockquoteBlock', flatKey: 'analystQuote', cardinality: 'one', note: 'analystSource -> the attribution.' },
         { contentType: 'StackedHeadingElement', flatKey: 'analystHeadline', cardinality: 'one' },
         { contentType: 'ButtonBlock', flatKey: 'analystCTA', cardinality: 'one', note: 'analystCTA -> ButtonText, analystCTALink -> ButtonUrl' },

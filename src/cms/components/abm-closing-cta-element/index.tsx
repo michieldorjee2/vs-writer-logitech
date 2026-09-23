@@ -64,9 +64,12 @@ const strokeBorderColors: Record<string, { color?: string; video?: boolean }> = 
  * supporting line the quieter one.
  */
 const scheme = {
+  // `dark` is dark INK, for a light surface. On a dark band it must flip to the neutral ink
+  // or it paints the band's own colour — measured at 1.00:1 (title) and 1.28:1 (body).
+  // `data-band` is set per section by src/cms/rendering/visual-builder.tsx.
   dark: {
-    title: 'text-(--color-secondary-darkfir)',
-    body: 'text-(--color-tertiary-midfir)',
+    title: 'text-(--color-secondary-darkfir) [[data-band=dark]_&]:text-(--color-primary-1)',
+    body: 'text-(--color-tertiary-midfir) [[data-band=dark]_&]:text-(--color-tertiary-2)',
   },
   neutral: {
     title: 'text-(--color-primary-1)',

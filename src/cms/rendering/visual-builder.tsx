@@ -127,11 +127,21 @@ function Rows({ rows, locale, preview }: LevelProps & { rows?: RowNode[] }) {
   )
 }
 
+/** Section backgrounds that need light ink. Every other BlankSection background is light. */
+const DARK_BANDS = new Set(['dark_forest'])
+
+function bandOf(settings: unknown): 'dark' | 'light' {
+  const list = Array.isArray(settings) ? (settings as Array<{ key?: string; value?: string }>) : []
+  const bg = list.find((s) => s?.key === 'backgroundColor')?.value
+  return bg && DARK_BANDS.has(bg) ? 'dark' : 'light'
+}
+
 function SectionNode({ node, locale, preview }: LevelProps & { node: VisualBuilderNode }) {
   const typeName = node.section?.__typename
   if (!typeName) return null
 
   const hasRows = Boolean(node.rows?.length)
+  const sectionSettings = withContentTypeDefaults(typeName, node.displaySettings)
 
   return (
     <EditableBlock
@@ -139,12 +149,17 @@ function SectionNode({ node, locale, preview }: LevelProps & { node: VisualBuild
       className="relative w-full"
       visualBuilderClass="vb:section"
     >
-      <div className={draftClass(preview, 'vb:grid')}>
+      {/* `data-band` tells every element inside whether it sits on a dark or a light band.
+          Elements render independently and cannot see their section, and BlankSection only
+          sets a foreground for `dark_forest` — so without this an element built for a light
+          card paints dark ink on the dark band (measured at 1.00:1 on the closing CTA).
+          Elements adapt with a `[[data-band=dark]_&]:` variant instead of guessing. */}
+      <div className={draftClass(preview, 'vb:grid')} data-band={bandOf(sectionSettings)}>
         <Component
           typeName={typeName}
           props={{
             ...node.section,
-            displaySettings: withContentTypeDefaults(typeName, node.displaySettings),
+            displaySettings: sectionSettings,
             locale,
             preview,
             // See the header: children, never `rows`. An empty section passes undefined so
