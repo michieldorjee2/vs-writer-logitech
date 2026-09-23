@@ -461,6 +461,334 @@ export default [
           },
         ],
       },
+      {
+        key: 'displayMode',
+        displayName: 'Display Mode',
+        description: 'Layout mode for this column\'s own children',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'flex',
+            displayName: 'Flex',
+          },
+          {
+            value: 'grid',
+            displayName: 'Grid',
+          },
+        ],
+        defaultValue: 'flex',
+      },
+      {
+        key: 'gridColumns',
+        displayName: 'Grid Columns',
+        description: 'Number of columns in this column\'s own grid (base/sm breakpoint), when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'cols_1',
+      },
+      {
+        key: 'gridColumnsMd',
+        displayName: 'Grid Columns (md)',
+        description: 'Number of columns at md breakpoint and above, when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'inherit',
+            displayName: 'Inherit from base',
+          },
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'gridColumnsLg',
+        displayName: 'Grid Columns (lg)',
+        description: 'Number of columns at lg breakpoint and above, when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'inherit',
+            displayName: 'Inherit from md',
+          },
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'gridColumnsXl',
+        displayName: 'Grid Columns (xl)',
+        description: 'Number of columns at xl breakpoint and above, when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'inherit',
+            displayName: 'Inherit from lg',
+          },
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'gap',
+        displayName: 'Gap',
+        description: 'Spacing between this column\'s own child items',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'none',
+            displayName: 'None (0)',
+          },
+          {
+            value: 'xs',
+            displayName: 'Extra Small (0.5rem)',
+          },
+          {
+            value: 'sm',
+            displayName: 'Small (1rem)',
+          },
+          {
+            value: 'md',
+            displayName: 'Medium (1.5rem)',
+          },
+          {
+            value: 'lg',
+            displayName: 'Large (2rem)',
+          },
+          {
+            value: 'xl',
+            displayName: 'Extra Large (3rem)',
+          },
+        ],
+        defaultValue: 'none',
+      },
     ],
   },
 ] as const

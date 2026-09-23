@@ -21,11 +21,44 @@
  * reference held elsewhere. The `slotId` is the stable half of that derivation, which is why
  * it is recorded alongside the blueprint rather than inside it.
  *
- * ONE ROW, ONE COLUMN PER SECTION. Every slot is `section > row > column`, and the column
- * holds N element nodes. The row's grid vocabulary (`gridColumns`, `gap`, the per-breakpoint
- * counts) only becomes load-bearing once a slot grows a second column, so a blueprint leaves
- * it at its defaults and lets the slot's renderer arrange its own items. Arranging five stat
- * pills is a property of the pill row, not of the page grid.
+ * ONE ROW PER FEED, ONE COLUMN PER ITEM. Every feed in `SlotSpec.feeds` gets its OWN row
+ * (`section > row* > column*`), and that row holds one column per item the feed supplies —
+ * one column for a `one` feed, N for a `many` feed with N items. This is a correction, not the
+ * original shape, and it went through TWO wrong shapes before this one:
+ *
+ *   1. Phase 1 gave every slot exactly one column holding every feed's elements flattened
+ *      together, so a `many` feed's items could not be arranged without also rearranging the
+ *      slot's headings and text — they were the same node.
+ *   2. The first fix tried was one column PER FEED, with the arranging vocabulary
+ *      (`displayMode` / `gridColumns` / `gap`, copied from `RowDisplayTemplate`) added to
+ *      `ColumnDisplayTemplate` and patched into the vendored Column component. That renders
+ *      correctly — but it does not survive the CMS: `POST`ing a composition with an unknown
+ *      key in a `column` node's `displaySettings.settings` is accepted with a 200 and the
+ *      unknown key is silently dropped on read-back, MEASURED against the live Showcase CMS
+ *      (every one of six new column settings, on eight different column nodes, came back
+ *      missing; the column's own pre-existing `colSpan` survived every time). The CMS's
+ *      `column` node type only recognises the nine grid-CELL settings it shipped with
+ *      (`colSpan` and friends); `row` nodes are not limited the same way, because
+ *      `RowDisplayTemplate`'s grid-CONTAINER vocabulary already existed upstream and the CMS
+ *      already honours it.
+ *
+ * So the arranging setting has to live on a ROW, never a column, and a `many` feed that wants
+ * to arrange several items needs a row of its own to put that setting on — hence one row per
+ * feed. A feed with nothing to arrange (a `one` feed, or a `many` feed left at Row's default
+ * `gridColumns: cols_1`) still gets its own row; it is simply a row with one column, which is
+ * indistinguishable from the old shape. The Column patch (`ColumnDisplayTemplate` gaining the
+ * same six settings, and the vendored component honouring them) is left in place rather than
+ * reverted: it is correct, forward-compatible code that would take effect the day the CMS's
+ * built-in column vocabulary is ever extended, and `SlotFeed.column` / `SlotSpec.column` still
+ * exist for the settings a column DOES keep working (`colSpan` and its siblings) — but neither
+ * this file nor any blueprint uses the six new ones to solve the layout problem; `SlotFeed.row`
+ * does.
+ *
+ * `SlotSpec.sharedRow` is the one case that inverts this: two or more DIFFERENT feeds sitting
+ * side by side (`customer-stories`'s two testimonials) need to share ONE row so that row's
+ * `gridColumns` can seat them as its columns — the opposite arrangement from a single feed
+ * arranging its own many items. It is `false` (each feed gets its own row) unless a slot opts
+ * in.
  *
  * DISPLAY SETTINGS ARE DEVIATIONS ONLY. The CMS stores no defaults, so defaults are applied
  * client-side at compose time from the repo's own display templates (`extractDefaults`).
@@ -94,14 +127,16 @@ export const SECTION_CONTENT_TYPE = 'BlankSection'
 export type Cardinality = 'one' | 'many'
 
 /**
- * One element type in a slot's column, and the legacy flat key that feeds it.
+ * One element type in a slot, and the legacy flat key that feeds it. Each feed gets its own
+ * ROW (see `sectionNodeFor`), so a feed is also the unit that knows its own cardinality and
+ * therefore its own layout.
  *
  * A slot usually has several: `account-intel` holds a heading, then the tech stack, then the
- * news items, then the stakeholders — four element types from four flat keys, in one column.
- * Collapsing that to a single binding would force Phase 3 to guess.
+ * news items, then the stakeholders — four element types from four flat keys, four rows in
+ * one section. Collapsing that to a single binding would force Phase 3 to guess.
  */
 export interface SlotFeed {
-  /** The element content type written into the column. */
+  /** The element content type written into this feed's column(s). */
   contentType: string
   /**
    * The property on the legacy flat page type that supplies it — `painPoints`,
@@ -112,6 +147,32 @@ export interface SlotFeed {
   cardinality: Cardinality
   /** Field-level mapping, or anything a reader would otherwise have to infer. */
   note?: string
+  /**
+   * Marks this feed as the slot's PRIMARY binding — the one mirrored onto `SlotBinding`'s
+   * top-level `contentType` / `flatKey` / `cardinality`. Render order is simply this feed's
+   * position in `SlotSpec.feeds`; the two used to be conflated (`feeds[0]` read as both "renders
+   * first" and "is primary"), which is wrong wherever a heading's own copy says it renders
+   * ABOVE the thing that is nonetheless the slot's primary write — the hero's eyebrow is the
+   * documented case. At most one feed per slot may set this; omitted, the first feed is
+   * primary, which is the old behaviour and keeps every already-correct slot unchanged.
+   */
+  primary?: boolean
+  /**
+   * Deviations from `RowDisplayTemplate`'s defaults for the row THIS FEED OWNS (merged on top
+   * of the slot's own `row` — this wins on a shared key; ignored when the slot sets
+   * `sharedRow`, where `SlotSpec.row` is what matters instead). This is where a `many` feed
+   * arranges its own items — `displayMode: 'grid'` plus `gridColumns` / `gridColumnsMd` /
+   * `gridColumnsLg` / `gridColumnsXl` / `gap` turns its per-item columns into an N-up strip or
+   * grid. It has to be the ROW, not the column each item sits in: see this file's header for
+   * the measured reason a column-level equivalent does not survive the CMS.
+   */
+  row?: Record<string, string>
+  /**
+   * Deviations from `ColumnDisplayTemplate`'s defaults for each of this feed's own item
+   * column(s) — merged on top of the slot's own `column`. Only the settings a `column` node
+   * actually keeps (`colSpan` and its siblings) take effect; see this file's header.
+   */
+  column?: Record<string, string>
 }
 
 /** What a blueprint file declares per section. */
@@ -123,11 +184,33 @@ export interface SlotSpec {
   why?: string
   /** Deviations from `BlankSectionDisplayTemplate`'s defaults. */
   section?: Record<string, string>
-  /** Deviations from `RowDisplayTemplate`'s defaults. */
+  /**
+   * Deviations from `RowDisplayTemplate`'s defaults. Normally this is the BASE merged under
+   * every feed's own row (a feed's own `row` wins on a shared key) — usually left unset, since
+   * a feed's own row already defaults to a one-column grid (one item per line). When
+   * `sharedRow` is true, this is instead the settings of the ONE row every feed shares — e.g.
+   * `customer-stories` sets `gridColumns` here to seat its two testimonial columns side by
+   * side.
+   */
   row?: Record<string, string>
-  /** Deviations from `ColumnDisplayTemplate`'s defaults. */
+  /**
+   * Deviations from `ColumnDisplayTemplate`'s defaults, applied as the BASE for every column
+   * this slot builds (a feed's own `column` merges on top and wins).
+   */
   column?: Record<string, string>
-  /** In render order. The first is the slot's primary feed. */
+  /**
+   * True seats every feed's column in ONE shared row, side by side, instead of giving each
+   * feed its own row — the arrangement two or more DIFFERENT feeds need to sit next to each
+   * other (`customer-stories`'s two testimonials). False (the default) gives every feed its
+   * own row, which is what a `many` feed needs to arrange its own items without dragging its
+   * sibling feeds into the same grid.
+   */
+  sharedRow?: boolean
+  /**
+   * In render order — render order and "is the primary binding" are separate questions now
+   * (see `SlotFeed.primary`), so a slot is free to declare its heading feed before its primary
+   * list without lying about which one is primary.
+   */
   feeds: SlotFeed[]
 }
 
@@ -140,11 +223,13 @@ export interface SlotBinding extends SlotFeed {
   blueprintId: string
   slotId: SlotId
   displayName: string
+  /** Mirrors `SlotSpec.sharedRow` — Phase 3 and `create-sample-page.mjs` both read it off the binding rather than re-deriving it from the composition shape. */
+  sharedRow?: boolean
   /** Every element content type this column accepts, in render order, de-duplicated. */
   accepts: string[]
   /** Every flat key that feeds this slot, in render order, de-duplicated. */
   flatKeys: string[]
-  /** All feeds, including the primary one at index 0. */
+  /** All feeds, in render order. The primary one is whichever sets `primary: true` (or, absent that, the first). */
   feeds: SlotFeed[]
   why?: string
 }
@@ -275,17 +360,53 @@ function withSettings(
   return node
 }
 
+/** A column skeleton: `spec.column` as the base, `feed.column` merged on top and winning. */
+function columnFor(spec: SlotSpec, feed: SlotFeed): CompositionNode {
+  return withSettings(
+    { nodeType: 'column' },
+    COLUMN_TEMPLATE.key,
+    { ...(spec.column ?? {}), ...(feed.column ?? {}) }
+  )
+}
+
 /**
- * `section > row > column`, with no node ids and no empty `nodes` arrays.
+ * `section > row* > column` — one row per feed (`spec.feeds` order), each holding ONE column
+ * skeleton. `create-sample-page.mjs` clones that one column once per item at instantiation
+ * time (a `many` feed's N items become N columns of its own row), which is also why the
+ * skeleton never has more than one column here: the item count isn't known until then. A
+ * feed's own `row` overrides merge on top of the slot's `row` (the feed wins on a shared key),
+ * so a `many` feed's `gridColumns` only ever affects its own row, never its neighbours'.
+ */
+function ownRowFor(spec: SlotSpec, feed: SlotFeed): CompositionNode {
+  const row = withSettings(
+    { nodeType: 'row' },
+    ROW_TEMPLATE.key,
+    { ...(spec.row ?? {}), ...(feed.row ?? {}) }
+  )
+  row.nodes = [columnFor(spec, feed)]
+  return row
+}
+
+/**
+ * `section > row > column*` — every feed sharing the slot's one row, one column each, side by
+ * side once that row's `gridColumns` says so. Only for `spec.sharedRow` slots.
+ */
+function sharedRowFor(spec: SlotSpec): CompositionNode {
+  const row = withSettings({ nodeType: 'row' }, ROW_TEMPLATE.key, spec.row)
+  row.nodes = spec.feeds.map((feed) => columnFor(spec, feed))
+  return row
+}
+
+/**
+ * `section > (sharedRowFor | one ownRowFor per feed)`, with no node ids and no empty `nodes`
+ * arrays.
  *
  * Each node names its own display template — the section's comes from
- * `blank-section-display.ts`, the row's and column's from `layout/`, so the three keys are
+ * `blank-section-display.ts`, the rows' and columns' from `layout/`, so the three keys are
  * read off the same modules `validateOverrides` checks against and cannot drift from them.
  */
 function sectionNodeFor(spec: SlotSpec): CompositionNode {
-  const column = withSettings({ nodeType: 'column' }, COLUMN_TEMPLATE.key, spec.column)
-  const row = withSettings({ nodeType: 'row' }, ROW_TEMPLATE.key, spec.row)
-  row.nodes = [column]
+  const rows = spec.sharedRow ? [sharedRowFor(spec)] : spec.feeds.map((feed) => ownRowFor(spec, feed))
 
   const section: CompositionNode = {
     nodeType: 'section',
@@ -294,7 +415,7 @@ function sectionNodeFor(spec: SlotSpec): CompositionNode {
     component: { contentType: SECTION_CONTENT_TYPE, properties: {} },
   }
   withSettings(section, BLANK_SECTION_TEMPLATE.key, spec.section)
-  section.nodes = [row]
+  section.nodes = rows
   return section
 }
 
@@ -355,8 +476,20 @@ export function defineBlueprint(input: BlueprintInput): LimitlessBlueprint {
     validateOverrides(BLANK_SECTION_TEMPLATE, spec.section, `${where} section`)
     validateOverrides(ROW_TEMPLATE, spec.row, `${where} row`)
     validateOverrides(COLUMN_TEMPLATE, spec.column, `${where} column`)
+    for (const feed of spec.feeds) {
+      validateOverrides(ROW_TEMPLATE, feed.row, `${where} ${feed.flatKey} row`)
+      validateOverrides(COLUMN_TEMPLATE, feed.column, `${where} ${feed.flatKey} column`)
+    }
 
-    const primary = spec.feeds[0]
+    const primaryCandidates = spec.feeds.filter((feed) => feed.primary)
+    if (primaryCandidates.length > 1) {
+      throw new Error(
+        `${where}: ${primaryCandidates.length} feeds set 'primary: true' ` +
+          `(${primaryCandidates.map((feed) => feed.flatKey).join(', ')}). A slot mirrors ` +
+          `exactly one feed onto its binding, so at most one may claim it.`
+      )
+    }
+    const primary = primaryCandidates[0] ?? spec.feeds[0]
     const binding: SlotBinding = {
       blueprintId,
       slotId: spec.slotId,
@@ -368,6 +501,7 @@ export function defineBlueprint(input: BlueprintInput): LimitlessBlueprint {
       flatKeys: unique(spec.feeds.map((feed) => feed.flatKey)),
       feeds: spec.feeds.map((feed) => ({ ...feed })),
     }
+    if (spec.sharedRow !== undefined) binding.sharedRow = spec.sharedRow
     if (primary.note !== undefined) binding.note = primary.note
     if (spec.why !== undefined) binding.why = spec.why
     slots.push(binding)

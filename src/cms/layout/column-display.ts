@@ -1,10 +1,11 @@
 /**
  * Display template for a Visual Builder `column` node.
  *
- * Copied verbatim from optimizely.com's `components/layout/column/display-settings.ts` — all
- * nine settings, unchanged: span and start/end grid lines on both axes, per-column self
- * alignment, and visual order. Together with `row-display.ts` this is the whole grid model
- * the corporate site uses, which is why a column authored here behaves the same way there.
+ * The first nine settings are copied verbatim from optimizely.com's
+ * `components/layout/column/display-settings.ts` — unchanged: span and start/end grid lines
+ * on both axes, per-column self alignment, and visual order. Together with `row-display.ts`
+ * this is the whole grid model the corporate site uses, which is why a column authored here
+ * behaves the same way there.
  *
  * Keyed on `nodeType: 'column'`. A column carries no component — only `displaySettings` and
  * `nodes` — and an empty one round-trips from the API as `{"nodeType": "column"}` with no
@@ -13,6 +14,22 @@
  * Only `colSpan` carries a `defaultValue` upstream; the other eight lead with `auto` or
  * `none`, which `extractDefaults()` picks up as the default by taking the first option. That
  * matches upstream exactly — do not add defaults it does not have.
+ *
+ * SIX SETTINGS ADDED, NOT UPSTREAM'S: `displayMode` / `gridColumns` / `gridColumnsMd` /
+ * `gridColumnsLg` / `gridColumnsXl` / `gap` — the many-cardinality layout fix. A column can
+ * hold several sibling item nodes (one `many` feed's worth), and upstream gives it no way to
+ * arrange them; it is always `flex flex-col`. Rather than invent a column-only vocabulary,
+ * these six are `RowDisplayTemplate`'s own grid settings (`row-display.ts`, same keys, same
+ * option values), copied onto Column so an editor sees identical choices regardless of which
+ * node they are on. Column's own defaults differ from Row's on purpose — `displayMode: 'flex'`
+ * and `gap: 'none'` reproduce the exact old always-flex-col, no-gap behaviour for every column
+ * that does not opt in, so this is additive, never a change to an unconfigured column. This
+ * mirrors the same six settings added to the VENDORED
+ * `src/vendor/opticom/components/layout/column/display-settings.ts` — see that file and
+ * `src/vendor/opticom/UPSTREAM.md` for the patch record. The two must stay in sync: this is
+ * the copy `src/cms/blueprints/internal/compose.ts` validates blueprint `column` overrides
+ * against, so a setting missing here throws at blueprint-import time even though the renderer
+ * itself would have honoured it.
  *
  * NOTE ON DISCOVERY: `registry.ts` does not glob `layout/`, so `apply.ts` will not push this
  * template until it does.
@@ -476,6 +493,334 @@ const displayTemplates: RepoDisplayTemplate[] = [
             displayName: '12',
           },
         ],
+      },
+      {
+        key: 'displayMode',
+        displayName: 'Display Mode',
+        description: 'Layout mode for this column\'s own children',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'flex',
+            displayName: 'Flex',
+          },
+          {
+            value: 'grid',
+            displayName: 'Grid',
+          },
+        ],
+        defaultValue: 'flex',
+      },
+      {
+        key: 'gridColumns',
+        displayName: 'Grid Columns',
+        description: 'Number of columns in this column\'s own grid (base/sm breakpoint), when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'cols_1',
+      },
+      {
+        key: 'gridColumnsMd',
+        displayName: 'Grid Columns (md)',
+        description: 'Number of columns at md breakpoint and above, when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'inherit',
+            displayName: 'Inherit from base',
+          },
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'gridColumnsLg',
+        displayName: 'Grid Columns (lg)',
+        description: 'Number of columns at lg breakpoint and above, when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'inherit',
+            displayName: 'Inherit from md',
+          },
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'gridColumnsXl',
+        displayName: 'Grid Columns (xl)',
+        description: 'Number of columns at xl breakpoint and above, when Display Mode is Grid',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'inherit',
+            displayName: 'Inherit from lg',
+          },
+          {
+            value: 'auto',
+            displayName: 'Auto',
+          },
+          {
+            value: 'none',
+            displayName: 'None',
+          },
+          {
+            value: 'cols_1',
+            displayName: '1 Column',
+          },
+          {
+            value: 'cols_2',
+            displayName: '2 Columns',
+          },
+          {
+            value: 'cols_3',
+            displayName: '3 Columns',
+          },
+          {
+            value: 'cols_4',
+            displayName: '4 Columns',
+          },
+          {
+            value: 'cols_5',
+            displayName: '5 Columns',
+          },
+          {
+            value: 'cols_6',
+            displayName: '6 Columns',
+          },
+          {
+            value: 'cols_7',
+            displayName: '7 Columns',
+          },
+          {
+            value: 'cols_8',
+            displayName: '8 Columns',
+          },
+          {
+            value: 'cols_9',
+            displayName: '9 Columns',
+          },
+          {
+            value: 'cols_10',
+            displayName: '10 Columns',
+          },
+          {
+            value: 'cols_11',
+            displayName: '11 Columns',
+          },
+          {
+            value: 'cols_12',
+            displayName: '12 Columns',
+          },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'gap',
+        displayName: 'Gap',
+        description: 'Spacing between this column\'s own child items',
+        type: 'select',
+        required: false,
+        options: [
+          {
+            value: 'none',
+            displayName: 'None (0)',
+          },
+          {
+            value: 'xs',
+            displayName: 'Extra Small (0.5rem)',
+          },
+          {
+            value: 'sm',
+            displayName: 'Small (1rem)',
+          },
+          {
+            value: 'md',
+            displayName: 'Medium (1.5rem)',
+          },
+          {
+            value: 'lg',
+            displayName: 'Large (2rem)',
+          },
+          {
+            value: 'xl',
+            displayName: 'Extra Large (3rem)',
+          },
+        ],
+        defaultValue: 'none',
       },
     ],
   },

@@ -68,7 +68,28 @@ const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 const NODE_ID_NAMESPACE = '6f1d4f2e-9c3a-4b57-8a21-0d5e7c9b4f80';
 /** Each feed owns a band of 1000 indices, so pruning one feed cannot renumber another. */
 const FEED_INDEX_STRIDE = 1000;
-const STRUCTURAL_INDEX = { section: -1, row: -2, column: -3 };
+/**
+ * `compose.ts`'s `sectionNodeFor` gives every feed its own row (one column per item in it),
+ * except a `sharedRow` slot's one shared row (one column per feed). Three structural bands,
+ * none overlapping each other or the non-negative element-id band
+ * (`feedIndex * FEED_INDEX_STRIDE + itemIndex`):
+ *
+ *   section         -1                              (always exactly one)
+ *   own row          -1000 - feedIndex               (one per feed, `sharedRow` slots have none)
+ *   shared row       -2                               (`sharedRow` slots only, always exactly one)
+ *   column           -3000 - feedIndex*STRIDE - itemIndex   (one per item; a `sharedRow` slot's
+ *                                                      one column per feed is itemIndex 0)
+ *
+ * Stable per feed/item index regardless of which OTHER feeds or items get pruned that run,
+ * which is what keeps an id constant across re-runs.
+ */
+const STRUCTURAL_INDEX = { section: -1, sharedRow: -2 };
+function ownRowStructuralIndex(feedIndex) {
+  return -1000 - feedIndex;
+}
+function columnStructuralIndex(feedIndex, itemIndex = 0) {
+  return -3000 - feedIndex * FEED_INDEX_STRIDE - itemIndex;
+}
 
 /**
  * Two images this page does not own.
@@ -445,31 +466,15 @@ function pageProperties() {
 }
 
 /**
- * Where a slot's feed order and its PAGE order disagree, the page order wins — and it is
- * written down here rather than inferred.
- *
- * `compose.ts` documents `feeds` as "in render order", but `feeds[0]` is also the slot's
- * PRIMARY feed, the one whose `contentType` and `flatKey` are mirrored onto the binding. In
- * five slots those two jobs pull in opposite directions: the hero's primary feed is the
- * headline, while its own note says the eyebrow is "the kicker ABOVE the headline", and the
- * comparison, ROI, migration and analyst bands all lead with their list and carry their
- * heading second. Placing nodes in feed order there prints every heading underneath the thing
- * it introduces.
- *
- * Node ids are NOT affected: an id is keyed on the feed's index in the blueprint and the
- * item's index in its list, never on where the node lands in the column. So this changes what
- * a reader sees and nothing a re-run depends on. The right long-term fix is a `renderOrder`
- * on the slot spec; that is a blueprint change and belongs to whoever owns those files.
+ * Feed order and render order used to be two different questions asked of one field
+ * (`feeds[0]`, which was both "renders first" and "is the slot's primary binding"), and a
+ * hardcoded `PAGE_ORDER` table lived here to paper over the five slots where they disagreed —
+ * the hero's primary feed is the headline, but its own note says the eyebrow is "the kicker
+ * ABOVE the headline". `compose.ts`'s `SlotSpec.feeds` is now authored in true render order
+ * (see its `SlotFeed.primary`), so `binding.feeds` already IS page order and no reordering
+ * happens here any more. This script only groups each feed's items into that feed's own
+ * column, in the order the blueprint declares.
  */
-const PAGE_ORDER = {
-  hero: ['eyebrow', 'headline', 'subheadline', 'cta'],
-  'account-intel': ['intelEyebrow', 'intelHeadline', 'techStack', 'newsItems', 'stakeholders'],
-  'comparison-table': ['comparisonHeadline', 'comparisonDescription', 'comparisonTableRows'],
-  'roi-projection': ['roiTitle', 'roiDescription', 'roiProjectionValue', 'roiCards'],
-  'migration-timeline': ['migrationTitle', 'migrationDescription', 'timelinePhases'],
-  'analyst-proof': ['analystHeadline', 'analystQuote', 'analystCards', 'analystCTA'],
-  'contact-close': ['ctaTitle', 'stakeholders', 'teamMembers'],
-};
 
 // ---------------------------------------------------------------------------
 // Deterministic node ids
@@ -522,13 +527,37 @@ function itemsFor(flatKey) {
 }
 
 /**
- * The blueprint's skeleton plus this page's copy: `section > row > column > N elements`.
+ * One item -> one `component` node, wrapped in its own column (`compose.ts`'s
+ * `sectionNodeFor` clones one column skeleton per feed; this clones it again per item, since
+ * the item count is exactly what the skeleton cannot know).
+ */
+function itemColumn(columnSkeleton, pageKey, slotId, feedIndex, itemIndex, feed, properties) {
+  const column = structuredClone(columnSkeleton);
+  column.id = nodeId(pageKey, slotId, columnStructuralIndex(feedIndex, itemIndex));
+  column.nodes = [
+    {
+      nodeType: 'component',
+      id: elementNodeId(pageKey, slotId, feedIndex, itemIndex),
+      // FLAT properties. Wrapping a scalar as {value: …} is a 400 on this surface —
+      // see the header. The /v1 version surface is the one that wants them wrapped.
+      component: { contentType: feed.contentType, properties: { ...properties } },
+    },
+  ];
+  return column;
+}
+
+/**
+ * The blueprint's skeleton plus this page's copy: one row per feed (`ownRowFor`), each row's
+ * one column skeleton cloned once per item — or, for a `sharedRow` slot, one shared row with
+ * one column per feed (`sharedRowFor`). See `compose.ts`'s `sectionNodeFor` header for why the
+ * arranging settings live on a row and never a column.
  *
  * The skeleton is cloned from the blueprint rather than rebuilt, so every display-setting
  * deviation the blueprint author made — the hero's `gradient_galaxy`, the ROI band's
- * `extrusion`, the seam between the hero and the pill strip — survives into the page. A slot
- * whose feeds supply nothing is left out of the tree entirely, which is how a withheld band is
- * meant to look: absent, not empty.
+ * `extrusion`, signal-pills' pill-strip grid — survives into the page. A feed that supplies
+ * nothing prunes just its own row (its neighbours in the same slot are unaffected); a slot
+ * whose feeds ALL supply nothing is left out of the tree entirely, which is how a withheld
+ * band is meant to look: absent, not empty.
  */
 function project(pageKey) {
   const blueprint = BLUEPRINTS_BY_ID[BLUEPRINT_ID];
@@ -554,41 +583,71 @@ function project(pageKey) {
 
     const section = structuredClone(skeleton[slotIndex]);
     section.id = nodeId(pageKey, slot.slotId, STRUCTURAL_INDEX.section);
-    const row = section.nodes?.find((n) => n.nodeType === 'row');
-    const column = row?.nodes?.find((n) => n.nodeType === 'column');
-    if (!row || !column) throw new Error(`${slot.slotId}: skeleton has no row/column`);
-    row.id = nodeId(pageKey, slot.slotId, STRUCTURAL_INDEX.row);
-    column.id = nodeId(pageKey, slot.slotId, STRUCTURAL_INDEX.column);
 
-    // Feed index is the blueprint's order (it keys the ids); placement order is the page's.
-    const order = PAGE_ORDER[slot.slotId];
-    const placement = binding.feeds
-      .map((feed, feedIndex) => ({ feed, feedIndex }))
-      .sort((a, b) => {
-        if (!order) return 0;
-        const ai = order.indexOf(a.feed.flatKey);
-        const bi = order.indexOf(b.feed.flatKey);
-        return (ai === -1 ? order.length : ai) - (bi === -1 ? order.length : bi);
-      });
-
-    const elements = [];
     const usedKeys = [];
-    for (const { feed, feedIndex } of placement) {
-      const items = itemsFor(feed.flatKey);
-      if (items.length === 0) continue;
-      usedKeys.push(feed.flatKey);
-      items.forEach((properties, itemIndex) => {
-        elements.push({
+    let resultRows;
+
+    if (binding.sharedRow) {
+      const [rowSkeleton] = section.nodes?.filter((n) => n.nodeType === 'row') ?? [];
+      const columnSkeletons = rowSkeleton?.nodes?.filter((n) => n.nodeType === 'column') ?? [];
+      if (!rowSkeleton || columnSkeletons.length !== binding.feeds.length) {
+        throw new Error(
+          `${slot.slotId}: sharedRow skeleton has ${columnSkeletons.length} column(s) for ` +
+            `${binding.feeds.length} feed(s) — the projection pairs them by index.`,
+        );
+      }
+      const row = structuredClone(rowSkeleton);
+      row.id = nodeId(pageKey, slot.slotId, STRUCTURAL_INDEX.sharedRow);
+      const columns = [];
+      binding.feeds.forEach((feed, feedIndex) => {
+        const items = itemsFor(feed.flatKey);
+        if (items.length === 0) return;
+        usedKeys.push(feed.flatKey);
+        // A shared-row feed's column holds ALL its items directly (stacked, if it has more
+        // than one) — sharedRow is for seating DIFFERENT feeds side by side, not for one
+        // feed's own many-cardinality arrangement, so there is no per-item explosion here.
+        const column = structuredClone(columnSkeletons[feedIndex]);
+        column.id = nodeId(pageKey, slot.slotId, columnStructuralIndex(feedIndex));
+        column.nodes = items.map((properties, itemIndex) => ({
           nodeType: 'component',
           id: elementNodeId(pageKey, slot.slotId, feedIndex, itemIndex),
-          // FLAT properties. Wrapping a scalar as {value: …} is a 400 on this surface —
-          // see the header. The /v1 version surface is the one that wants them wrapped.
           component: { contentType: feed.contentType, properties: { ...properties } },
-        });
+        }));
+        columns.push(column);
+      });
+      row.nodes = columns;
+      resultRows = columns.length > 0 ? [row] : [];
+    } else {
+      const rowSkeletons = section.nodes?.filter((n) => n.nodeType === 'row') ?? [];
+      if (rowSkeletons.length !== binding.feeds.length) {
+        throw new Error(
+          `${slot.slotId}: skeleton has ${rowSkeletons.length} row(s) for ` +
+            `${binding.feeds.length} feed(s) — the projection pairs them by index.`,
+        );
+      }
+      // binding.feeds is already in render order (SlotFeed.primary separates "renders first"
+      // from "is the primary binding" — see compose.ts), so this needs no reordering: the
+      // Nth feed fills the Nth row skeleton.
+      resultRows = [];
+      binding.feeds.forEach((feed, feedIndex) => {
+        const items = itemsFor(feed.flatKey);
+        if (items.length === 0) return;
+        usedKeys.push(feed.flatKey);
+
+        const rowSkeleton = rowSkeletons[feedIndex];
+        const [columnSkeleton] = rowSkeleton.nodes?.filter((n) => n.nodeType === 'column') ?? [];
+        if (!columnSkeleton) throw new Error(`${slot.slotId}/${feed.flatKey}: row skeleton has no column`);
+
+        const row = structuredClone(rowSkeleton);
+        row.id = nodeId(pageKey, slot.slotId, ownRowStructuralIndex(feedIndex));
+        row.nodes = items.map((properties, itemIndex) =>
+          itemColumn(columnSkeleton, pageKey, slot.slotId, feedIndex, itemIndex, feed, properties),
+        );
+        resultRows.push(row);
       });
     }
 
-    if (elements.length === 0) {
+    if (resultRows.length === 0) {
       pruned.push({
         slot: slot.slotId,
         why: `none of ${binding.flatKeys.join(', ')} was supplied`,
@@ -596,8 +655,9 @@ function project(pageKey) {
       return;
     }
 
-    column.nodes = elements;
+    section.nodes = resultRows;
     sections.push(section);
+    const elements = resultRows.flatMap((row) => row.nodes.flatMap((column) => column.nodes ?? []));
     filled.push({
       slot: slot.slotId,
       displayName: slot.displayName,
