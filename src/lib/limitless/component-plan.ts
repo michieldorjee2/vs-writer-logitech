@@ -80,7 +80,13 @@ export type ComponentId =
   | 'customer-stories'
   // offer + conversion
   | 'offer-card'
-  | 'sticky-cta';
+  | 'sticky-cta'
+  // the offer shape — a campaign page promoting one offer (Visual Builder only; the legacy
+  // renderers have no section for these, so `renderedBy` is empty)
+  | 'offer-hosts'
+  | 'offer-outcomes'
+  | 'offer-agenda'
+  | 'offer-fit';
 
 export interface ComponentPlanEntry {
   id: ComponentId;
@@ -176,6 +182,11 @@ export const COMPONENTS: Record<ComponentId, ComponentSpec> = {
 
   'offer-card': { label: 'Offer card', sectionId: 'promo', renderedBy: ['comparison'], derivedFrom: (p) => !!p.promoHeading },
   'sticky-cta': { label: 'Sticky CTA', sectionId: 'sticky-cta', renderedBy: ['abm'], derivedFrom: (p) => !!p.stickyCTAText },
+
+  'offer-hosts': { label: 'Who runs it', sectionId: 'hosts', renderedBy: [], navLabel: 'Who runs it', derivedFrom: () => false },
+  'offer-outcomes': { label: 'What you walk away with', sectionId: 'outcomes', renderedBy: [], navLabel: 'What you get', derivedFrom: () => false },
+  'offer-agenda': { label: 'How it runs', sectionId: 'agenda', renderedBy: [], navLabel: 'How it runs', derivedFrom: () => false },
+  'offer-fit': { label: 'Is this for you?', sectionId: 'fit', renderedBy: [], navLabel: 'Is this for you?', derivedFrom: () => false },
 };
 
 export const COMPONENT_IDS = Object.keys(COMPONENTS) as ComponentId[];

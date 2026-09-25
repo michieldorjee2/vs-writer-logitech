@@ -10,10 +10,11 @@
  * Deliberately NOT ported, because no Showcase page uses them yet: section background media,
  * fades and secondary backgrounds; the row's `layout` presets and `timeline` mode; centerLastRow.
  */
-import type { CSSProperties, ReactNode } from 'react'
+import { useRef, type CSSProperties, type ReactNode } from 'react'
 import { cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 import { draftClass } from '@/lib/utils/draft-helpers'
+import { useHeroScroll } from './hero-scroll'
 import { PROD_LAYOUT as M, PROD_ROW_GAPS as G } from './maps'
 
 type Settings = Record<string, string>
@@ -79,8 +80,12 @@ export function ProdSection({
   /** Accepted for parity with the other levels; the section itself has no draft-only classes. */
   preview?: boolean
 }) {
-  if (!children) return null
   const s = toSettings(displaySettings)
+  const ref = useRef<HTMLDivElement>(null)
+  // A hero that is not a card is FULL-BLEED: fixed backdrop + scroll waypoints (./hero-scroll).
+  const fullHero = s.treatment === 'hero' && (s.containerWidth || 'full') !== 'contained_bg'
+  useHeroScroll(ref, fullHero)
+  if (!children) return null
   const bg = s.backgroundColor || 'transparent'
   const width = s.containerWidth || 'full'
   // Prod defaults: rounded TOP corners, `default` radius, `lg` on desktop — why bands stack as sheets.
@@ -95,9 +100,11 @@ export function ProdSection({
 
   const section = (
     <div
+      ref={ref}
       data-treatment={treatment}
       className={cn(
         treatment && `vb-${treatment}`,
+        fullHero && 'vb-hero--full',
         sectionVariants({
           backgroundColor: bg as never,
           paddingTop: (s.paddingTop || undefined) as never,
@@ -125,6 +132,7 @@ export function ProdSection({
         className,
       )}
     >
+      {fullHero && <div className="vb-hero__backdrop" aria-hidden="true" />}
       {width === 'contained' ? (
         <div className={cn('vb-container mx-auto flex grow flex-col', JUSTIFY[s.contentAlign || 'start'])}>
           {children}

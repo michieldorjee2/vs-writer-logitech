@@ -677,7 +677,7 @@ a:hover .arrow-animated,
     text-wrap: balance;
 }
 /* the eyebrow row renders as a pill */
-.vb-hero > .vb-row:first-child :is(h2, h3, h4, h5, h6) {
+.vb-hero .vb-row:first-child :is(h2, h3, h4, h5, h6) {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -701,7 +701,7 @@ a:hover .arrow-animated,
 }
 
 /* the floating stat cards */
-.vb-hero > .vb-row:has(.vb-stat) {
+.vb-hero .vb-row:has(.vb-stat) {
     position: relative;
     z-index: 2;
     max-width: 1040px;
@@ -709,7 +709,7 @@ a:hover .arrow-animated,
     width: 100%;
 }
 @media (min-width: 1024px) {
-    .vb-hero > .vb-row:has(.vb-stat) { margin-top: -8px; }
+    .vb-hero .vb-row:has(.vb-stat) { margin-top: -8px; }
 }
 .vb-hero .vb-stat {
     gap: 16px;
@@ -733,35 +733,35 @@ a:hover .arrow-animated,
     .vb-hero .vb-stat > p { font-size: 14px; }
 }
 .vb-hero .vb-stat > p { font-size: 15px; line-height: 1.35; opacity: 0.75; }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(1) .vb-stat { --tilt: -6deg; --float: -1.5s; }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(2) .vb-stat {
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(1) .vb-stat { --tilt: -6deg; --float: -1.5s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(2) .vb-stat {
     --tilt: -2deg; --float: -4s;
     background: #08251a; color: #fff;
     box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 32px 64px -20px rgb(0 0 0 / 0.7);
 }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(3) .vb-stat { --tilt: 3deg; --float: -2.5s; }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(4) .vb-stat { --tilt: 7deg; --float: -5s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(3) .vb-stat { --tilt: 3deg; --float: -2.5s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(4) .vb-stat { --tilt: 7deg; --float: -5s; }
 @keyframes vb-float {
     0%, 100% { translate: 0 0; }
     50%      { translate: 0 -10px; }
 }
 
 /* entrance: rows rise in order; the stat cards fly up one by one */
-.vb-hero > .vb-row {
+.vb-hero .vb-row {
     animation: vb-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-.vb-hero > .vb-row:nth-child(1) { animation-delay: 0.05s; }
-.vb-hero > .vb-row:nth-child(2) { animation-delay: 0.15s; }
-.vb-hero > .vb-row:nth-child(4) { animation-delay: 0.85s; }
-.vb-hero > .vb-row:nth-child(5) { animation-delay: 1s; }
-.vb-hero > .vb-row:has(.vb-stat) { animation: none; }
-.vb-hero > .vb-row:has(.vb-stat) > * {
+.vb-hero .vb-row:nth-child(1) { animation-delay: 0.05s; }
+.vb-hero .vb-row:nth-child(2) { animation-delay: 0.15s; }
+.vb-hero .vb-row:nth-child(4) { animation-delay: 0.85s; }
+.vb-hero .vb-row:nth-child(5) { animation-delay: 1s; }
+.vb-hero .vb-row:has(.vb-stat) { animation: none; }
+.vb-hero .vb-row:has(.vb-stat) > * {
     animation: vb-card-in 1s cubic-bezier(0.16, 0.9, 0.2, 1.05) both;
 }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(1) { animation-delay: 0.4s; }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(2) { animation-delay: 0.5s; }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(3) { animation-delay: 0.6s; }
-.vb-hero > .vb-row:has(.vb-stat) > :nth-child(4) { animation-delay: 0.7s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(1) { animation-delay: 0.4s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(2) { animation-delay: 0.5s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(3) { animation-delay: 0.6s; }
+.vb-hero .vb-row:has(.vb-stat) > :nth-child(4) { animation-delay: 0.7s; }
 @keyframes vb-rise {
     from { opacity: 0; translate: 0 24px; }
     to   { opacity: 1; translate: 0 0; }
@@ -792,8 +792,8 @@ a:hover .arrow-animated,
 
 @media (prefers-reduced-motion: reduce) {
     .vb-hero,
-    .vb-hero > .vb-row,
-    .vb-hero > .vb-row > *,
+    .vb-hero .vb-row,
+    .vb-hero .vb-row > *,
     .vb-hero .vb-stat {
         animation: none !important;
     }
@@ -805,3 +805,97 @@ a:hover .arrow-animated,
 .vb-experience section h2,
 .vb-experience .vb-row h2 { max-width: 24ch; text-wrap: balance; }
 .vb-hero .text-content-element > * { margin-inline: auto; }
+
+/* ---- full-bleed hero with a fixed, scroll-faded backdrop ----------------
+   The backdrop is fixed at z-index -1 in the ROOT stacking context; the hero
+   itself is transparent over it, and every later section is an opaque white
+   surface that scrolls up over it. --vb-hero-p (0 -> 1 over the hero's height)
+   comes from src/cms/layout-prod/hero-scroll.ts. */
+html:has(.vb-hero--full) {
+    background: #fff;
+}
+/* body MUST be transparent: with html carrying its own background, body's paints as an ordinary
+   block — AFTER negative z-index layers — and would cover the fixed backdrop entirely. */
+html:has(.vb-hero--full) body {
+    background: transparent;
+}
+.vb-experience:has(.vb-hero--full) {
+    background: transparent;
+}
+.vb-experience:has(.vb-hero--full) [data-vb-root] > :not(:first-child) {
+    position: relative;
+    background: #fff;
+    display: flow-root; /* stop a section's top margin collapsing out of its white surface */
+}
+.vb-hero.vb-hero--full {
+    background: transparent;
+    overflow: visible;
+    isolation: auto;
+    min-height: min(100svh, 1000px);
+    justify-content: center;
+}
+.vb-hero.vb-hero--full::before { display: none; }
+.vb-hero__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: #08251a;
+    background-image:
+        radial-gradient(55% 45% at 18% 8%, rgb(171 255 68 / 0.26), transparent 62%),
+        radial-gradient(45% 55% at 86% 18%, rgb(145 219 218 / 0.30), transparent 60%),
+        radial-gradient(70% 55% at 50% 115%, rgb(13 58 41 / 1), transparent 70%),
+        linear-gradient(180deg, #0d3a29 0%, #08251a 100%);
+    background-size: 150% 150%, 150% 150%, 100% 100%, 100% 100%;
+    animation: vb-hero-drift 22s ease-in-out infinite alternate;
+    /* waypoint 2: most of the colour is gone by ~75% of the hero, all of it by 100% */
+    opacity: clamp(0, calc(1 - var(--vb-hero-p, 0) * 1.25), 1);
+    scale: calc(1 + var(--vb-hero-p, 0) * 0.08);
+}
+.vb-hero__backdrop::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgb(255 255 255 / 0.16) 1px, transparent 1.3px);
+    background-size: 22px 22px;
+    mask-image: radial-gradient(70% 60% at 50% 40%, black, transparent);
+}
+/* the graceful edge: the hero's last 30% dissolves into the white page below */
+.vb-hero.vb-hero--full::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 30%;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgb(255 255 255 / 0), #fff);
+}
+/* waypoint 1: from ~35% of the hero the copy lifts and fades as the page takes over */
+.vb-hero.vb-hero--full > .vb-container {
+    position: relative;
+    z-index: 1;
+    translate: 0 calc(var(--vb-hero-p, 0) * -80px);
+    opacity: clamp(0, calc(1 - (var(--vb-hero-p, 0) - 0.35) * 2), 1);
+}
+
+/* ---- reveal waypoints for the rest of the page ---------------------------
+   hero-scroll.ts adds .vb-pre to rows below the fold at load (never server-side),
+   then .vb-in as each enters the viewport. */
+.vb-row.vb-pre {
+    opacity: 0;
+    translate: 0 28px;
+    transition: opacity 0.8s ease, translate 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.vb-row.vb-pre.vb-in {
+    opacity: 1;
+    translate: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vb-hero__backdrop { animation: none; scale: 1; }
+    .vb-hero.vb-hero--full > .vb-container { translate: none; }
+}
+
+/* Friction/outcome cards number themselves with a CSS counter. With no ancestor reset, each card
+   instantiates its OWN counter (so every one read "01"); a reset on the row gives the cards in a
+   row one shared scope: 01, 02, 03. */
+.vb-experience .vb-row { counter-reset: abm-friction; }

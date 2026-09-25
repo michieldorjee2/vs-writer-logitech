@@ -48,10 +48,11 @@ import {
   type SlotFeed,
   type SlotId,
 } from './internal/compose'
+import offer from './offer'
 import person from './person'
 import useCaseDefault from './use-case-default'
 
-export { abmTakeout, comparison, person, useCaseDefault }
+export { abmTakeout, comparison, offer, person, useCaseDefault }
 
 export {
   COLUMN_DEFAULTS,
@@ -75,9 +76,10 @@ export const BLUEPRINTS: LimitlessBlueprint[] = [
   useCaseDefault,
   comparison,
   person,
+  offer,
 ]
 
-export type BlueprintId = 'abm-takeout' | 'use-case-default' | 'comparison' | 'person'
+export type BlueprintId = 'abm-takeout' | 'use-case-default' | 'comparison' | 'person' | 'offer'
 
 export const BLUEPRINT_IDS: BlueprintId[] = BLUEPRINTS.map((b) => b.blueprintId as BlueprintId)
 

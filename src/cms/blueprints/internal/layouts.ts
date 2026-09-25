@@ -63,6 +63,24 @@ function card(bg: string, extra: Settings = {}): Settings {
  */
 export const HERO_CARD: Settings = card('dark_forest', { treatment: 'hero', marginTop: 'sm', marginTopLg: 'md' })
 
+/**
+ * The FULL-BLEED hero (2026-09-25): edge to edge, no card. Its animated backdrop is fixed to the
+ * viewport and fades out as the page scrolls over it (index.css `.vb-hero--full`, driven by
+ * `useHeroScroll` in src/cms/layout-prod), dissolving into the white page instead of ending at
+ * a hard card edge.
+ */
+export const HERO_FULL: Settings = {
+  backgroundColor: 'dark_forest',
+  containerWidth: 'contained',
+  treatment: 'hero',
+  paddingTop: 'xxl',
+  paddingTopLg: 'p_3xl',
+  paddingBottom: 'xxl',
+  paddingBottomLg: 'px_168',
+  paddingX: 'px_8',
+  roundedCorners: 'none',
+}
+
 /** The one dark block on the page — a card, not a band. */
 export const DARK_CARD: Settings = card('dark_forest')
 

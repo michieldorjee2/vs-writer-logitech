@@ -202,7 +202,9 @@ export default function VisualBuilderExperience({
   if (!nodes?.length) return null
 
   return (
-    <div className={cn('relative w-full flex-1', draftClass(preview, 'vb:outline'))}>
+    // data-vb-root: index.css gives every section after a full-bleed hero an opaque surface so
+    // the page scrolls OVER the hero's fixed backdrop. The SSR twin sets it too.
+    <div data-vb-root className={cn('relative w-full flex-1', draftClass(preview, 'vb:outline'))}>
       {nodes.map((node) => {
         if (node.nodeType === 'section' && node.section) {
           return <SectionNode key={node.key} node={node} locale={locale} preview={preview} />

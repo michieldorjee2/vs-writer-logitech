@@ -8,10 +8,9 @@
  * from the rest, and `EditableBlock` wraps each node in edit mode so `nth-child` would not
  * survive either. A CSS counter is the one mechanism that numbers N independent siblings
  * without any of them coordinating: each card increments `abm-friction` in document order
- * and renders the value from a `::before`. With no ancestor reset the counter is reset
- * implicitly on the root element, so the first card on the page is 01 and the numbering runs
- * on across the document — which is the behaviour a single "where it breaks" section wants,
- * and the only self-consistent one available when two sections exist.
+ * and renders the value from a `::before`. The counter needs an ANCESTOR reset: without one,
+ * each card instantiates its own counter and every card reads 01 (measured 2026-09-25).
+ * index.css resets `abm-friction` on every `.vb-row`, so the cards in one row count 01, 02, 03.
  *
  * The ordinal is `aria-hidden`: it is a visual rhythm, not content, and a screen reader
  * already gets the list from the headings.

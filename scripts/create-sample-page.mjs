@@ -46,15 +46,21 @@ import { readFileSync, existsSync } from 'node:fs';
 
 import { BLUEPRINTS_BY_ID, SLOT_MAP, slotKey } from '../src/cms/blueprints/index.ts';
 import { PATHS, req } from '../src/cms/client.ts';
+import { OFFER_PAGE, offerContent } from './sample-content/offer.mjs';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const BLUEPRINT_ID = 'abm-takeout';
-const ROUTE_SEGMENT = 'vb-sample';
+// `--blueprint offer --route vb-offer` builds the offer page; the defaults build the takeout sample.
+const argValue = (name) => {
+  const i = process.argv.indexOf(name);
+  return i > -1 ? process.argv[i + 1] : undefined;
+};
+const BLUEPRINT_ID = argValue('--blueprint') ?? 'abm-takeout';
+const ROUTE_SEGMENT = argValue('--route') ?? 'vb-sample';
 const LOCALE = 'en';
-const DISPLAY_NAME = 'Northwind Traders';
+const DISPLAY_NAME = BLUEPRINT_ID === 'offer' ? 'Northwind Traders — working session offer' : 'Northwind Traders';
 /** The Showcase site root. Every account page hangs directly off it. */
 const SITE_ROOT_CONTAINER = '3fbbcee66f954d089df0f4e62b75ca3c';
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
@@ -456,10 +462,12 @@ function pageProperties() {
     brandAccentColor: '#0E7C66',
     customerLogo: PLACEHOLDER_LOGO,
     competitorName: 'Adobe Experience Manager',
-    PageTitle: 'Northwind Traders — Optimizely',
+    PageTitle: BLUEPRINT_ID === 'offer' ? OFFER_PAGE.PageTitle : 'Northwind Traders — Optimizely',
     MetaDescription:
-      'Why Northwind Traders publishes a campaign page in eleven weeks, what that costs, and what ' +
-      'changes when the page stops shipping with code. Written for the FY27 platform review.',
+      BLUEPRINT_ID === 'offer'
+        ? OFFER_PAGE.MetaDescription
+        : 'Why Northwind Traders publishes a campaign page in eleven weeks, what that costs, and what ' +
+          'changes when the page stops shipping with code. Written for the FY27 platform review.',
     noIndex: true,
     componentPlan: JSON.stringify(componentPlan),
     template: BLUEPRINT_ID,
@@ -523,8 +531,10 @@ function elementNodeId(pageKey, slotId, feedIndex, itemIndex) {
 // Projection
 // ---------------------------------------------------------------------------
 
+const ACTIVE_CONTENT = BLUEPRINT_ID === 'offer' ? offerContent(MEETING_URL) : CONTENT;
+
 function itemsFor(flatKey) {
-  const value = CONTENT[flatKey];
+  const value = ACTIVE_CONTENT[flatKey];
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
 }
@@ -754,6 +764,9 @@ async function ensureContentItem(key) {
       properties: pageProperties(),
     },
   });
+  // 409 = it exists after all: the GET above can read stale for a moment after a create (the
+  // CMS's read-after-write lag), and a deterministic key makes "exists" the only meaning.
+  if (created.status === 409) return { action: 'found' };
   if (!created.ok) {
     throw new Error(`POST content -> ${created.status} ${JSON.stringify(created.body)}`);
   }

@@ -896,7 +896,7 @@ function VisualBuilderExperienceSSR({
   const nodes = experience?.composition?.nodes;
   if (!nodes?.length) return null;
   return (
-    <div className={cn('relative w-full flex-1', draftClass(preview, 'vb:outline'))}>
+    <div data-vb-root className={cn('relative w-full flex-1', draftClass(preview, 'vb:outline'))}>
       {nodes.map((node) => {
         if (node.nodeType === 'section' && node.section) {
           return <VbSectionNode key={node.key} node={node} locale={locale} preview={preview} />;
