@@ -87,7 +87,8 @@ export type ComponentId =
   | 'offer-outcomes'
   | 'offer-agenda'
   | 'offer-fit'
-  | 'offer-faq';
+  | 'offer-faq'
+  | 'offer-problem';
 
 export interface ComponentPlanEntry {
   id: ComponentId;
@@ -189,6 +190,7 @@ export const COMPONENTS: Record<ComponentId, ComponentSpec> = {
   'offer-agenda': { label: 'How it runs', sectionId: 'agenda', renderedBy: [], navLabel: 'How it runs', derivedFrom: () => false },
   'offer-fit': { label: 'Is this for you?', sectionId: 'fit', renderedBy: [], navLabel: 'Is this for you?', derivedFrom: () => false },
   'offer-faq': { label: 'Questions', sectionId: 'faq', renderedBy: [], navLabel: 'FAQ', derivedFrom: () => false },
+  'offer-problem': { label: 'The problem', sectionId: 'problem', renderedBy: [], navLabel: 'Why', derivedFrom: () => false },
 };
 
 export const COMPONENT_IDS = Object.keys(COMPONENTS) as ComponentId[];

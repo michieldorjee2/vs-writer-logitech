@@ -2,8 +2,8 @@
  * The OFFER page: one account, one offer, one call to action.
  *
  * Modelled on optimizely.com's AI Marketing Certificate page (prod content 7879), which is a
- * campaign page, not an account dossier: hero -> proof -> who runs it -> what you walk away with
- * -> how it runs -> is this for you -> questions -> sign up. Michiel's ruling (2026-09-25): the takeout shape
+ * campaign page, not an account dossier: hero -> the problem -> proof -> who runs it -> what you
+ * walk away with -> how it runs -> is this for you -> questions -> sign up. Michiel's ruling (2026-09-25): the takeout shape
  * mirrors the account-intelligence page too closely; a page like this should promote an offer.
  *
  * So there is no comparison table, no tech-stack intel, no ROI model and no analyst wall here.
@@ -44,6 +44,36 @@ export default defineBlueprint({
         },
         { contentType: 'TextContentElement', flatKey: 'offerIntro', cardinality: 'one' },
         { contentType: 'ButtonBlock', flatKey: 'offerCta', cardinality: 'one' },
+      ],
+    },
+    {
+      slotId: 'offer-problem',
+      displayName: 'The problem',
+      why: 'The problem the offer solves, in the account’s own terms: why this is hard for them, now.',
+      section: sheet(),
+      // Editorial, not another card strip: the argument on the left, one card per audience
+      // stacked on the right. Stacks on tablets and phones.
+      sharedRow: true,
+      row: { ...ROW_GRID, gridColumns: 'cols_1', gridColumnsMd: 'cols_12', columnGap: 'xl', rowGap: 'md' },
+      column: { colSpan: 'full', colSpanMd: 'full' },
+      feeds: [
+        {
+          contentType: 'AbmThesisElement',
+          flatKey: 'problemThesis',
+          cardinality: 'one',
+          primary: true,
+          note: 'Headline / Body (paragraphs split on blank lines). Quote only for a real, attributable quote.',
+          column: { colSpanLg: 'span_6' },
+        },
+        {
+          contentType: 'AbmUseCaseLaneElement',
+          flatKey: 'problemLanes',
+          cardinality: 'many',
+          note:
+            'One card per audience: Lane = who, Need = what they need to hear, Outcome = why one shared page misses them. ' +
+            'Leave Solution empty: this band states the problem, and Solution renders a "We’d use" product pill.',
+          column: { colSpanLg: 'span_6', gap: 'sm' },
+        },
       ],
     },
     {

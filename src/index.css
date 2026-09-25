@@ -840,6 +840,10 @@ html:has(.vb-hero--full) body {
     justify-content: center;
 }
 .vb-hero.vb-hero--full h1 { font-size: clamp(40px, 6vw, 88px); }
+/* The cards tilt up to 7deg, so a 280px card's corner rises ~17px, and the h1's 0.95 line box lets
+   descenders hang below it: the -8px pull-up let a two-line headline's last line sit under the
+   cards (measured on "…of pages. Start with twelve."). Clear it instead. */
+.vb-hero.vb-hero--full .vb-row:has(.vb-stat) { margin-top: 28px; }
 .vb-hero.vb-hero--full .vb-stat { padding: 16px 18px; gap: 12px; }
 .vb-hero.vb-hero--full .vb-stat > span { font-size: clamp(26px, 2.6vw, 38px); }
 .vb-hero.vb-hero--full .vb-stat > p { font-size: 14px; }

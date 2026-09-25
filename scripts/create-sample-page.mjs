@@ -63,7 +63,16 @@ const argValue = (name) => {
 const BLUEPRINT_ID = argValue('--blueprint') ?? 'abm-takeout';
 const ROUTE_SEGMENT = argValue('--route') ?? 'vb-sample';
 const LOCALE = 'en';
-const DISPLAY_NAME = BLUEPRINT_ID === 'offer' ? 'Northwind Traders — working session offer' : 'Northwind Traders';
+/**
+ * `--content <name>` builds an account from `sample-content/<name>.mjs`, which exports
+ * `content(meetingUrl)` (the flat keys) and `PAGE` ({displayName, properties}); a `null` property
+ * withholds that Northwind default. Without it, the offer blueprint gets the Northwind offer.
+ */
+const CONTENT_NAME = argValue('--content');
+const CONTENT_MODULE = CONTENT_NAME ? await import(`./sample-content/${CONTENT_NAME}.mjs`) : undefined;
+const DISPLAY_NAME =
+  CONTENT_MODULE?.PAGE.displayName ??
+  (BLUEPRINT_ID === 'offer' ? 'Northwind Traders — working session offer' : 'Northwind Traders');
 /** The Showcase site root. Every account page hangs directly off it. */
 const SITE_ROOT_CONTAINER = '3fbbcee66f954d089df0f4e62b75ca3c';
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
@@ -445,19 +454,20 @@ const CONTENT = {
 /** The page-level properties — identity, brand, SEO, provenance. No copy. */
 function pageProperties() {
   const componentPlan = {
-    rung: 'takeout',
-    fit: 'competitor-confirmed',
+    rung: BLUEPRINT_ID === 'offer' ? 'offer' : 'takeout',
+    fit: CONTENT_MODULE?.PAGE.fit ?? 'competitor-confirmed',
     blueprint: BLUEPRINT_ID,
     resolvedAt: '2026-09-22T00:00:00.000Z',
     components: BLUEPRINTS_BY_ID[BLUEPRINT_ID].slots.map((slot) => ({
       componentId: slot.slotId,
-      include: true,
+      // A band whose keys this page does not supply is withheld, and the plan says so.
+      include: SLOT_MAP[slotKey(BLUEPRINT_ID, slot.slotId)].flatKeys.some((key) => itemsFor(key).length > 0),
       variant: 'default',
       why: slot.why || `${slot.displayName} is part of the takeout shape.`,
     })),
   };
 
-  return {
+  const properties = {
     salesforceAccountID: '0018c00002LmN4qAAF',
     companySlug: 'northwind-traders',
     companyName: 'Northwind Traders',
@@ -476,7 +486,9 @@ function pageProperties() {
     template: BLUEPRINT_ID,
     generatedAt: new Date().toISOString(),
     generatedBy: 'scripts/create-sample-page.mjs',
+    ...CONTENT_MODULE?.PAGE.properties,
   };
+  return Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== null));
 }
 
 /**
@@ -534,7 +546,11 @@ function elementNodeId(pageKey, slotId, feedIndex, itemIndex) {
 // Projection
 // ---------------------------------------------------------------------------
 
-const ACTIVE_CONTENT = BLUEPRINT_ID === 'offer' ? offerContent(MEETING_URL) : CONTENT;
+const ACTIVE_CONTENT = CONTENT_MODULE
+  ? CONTENT_MODULE.content(MEETING_URL)
+  : BLUEPRINT_ID === 'offer'
+    ? offerContent(MEETING_URL)
+    : CONTENT;
 
 function itemsFor(flatKey) {
   const value = ACTIVE_CONTENT[flatKey];
@@ -1055,7 +1071,10 @@ async function main() {
   }
 
   const graphElements = report.reduce((total, row) => total + row.elements, 0);
-  const pageLevel = ['companyName', 'companySlug', 'competitorName', 'PageTitle', 'componentPlan'];
+  const sentProps = pageProperties();
+  const pageLevel = ['companyName', 'companySlug', 'competitorName', 'PageTitle', 'componentPlan'].filter(
+    (k) => k in sentProps,
+  );
   const missingPageLevel = pageLevel.filter((k) => !graphItem[k]);
 
   console.log('');
