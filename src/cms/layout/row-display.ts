@@ -53,7 +53,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "Extra Large (1280px)"
         }
       ],
-      "defaultValue": "lg"
+      "defaultValue": ""
     },
     {
       "key": "gridColumns",
@@ -401,7 +401,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "3X Large (144px)"
         }
       ],
-      "defaultValue": "sm"
+      "defaultValue": ""
     },
     {
       "key": "columnGap",
@@ -875,7 +875,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "128px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "marginTopMd",
@@ -919,7 +919,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "128px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "marginTopLg",
@@ -963,7 +963,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "128px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "marginBottom",
@@ -1007,7 +1007,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "128px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "marginBottomMd",
@@ -1051,7 +1051,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "128px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "marginBottomLg",
@@ -1095,7 +1095,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "128px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "spacing",

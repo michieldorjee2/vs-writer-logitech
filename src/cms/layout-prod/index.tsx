@@ -88,9 +88,16 @@ export function ProdSection({
   const radiusLg = s.borderRadiusLg || 'lg'
   const bp = (key: keyof typeof M.sectionBreakpoints) => at(M.sectionBreakpoints[key], set(s[key]))
 
+  // Showcase extension (not in prod): a section-level visual treatment, rendered as a
+  // `data-treatment` hook plus a class that index.css styles. `hero` = the animated gradient
+  // hero with floating cards; `panel` = a soft gradient panel that white cards sit on.
+  const treatment = s.treatment && s.treatment !== 'none' ? s.treatment : undefined
+
   const section = (
     <div
+      data-treatment={treatment}
       className={cn(
+        treatment && `vb-${treatment}`,
         sectionVariants({
           backgroundColor: bg as never,
           paddingTop: (s.paddingTop || undefined) as never,
@@ -215,6 +222,7 @@ export function ProdRow({
           borderRadiusMd: s.borderRadiusMd as never,
           borderRadiusLg: s.borderRadiusLg as never,
         }),
+        'vb-row',
         ...rowGapClasses(s),
         ...hideClasses(s),
         draftClass(preview, 'vb:row'),

@@ -19,7 +19,7 @@
  */
 
 import { defineBlueprint } from './internal/compose'
-import { CHROME, CLOSE_CARD, COL_BODY, COL_FULL, COL_HERO, HERO_CARD, ROW_GRID, cards, sheet } from './internal/layouts'
+import { CHROME, CLOSE_CARD, COL_BODY, COL_FULL, COL_HERO, DARK_CARD, HERO_CARD, PANEL_CARD, ROW_GRID, cards, sheet } from './internal/layouts'
 
 export default defineBlueprint({
   blueprintId: 'abm-takeout',
@@ -53,23 +53,6 @@ export default defineBlueprint({
           primary: true,
           note: 'headline -> Text at HeadingLevel h1. splitEmphasis() bolds the emphasised run at render time, so the copy carries its own emphasis markers rather than needing a second field.',
         },
-        { contentType: 'TextContentElement', flatKey: 'subheadline', cardinality: 'one', note: 'subheadline -> MainBody' },
-        {
-          contentType: 'ButtonBlock',
-          flatKey: 'cta',
-          cardinality: 'one',
-          note: 'cta -> ButtonText, link -> ButtonUrl. Flattened from upstream ButtonBlock.Link, which is a content reference and therefore a 400 on an element.',
-        },
-      ],
-    },
-    {
-      slotId: 'signal-pills',
-      displayName: 'Signal pills',
-      why: 'The evidence the page was written from, as short phrases directly under the hero.',
-      section: sheet('white'),
-      row: ROW_GRID,
-      column: COL_BODY,
-      feeds: [
         {
           contentType: 'StatBlock',
           flatKey: 'intelStats',
@@ -87,7 +70,17 @@ export default defineBlueprint({
           // the viewport — a phone-width horizontal scrollbar, worse than the stacking bug
           // this slot exists to fix. techStack below is small tag text and stays 2-up.
           // Base (phone) is still 1-up — see above; 2-up on tablets, 4-up on desktop.
+          // In the hero, the four stats ARE the hero's floating cards (index.css .vb-hero):
+          // 2-up on phones, 4-up from md. They sit between the headline and the subtext.
           ...cards('cols_4', 'cols_2'),
+          row: { ...cards('cols_4', 'cols_2').row, gridColumns: 'cols_2', gridColumnsMd: 'cols_4' },
+        },
+        { contentType: 'TextContentElement', flatKey: 'subheadline', cardinality: 'one', note: 'subheadline -> MainBody' },
+        {
+          contentType: 'ButtonBlock',
+          flatKey: 'cta',
+          cardinality: 'one',
+          note: 'cta -> ButtonText, link -> ButtonUrl. Flattened from upstream ButtonBlock.Link, which is a content reference and therefore a 400 on an element.',
         },
       ],
     },
@@ -95,7 +88,7 @@ export default defineBlueprint({
       slotId: 'account-intel',
       displayName: 'Account intelligence',
       why: 'What we found: the stack, the news, the people. Five element types, five columns, one row.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -122,6 +115,7 @@ export default defineBlueprint({
           note: 'Initials / Name / Role / LinkedInUrl / AvatarColor, plus the Salesforce engagement fields (EngagementTier, EngagementNote, PersonSlug, CrmContactId).',
           // 3-up from md; full width on a phone, where a 3rd of the width is too narrow for
           // a name, a role and an engagement note.
+          element: { colorScheme: 'light' },
           ...cards('cols_3', 'cols_2'),
         },
       ],
@@ -130,7 +124,7 @@ export default defineBlueprint({
       slotId: 'challenge-shot',
       displayName: 'The challenge',
       why: "A framed screenshot of the customer's own site, and what is wrong with it.",
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -146,7 +140,7 @@ export default defineBlueprint({
       slotId: 'comparison-table',
       displayName: 'Comparison table',
       why: 'Only present when a competitor is confirmed. The whole point of the takeout shape.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       // Another of the five slots where the primary feed (the rows — the whole point of
@@ -169,7 +163,7 @@ export default defineBlueprint({
       slotId: 'proof-wall',
       displayName: 'Proof wall',
       why: 'The logo wall. Shown unconditionally today — it has no content gate of its own.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -185,7 +179,7 @@ export default defineBlueprint({
       slotId: 'roi-projection',
       displayName: 'ROI projection',
       why: 'The number the page is arguing for, with its citations.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       // Another of the five: the cards are primary, but the headline number renders above
@@ -214,7 +208,7 @@ export default defineBlueprint({
       slotId: 'migration-timeline',
       displayName: 'Migration timeline',
       why: 'How the move happens. Answers the objection the comparison table creates.',
-      section: sheet('dark_forest'),
+      section: DARK_CARD,
       row: ROW_GRID,
       column: COL_BODY,
       // Another of the five: the phases are primary, but the title renders above them.
@@ -236,53 +230,68 @@ export default defineBlueprint({
       slotId: 'analyst-proof',
       displayName: 'Analyst recognition',
       why: 'Third-party proof, which is the only kind that answers "says who?".',
-      section: sheet('white'),
-      row: ROW_GRID,
-      column: COL_BODY,
-      // Another of the five: the badge cards are primary, but the headline and quote render
-      // above them.
+      section: sheet(),
+      // The "reports" layout: headline + quote on the left, the recognitions as a feature list
+      // on the right, the CTA under the quote. One shared 12-column row; each feed is placed by
+      // column/row start and span, so on phones it all simply stacks in feed order.
+      sharedRow: true,
+      row: { ...ROW_GRID, gridColumns: 'cols_1', gridColumnsLg: 'cols_12', columnGap: 'xl', rowGap: 'md' },
+      column: { colSpan: 'full' },
       feeds: [
-        { contentType: 'StackedHeadingElement', flatKey: 'analystHeadline', cardinality: 'one' },
+        {
+          contentType: 'StackedHeadingElement',
+          flatKey: 'analystHeadline',
+          cardinality: 'one',
+          column: { colSpanLg: 'span_5', colStartLg: 'start_1', rowStartLg: 'row_start_1' },
+        },
         {
           contentType: 'BlockquoteBlock',
           flatKey: 'analystQuote',
           cardinality: 'one',
           note: 'analystSource -> the attribution. A real quote from a named report, never a synthesised one.',
+          column: { colSpanLg: 'span_5', colStartLg: 'start_1', rowStartLg: 'row_start_2' },
         },
         {
           contentType: 'AbmAnalystCardElement',
           flatKey: 'analystCards',
           cardinality: 'many',
           primary: true,
-          note: 'Badge / Source / Category / Url',
-          ...cards('cols_3', 'cols_2'),
+          note: 'Badge / Source / Category / Url — rendered as a feature list (icon, title, description).',
+          column: { colSpanLg: 'span_6', colStartLg: 'start_7', rowStartLg: 'row_start_1', rowSpanLg: 'row_span_3', gap: 'lg' },
         },
-        { contentType: 'ButtonBlock', flatKey: 'analystCTA', cardinality: 'one', note: 'analystCTA -> ButtonText, analystCTALink -> ButtonUrl' },
+        {
+          contentType: 'ButtonBlock',
+          flatKey: 'analystCTA',
+          cardinality: 'one',
+          note: 'analystCTA -> ButtonText, analystCTALink -> ButtonUrl',
+          column: { colSpanLg: 'span_5', colStartLg: 'start_1', rowStartLg: 'row_start_3' },
+        },
       ],
     },
     {
       slotId: 'customer-stories',
       displayName: 'Customer stories',
-      section: sheet('neutral'),
-      // TWO DIFFERENT feeds side by side, not one feed's own items — the one case that needs
-      // `sharedRow`. No slot-level colSpan override: `colSpan: 'full'` on both columns would
-      // make the second always wrap to its own line; `auto` (the column default) lets each
-      // take one of the row's two grid cells instead.
+      // The panel under the reports: a soft gradient card holding the two quotes as white cards.
+      section: PANEL_CARD,
       sharedRow: true,
-      row: cards('cols_2', 'cols_1').row,
-      column: cards('cols_2', 'cols_1').column,
+      row: { ...ROW_GRID, gridColumns: 'cols_1', gridColumnsMd: 'cols_12', columnGap: 'md', rowGap: 'md' },
+      column: { colSpan: 'full', colSpanMd: 'span_6' },
       feeds: [
         {
           contentType: 'CardCustomerQuoteBlock',
           flatKey: 'testimonial1',
           cardinality: 'one',
           note: 'testimonial1JobTitle and testimonial1Company -> the attribution.',
+          column: { colSpanLg: 'span_5', colStartLg: 'start_2' },
+          element: { cardStyle: 'light' },
         },
         {
           contentType: 'CardCustomerQuoteBlock',
           flatKey: 'testimonial2',
           cardinality: 'one',
           note: 'The legacy type NUMBERS its testimonials, which is why there are exactly two of them and never three. In the composition each quote is a node, so a third costs a node rather than four new properties.',
+          column: { colSpanLg: 'span_5', colStartLg: 'start_7' },
+          element: { cardStyle: 'light' },
         },
       ],
     },
@@ -290,7 +299,7 @@ export default defineBlueprint({
       slotId: 'friction-points',
       displayName: 'Where it breaks',
       why: 'The gaps, in the account\'s own language. Late on a takeout page, early on a use-case page.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [

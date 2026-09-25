@@ -327,3 +327,11 @@ node scripts/sync-opticom.mjs --upstream <path-to-unpacked-zip> --check
 Nothing under `src/cms/` is vendored. The render chain that binds this slice to the Showcase
 content model is `src/cms/rendering/`, and the props contract for a component renderer is
 `src/cms/rendering/RENDERER-SPEC.md`.
+
+## Prod is newer than the zip (2026-09-25)
+
+`components/_ui/button/index.tsx` carries a patch taking its `default` size to what
+www.optimizely.com's live bundle ships: 40px on phones, 56px from `lg` (the zip has 56px everywhere).
+Recorded in `scripts/sync-opticom.mjs` PATCHES. When a newer zip lands, the check will show whether
+upstream caught up and the patch can go. Section, row and column were handled the same way, but as
+a separate module (`src/cms/layout-prod`) rather than patches, because the gap there is too wide.

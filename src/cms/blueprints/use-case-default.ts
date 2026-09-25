@@ -50,7 +50,7 @@ export default defineBlueprint({
       slotId: 'nav-rail',
       displayName: 'Navigation rail',
       why: 'Chrome. A fixed rail with the section anchors and three lines of page meta.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -85,7 +85,7 @@ export default defineBlueprint({
       slotId: 'signal-pills',
       displayName: 'Signal pills',
       why: 'The evidence, as phrases. On this template they are the only numbers on the page.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -101,7 +101,7 @@ export default defineBlueprint({
       slotId: 'use-case-matrix',
       displayName: 'In-market use cases',
       why: 'The centre of the template: the account\'s need on top, what we would use underneath.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -120,7 +120,7 @@ export default defineBlueprint({
       slotId: 'why-now-thesis',
       displayName: 'Why now',
       why: 'The argument the page makes, in prose. The second shape the flat type had nowhere to put.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -136,7 +136,7 @@ export default defineBlueprint({
       slotId: 'friction-points',
       displayName: 'Where it breaks',
       why: 'Early here, late on the takeout: without a comparison table this IS the argument.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [

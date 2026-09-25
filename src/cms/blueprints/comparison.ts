@@ -44,7 +44,7 @@ export default defineBlueprint({
       slotId: 'comparison-table',
       displayName: 'Comparison table',
       why: 'The page. Unlike the takeout, this blueprint is nothing without it.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -62,7 +62,7 @@ export default defineBlueprint({
       slotId: 'analyst-proof',
       displayName: 'Analyst recognition',
       why: 'On a category page this is the only third-party voice, so it sits directly under the table.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -75,7 +75,7 @@ export default defineBlueprint({
     {
       slotId: 'customer-stories',
       displayName: 'Customer stories',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -87,7 +87,7 @@ export default defineBlueprint({
       slotId: 'offer-card',
       displayName: 'Offer card',
       why: 'The named next step. A section of its own here because it is the page\'s only conversion point.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [

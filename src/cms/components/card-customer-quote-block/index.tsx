@@ -24,6 +24,8 @@
  *    not exist here yet — see `src/vendor/opticom/UPSTREAM.md`, "The CSS entry point".
  */
 import { CardBottomBar, CardResourceDetails } from '@/components/_ui/card'
+import { parseDisplaySettings } from '@/lib/hooks/parseDisplaySettings'
+import type { DisplaySettings } from '@/lib/optimizely/types/display-settings'
 import type { CardCustomerQuoteBlockProps } from './types'
 
 /**
@@ -50,13 +52,48 @@ export default function CardCustomerQuoteBlock({
   CompanyName,
   CompanyLogoUrl,
   ResourceUrl,
+  displaySettings,
 }: CardCustomerQuoteBlockProps) {
   const href = resolveUrl(ResourceUrl)
+  const { cardStyle } = parseDisplaySettings<{ cardStyle?: 'dark' | 'light' }>(
+    displaySettings as unknown as DisplaySettings
+  )
+  const light = cardStyle === 'light'
 
   // Upstream's guard: the whole card IS the link, so without one there is nothing to render.
   if (!href) return null
 
   const companyLogoUrl = resolveUrl(CompanyLogoUrl)
+
+  if (light) {
+    // The panel card: white, dark ink, the same nudge-up-and-right hover as the site's buttons.
+    return (
+      <a
+        href={href}
+        className="group block h-full rounded-[24px] bg-white p-6 shadow-[0_1px_2px_rgba(8,37,26,0.06),0_12px_32px_-12px_rgba(8,37,26,0.18)] transition-transform duration-200 ease-out hover:translate-x-0.5 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-secondary-darkfir) md:p-8"
+      >
+        <div className="flex h-full flex-col gap-8">
+          {QuoteText && (
+            <blockquote
+              data-epi-edit="QuoteText"
+              className="font-body text-(length:--text-body-xl) leading-[1.25] font-(--font-weight-body-medium) text-(--color-secondary-darkfir)"
+            >
+              &ldquo;{QuoteText}&rdquo;
+            </blockquote>
+          )}
+          <div className="mt-auto flex flex-col gap-4">
+            {Attribution && (
+              <p data-epi-edit="Attribution" className="font-body text-body-s leading-[1.4] text-(--color-tertiary-midfir)">
+                {Attribution}
+              </p>
+            )}
+            <CardResourceDetails resourceType={ResourceType} duration={Duration} colorScheme="dark" />
+            <CardBottomBar companyName={CompanyName} companyLogoUrl={companyLogoUrl} colorScheme="dark" />
+          </div>
+        </div>
+      </a>
+    )
+  }
 
   return (
     <a

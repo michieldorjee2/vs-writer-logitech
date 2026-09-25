@@ -1,48 +1,16 @@
 /**
- * AbmAnalystCardElement — one analyst or third-party proof point.
+ * AbmAnalystCardElement — one analyst or third-party recognition, rendered as a FEATURE ITEM:
+ * an icon tile, the recognition as the title (Badge), and who said it and in what as the
+ * description (Source · Category). This is the right-hand list of the reports layout in the
+ * `analyst-proof` slot (see src/cms/blueprints/abm-takeout.ts).
  *
- * There is no upstream component to port (optimizely.com's block catalogue has no analyst
- * card), so this is assembled out of the vendored vocabulary rather than reinterpreted from
- * scratch: `TaxonomyTag` for the category chip, the `--color-*` tokens for every colour, and
- * the same card grammar `card-customer-quote-block` inherits from upstream — a rounded
- * module, a hover lift, an arrow that leans out on hover, and a focus ring on the anchor.
- * `colorScheme` is deliberately the same select `blockquote-block` carries upstream, because
- * the two render side by side in the `analyst-proof` slot and have to flip together.
- *
- * WHY THE GRID TEMPLATE IS FIXED, and why it is not `auto auto 1fr`. This is an ELEMENT. The
- * `analystCards` feed is `cardinality: 'many'`, so N of these are placed as N independent
- * nodes and none of them can see the others. Anything that has to line up across siblings has
- * to line up by construction:
- *
- *   row 1  1.25rem   the source overline — a FIXED band, not `auto`. `auto` collapses to zero
- *                    on a card whose Source is empty, which drops that card's badge half a
- *                    line above its neighbours'. 20px clears Roboto Mono at 14px/1.2. Spelled
- *                    `theme(spacing.5)` rather than the bare `1.25rem` literal: this app's root
- *                    font-size is rescaled 1.6x (tailwind.config.js's rem-scale-mismatch
- *                    comment), so a literal `1.25rem` in an arbitrary value renders at 12.5px
- *                    here, not the 20px this row depends on, while `theme(spacing.5)` resolves
- *                    through that same rescaled theme.
- *   row 2  1fr       the badge. Absorbs every difference in claim length, so the row below it
- *                    is pinned to the bottom edge instead of floating at the end of the text.
- *   row 3  auto      the chip + arrow, bottom-anchored on every card.
- *
- * With `h-full` on the anchor the card fills whatever height the column gives it, so three
- * cards in three columns of one row share a bottom rule and a badge baseline without any of
- * them knowing the others exist.
+ * Revised 2026-09-25 from a chip card to this shape at Michiel's direction. Items stack in one
+ * column with the column's own gap, so there is no cross-sibling alignment to engineer. On a dark
+ * band the icon tile flips via the section's `data-band` (src/cms/rendering/band.ts).
  */
-import { cva } from 'class-variance-authority'
-import { ArrowUpRight } from 'lucide-react'
-import { TaxonomyTag } from '@/components/_ui/taxonomy-tag'
-import { parseDisplaySettings } from '@/lib/hooks/parseDisplaySettings'
-import type { DisplaySettings } from '@/lib/optimizely/types/display-settings'
+import { ArrowUpRight, Award } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AbmAnalystCardElementProps } from './types'
-
-type ColorScheme = 'dark' | 'neutral'
-
-type DisplaySettingValues = {
-  colorScheme?: ColorScheme
-}
 
 /** A CMS `url` property (`{ default }`), upstream's link object, or a bare string. */
 function resolveUrl(value: unknown): string | undefined {
@@ -56,108 +24,59 @@ function resolveUrl(value: unknown): string | undefined {
   return undefined
 }
 
-const card = cva(
-  'grid h-full grid-rows-[theme(spacing.5)_1fr_auto] gap-5 rounded-(--radius-module-med) border p-6 transition-colors duration-200 ease-out',
-  {
-    variants: {
-      colorScheme: {
-        dark: 'border-(--color-tertiary-4) bg-(--color-primary-1) text-(--color-secondary-darkfir) group-hover:border-(--color-primary-goodtogo)',
-        neutral:
-          'border-white/20 bg-white/5 text-(--color-primary-1) group-hover:border-(--color-primary-lfgreen)',
-      } satisfies Record<ColorScheme, string>,
-    },
-    defaultVariants: { colorScheme: 'dark' },
-  }
-)
-
-const source = cva(
-  'font-overline text-body-xxs truncate leading-5 tracking-[0.42px] uppercase',
-  {
-    variants: {
-      colorScheme: {
-        dark: 'text-(--color-tertiary-midfir)',
-        neutral: 'text-(--color-tertiary-2)',
-      } satisfies Record<ColorScheme, string>,
-    },
-    defaultVariants: { colorScheme: 'dark' },
-  }
-)
-
-const arrow = cva('shrink-0 transition-transform duration-200 ease-out', {
-  variants: {
-    colorScheme: {
-      dark: 'text-(--color-primary-goodtogo)',
-      neutral: 'text-(--color-primary-lfgreen)',
-    } satisfies Record<ColorScheme, string>,
-  },
-  defaultVariants: { colorScheme: 'dark' },
-})
-
-/**
- * `TaxonomyTag`'s `className` REPLACES its default rather than merging with it, so the light
- * variant has to restate the whole chip. The default is the dark one, verbatim from the
- * vendored primitive, and is left to it.
- */
-const NEUTRAL_CHIP =
-  'font-overline text-body-xxs rounded-[8px] border border-(--color-tertiary-2) px-3 py-2 leading-[1.2] tracking-[0.42px] text-(--color-tertiary-2) uppercase'
 
 export default function AbmAnalystCardElement({
   Badge,
   Source,
   Category,
   Url,
-  displaySettings,
 }: AbmAnalystCardElementProps) {
   // The badge IS the proof point. Without it the card is chrome around nothing.
   if (!Badge) return null
 
-  // `displaySettings` arrives as an ARRAY of {key,value} (RENDERER-SPEC.md, and
-  // `withContentTypeDefaults` in ../../rendering/display-defaults.ts returns one). types.ts
-  // declares the write-side `Record<string,string>`; the cast reconciles the two without
-  // editing a file this task does not own. `parseDisplaySettings` guards the non-array case.
-  const { colorScheme } = parseDisplaySettings<DisplaySettingValues>(
-    displaySettings as unknown as DisplaySettings
-  )
-  const scheme: ColorScheme = colorScheme === 'neutral' ? 'neutral' : 'dark'
 
   const href = resolveUrl(Url)
 
+  // A FEATURE ITEM, not a card: icon tile, title, one line of description — the right-hand
+  // column of the reports layout. The recognition (Badge) is the title; who said it (Source)
+  // and in what (Category) are the description.
   const body = (
-    <div className={cn(card({ colorScheme: scheme }))}>
-      <p data-epi-edit="Source" className={cn(source({ colorScheme: scheme }))}>
-        {Source}
-      </p>
-
-      <p
-        data-epi-edit="Badge"
-        className="font-body text-body-lg leading-[1.25] font-(--font-weight-body-medium)"
+    <div className="flex items-start gap-4">
+      <span
+        className={cn(
+          'flex size-12 shrink-0 items-center justify-center rounded-2xl bg-(--color-neutral-2) text-(--color-secondary-darkfir)',
+          '[[data-band=dark]_&]:bg-white/10 [[data-band=dark]_&]:text-(--color-primary-lfgreen)'
+        )}
+        aria-hidden="true"
       >
-        {Badge}
-      </p>
-
-      <div className="flex items-end justify-between gap-4">
-        {Category ? (
-          <TaxonomyTag
-            label={Category}
-            className={scheme === 'neutral' ? NEUTRAL_CHIP : undefined}
-          />
-        ) : (
-          <span />
-        )}
-        {href && (
-          <ArrowUpRight
-            aria-hidden="true"
-            size={24}
-            className={cn(
-              arrow({ colorScheme: scheme }),
-              'group-hover:translate-x-1 group-hover:-translate-y-1'
-            )}
-          />
-        )}
+        <Award size={22} strokeWidth={1.75} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p
+          data-epi-edit="Badge"
+          className="font-body text-body-lg leading-[1.25] font-(--font-weight-body-medium) text-current"
+        >
+          {Badge}
+          {href && (
+            <ArrowUpRight
+              aria-hidden="true"
+              size={18}
+              className="ml-1 inline-block align-baseline opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+            />
+          )}
+        </p>
+        <p className="font-body text-body-base leading-[1.45] opacity-75">
+          <span data-epi-edit="Source">{Source}</span>
+          {Category && (
+            <>
+              {' · '}
+              <span data-epi-edit="Category">{Category}</span>
+            </>
+          )}
+        </p>
       </div>
     </div>
   )
-
   // No link is a legitimate state — a recognition without a public page is still proof — so
   // the card renders either way and only the anchor is conditional.
   if (!href) return <div className="group h-full">{body}</div>

@@ -18,6 +18,19 @@ const displayTemplates: RepoDisplayTemplate[] = [
     isDefault: true,
     settings: [
       {
+        // Showcase extension. Upstream ALWAYS extrudes the value; the brand says to extrude one
+        // heroic moment per page, so here it is opt-in and `plain` is the default.
+        key: 'presentation',
+        displayName: 'Presentation',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'plain', displayName: 'Plain' },
+          { value: 'extruded', displayName: 'Extruded' },
+        ],
+        defaultValue: 'plain',
+      },
+      {
         key: 'animationMode',
         displayName: 'Animation Mode',
         type: 'select',

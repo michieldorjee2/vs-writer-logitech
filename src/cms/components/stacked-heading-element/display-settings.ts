@@ -25,6 +25,19 @@ const displayTemplates: RepoDisplayTemplate[] = [
     isDefault: true,
     settings: [
       {
+        // Showcase extension. Upstream always extrudes a ##run##; the brand asks for one
+        // extruded moment per page, so here the default is a tonal colour shift.
+        key: 'emphasis',
+        displayName: 'Emphasis',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'tonal', displayName: 'Tonal' },
+          { value: 'extruded', displayName: 'Extruded' },
+        ],
+        defaultValue: 'tonal',
+      },
+      {
         key: 'animationMode',
         displayName: 'Animation Mode',
         type: 'select',

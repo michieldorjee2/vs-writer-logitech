@@ -606,3 +606,202 @@ a:hover .arrow-animated,
     @media (min-width: 1280px) { max-width: 1280px; }
     @media (min-width: 1376px) { max-width: 1376px; }
 }
+
+/* ---------------------------------------------------------------------------
+   VISUAL BUILDER PAGE — treatments (src/cms/layout-prod `treatment` setting)
+   and the button colour prod uses. Everything is scoped to .vb-experience or a
+   .vb-* treatment, so no legacy template can match any rule below.
+   --------------------------------------------------------------------------- */
+
+/* Prod's button border / hover-shadow green. index.css clears --color-lfgreen-100
+   for the legacy templates (their value is the fill lime), which left the primary
+   button with a Dark Fir border and a lime-on-lime shadow. */
+.vb-experience {
+    --color-lfgreen-100: hsl(92 82% 59%);
+}
+@utility border-lfgreen-100 {
+    border-color: var(--color-lfgreen-100);
+}
+@utility bg-lfgreen-100 {
+    background-color: var(--color-lfgreen-100);
+}
+
+/* Tonal emphasis for a ##run## (StackedHeadingElement's default). */
+.vb-emph {
+    color: var(--color-fir-lightfir, hsl(158 64% 27%));
+}
+[data-band='dark'] .vb-emph {
+    background: linear-gradient(95deg, #abff44 10%, #91dbda 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* ---- hero -------------------------------------------------------------- */
+.vb-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    text-align: center;
+    background-color: #08251a;
+    background-image:
+        radial-gradient(55% 45% at 18% 8%, rgb(171 255 68 / 0.26), transparent 62%),
+        radial-gradient(45% 55% at 86% 18%, rgb(145 219 218 / 0.30), transparent 60%),
+        radial-gradient(70% 55% at 50% 115%, rgb(13 58 41 / 1), transparent 70%),
+        linear-gradient(180deg, #0d3a29 0%, #08251a 100%);
+    background-size: 150% 150%, 150% 150%, 100% 100%, 100% 100%;
+    animation: vb-hero-drift 22s ease-in-out infinite alternate;
+}
+.vb-hero::before {
+    /* a faint dot grid that fades out towards the edges */
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgb(255 255 255 / 0.16) 1px, transparent 1.3px);
+    background-size: 22px 22px;
+    mask-image: radial-gradient(70% 60% at 50% 40%, black, transparent);
+}
+@keyframes vb-hero-drift {
+    0%   { background-position: 0% 0%, 100% 0%, 50% 50%, 50% 50%; }
+    100% { background-position: 30% 20%, 70% 30%, 50% 50%, 50% 50%; }
+}
+.vb-hero .vb-row > * {
+    align-items: center;
+    text-align: center;
+}
+.vb-hero h1 {
+    font-size: clamp(44px, 7.2vw, 104px);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+}
+/* the eyebrow row renders as a pill */
+.vb-hero > .vb-row:first-child :is(h2, h3, h4, h5, h6) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    background: rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(6px);
+    font-family: var(--font-body, 'Die Grotesk B'), system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    color: rgb(255 255 255 / 0.85);
+}
+.vb-hero .text-content-element p {
+    max-width: 56ch;
+    margin-inline: auto;
+    color: rgb(255 255 255 / 0.78);
+    text-wrap: balance;
+}
+
+/* the floating stat cards */
+.vb-hero > .vb-row:has(.vb-stat) {
+    position: relative;
+    z-index: 2;
+    max-width: 1040px;
+    margin-inline: auto;
+    width: 100%;
+}
+@media (min-width: 1024px) {
+    .vb-hero > .vb-row:has(.vb-stat) { margin-top: -8px; }
+}
+.vb-hero .vb-stat {
+    gap: 16px;
+    padding: 20px;
+    border-radius: 24px;
+    background: #fff;
+    color: #08251a;
+    text-align: left;
+    box-shadow:
+        0 1px 0 rgb(255 255 255 / 0.6) inset,
+        0 28px 56px -22px rgb(0 0 0 / 0.55);
+    /* tilts are designed for the 4-up desktop row; a 2-up phone grid gets a third of them,
+       or the outer cards swing past the hero's edge and get clipped */
+    rotate: calc(var(--tilt, 0deg) * var(--tilt-k, 1));
+    animation: vb-float 7s ease-in-out infinite;
+    animation-delay: var(--float, 0s);
+}
+.vb-hero .vb-stat > span { font-size: clamp(28px, 3.2vw, 44px); }
+@media (max-width: 767.98px) {
+    .vb-hero .vb-stat { --tilt-k: 0.35; padding: 16px; gap: 10px; }
+    .vb-hero .vb-stat > p { font-size: 14px; }
+}
+.vb-hero .vb-stat > p { font-size: 15px; line-height: 1.35; opacity: 0.75; }
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(1) .vb-stat { --tilt: -6deg; --float: -1.5s; }
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(2) .vb-stat {
+    --tilt: -2deg; --float: -4s;
+    background: #08251a; color: #fff;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 32px 64px -20px rgb(0 0 0 / 0.7);
+}
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(3) .vb-stat { --tilt: 3deg; --float: -2.5s; }
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(4) .vb-stat { --tilt: 7deg; --float: -5s; }
+@keyframes vb-float {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 -10px; }
+}
+
+/* entrance: rows rise in order; the stat cards fly up one by one */
+.vb-hero > .vb-row {
+    animation: vb-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.vb-hero > .vb-row:nth-child(1) { animation-delay: 0.05s; }
+.vb-hero > .vb-row:nth-child(2) { animation-delay: 0.15s; }
+.vb-hero > .vb-row:nth-child(4) { animation-delay: 0.85s; }
+.vb-hero > .vb-row:nth-child(5) { animation-delay: 1s; }
+.vb-hero > .vb-row:has(.vb-stat) { animation: none; }
+.vb-hero > .vb-row:has(.vb-stat) > * {
+    animation: vb-card-in 1s cubic-bezier(0.16, 0.9, 0.2, 1.05) both;
+}
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(1) { animation-delay: 0.4s; }
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(2) { animation-delay: 0.5s; }
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(3) { animation-delay: 0.6s; }
+.vb-hero > .vb-row:has(.vb-stat) > :nth-child(4) { animation-delay: 0.7s; }
+@keyframes vb-rise {
+    from { opacity: 0; translate: 0 24px; }
+    to   { opacity: 1; translate: 0 0; }
+}
+@keyframes vb-card-in {
+    from { opacity: 0; translate: 0 80px; scale: 0.9; }
+    to   { opacity: 1; translate: 0 0; scale: 1; }
+}
+
+/* ---- panel ------------------------------------------------------------- */
+.vb-panel {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background-color: #e9f2e4;
+    background-image:
+        radial-gradient(70% 70% at 12% 0%, rgb(145 219 218 / 0.55), transparent 62%),
+        radial-gradient(60% 70% at 92% 100%, rgb(171 255 68 / 0.28), transparent 60%);
+}
+.vb-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgb(8 37 26 / 0.12) 1px, transparent 1.3px);
+    background-size: 18px 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vb-hero,
+    .vb-hero > .vb-row,
+    .vb-hero > .vb-row > *,
+    .vb-hero .vb-stat {
+        animation: none !important;
+    }
+}
+
+/* Measure. Copy columns span the container so every block shares one left edge; lines stay
+   readable by capping the text itself, not the column. */
+.vb-experience .text-content-element > * { max-width: 68ch; }
+.vb-experience section h2,
+.vb-experience .vb-row h2 { max-width: 24ch; text-wrap: balance; }
+.vb-hero .text-content-element > * { margin-inline: auto; }

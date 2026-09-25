@@ -367,8 +367,8 @@ export default function StatBlock({
 }: Props) {
   if (!StatValue) return null
 
-  const { animationMode, extrusionCount, invertExtrusion } =
-    parseDisplaySettings<DisplaySettingValues>(displaySettings)
+  const { animationMode, extrusionCount, invertExtrusion, presentation } =
+    parseDisplaySettings<DisplaySettingValues & { presentation?: 'plain' | 'extruded' }>(displaySettings)
 
   /**
    * `Description` is the CMS property; `StatDescription` is the alias upstream's fragment
@@ -382,6 +382,22 @@ export default function StatBlock({
     ? parseInt(extrusionCount.replace('layers_', ''), 10)
     : DEFAULT_EXTRUSION_COUNT
   const invert = invertExtrusion === 'true'
+
+  if (presentation !== 'extruded') {
+    // Plain: the value set in the headline face, no extrusion. Inside a hero section
+    // (`data-treatment="hero"`) the same card becomes one of the hero's floating cards — the
+    // tilt, float and entrance come from `.vb-hero` in index.css, keyed on `vb-stat`.
+    return (
+      <div className="vb-stat flex h-full min-w-0 flex-col items-start justify-between gap-6 rounded-3xl bg-(--color-neutral-2) p-6 text-(--color-secondary-darkfir) md:p-8">
+        <span className="font-headline text-headline-l md:text-headline-xl leading-none font-(--font-weight-headline-extrabold) tracking-tight">
+          {StatValue}
+        </span>
+        {description && (
+          <p className="font-body text-body-base/tight font-medium opacity-80">{description}</p>
+        )}
+      </div>
+    )
+  }
 
   return (
     // `overflow-x-clip` + `min-w-0`: the extrusion layers are absolutely positioned and travel

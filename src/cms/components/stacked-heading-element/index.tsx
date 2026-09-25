@@ -811,7 +811,8 @@ export function StackedHeading({
   arcAmount = 0.3,
   extrusionCount = 5,
   invertExtrusion = false,
-}: StackedHeadingProps) {
+  tonal = false,
+}: StackedHeadingProps & { tonal?: boolean }) {
   const lines = text.split('\n').filter((line) => line.trim() !== '')
   const Tag = as as ElementType
   const sizeClasses =
@@ -828,7 +829,7 @@ export function StackedHeading({
    * direction — see `directionY` in `Layer` above) and only when a line has a stacked run to
    * travel with; a heading with no `##…##` renders no extra layers and needs no extra room.
    */
-  const hasStackedRun = !curved && lines.some((line) => /##(.+?)##/.test(line))
+  const hasStackedRun = !tonal && !curved && lines.some((line) => /##(.+?)##/.test(line))
 
   return (
     <Tag
@@ -851,6 +852,24 @@ export function StackedHeading({
     >
       {lines.map((line, lineIndex) => {
         const parts = parseStackedText(line)
+
+        // Tonal emphasis: the ##run## in a colour shift instead of the extrusion — what
+        // optimizely.com's own heroes do, and the Showcase default (see display-settings.ts).
+        if (tonal) {
+          return (
+            <span key={lineIndex} className="block">
+              {parts.map((part, partIndex) =>
+                part.type === 'stacked' ? (
+                  <span key={partIndex} className="vb-emph">
+                    {part.content}
+                  </span>
+                ) : (
+                  <span key={partIndex}>{part.content}</span>
+                )
+              )}
+            </span>
+          )
+        }
 
         // When curved, render entire line as CurvedLine
         if (curved) {
@@ -915,8 +934,10 @@ export default function StackedHeadingElement({
   HeadingLevel,
   displaySettings,
 }: StackedHeadingElementProps) {
-  const { animationMode, curvedText, arcAmount, extrusionCount, invertExtrusion } =
-    parseDisplaySettings<DisplaySettingValues>(asDisplaySettings(displaySettings))
+  const { animationMode, curvedText, arcAmount, extrusionCount, invertExtrusion, emphasis } =
+    parseDisplaySettings<DisplaySettingValues & { emphasis?: 'tonal' | 'extruded' }>(
+      asDisplaySettings(displaySettings)
+    )
 
   // Upstream parses `Text.html` here. `Text` is a bare string (DIVERGENCE.md), so the only
   // normalisation left is upstream's own run-collapse: 3+ newlines become a paragraph break.
@@ -942,6 +963,7 @@ export default function StackedHeadingElement({
       arcAmount={arc}
       extrusionCount={layers}
       invertExtrusion={invert}
+      tonal={emphasis !== 'extruded'}
     />
   )
 }

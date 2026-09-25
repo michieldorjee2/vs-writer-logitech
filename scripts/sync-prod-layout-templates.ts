@@ -7,7 +7,7 @@
  * The JSON is `GET /preview3/displaytemplates` against the prod instance (opti01saas4uc99p001).
  * Defaults are chosen so an unset setting produces exactly the class prod's renderer produces
  * with nothing set: prod's cva defaultVariants where it has one, otherwise an option whose class
- * is empty, otherwise `inherit`. Never "the first option" — that would inject classes prod never
+ * is empty, otherwise `inherit`, otherwise ''. Never "the first option" — that would inject classes prod never
  * adds (contentAlign `start` -> items-start where prod adds nothing).
  */
 import fs from 'node:fs'
@@ -46,7 +46,9 @@ function build(key: string, maps: Record<string, Record<string, string>>, defaul
     settings: repo.settings.map((s) => {
       if (s.type !== 'select') return { ...s, defaultValue: s.defaultValue ?? false }
       const opts = s.options ?? []
-      const d = defaults[s.key] ?? neutral(opts, maps[s.key]) ?? opts[0]?.value
+      // '' (not the first option) when prod has no neutral value: the first option is often
+      // `none`, which DOES emit a class (md:mt-0) and silently cancelled every row gap from md up.
+      const d = defaults[s.key] ?? neutral(opts, maps[s.key]) ?? ''
       return { ...s, defaultValue: d }
     }),
   }
@@ -60,6 +62,21 @@ const templates: Array<[string, string, Record<string, Record<string, string>>, 
 
 for (const [key, file, maps, defaults] of templates) {
   const t = build(key, maps, defaults)
+  // Showcase extensions, appended after prod's settings so a re-sync keeps them. Rendered by
+  // src/cms/layout-prod — prod has no equivalent.
+  if (key === 'BlankSectionDisplayTemplate') {
+    ;(t.settings as unknown as RepoDisplayTemplate['settings'][number][]).push({
+      key: 'treatment',
+      displayName: 'Treatment (Showcase)',
+      type: 'select',
+      options: [
+        { value: 'none', displayName: 'None' },
+        { value: 'hero', displayName: 'Hero — animated gradient, floating cards' },
+        { value: 'panel', displayName: 'Panel — soft gradient behind white cards' },
+      ],
+      defaultValue: 'none',
+    })
+  }
   const body = `/**
  * GENERATED from optimizely.com PROD's live \`${key}\` by scripts/sync-prod-layout-templates.ts.
  * Do not hand-edit — re-run the script. Rendered by src/cms/layout-prod, whose class maps come

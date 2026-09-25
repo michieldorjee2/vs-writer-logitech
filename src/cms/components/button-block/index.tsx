@@ -126,8 +126,10 @@ export default function ButtonBlock({
     )
   }
 
+  // `w-fit`: a column is flex-col with align-items stretch, so without it the button
+  // stretched to the whole column (measured 721px / 912px). optimizely.com's are compact.
   const button = (
-    <Button variant={variant} size={size} asChild>
+    <Button variant={variant} size={size} className="w-fit" asChild>
       {label}
     </Button>
   )

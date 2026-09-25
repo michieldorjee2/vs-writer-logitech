@@ -534,6 +534,13 @@ function itemsFor(flatKey) {
  * `sectionNodeFor` clones one column skeleton per feed; this clones it again per item, since
  * the item count is exactly what the skeleton cannot know).
  */
+/** A feed's element-level display settings, or nothing — see SlotFeed.element in compose.ts. */
+function elementDisplaySettings(feed) {
+  return feed.element && Object.keys(feed.element).length
+    ? { displaySettings: { displayTemplate: `${feed.contentType}DisplayTemplate`, settings: { ...feed.element } } }
+    : {};
+}
+
 function itemColumn(columnSkeleton, pageKey, slotId, feedIndex, itemIndex, feed, properties) {
   const column = structuredClone(columnSkeleton);
   column.id = nodeId(pageKey, slotId, columnStructuralIndex(feedIndex, itemIndex));
@@ -544,6 +551,7 @@ function itemColumn(columnSkeleton, pageKey, slotId, feedIndex, itemIndex, feed,
       // FLAT properties. Wrapping a scalar as {value: …} is a 400 on this surface —
       // see the header. The /v1 version surface is the one that wants them wrapped.
       component: { contentType: feed.contentType, properties: { ...properties } },
+      ...elementDisplaySettings(feed),
     },
   ];
   return column;
@@ -615,6 +623,7 @@ function project(pageKey) {
           nodeType: 'component',
           id: elementNodeId(pageKey, slot.slotId, feedIndex, itemIndex),
           component: { contentType: feed.contentType, properties: { ...properties } },
+          ...elementDisplaySettings(feed),
         }));
         columns.push(column);
       });

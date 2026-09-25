@@ -1,7 +1,7 @@
 /**
  * GENERATED from optimizely.com PROD's live `BlankSectionDisplayTemplate` by scripts/sync-prod-layout-templates.ts.
  * Do not hand-edit — re-run the script. Rendered by src/cms/layout-prod, whose class maps come
- * from the same prod source. 44 settings.
+ * from the same prod source. 45 settings.
  */
 import type { RepoDisplayTemplate } from '../display-template-transform'
 
@@ -161,7 +161,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "Dark pink"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "fadeBackgroundTop",
@@ -609,7 +609,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "XXL (128px)"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "outerPaddingTopMd",
@@ -737,7 +737,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "XXL (128px)"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "outerPaddingBottomMd",
@@ -949,7 +949,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "11/12 (91.67%)"
         }
       ],
-      "defaultValue": "full"
+      "defaultValue": ""
     },
     {
       "key": "marginTop",
@@ -1413,7 +1413,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "3X Large (144px)"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "rowGapMd",
@@ -1525,7 +1525,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "800px"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "height",
@@ -1561,7 +1561,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "100vh"
         }
       ],
-      "defaultValue": "auto"
+      "defaultValue": ""
     },
     {
       "key": "backgroundMedia",
@@ -1589,7 +1589,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "Rive Animation"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "backgroundMediaFit",
@@ -1605,7 +1605,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "Contain"
         }
       ],
-      "defaultValue": "cover"
+      "defaultValue": ""
     },
     {
       "key": "backgroundMediaPosition",
@@ -1649,7 +1649,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "Bottom Right"
         }
       ],
-      "defaultValue": "center"
+      "defaultValue": ""
     },
     {
       "key": "backgroundMediaOverlay",
@@ -1677,7 +1677,7 @@ const displayTemplates: RepoDisplayTemplate[] = [{
           "displayName": "Heavy (80%)"
         }
       ],
-      "defaultValue": "none"
+      "defaultValue": ""
     },
     {
       "key": "hideMobile",
@@ -1713,6 +1713,26 @@ const displayTemplates: RepoDisplayTemplate[] = [{
         {
           "value": "show",
           "displayName": "Show on submit (added to DOM on success)"
+        }
+      ],
+      "defaultValue": ""
+    },
+    {
+      "key": "treatment",
+      "displayName": "Treatment (Showcase)",
+      "type": "select",
+      "options": [
+        {
+          "value": "none",
+          "displayName": "None"
+        },
+        {
+          "value": "hero",
+          "displayName": "Hero — animated gradient, floating cards"
+        },
+        {
+          "value": "panel",
+          "displayName": "Panel — soft gradient behind white cards"
         }
       ],
       "defaultValue": "none"

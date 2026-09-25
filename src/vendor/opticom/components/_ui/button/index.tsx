@@ -48,7 +48,8 @@ const buttonVariants = cva(
       },
       size: {
         sm: 'h-10 rounded-(--radius-cta-sml) px-4 text-(length:--text-body-xs) tracking-[0.32px]',
-        default: 'h-14 rounded-[20px] px-6 text-body-med tracking-[0.4px]',
+        default:
+          'h-10 rounded-(--radius-cta-sml) px-4 text-(length:--text-body-xs) leading-[1.3] tracking-[0.32px] min-[1024px]:h-14 min-[1024px]:rounded-[20px] min-[1024px]:px-6 min-[1024px]:text-body-med min-[1024px]:tracking-[0.4px]',
       },
     },
     defaultVariants: {

@@ -52,7 +52,7 @@ export default defineBlueprint({
       slotId: 'signal-pills',
       displayName: 'The key number',
       why: 'One number with a citation, not a row of pills. A person page that quotes five statistics reads as a brochure.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -68,7 +68,7 @@ export default defineBlueprint({
       slotId: 'friction-points',
       displayName: 'Where this gets hard',
       why: 'What a seat like theirs is scored on. The section that proves we understand the job.',
-      section: sheet('neutral'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [
@@ -86,7 +86,7 @@ export default defineBlueprint({
       slotId: 'proof-wall',
       displayName: 'Others who hold a seat like yours',
       why: 'Peer proof rather than a logo wall: at this altitude the relevant question is who like me has done this.',
-      section: sheet('white'),
+      section: sheet(),
       row: ROW_GRID,
       column: COL_BODY,
       feeds: [

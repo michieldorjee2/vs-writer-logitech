@@ -173,6 +173,14 @@ export interface SlotFeed {
    * actually keeps (`colSpan` and its siblings) take effect; see this file's header.
    */
   column?: Record<string, string>
+  /**
+   * Display settings for each ELEMENT this feed writes — keyed against the element type's own
+   * `<ContentType>DisplayTemplate`. Blueprints never place element nodes (a required property
+   * would 400 an empty one), so this rides on SLOT_MAP and is applied by whatever instantiates
+   * the page (`scripts/create-sample-page.mjs`). E.g. `{ presentation: 'extruded' }` on the one
+   * StatBlock a page extrudes.
+   */
+  element?: Record<string, string>
 }
 
 /** What a blueprint file declares per section. */

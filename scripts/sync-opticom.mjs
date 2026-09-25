@@ -151,6 +151,14 @@ function stripUseClient(source) {
  * aborts — an upstream rewrite must not silently drop an adaptation.
  */
 const PATCHES = {
+  'components/_ui/button/index.tsx': [
+    {
+      why: "PROD IS NEWER THAN THE ZIP: www.optimizely.com's button (live bundle, 2026-09-25) is 40px on phones and 56px from lg, where the zip's is 56px everywhere. lg: is min-[1024px]: because Showcase keeps bootstrap's 992px lg for the legacy templates.",
+      find: "        default: 'h-14 rounded-[20px] px-6 text-body-med tracking-[0.4px]',",
+      replace: "        default:\n          'h-10 rounded-(--radius-cta-sml) px-4 text-(length:--text-body-xs) leading-[1.3] tracking-[0.32px] min-[1024px]:h-14 min-[1024px]:rounded-[20px] min-[1024px]:px-6 min-[1024px]:text-body-med min-[1024px]:tracking-[0.4px]',",
+    },
+  ],
+
   'lib/utils.ts': [
     {
       why: "next/navigation does not exist here; ReadonlyURLSearchParams is structurally just { toString(): string }",

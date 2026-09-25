@@ -15,7 +15,21 @@ const displayTemplates: RepoDisplayTemplate[] = [
     displayName: 'Customer Quote Card Display Template',
     contentType: 'CardCustomerQuoteBlock',
     isDefault: true,
-    settings: [],
+    settings: [
+      {
+        // Showcase extension: `light` is a white card for a soft panel (the reports layout);
+        // `dark` is upstream's green card and stays the default.
+        key: 'cardStyle',
+        displayName: 'Card style',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'dark', displayName: 'Dark' },
+          { value: 'light', displayName: 'Light' },
+        ],
+        defaultValue: 'dark',
+      },
+    ],
   },
 ]
 
