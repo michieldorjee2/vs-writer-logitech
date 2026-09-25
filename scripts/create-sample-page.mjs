@@ -7,6 +7,9 @@
  *
  *     npx tsx scripts/create-sample-page.mjs
  *     npx tsx scripts/create-sample-page.mjs --dry-run     # project and report, write nothing
+ *     npx tsx scripts/create-sample-page.mjs --dry-run --emit out.json
+ *                                                          # also write {pageKey, content, composition}:
+ *                                                          # mcp-optimizely-cms's equivalence fixture
  *
  * IT IS IDEMPOTENT, AND THAT IS NOT A CONVENIENCE. The content key is `md5('vb-sample')`, a
  * value the CMS honours on create, so a second run finds the same page instead of minting a
@@ -42,7 +45,7 @@
 
 import { createHash } from 'node:crypto';
 import process from 'node:process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 
 import { BLUEPRINTS_BY_ID, SLOT_MAP, slotKey } from '../src/cms/blueprints/index.ts';
 import { PATHS, req } from '../src/cms/client.ts';
@@ -976,6 +979,15 @@ async function main() {
     );
   }
   for (const slot of pruned) console.log(`  prune  ${slot.slot.padEnd(19)} ${slot.why}`);
+
+  const emitPath = argValue('--emit');
+  if (emitPath) {
+    // The reference the tools' projection must reproduce byte-for-byte, node ids included
+    // (mcp-optimizely-cms tests/fixtures/sample-builder-*.json).
+    const fixture = { blueprintId: BLUEPRINT_ID, pageKey, content: ACTIVE_CONTENT, composition };
+    writeFileSync(emitPath, JSON.stringify(fixture, null, 2) + '\n');
+    console.log(`emitted     ${emitPath}`);
+  }
 
   if (dryRun) {
     console.log('\n--dry-run: nothing was written.');
