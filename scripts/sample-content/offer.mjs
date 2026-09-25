@@ -97,6 +97,15 @@ export function offerContent(meetingUrl) {
         '— need a full RFP response (we will do that separately)',
     },
 
+    faqHeadline: { Text: 'Questions you might have', HeadingLevel: 'h2' },
+    faqs: [
+      { Question: 'Is it really free?', Answer: 'Yes. No licence, no pilot agreement and no procurement. It is thirty minutes of our time, on your page.' },
+      { Question: 'What do we need to bring?', Answer: 'The page — a live URL is enough — plus its copy and your brand guide if you have one to hand. Nothing needs to be exported from Adobe Experience Manager.' },
+      { Question: 'Do we have to be evaluating Optimizely?', Answer: 'No. The three fixes you leave with are yours whatever you decide, and plenty of teams book this to pressure-test the tools they already have.' },
+      { Question: 'Who should join from our side?', Answer: 'Whoever owns the page, and ideally whoever ships it. Two or three people is the sweet spot; more than five and it turns into a meeting.' },
+      { Question: 'What happens after the call?', Answer: 'You get the rebuilt page and the written plan the same day. If you want to go further we will suggest a next step; if you do not, that is the end of it.' },
+    ],
+
     offerClose: {
       Title: 'Bring one page. Leave with it shipped.',
       Description: 'Thirty minutes with the people who would build it. Pick a time that works for your team.',

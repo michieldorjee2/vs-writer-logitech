@@ -6,9 +6,11 @@
  * <html>: 0 at the top of the page, 1 once the hero has scrolled fully away. index.css maps it:
  *
  *   p 0.00 -> backdrop at full strength, hero copy at rest
+ *   p 0.00-0.40 -> parallax only: the backdrop rises at ~1/3 of scroll speed, full strength
  *   p 0.35 -> copy starts to lift and fade (waypoint 1)
- *   p 0.75 -> backdrop mostly gone, dissolving into the white page (waypoint 2)
- *   p 1.00 -> backdrop hidden, so it costs nothing further down
+ *   p 0.40-1.00 -> the backdrop fades out gradually while still drifting (waypoint 2)
+ *
+ * It also publishes `--vb-hero-y`, the raw scroll offset in px, for the parallax.
  *
  * It also reveals each later row as it enters the viewport. Rows are hidden only once this has
  * run, so a page without JavaScript (or a crawler) sees everything. `prefers-reduced-motion`
@@ -28,6 +30,10 @@ export function useHeroScroll(ref: RefObject<HTMLElement | null>, enabled: boole
       const height = hero.offsetHeight || window.innerHeight
       const p = Math.min(1, Math.max(0, window.scrollY / height))
       root.style.setProperty('--vb-hero-p', p.toFixed(3))
+      // the backdrop is 80svh, but never shorter than the hero's own content plus its fade
+      root.style.setProperty('--vb-hero-h', `${height}px`)
+      // raw offset for the parallax; capped at the hero's height, past which it is invisible anyway
+      root.style.setProperty('--vb-hero-y', `${Math.min(window.scrollY, height).toFixed(1)}px`)
     }
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update)
@@ -35,6 +41,10 @@ export function useHeroScroll(ref: RefObject<HTMLElement | null>, enabled: boole
     update()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
+    // The hero grows after first paint (web fonts, images), and that fires no resize event, so a
+    // one-off measurement left --vb-hero-h stale and the backdrop too short. Re-measure on change.
+    const resize = 'ResizeObserver' in window ? new ResizeObserver(onScroll) : undefined
+    resize?.observe(hero)
 
     // Waypoint reveals for everything below the hero.
     let observer: IntersectionObserver | undefined
@@ -65,7 +75,10 @@ export function useHeroScroll(ref: RefObject<HTMLElement | null>, enabled: boole
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       observer?.disconnect()
+      resize?.disconnect()
       root.style.removeProperty('--vb-hero-p')
+      root.style.removeProperty('--vb-hero-y')
+      root.style.removeProperty('--vb-hero-h')
     }
   }, [ref, enabled])
 }

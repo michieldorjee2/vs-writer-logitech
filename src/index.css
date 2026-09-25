@@ -827,30 +827,47 @@ html:has(.vb-hero--full) body {
     background: #fff;
     display: flow-root; /* stop a section's top margin collapsing out of its white surface */
 }
+/* ...except the first one, whose top is transparent and ramps to white over the same 260px the
+   backdrop runs past the hero, so the green dissolves into the page instead of ending on a line */
+.vb-experience:has(.vb-hero--full) [data-vb-root] > :nth-child(2) {
+    background: linear-gradient(to bottom, rgb(255 255 255 / 0) 0, rgb(255 255 255 / 0.55) 140px, #fff 260px);
+}
 .vb-hero.vb-hero--full {
     background: transparent;
     overflow: visible;
     isolation: auto;
-    min-height: min(100svh, 1000px);
+    min-height: 80svh;
     justify-content: center;
 }
+.vb-hero.vb-hero--full h1 { font-size: clamp(40px, 6vw, 88px); }
+.vb-hero.vb-hero--full .vb-stat { padding: 16px 18px; gap: 12px; }
+.vb-hero.vb-hero--full .vb-stat > span { font-size: clamp(26px, 2.6vw, 38px); }
+.vb-hero.vb-hero--full .vb-stat > p { font-size: 14px; }
 .vb-hero.vb-hero--full::before { display: none; }
 .vb-hero__backdrop {
     position: fixed;
-    inset: 0;
+    inset: 0 0 auto 0;
+    /* the hero is 80svh (or its content, if taller); the backdrop runs 260px PAST it so the fade
+       happens under the next section's transparent-to-white top, not at the hero's hard edge */
+    height: calc(var(--vb-hero-h, 80svh) + 260px);
     z-index: -1;
     pointer-events: none;
     background-color: #08251a;
     background-image:
         radial-gradient(55% 45% at 18% 8%, rgb(171 255 68 / 0.26), transparent 62%),
         radial-gradient(45% 55% at 86% 18%, rgb(145 219 218 / 0.30), transparent 60%),
-        radial-gradient(70% 55% at 50% 115%, rgb(13 58 41 / 1), transparent 70%),
         linear-gradient(180deg, #0d3a29 0%, #08251a 100%);
-    background-size: 150% 150%, 150% 150%, 100% 100%, 100% 100%;
+    background-size: 150% 150%, 150% 150%, 100% 100%;
     animation: vb-hero-drift 22s ease-in-out infinite alternate;
-    /* waypoint 2: most of the colour is gone by ~75% of the hero, all of it by 100% */
-    opacity: clamp(0, calc(1 - var(--vb-hero-p, 0) * 1.25), 1);
-    scale: calc(1 + var(--vb-hero-p, 0) * 0.08);
+    /* full strength behind every line of the hero's copy, then a 320px eased ramp to nothing that
+       starts just above the hero's bottom edge */
+    mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 320px), rgb(0 0 0 / 0.72) calc(100% - 220px), rgb(0 0 0 / 0.36) calc(100% - 120px), rgb(0 0 0 / 0.1) calc(100% - 40px), transparent 100%);
+    /* parallax: rises at ~1/3 of scroll speed, while the page itself moves at full speed */
+    translate: 0 calc(var(--vb-hero-y, 0px) * -0.33);
+    /* holds full strength for the first 40% of the hero, then fades out gradually, gone at 100%
+       (--vb-hero-p stops at 1, so the ramp must reach 0 there or the backdrop lingers at ~13%) */
+    opacity: clamp(0, calc(1 - (var(--vb-hero-p, 0) - 0.4) * 1.67), 1);
+    scale: calc(1 + var(--vb-hero-p, 0) * 0.05);
 }
 .vb-hero__backdrop::before {
     content: '';
@@ -859,15 +876,6 @@ html:has(.vb-hero--full) body {
     background-image: radial-gradient(rgb(255 255 255 / 0.16) 1px, transparent 1.3px);
     background-size: 22px 22px;
     mask-image: radial-gradient(70% 60% at 50% 40%, black, transparent);
-}
-/* the graceful edge: the hero's last 30% dissolves into the white page below */
-.vb-hero.vb-hero--full::after {
-    content: '';
-    position: absolute;
-    inset: auto 0 0 0;
-    height: 30%;
-    pointer-events: none;
-    background: linear-gradient(to bottom, rgb(255 255 255 / 0), #fff);
 }
 /* waypoint 1: from ~35% of the hero the copy lifts and fades as the page takes over */
 .vb-hero.vb-hero--full > .vb-container {
@@ -891,7 +899,7 @@ html:has(.vb-hero--full) body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .vb-hero__backdrop { animation: none; scale: 1; }
+    .vb-hero__backdrop { animation: none; scale: 1; translate: none; }
     .vb-hero.vb-hero--full > .vb-container { translate: none; }
 }
 

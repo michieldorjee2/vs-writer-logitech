@@ -95,6 +95,7 @@ import AbmChallengeShotElement from '../src/cms/components/abm-challenge-shot-el
 import AbmClosingCtaElement from '../src/cms/components/abm-closing-cta-element';
 import AbmComparisonRowElement from '../src/cms/components/abm-comparison-row-element';
 import AbmFrictionPointElement from '../src/cms/components/abm-friction-point-element';
+import FaqItemElement from '../src/cms/components/faq-item-element';
 import AbmNavRailElement from '../src/cms/components/abm-nav-rail-element';
 import AbmNewsItemElement from '../src/cms/components/abm-news-item-element';
 import AbmRoiCardElement from '../src/cms/components/abm-roi-card-element';
@@ -125,6 +126,7 @@ const SSR_ELEMENT_RENDERERS: Record<string, Renderer> = {
   AbmClosingCtaElement,
   AbmComparisonRowElement,
   AbmFrictionPointElement,
+  FaqItemElement,
   AbmNavRailElement,
   AbmNewsItemElement,
   AbmRoiCardElement,

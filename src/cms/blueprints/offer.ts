@@ -3,7 +3,7 @@
  *
  * Modelled on optimizely.com's AI Marketing Certificate page (prod content 7879), which is a
  * campaign page, not an account dossier: hero -> proof -> who runs it -> what you walk away with
- * -> how it runs -> is this for you -> sign up. Michiel's ruling (2026-09-25): the takeout shape
+ * -> how it runs -> is this for you -> questions -> sign up. Michiel's ruling (2026-09-25): the takeout shape
  * mirrors the account-intelligence page too closely; a page like this should promote an offer.
  *
  * So there is no comparison table, no tech-stack intel, no ROI model and no analyst wall here.
@@ -14,7 +14,7 @@
  * behind this blueprint, so nothing constrains them to CompetitorComparisonPage's field names.
  */
 import { defineBlueprint } from './internal/compose'
-import { CLOSE_CARD, COL_BODY, COL_HERO, DARK_CARD, HERO_FULL, PANEL_CARD, ROW_GRID, cards, sheet } from './internal/layouts'
+import { CLOSE_CARD, COL_BODY, COL_HERO, DARK_CARD, HERO_FULL, PANEL_CARD, ROW_GRID, ROW_HERO, cards, sheet } from './internal/layouts'
 
 export default defineBlueprint({
   blueprintId: 'offer',
@@ -29,7 +29,7 @@ export default defineBlueprint({
       displayName: 'Hero',
       why: 'The offer, stated once, with the three or four facts that make it worth taking.',
       section: HERO_FULL,
-      row: ROW_GRID,
+      row: ROW_HERO,
       column: COL_HERO,
       feeds: [
         { contentType: 'StackedHeadingElement', flatKey: 'offerEyebrow', cardinality: 'one', note: 'Rendered as a pill above the headline.' },
@@ -40,7 +40,7 @@ export default defineBlueprint({
           cardinality: 'many',
           note: 'The floating cards: what the offer IS (time, cost, deliverable), not account intel.',
           ...cards('cols_4', 'cols_2'),
-          row: { ...cards('cols_4', 'cols_2').row, gridColumns: 'cols_2', gridColumnsMd: 'cols_4' },
+          row: { ...cards('cols_4', 'cols_2').row, gridColumns: 'cols_2', gridColumnsMd: 'cols_4', marginTop: 'mt_16' },
         },
         { contentType: 'TextContentElement', flatKey: 'offerIntro', cardinality: 'one' },
         { contentType: 'ButtonBlock', flatKey: 'offerCta', cardinality: 'one' },
@@ -128,6 +128,25 @@ export default defineBlueprint({
         { contentType: 'StackedHeadingElement', flatKey: 'fitHeadline', cardinality: 'one', column: { colSpanMd: 'full', colSpanLg: 'span_4' } },
         { contentType: 'CalloutBlock', flatKey: 'fitYes', cardinality: 'one', column: { colSpanMd: 'span_6', colSpanLg: 'span_4', colStartLg: 'start_5' } },
         { contentType: 'CalloutBlock', flatKey: 'fitNo', cardinality: 'one', column: { colSpanMd: 'span_6', colSpanLg: 'span_4' } },
+      ],
+    },
+    {
+      slotId: 'offer-faq',
+      displayName: 'Questions',
+      why: 'The objections a reader has before they book, answered without a call.',
+      section: sheet(),
+      row: ROW_GRID,
+      // Centred at 8/12, like the reference page's FAQ.
+      column: { colSpan: 'full', colSpanMd: 'span_10', colSpanLg: 'span_8', colStartMd: 'start_2', colStartLg: 'start_3', gap: 'sm' },
+      feeds: [
+        { contentType: 'StackedHeadingElement', flatKey: 'faqHeadline', cardinality: 'one' },
+        {
+          contentType: 'FaqItemElement',
+          flatKey: 'faqs',
+          cardinality: 'many',
+          primary: true,
+          note: 'Question / Answer, one node per question. Each takes the 8/12 column, so they stack as a list.',
+        },
       ],
     },
     {

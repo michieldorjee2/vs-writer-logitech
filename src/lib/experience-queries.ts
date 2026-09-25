@@ -44,6 +44,7 @@ fragment CompositionElement on _IComponent {
   ... on AbmClosingCtaElement { Title Description ButtonText ScheduleUrl { default } }
   ... on AbmComparisonRowElement { Category OurValue OurDetail CompetitorValue CompetitorDetail }
   ... on AbmFrictionPointElement { Title Description }
+  ... on FaqItemElement { Question Answer }
   ... on AbmNavRailElement { RailLines }
   ... on AbmNewsItemElement { NewsDate Headline Url { default } }
   ... on AbmRoiCardElement { Metric Unit Label CitationText }

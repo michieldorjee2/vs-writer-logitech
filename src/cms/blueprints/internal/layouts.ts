@@ -73,10 +73,11 @@ export const HERO_FULL: Settings = {
   backgroundColor: 'dark_forest',
   containerWidth: 'contained',
   treatment: 'hero',
-  paddingTop: 'xxl',
-  paddingTopLg: 'p_3xl',
-  paddingBottom: 'xxl',
-  paddingBottomLg: 'px_168',
+  // compact enough that the whole hero fits in 80svh on a 900px-tall screen
+  paddingTop: 'px_80',
+  paddingTopLg: 'px_80',
+  paddingBottom: 'loose',
+  paddingBottomLg: 'loose',
   paddingX: 'px_8',
   roundedCorners: 'none',
 }
@@ -111,6 +112,9 @@ export const ROW_GRID: Settings = {
   spacing: 'none',
   marginTop: 'mt_32',
 }
+
+/** Hero rows sit 16px apart, not the page's 32px — the hero is one composed unit. */
+export const ROW_HERO: Settings = { ...ROW_GRID, marginTop: 'mt_16' }
 
 /**
  * Copy columns span the full container, so headings, copy, tables and card rows all share ONE
