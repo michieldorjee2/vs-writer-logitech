@@ -122,6 +122,7 @@ export const SLOT_IDS = [
   'offer-fit',
   'offer-faq',
   'offer-problem',
+  'offer-about',
 ] as const
 
 export type SlotId = (typeof SLOT_IDS)[number]

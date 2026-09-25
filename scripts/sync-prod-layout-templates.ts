@@ -76,6 +76,23 @@ for (const [key, file, maps, defaults] of templates) {
       ],
       defaultValue: 'none',
     })
+    // An in-page link target (`#about`). A closed list rather than free text: display settings
+    // are choices, and a button's `#…` URL has to name one that exists.
+    ;(t.settings as unknown as RepoDisplayTemplate['settings'][number][]).push({
+      key: 'anchor',
+      displayName: 'Anchor (Showcase)',
+      type: 'select',
+      options: [
+        { value: 'none', displayName: 'None' },
+        { value: 'about', displayName: '#about' },
+        { value: 'problem', displayName: '#problem' },
+        { value: 'outcomes', displayName: '#outcomes' },
+        { value: 'agenda', displayName: '#agenda' },
+        { value: 'faq', displayName: '#faq' },
+        { value: 'contact', displayName: '#contact' },
+      ],
+      defaultValue: 'none',
+    })
   }
   const body = `/**
  * GENERATED from optimizely.com PROD's live \`${key}\` by scripts/sync-prod-layout-templates.ts.

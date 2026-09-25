@@ -97,12 +97,16 @@ export function ProdSection({
   // `data-treatment` hook plus a class that index.css styles. `hero` = the animated gradient
   // hero with floating cards; `panel` = a soft gradient panel that white cards sit on.
   const treatment = s.treatment && s.treatment !== 'none' ? s.treatment : undefined
+  // Showcase extension: an in-page link target, so a button can point at `#about`.
+  const anchor = s.anchor && s.anchor !== 'none' ? s.anchor : undefined
 
   const section = (
     <div
       ref={ref}
+      id={anchor}
       data-treatment={treatment}
       className={cn(
+        anchor && 'scroll-mt-6',
         treatment && `vb-${treatment}`,
         fullHero && 'vb-hero--full',
         sectionVariants({

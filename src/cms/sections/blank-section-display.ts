@@ -1,7 +1,7 @@
 /**
  * GENERATED from optimizely.com PROD's live `BlankSectionDisplayTemplate` by scripts/sync-prod-layout-templates.ts.
  * Do not hand-edit — re-run the script. Rendered by src/cms/layout-prod, whose class maps come
- * from the same prod source. 45 settings.
+ * from the same prod source. 46 settings.
  */
 import type { RepoDisplayTemplate } from '../display-template-transform'
 
@@ -1733,6 +1733,42 @@ const displayTemplates: RepoDisplayTemplate[] = [{
         {
           "value": "panel",
           "displayName": "Panel — soft gradient behind white cards"
+        }
+      ],
+      "defaultValue": "none"
+    },
+    {
+      "key": "anchor",
+      "displayName": "Anchor (Showcase)",
+      "type": "select",
+      "options": [
+        {
+          "value": "none",
+          "displayName": "None"
+        },
+        {
+          "value": "about",
+          "displayName": "#about"
+        },
+        {
+          "value": "problem",
+          "displayName": "#problem"
+        },
+        {
+          "value": "outcomes",
+          "displayName": "#outcomes"
+        },
+        {
+          "value": "agenda",
+          "displayName": "#agenda"
+        },
+        {
+          "value": "faq",
+          "displayName": "#faq"
+        },
+        {
+          "value": "contact",
+          "displayName": "#contact"
         }
       ],
       "defaultValue": "none"

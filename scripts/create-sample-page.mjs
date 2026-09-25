@@ -923,6 +923,26 @@ function graphKey() {
  * waits until the section and element counts match what was written, and says UNVERIFIED
  * rather than wrong if they never do.
  */
+/**
+ * The version Graph serves for this route under the renderer's own filter (`url.hierarchical`
+ * + `locale: en`). Counting sections and elements is not enough: on 2026-09-25 that view kept
+ * serving the PREVIOUS publish of vb-offer-wellsky for minutes while a query without `locale`
+ * was current, and the old version had the same counts, so the read-back passed on stale data.
+ * Graph's `_metadata.version` is the CMA version id, so this is an exact match.
+ */
+async function servedVersion(key) {
+  const res = await fetch(`${GRAPH_ENDPOINT}?auth=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `query V($slug: String!) { ABMExperience(where: { _metadata: { url: { hierarchical: { eq: $slug } } } }, locale: en) { items { _metadata { version } } } }`,
+      variables: { slug: `/${ROUTE_SEGMENT}/` },
+    }),
+  });
+  const json = await res.json();
+  return json?.data?.ABMExperience?.items?.[0]?._metadata?.version;
+}
+
 async function readThroughGraph(query, expected, attempts = 24) {
   const key = graphKey();
   let last = null;
@@ -941,7 +961,8 @@ async function readThroughGraph(query, expected, attempts = 24) {
       last = item;
       const report = graphSlotReport(item);
       const elements = report.reduce((total, row) => total + row.elements, 0);
-      if (report.length === expected.sections && elements === expected.elements) return item;
+      const fresh = !expected.versionId || String(await servedVersion(key)) === String(expected.versionId);
+      if (fresh && report.length === expected.sections && elements === expected.elements) return item;
     }
     if (attempt < attempts) await sleep(5000);
   }
@@ -1053,7 +1074,7 @@ async function main() {
   console.log(`published   yes${repinned ? ' (routeSegment re-pinned)' : ''}`);
 
   const { ABM_EXPERIENCE_QUERY } = await import('../src/lib/experience-queries.ts');
-  const graphItem = await readThroughGraph(ABM_EXPERIENCE_QUERY, sent);
+  const graphItem = await readThroughGraph(ABM_EXPERIENCE_QUERY, { ...sent, versionId: version.versionId });
   if (!graphItem) {
     console.error('\nGraph read-back: the page did not appear with a composition. UNVERIFIED.');
     process.exitCode = 1;

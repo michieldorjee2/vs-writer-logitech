@@ -2,8 +2,8 @@
  * The OFFER page: one account, one offer, one call to action.
  *
  * Modelled on optimizely.com's AI Marketing Certificate page (prod content 7879), which is a
- * campaign page, not an account dossier: hero -> the problem -> proof -> who runs it -> what you
- * walk away with -> how it runs -> is this for you -> questions -> sign up. Michiel's ruling (2026-09-25): the takeout shape
+ * campaign page, not an account dossier: hero -> who is Optimizely -> the problem -> proof -> who
+ * runs it -> what you walk away with -> how it runs -> is this for you -> questions -> sign up. Michiel's ruling (2026-09-25): the takeout shape
  * mirrors the account-intelligence page too closely; a page like this should promote an offer.
  *
  * So there is no comparison table, no tech-stack intel, no ROI model and no analyst wall here.
@@ -44,6 +44,39 @@ export default defineBlueprint({
         },
         { contentType: 'TextContentElement', flatKey: 'offerIntro', cardinality: 'one' },
         { contentType: 'ButtonBlock', flatKey: 'offerCta', cardinality: 'one' },
+        {
+          contentType: 'ButtonBlock',
+          flatKey: 'offerSecondaryCta',
+          cardinality: 'one',
+          note: 'Sits beside offerCta. `#about` scrolls to the Who is Optimizely band.',
+          // The display setting, not the content `Variant`: buttonVariant defaults to primary and
+          // wins over Variant, so a ghost Variant alone rendered a second lime button.
+          element: { buttonVariant: 'whiteStroke' },
+        },
+      ],
+    },
+    {
+      slotId: 'offer-about',
+      displayName: 'Who is Optimizely?',
+      why: 'For a reader who does not know us yet: the company behind the offer, in optimizely.com’s own words.',
+      // `anchor: about` is what the hero's secondary CTA (`#about`) scrolls to. A plain sheet, not
+      // PANEL_CARD: Proof already uses the panel, and two gradient panels with one white band between
+      // them is the zebra rhythm Michiel ruled out.
+      section: { ...sheet(), anchor: 'about' },
+      row: ROW_GRID,
+      column: COL_BODY,
+      feeds: [
+        { contentType: 'StackedHeadingElement', flatKey: 'aboutEyebrow', cardinality: 'one', note: 'h4 kicker, e.g. "Who is Optimizely?"' },
+        { contentType: 'StackedHeadingElement', flatKey: 'aboutHeadline', cardinality: 'one', primary: true },
+        { contentType: 'TextContentElement', flatKey: 'aboutIntro', cardinality: 'one' },
+        {
+          contentType: 'AbmFrictionPointElement',
+          flatKey: 'aboutPillars',
+          cardinality: 'many',
+          note: 'Title / Description, one per platform pillar. Unnumbered cream cards.',
+          element: { numbering: 'none', colorScheme: 'neutral' },
+          ...cards('cols_3', 'cols_1'),
+        },
       ],
     },
     {
