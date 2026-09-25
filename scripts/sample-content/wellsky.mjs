@@ -217,7 +217,8 @@ export function content(meetingUrl) {
 /** Page-level properties. `null` withholds a key the Northwind defaults would otherwise set. */
 export const PAGE = {
   displayName: 'WellSky — working lunch offer',
-  fit: 'use-case, WordPress disclosed (not named on an offer page)',
+  // Serialized into the page source with componentPlan: never name a signal here.
+  fit: 'use-case, competitor not named',
   properties: {
     salesforceAccountID: '0014J00000MyY3IQAV',
     companySlug: 'wellsky',
