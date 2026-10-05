@@ -13,6 +13,13 @@ import '../styles/search.css';
 const CREATE_PAGE_ENDPOINT = '/api/opal-create-page';
 const CREATE_PERSON_PAGE_ENDPOINT = '/api/opal-create-person-page';
 const MAX_COMPANY_NAME_LEN = 120;
+
+/** Same reading as api/_lib/validate-input's websiteDomain. */
+function looksLikeWebsite(value: string): boolean {
+  const host = value.toLowerCase().replace(/\s+/g, '').replace(/^https?:\/\//, '').split('/')[0];
+  const domain = host.startsWith('www.') ? host.slice(4) : host;
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain);
+}
 const COOLDOWN_MS = 60 * 1000;
 const COOLDOWN_KEY = 'opti.add-new.last-sent.v1';
 
@@ -675,6 +682,11 @@ function SearchPage() {
       setAddError(`Keep it under ${MAX_COMPANY_NAME_LEN} characters`);
       return;
     }
+    // An account page is found by the company's website, exactly — never by name.
+    if (addKind !== 'person' && !looksLikeWebsite(company)) {
+      setAddError("Enter the company's website, e.g. anaplan.com");
+      return;
+    }
 
     const email = (loadStoredEmail() || addEmail).trim();
     if (!isValidOptimizelyEmail(email)) {
@@ -969,7 +981,7 @@ function SearchPage() {
                           ? `Who at ${addCompany || 'this company'}?`
                           : addKind === 'person'
                             ? 'Company they work at'
-                            : 'Company name'
+                            : 'Company website, e.g. anaplan.com'
                     }
                     value={
                       addPhase === 'email'

@@ -97,6 +97,31 @@ export function validateCompanyName(raw: unknown): Validated<string> {
 }
 
 /**
+ * The domain a typed website names, or null when it does not name one:
+ * "https://www.Printerland.co.uk/" -> "printerland.co.uk", "Atlassian" -> null.
+ * The same reading as the Opal one-off's gather step (`domain_of` + `DOMAIN_RE`),
+ * which matches it exactly against Salesforce's Domain_Name__c.
+ */
+export function websiteDomain(value: string): string | null {
+  const host = value.toLowerCase().replace(/\s+/g, '').replace(/^https?:\/\//, '').split('/')[0];
+  const domain = host.startsWith('www.') ? host.slice(4) : host;
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain) ? domain : null;
+}
+
+/**
+ * Account page request: the company's WEBSITE. The page is built from the
+ * account's wiki dossier, and the account is found by its website, exactly —
+ * a name is never matched to an account, so a name would only buy a run that
+ * ends in "request it again with the website".
+ */
+export function validateCompanyWebsite(raw: unknown): Validated<string> {
+  const text = validateCompanyName(raw);
+  if (!text.ok) return text;
+  if (!websiteDomain(text.value)) return fail("company_name must be the company's website, for example anaplan.com");
+  return text;
+}
+
+/**
  * Email of the Optimizely person making the request. `strict` requires an
  * @optimizely.com address — these endpoints spend credits and attribute
  * published pages, so the requester should be identifiable.

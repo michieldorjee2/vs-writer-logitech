@@ -249,8 +249,7 @@ function opalFeedbackDevProxy(): Plugin {
  * Mirrors api/opal-create-page.ts so the dev server behaves like prod.
  */
 function opalCreatePageDevProxy(): Plugin {
-  const OPAL_WEBHOOK_URL =
-    'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/632a7f56-733d-41d0-b71a-6da3b657c5c6'
+  const OPAL_WEBHOOK_URL = process.env.OPAL_CREATE_PAGE_WEBHOOK_URL || ''
   const OPTIMIZELY_EMAIL_RE = /^[^\s@]+@optimizely\.com$/i
   const MAX_COMPANY_NAME_LEN = 120
 

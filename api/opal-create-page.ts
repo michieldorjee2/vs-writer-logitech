@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateCompanyName, validateEmail } from './_lib/validate-input.js';
+import { validateCompanyWebsite, validateEmail } from './_lib/validate-input.js';
 
 /**
  * Proxy the search-page "Add new" payload to the Opal create-page webhook.
@@ -8,10 +8,15 @@ import { validateCompanyName, validateEmail } from './_lib/validate-input.js';
  *
  * Payload shape:
  *   { company_name, edit_user_email }
+ *
+ * `company_name` is the company's website. Opal resolves it to one Salesforce
+ * account by exact domain, refreshes that account's wiki dossier, and builds the
+ * page from it; a request it cannot resolve is answered on Teams with the reason.
  */
 
-const OPAL_WEBHOOK_URL =
-  'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/632a7f56-733d-41d0-b71a-6da3b657c5c6';
+// The one-off workflow's webhook. The URL is the credential, so it lives in the
+// environment (Vercel: OPAL_CREATE_PAGE_WEBHOOK_URL), not in the repo.
+const OPAL_WEBHOOK_URL = process.env.OPAL_CREATE_PAGE_WEBHOOK_URL || '';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -20,10 +25,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { company_name, edit_user_email } = (req.body ?? {}) as Record<string, unknown>;
 
-  // Each accepted request buys a ~12-minute agent run at 150-200 credits and
-  // can publish a live page, so the bar for spending one is a plausible
-  // company name from an identifiable Optimizely address. See _lib/validate-input.
-  const name = validateCompanyName(company_name);
+  if (!OPAL_WEBHOOK_URL) {
+    console.error('[opal-create-page] OPAL_CREATE_PAGE_WEBHOOK_URL is not set');
+    return res.status(503).json({ error: 'Page requests are not configured' });
+  }
+
+  // Each accepted request starts an Opal run that can publish a live page, so
+  // the bar for spending one is a website from an identifiable Optimizely
+  // address. See _lib/validate-input.
+  const name = validateCompanyWebsite(company_name);
   if (!name.ok) {
     console.warn('[opal-create-page] rejected company_name:', name.error);
     return res.status(400).json({ error: name.error });
