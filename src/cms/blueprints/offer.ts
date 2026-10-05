@@ -81,8 +81,9 @@ export default defineBlueprint({
     },
     {
       slotId: 'offer-problem',
-      displayName: 'The problem',
-      why: 'The problem the offer solves, in the account’s own terms: why this is hard for them, now.',
+      // Renamed from "The problem" in Laura's v3 review (2026-10): the coverage gap, then the steps.
+      displayName: 'The opportunity, and how it works',
+      why: 'Their coverage gap in numbers (segments x personas = pages), then the four steps that close it.',
       section: sheet(),
       // Editorial, not another card strip: the argument on the left, one card per audience
       // stacked on the right. Stacks on tablets and phones.
@@ -95,7 +96,7 @@ export default defineBlueprint({
           flatKey: 'problemThesis',
           cardinality: 'one',
           primary: true,
-          note: 'Headline / Body (paragraphs split on blank lines). Quote only for a real, attributable quote.',
+          note: 'Headline = their volume problem, estimates labelled. Body = paragraphs split on blank lines. Quote only for a real, attributable quote.',
           column: { colSpanLg: 'span_6' },
         },
         {
@@ -103,8 +104,8 @@ export default defineBlueprint({
           flatKey: 'problemLanes',
           cardinality: 'many',
           note:
-            'One card per audience: Lane = who, Need = what they need to hear, Outcome = why one shared page misses them. ' +
-            'Leave Solution empty: this band states the problem, and Solution renders a "We’d use" product pill.',
+            'One card per step: Lane = step header ("01 · Hand over your list"), Need = step subheader, Outcome = step description. ' +
+            'Leave Solution empty: it renders a "We’d use" product pill.',
           column: { colSpanLg: 'span_6', gap: 'sm' },
         },
       ],
@@ -181,8 +182,9 @@ export default defineBlueprint({
     },
     {
       slotId: 'offer-fit',
-      displayName: 'Is this for you?',
-      why: 'Who should say yes and who should not — it qualifies without a form.',
+      // Renamed from "Is this for you?" in Laura's v3 review: fit is stated, never asked.
+      displayName: 'What this means for you',
+      why: 'Statements of fit from their own signals, then the personalization tiers in their vocabulary.',
       section: sheet(),
       sharedRow: true,
       row: { ...ROW_GRID, gridColumns: 'cols_1', gridColumnsMd: 'cols_12', columnGap: 'md', rowGap: 'md' },
@@ -190,6 +192,8 @@ export default defineBlueprint({
       feeds: [
         { contentType: 'StackedHeadingElement', flatKey: 'fitHeadline', cardinality: 'one', column: { colSpanMd: 'full', colSpanLg: 'span_4' } },
         { contentType: 'CalloutBlock', flatKey: 'fitYes', cardinality: 'one', column: { colSpanMd: 'span_6', colSpanLg: 'span_4', colStartLg: 'start_5' } },
+        // fitNo is now the use-case panel ("So you can personalize for…"), CalloutType info, never the
+        // negative default styling. The key keeps its name: renaming a flat key breaks every page.
         { contentType: 'CalloutBlock', flatKey: 'fitNo', cardinality: 'one', column: { colSpanMd: 'span_6', colSpanLg: 'span_4' } },
       ],
     },

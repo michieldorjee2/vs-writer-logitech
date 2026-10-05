@@ -69,7 +69,39 @@ const LOCALE = 'en';
  * withholds that Northwind default. Without it, the offer blueprint gets the Northwind offer.
  */
 const CONTENT_NAME = argValue('--content');
-const CONTENT_MODULE = CONTENT_NAME ? await import(`./sample-content/${CONTENT_NAME}.mjs`) : undefined;
+/**
+ * `--content-json <file>` builds a page from `{account, page: {PageTitle, MetaDescription}, content}`,
+ * the shape the offer page agent emits in draft-only mode and the review doc's gold pages are mapped
+ * to. Page identity is derived from the account name; Northwind's ids and brand are withheld.
+ */
+const CONTENT_JSON = argValue('--content-json');
+function contentModuleFromJson(file) {
+  const { account, page = {}, content } = JSON.parse(readFileSync(file, 'utf8'));
+  const slug = account.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return {
+    content: () => content,
+    PAGE: {
+      displayName: `${account} — ${argValue('--label') ?? 'offer'}`,
+      fit: 'offer',
+      properties: {
+        salesforceAccountID: null,
+        companySlug: slug,
+        companyName: account,
+        brandDomain: null,
+        brandAccentColor: null,
+        customerLogo: null,
+        competitorName: null,
+        PageTitle: page.PageTitle ?? `${account} — Optimizely`,
+        MetaDescription: page.MetaDescription ?? null,
+      },
+    },
+  };
+}
+const CONTENT_MODULE = CONTENT_JSON
+  ? contentModuleFromJson(CONTENT_JSON)
+  : CONTENT_NAME
+    ? await import(`./sample-content/${CONTENT_NAME}.mjs`)
+    : undefined;
 const DISPLAY_NAME =
   CONTENT_MODULE?.PAGE.displayName ??
   (BLUEPRINT_ID === 'offer' ? 'Northwind Traders — working session offer' : 'Northwind Traders');
