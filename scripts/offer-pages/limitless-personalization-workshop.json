@@ -1,0 +1,216 @@
+{
+  "campaign": "limitless-personalization-workshop",
+  "blueprint": "offer",
+  "brief": "Notes/offer-briefs/limitless-personalization-workshop.md",
+  "pageTitle": "A personalization workshop for {account} — Optimizely",
+  "slots": [
+    "aboutIntro.MainBody",
+    "aboutPillars[0].Description",
+    "aboutPillars[1].Description",
+    "aboutPillars[2].Description",
+    "faqs[1].Answer",
+    "faqs[1].Question",
+    "faqs[3].Answer",
+    "faqs[3].Question",
+    "fitNo.CalloutText",
+    "fitYes.CalloutText",
+    "offerClose.Description",
+    "offerHeadline.Text",
+    "offerHighlights[1].Description",
+    "offerIntro.MainBody",
+    "outcomes[1].Description",
+    "outcomes[2].Description",
+    "problemLanes[0].Outcome",
+    "problemLanes[1].Outcome",
+    "problemLanes[2].Outcome",
+    "problemLanes[3].Outcome",
+    "problemThesis.Body",
+    "problemThesis.Headline",
+    "proofHeadline.Text",
+    "MetaDescription"
+  ],
+  "templatePatterns": [
+    "problemLanes[1].Outcome"
+  ],
+  "template": {
+    "offerEyebrow": {
+      "Text": "A personalization workshop for {account}",
+      "HeadingLevel": "h4"
+    },
+    "offerHeadline": {
+      "Text": "<<WRITE offerHeadline.Text>>",
+      "HeadingLevel": "h1"
+    },
+    "offerHighlights": [
+      {
+        "StatValue": "45 min",
+        "Description": "one session: data strategy, audiences, personalized output, distribution"
+      },
+      {
+        "StatValue": "{account}’s team",
+        "Description": "<<WRITE offerHighlights[1].Description>>"
+      },
+      {
+        "StatValue": "Built live",
+        "Description": "we personalize a page on one of your real accounts, in the room"
+      },
+      {
+        "StatValue": "Lunch",
+        "Description": "vouchers for everyone who joins, from the office or from home"
+      }
+    ],
+    "offerIntro": {
+      "MainBody": "<<WRITE offerIntro.MainBody>>"
+    },
+    "offerCta": {
+      "ButtonText": "Book the workshop",
+      "ButtonUrl": "https://www.optimizely.com/contact-sales/",
+      "Variant": "primary"
+    },
+    "offerSecondaryCta": {
+      "ButtonText": "Who is Optimizely?",
+      "ButtonUrl": "#about",
+      "Variant": "secondary"
+    },
+    "aboutEyebrow": {
+      "Text": "Who is Optimizely?",
+      "HeadingLevel": "h4"
+    },
+    "aboutHeadline": {
+      "Text": "The AI platform for marketing",
+      "HeadingLevel": "h2"
+    },
+    "aboutIntro": {
+      "MainBody": "<<WRITE aboutIntro.MainBody>>"
+    },
+    "aboutPillars": [
+      {
+        "Title": "Always yours",
+        "Description": "<<WRITE aboutPillars[0].Description>>"
+      },
+      {
+        "Title": "Always on",
+        "Description": "<<WRITE aboutPillars[1].Description>>"
+      },
+      {
+        "Title": "Always traceable",
+        "Description": "<<WRITE aboutPillars[2].Description>>"
+      }
+    ],
+    "problemThesis": {
+      "Headline": "<<WRITE problemThesis.Headline>>",
+      "Body": "<<WRITE problemThesis.Body>>"
+    },
+    "problemLanes": [
+      {
+        "Lane": "01 · Hand over your list",
+        "Need": "Straight from your CRM, or whatever source you prefer",
+        "Outcome": "<<WRITE problemLanes[0].Outcome>>"
+      },
+      {
+        "Lane": "02 · Agents do the homework",
+        "Need": "Every source you connect, every account on the list",
+        "Outcome": "<<WRITE problemLanes[1].Outcome>>"
+      },
+      {
+        "Lane": "03 · A real page shows up",
+        "Need": "Your brand, your domain, a live URL",
+        "Outcome": "<<WRITE problemLanes[2].Outcome>>"
+      },
+      {
+        "Lane": "04 · And it keeps up",
+        "Need": "Without being asked",
+        "Outcome": "<<WRITE problemLanes[3].Outcome>>"
+      }
+    ],
+    "proofHeadline": {
+      "Text": "<<WRITE proofHeadline.Text>>",
+      "HeadingLevel": "h2"
+    },
+    "proofQuote1": {
+      "QuoteText": "AI is still not a magic bullet, it's not an easy button, but it does make things easier and faster and is opening up more creative ways of working",
+      "Attribution": "John Habib, Senior Director, Content Strategy",
+      "CompanyName": "Diligent · governance, risk, and compliance software",
+      "ResourceType": "Customer story · video",
+      "ResourceUrl": "https://www.optimizely.com/field-notes/customer-stories/diligent-video/"
+    },
+    "proofQuote2": {
+      "QuoteText": "We brought in the CMP to centralize and fix that problem like many clients do, and it was a total game changer for us.",
+      "Attribution": "John Habib, Senior Director, Content Strategy",
+      "CompanyName": "Diligent · 65% of content team time reclaimed",
+      "ResourceType": "Customer story",
+      "ResourceUrl": "https://www.optimizely.com/field-notes/customer-stories/diligent-video/"
+    },
+    "outcomesHeadline": {
+      "Text": "What you leave the workshop with",
+      "HeadingLevel": "h2"
+    },
+    "outcomesIntro": {
+      "MainBody": "Three things your team can use the next morning, whatever you decide about Limitless."
+    },
+    "outcomes": [
+      {
+        "Title": "See Limitless personalization live",
+        "Description": "We take a real account and personalize a page for it live, so you see exactly what it takes. No homework, no list to prepare beforehand."
+      },
+      {
+        "Title": "A data plan you can act on",
+        "Description": "<<WRITE outcomes[1].Description>>"
+      },
+      {
+        "Title": "A review rule your team sets",
+        "Description": "<<WRITE outcomes[2].Description>>"
+      }
+    ],
+    "fitHeadline": {
+      "Text": "What this means for you",
+      "HeadingLevel": "h2"
+    },
+    "fitYes": {
+      "CalloutHeading": "We know this fits, because you…",
+      "CalloutText": "<<WRITE fitYes.CalloutText>>",
+      "CalloutType": "warning"
+    },
+    "fitNo": {
+      "CalloutHeading": "So you can personalize for…",
+      "CalloutText": "<<WRITE fitNo.CalloutText>>",
+      "CalloutType": "info"
+    },
+    "faqHeadline": {
+      "Text": "Questions about your data",
+      "HeadingLevel": "h2"
+    },
+    "faqs": [
+      {
+        "Question": "Which signals do you use?",
+        "Answer": "Pick the ones you want analyzed, or let the agents surface the ones that matter to your buyer. There is no fixed list. If it lives in a system with an API, it is a variable."
+      },
+      {
+        "Question": "<<WRITE faqs[1].Question>>",
+        "Answer": "<<WRITE faqs[1].Answer>>"
+      },
+      {
+        "Question": "Where does the copy come from?",
+        "Answer": "Only from sources you approve: your site, your CRM, public filings, and news. Nothing is invented, and every block traces back to the signal behind it."
+      },
+      {
+        "Question": "<<WRITE faqs[3].Question>>",
+        "Answer": "<<WRITE faqs[3].Answer>>"
+      },
+      {
+        "Question": "Do we have to move our website?",
+        "Answer": "No. Pages publish on a subdomain in your brand, so your current site stays exactly as it is."
+      },
+      {
+        "Question": "Who wrote this page?",
+        "Answer": "An agent did, from public signals and the same brand rules the workshop uses. That is Limitless. Connect your own systems and the pages get considerably sharper than this one."
+      }
+    ],
+    "offerClose": {
+      "Title": "Bring the team. We’ll bring lunch.",
+      "Description": "<<WRITE offerClose.Description>>",
+      "ButtonText": "Book the workshop",
+      "ScheduleUrl": "https://www.optimizely.com/contact-sales/"
+    }
+  }
+}
