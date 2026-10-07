@@ -6,6 +6,11 @@ import { useHeadMeta } from './hooks/useHeadMeta';
 import SearchPage from './components/SearchPage';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 import { includes, resolveComponentPlan } from './lib/limitless/component-plan';
+import type {
+    FinServPage as FinServPageData,
+    PersonPage as PersonPageData,
+    RetailCustomerPage as RetailPageData,
+} from './lib/graph-types';
 
 /*
  * Lazy-load the heavy page renderers. ABMHyperPage pulls in gsap +
@@ -59,16 +64,26 @@ function isABMPage(page: CompetitorComparisonPage): boolean {
     return !!(page.intelEyebrow || page.customerLogo);
 }
 
-function isRetailPage(page: any): boolean {
-    return page?.template === 'retail' || !!page?.customerSlug;
+/*
+ * The client receives whichever page type the slug resolved to, typed loosely as
+ * CompetitorComparisonPage by usePageContent. These read the tags each type carries and,
+ * as type predicates, narrow `data` for the renderer that owns it.
+ */
+type Tagged = { template?: unknown; __template?: unknown; customerSlug?: unknown } | null | undefined;
+
+function isRetailPage(page: unknown): page is RetailPageData {
+    const p = page as Tagged;
+    return p?.template === 'retail' || !!p?.customerSlug;
 }
 
-function isFinServPage(page: any): boolean {
-    return page?.template === 'finserv' || page?.__template === 'finserv';
+function isFinServPage(page: unknown): page is FinServPageData {
+    const p = page as Tagged;
+    return p?.template === 'finserv' || p?.__template === 'finserv';
 }
 
-function isPersonPage(page: any): boolean {
-    return page?.template === 'person' || page?.__template === 'person';
+function isPersonPage(page: unknown): page is PersonPageData {
+    const p = page as Tagged;
+    return p?.template === 'person' || p?.__template === 'person';
 }
 
 /** Turn a slug like "vs-writer-ai-logitech" into "Logitech" */
@@ -142,12 +157,12 @@ function HomePage() {
  * decision engine writes takes this branch with no further code change.
  */
 function renderPageBody(data: CompetitorComparisonPage, editMode: boolean) {
-    if (isPersonPage(data)) return <PersonPage page={data as any} editMode={editMode} />;
-    if (isRetailPage(data)) return <RetailCustomerPage page={data as any} />;
-    if (isFinServPage(data)) return <FinServPage page={data as any} />;
+    if (isPersonPage(data)) return <PersonPage page={data} editMode={editMode} />;
+    if (isRetailPage(data)) return <RetailCustomerPage page={data} />;
+    if (isFinServPage(data)) return <FinServPage page={data} />;
     // Resolved once and reused, rather than once to test and once to pass down.
-    const plan = resolveComponentPlan(data as any);
-    if (includes(plan, 'use-case-matrix')) return <UseCasePage page={data as any} plan={plan} />;
+    const plan = resolveComponentPlan(data);
+    if (includes(plan, 'use-case-matrix')) return <UseCasePage page={data} plan={plan} />;
     if (isABMPage(data)) return <ABMHyperPage page={data} />;
     return <DynamicComparisonPage page={data} />;
 }

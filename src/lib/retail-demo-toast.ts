@@ -12,7 +12,7 @@
  */
 
 const TOAST_ID = 'retail-demo-toast';
-let queue: Array<{ message: string; tone: 'default' | 'success' | 'note' }> = [];
+const queue: Array<{ message: string; tone: 'default' | 'success' | 'note' }> = [];
 let showing = false;
 
 function ensureNode(): HTMLDivElement | null {

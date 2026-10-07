@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import useMouseHovered from 'react-use/lib/useMouseHovered';
 
 interface GlowProps {
@@ -27,7 +27,9 @@ interface HighlightSectionProps {
 
 export const HighlightSection = ({ id, children }: HighlightSectionProps) => {
     const ref = useRef<HTMLElement>(null);
-    const { elX, elY, elH } = useMouseHovered(ref, {
+    // react-use's signature predates React 19's RefObject<T | null>; the hook
+    // already copes with a ref that is still null before mount.
+    const { elX, elY, elH } = useMouseHovered(ref as RefObject<Element>, {
         bound: true,
         whenHovered: false
     });

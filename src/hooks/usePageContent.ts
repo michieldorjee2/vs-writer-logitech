@@ -7,11 +7,18 @@ interface PageContentState {
     error: string | null;
 }
 
+declare global {
+    interface Window {
+        /** The page server/ssr-handler.tsx rendered, embedded so the client does not re-fetch it. */
+        __SSR_DATA__?: CompetitorComparisonPage;
+    }
+}
+
 function consumeSSRData(): CompetitorComparisonPage | null {
     if (typeof window === 'undefined') return null;
-    const data = (window as any).__SSR_DATA__ as CompetitorComparisonPage | undefined;
+    const data = window.__SSR_DATA__;
     if (data) {
-        delete (window as any).__SSR_DATA__;
+        delete window.__SSR_DATA__;
         return data;
     }
     return null;

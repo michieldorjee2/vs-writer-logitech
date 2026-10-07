@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { motion, useSpring } from 'framer-motion';
 import useMeasure from 'react-use-measure';
 
@@ -18,12 +18,14 @@ const AccordionItem: React.FC<AccordionItemProps> = (props) => {
     } = props;
     const [isActive, setActive] = useState(defaultOpen);
     const [ref, { height }] = useMeasure();
-    const { current: headerId } = useRef(
-        'accordion-' + title ? title.replace(/[^a-zA-Z]/g, '') : ''
-    );
-    const { current: contentId } = useRef(
-        'accordionContent-' + title ? title.replace(/[^a-zA-Z]/g, '') : ''
-    );
+    // These read `'accordion-' + title ? title.replace(…) : ''`, which parses as
+    // `('accordion-' + title) ? …` — always truthy — so the prefix never applied
+    // and the button and its panel got the SAME id, pointing aria-controls and
+    // aria-labelledby at themselves. useId() keeps them distinct, and unique even
+    // when two items share a title.
+    const uid = useId();
+    const headerId = `accordion-${uid}`;
+    const contentId = `accordionContent-${uid}`;
 
     const spring = useSpring(isActive ? height : 0, {
         stiffness: 120,
@@ -32,7 +34,7 @@ const AccordionItem: React.FC<AccordionItemProps> = (props) => {
 
     useEffect(() => {
         spring.set(isActive ? height : 0);
-    }, [isActive, height]);
+    }, [isActive, height, spring]);
 
     return (
         <div

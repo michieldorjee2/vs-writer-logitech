@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { GraphResponse } from '../src/lib/graph-envelope.js';
 
 /**
  * Edit-mode polling endpoint. The FloatingSidebar hits this every 15s
@@ -47,7 +48,7 @@ async function queryGraph(authKey: string, key: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: STATUS_QUERY, variables: { key } }),
   });
-  return res.json() as Promise<any>;
+  return res.json() as Promise<GraphResponse<{ _metadata?: Record<string, unknown> }>>;
 }
 
 /** Best-effort Cache-Tag purge. Vercel's tag-based eviction is

@@ -7,7 +7,6 @@
  */
 import React from 'react';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
-import { brandLogoUrl } from '../lib/brand-logo';
 import { readableAccentOnFir } from '../lib/brand-accent';
 
 interface Props {
@@ -64,7 +63,7 @@ const GENERIC_CONTACT_NAMES = new Set([
   'solutions architect', 'solution architect', 'migration engineer', 'customer success manager',
 ]);
 function realContacts(
-  members?: Array<{ Name: string; Role: string; Email: string | null; Initials: string }>,
+  members?: Array<{ Name: string; Role: string; Email: string | null; Initials: string }> | null,
 ) {
   return (members || []).filter(
     (m) => !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()),
@@ -102,7 +101,6 @@ const ABMHyperPageServer = ({ page }: Props) => {
     : '';
 
 
-  const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
   const teamContacts = realContacts(page.teamMembers);
 
   return (

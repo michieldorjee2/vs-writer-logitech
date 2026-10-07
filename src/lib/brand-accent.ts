@@ -65,8 +65,8 @@ export function readableAccentOnFir(hex: string | null | undefined): string {
   if (!hex) return LIME;
   const rgb = hexToRgb(hex);
   if (!rgb) return LIME;
-  let [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
-  l = Math.min(0.82, Math.max(0.56, l));
-  if (s > 0.05) s = Math.max(0.45, s); // keep colours vivid, leave true grays alone
+  const [h, s0, l0] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+  const l = Math.min(0.82, Math.max(0.56, l0));
+  const s = s0 > 0.05 ? Math.max(0.45, s0) : s0; // keep colours vivid, leave true grays alone
   return hslToHex(h, s, l);
 }

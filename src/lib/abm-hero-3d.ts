@@ -173,8 +173,8 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
   let isVisible = true;
   let starDriftOffset = 0;
 
-  let trail1: Array<{ x: number; y: number }> = [];
-  let trail2: Array<{ x: number; y: number }> = [];
+  const trail1: Array<{ x: number; y: number }> = [];
+  const trail2: Array<{ x: number; y: number }> = [];
   const MAX_TRAIL = 120;
 
   // -- Shooting stars --
@@ -200,7 +200,11 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
 
   // Twinkle subset
   const TWINKLE_COUNT = 50;
-  const twinkleStars: any[] = [];
+  const twinkleStars: Array<(typeof starData)[number] & {
+    phase1: number; phase2: number; phase3: number;
+    speed1: number; speed2: number; speed3: number;
+    baseAlpha: number; flashPhase: number; flashSpeed: number;
+  }> = [];
   for (
     let i = 0;
     i < starData.length && twinkleStars.length < TWINKLE_COUNT;
@@ -333,24 +337,6 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
   // -- 3D math: rotate point and project with perspective --
   const FOV = 600;
 
-  function transform3D(
-    x: number,
-    y: number,
-    z: number,
-    ry: number,
-    rx: number
-  ): { x: number; y: number; z: number; d: number } {
-    const cosY = Math.cos(ry);
-    const sinY = Math.sin(ry);
-    const x1 = x * cosY + z * sinY;
-    const z1 = -x * sinY + z * cosY;
-    const cosX = Math.cos(rx);
-    const sinX = Math.sin(rx);
-    const y1 = y * cosX - z1 * sinX;
-    const z2 = y * sinX + z1 * cosX;
-    const d = FOV / (FOV + z2);
-    return { x: x1 * d, y: y1 * d, z: z2, d };
-  }
 
   // -- Draw true 3D extruded SVG logo --
   function drawExtrudedLogo(
@@ -606,7 +592,6 @@ export function initHero3D(customerLogoUrl?: string | null, brandDomain?: string
 
     // Pass 3: White-hot inner core (front half only)
     for (let i = Math.floor(len * 0.5); i < len; i++) {
-      const t = i / len;
       const headT = (i - len * 0.5) / (len * 0.5);
       ctx!.beginPath();
       ctx!.moveTo(trail[i - 1].x, trail[i - 1].y);

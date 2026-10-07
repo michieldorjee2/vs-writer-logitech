@@ -251,7 +251,7 @@ function renderBlock(block: PreviewBlock) {
                 <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
                     <h1 className="text-2xl font-medium text-white">Block preview</h1>
                     <p className="text-gray-400">
-                        Preview not available for type: {(block as any).__typename}
+                        Preview not available for type: {(block as { __typename?: string }).__typename}
                     </p>
                 </div>
             );

@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content.js';
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
+import { graphItems } from '../src/lib/graph-envelope.js';
+import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -165,44 +167,6 @@ query GetPage($slug: String!) {
 }
 `;
 
-/**
- * Recover fields the agent wrote in propertiesJson but the registered
- * content type doesn't expose as typed fields (descriptor, imageDirection,
- * privateProvenance, customerDisplayName). Same logic as ssr-handler.tsx.
- */
-function mergeRetailJson(page: any): any {
-  const raw = page?._json;
-  if (!raw || typeof raw !== 'object') return page;
-  const merge = (block: any, src: any) =>
-    src && typeof src === 'object' ? { ...src, ...(block || {}) } : block;
-  if (raw.customerDisplayName && !page.customerDisplayName) page.customerDisplayName = raw.customerDisplayName;
-  if (page.hero || raw.hero) page.hero = merge(page.hero, raw.hero);
-  if (page.heldForYou && Array.isArray(raw.heldForYou?.items)) {
-    page.heldForYou = {
-      ...raw.heldForYou,
-      ...page.heldForYou,
-      items: page.heldForYou.items.map((it: any) => {
-        const fromRaw = raw.heldForYou.items.find((r: any) => r.name === it.name);
-        return fromRaw ? { ...fromRaw, ...it } : it;
-      }),
-    };
-  }
-  if (page.setAside && Array.isArray(raw.setAside?.items)) {
-    page.setAside = {
-      ...raw.setAside,
-      ...page.setAside,
-      items: page.setAside.items.map((it: any) => {
-        const fromRaw = raw.setAside.items.find((r: any) => r.name === it.name);
-        return fromRaw ? { ...fromRaw, ...it } : it;
-      }),
-    };
-  }
-  page.atelierNote = merge(page.atelierNote, raw.atelierNote);
-  page.smallInvitation = merge(page.smallInvitation, raw.smallInvitation);
-  page.appointment = merge(page.appointment, raw.appointment);
-  return page;
-}
-
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
   const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
     method: 'POST',
@@ -261,7 +225,7 @@ async function fetchParentShot(
   try {
     for (const s of [`/${slug}/`, `/en/${slug}/`]) {
       const json = await queryGraph(authKey, PARENT_SHOT_QUERY, { slug: s });
-      const item = (json as any)?.data?.CompetitorComparisonPage?.items?.[0];
+      const item = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage')?.[0];
       if (item?.challengeScreenshotUrl?.default) {
         return {
           siteScreenshotUrl: item.challengeScreenshotUrl.default,
@@ -342,7 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!slug.startsWith('en/')) personTries.push(`/en/${slug}/`);
     for (const s of personTries) {
       const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
-      const items = (pJson as any)?.data?.PersonPage?.items;
+      const items = graphItems<PersonPage>(pJson, 'PersonPage');
       if (items && items.length > 0) {
         const shot = await fetchParentShot(authKey, items[0]?.companySlug);
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
@@ -353,11 +317,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (const s of retailTries) {
       const json = await queryGraph(authKey, RETAIL_PAGE_QUERY, { slug: s });
-      const items = (json as any)?.data?.RetailCustomerPage?.items;
+      const items = graphItems<RetailCustomerPage>(json, 'RetailCustomerPage');
       if (items && items.length > 0) {
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-        return res.status(200).json(mergeRetailJson({ ...items[0], __template: 'retail' }));
+        return res.status(200).json({ ...items[0], __template: 'retail' });
       }
     }
 
@@ -367,7 +331,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!slug.startsWith('en/')) finservTries.push(`/en/${slug}/`);
     for (const s of finservTries) {
       const fsJson = await queryGraph(authKey, FINSERV_PAGE_QUERY, { slug: s });
-      const items = (fsJson as any)?.data?.FinServPage?.items;
+      const items = graphItems<FinServPage>(fsJson, 'FinServPage');
       if (items && items.length > 0) {
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -384,13 +348,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
-    let items = (json as any)?.data?.CompetitorComparisonPage?.items;
+    let items = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage');
 
     // Fallback: try with /en/ prefix (Graph stores locale-prefixed URLs)
     if ((!items || items.length === 0) && !slug.startsWith('en/')) {
       const enSlug = `/en/${slug}/`;
       json = await queryGraph(authKey, PAGE_QUERY, { slug: enSlug });
-      items = (json as any)?.data?.CompetitorComparisonPage?.items;
+      items = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage');
     }
 
     if (!items || items.length === 0) {

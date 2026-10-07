@@ -9,7 +9,7 @@
  *   - center motif: two overlapping arcs (an abstract opal facet) in gold
  */
 
-import type { CSSProperties } from 'react';
+import { useId, type CSSProperties } from 'react';
 
 interface Props {
   size?: number;
@@ -21,7 +21,15 @@ interface Props {
 }
 
 export default function OpalStamp({ size = 96, className, style, decorative = true }: Props) {
-  const id = 'opal-stamp-' + Math.random().toString(36).slice(2, 8);
+  // The gradients and text paths below are referenced by id, and a page can
+  // hold several stamps, so each instance needs its own. This used to be
+  // Math.random(), which gave the server and the browser different ids for the
+  // same stamp — a hydration mismatch on every retail page — and made the SSR
+  // output differ between two renders of the same page. useId() is stable
+  // across both. The character strip is defensive: React has changed the
+  // format twice (`:r1:`, `«r1»`, now `_R_1_`), and a colon or guillemet would
+  // break the url(#…) references.
+  const id = 'opal-stamp-' + useId().replace(/[^A-Za-z0-9_-]/g, '');
   return (
     <svg
       width={size}

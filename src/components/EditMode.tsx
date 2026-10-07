@@ -385,7 +385,26 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     }
   }, [emailModalOpen]);
 
-  /* ---- ESC handling: prefer to close popup → email modal → exit mode ---- */
+  /* ---- Email modal handlers ---- */
+  const openEmailEdit = useCallback(() => {
+    setEmailDraft(email);
+    setEmailError(null);
+    emailModalIsBlocking.current = false;
+    setEmailModalOpen(true);
+  }, [email]);
+
+  const cancelEmailModal = useCallback(() => {
+    setEmailModalOpen(false);
+    if (emailModalIsBlocking.current && !email) {
+      // First-time entry, no email committed → exit mode entirely
+      onClose();
+    }
+  }, [email, onClose]);
+
+  /* ---- ESC handling: prefer to close popup → email modal → exit mode ----
+   * Declared after cancelEmailModal because it lists it as a dependency: the
+   * callback reads `email`, and a listener holding a stale copy would see the
+   * pre-commit empty address and exit Edit mode instead of closing the modal. */
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
@@ -402,23 +421,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, emailModalOpen, activeSection, onClose]);
-
-  /* ---- Email modal handlers ---- */
-  const openEmailEdit = useCallback(() => {
-    setEmailDraft(email);
-    setEmailError(null);
-    emailModalIsBlocking.current = false;
-    setEmailModalOpen(true);
-  }, [email]);
-
-  const cancelEmailModal = useCallback(() => {
-    setEmailModalOpen(false);
-    if (emailModalIsBlocking.current && !email) {
-      // First-time entry, no email committed → exit mode entirely
-      onClose();
-    }
-  }, [email, onClose]);
+  }, [active, emailModalOpen, activeSection, onClose, cancelEmailModal]);
 
   const commitEmail = useCallback(() => {
     const trimmed = emailDraft.trim();
@@ -1132,8 +1135,14 @@ function LiveCard({ card, style }: { card: ActiveCard; style: CSSProperties }) {
 
 function Typewriter({ text, cps, caret }: { text: string; cps: number; caret?: boolean }) {
   const [n, setN] = useState(0);
-  useEffect(() => {
+  // Restart from the first character when the text changes — adjusted during
+  // render, so the new text never paints once at the old length first.
+  const [prevText, setPrevText] = useState(text);
+  if (text !== prevText) {
+    setPrevText(text);
     setN(0);
+  }
+  useEffect(() => {
     if (!text) return;
     const step = Math.max(12, 1000 / cps);
     const id = setInterval(() => {

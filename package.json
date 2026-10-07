@@ -13,7 +13,9 @@
     "check:rem-scale": "node scripts/check-rem-scale.mjs",
     "cms:apply": "tsx src/cms/apply.ts",
     "cms:apply:dry": "tsx src/cms/apply.ts --dry-run",
-    "tokens:build": "node scripts/build-tokens.js"
+    "tokens:build": "node scripts/build-tokens.js",
+    "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.20",

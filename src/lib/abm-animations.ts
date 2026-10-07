@@ -51,8 +51,8 @@ function initScrollAnimations(): void {
     const delay = parseFloat(el.getAttribute('data-delay') || '0');
 
     // Explicit from/to so animations work regardless of CSS cascade order
-    const fromProps: any = { opacity: 0 };
-    const toProps: any = {
+    const fromProps: gsap.TweenVars = { opacity: 0 };
+    const toProps: gsap.TweenVars = {
       opacity: 1,
       duration: 0.55,
       delay: delay * 0.5,
@@ -108,7 +108,7 @@ function initCounters(): void {
         snap: { innerText: 1 },
         onUpdate: function () {
           (counter as HTMLElement).textContent = Math.round(
-            (this.targets()[0] as any).innerText
+            Number((this.targets()[0] as HTMLElement).innerText)
           ).toLocaleString();
         },
       });

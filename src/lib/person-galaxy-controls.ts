@@ -51,7 +51,7 @@ const css = (el: HTMLElement, s: Partial<CSSStyleDeclaration>) => Object.assign(
 export function initGalaxyControls(): void {
   if (root) return;
 
-  let points = getWaypoints();
+  const points = getWaypoints();
   let selected = 0;
 
   root = document.createElement('div');

@@ -131,7 +131,6 @@ export interface CompetitorComparisonPage {
     };
     PageTitle: string;
     MetaDescription: string;
-    CanonicalUrl?: { default: string } | null;
 
     // Hero section (flat fields)
     eyebrow: string | null;
@@ -174,23 +173,6 @@ export interface CompetitorComparisonPage {
 
     // Logos (single content reference)
     Logos: { _metadata: { url: { default: string }; displayName?: string } } | null;
-
-    // Feature section — not on the registered type; never selected. Optional so
-    // no reader may assume it is present. See the note above PAGE_QUERY.
-    FeatureSection?: {
-        Headline: RichText | null;
-        Features: Array<{
-            Title: string;
-            Description: RichText | null;
-        }>;
-    } | null;
-
-    // FAQ section — not on the registered type; never selected.
-    FaqSection?: Array<{
-        _metadata?: { key: string };
-        __typename?: string;
-        _json?: unknown;
-    }> | null;
 
     // ABM Hyper fields
     customerLogo: string | null;
@@ -275,8 +257,6 @@ export interface CompetitorComparisonPage {
         Url: { default: string | null } | null;
     }> | null;
 
-    // Legacy block fields (may be empty objects from old content)
-    Testimonials?: TestimonialRef[] | null;
 
     // X-ray sales overlay — per-section data-source annotations.
     // When the CMS doesn't return entries, the component falls back to a

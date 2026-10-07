@@ -11,10 +11,10 @@
  *
  * ONE COPY OF EACH QUERY, TWO CALLERS. `api/content.ts` serves them in production and
  * `vite.config.ts`'s dev proxy serves them locally. An earlier pair of queries in this repo
- * lived in both files as two copies that drifted apart, and the drift is still visible:
- * `vite.config.ts`'s `PAGE_QUERY` still selects `CanonicalUrl`, `FeatureSection`,
- * `OurHighlight` and `Weeks`, four fields the live schema dropped — the same four that 404'd
- * 2,676 account pages. Two copies of a query is the defect, not a style preference.
+ * lived in both files as two copies that drifted apart: `vite.config.ts`'s `PAGE_QUERY` went on
+ * selecting `CanonicalUrl`, `FeatureSection`, `OurHighlight` and `Weeks` — four fields the live
+ * schema had dropped, the same four that 404'd 2,676 account pages — for weeks after
+ * `api/content.ts` stopped. Two copies of a query is the defect, not a style preference.
  *
  * A SELECTION ON A FIELD GRAPH DOES NOT KNOW FAILS THE WHOLE QUERY: `data: null`, no partial
  * result. So these are separate operations from `PAGE_QUERY` and friends rather than fields

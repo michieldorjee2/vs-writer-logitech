@@ -292,18 +292,31 @@ function XrayMode({ active, onClose, page, variant }: Props) {
   // Per-card current bob offset (lerps toward 0 on hover)
   const bobValuesRef = useRef<Map<string, number>>(new Map());
 
-  /* Lifecycle: toggle activation. */
-  useEffect(() => {
+  /* Lifecycle: toggle activation.
+   *
+   * The state reset happens during render, when `active` is seen to change —
+   * React's pattern for state that follows a prop — rather than in the effect,
+   * where it cost an extra render with the stale phase first. The effect keeps
+   * only what touches the outside world: the body class, the clock, the timer.
+   * `prevActive` starts false so mounting with `active` already true still
+   * enters 'scanning', exactly as the effect used to. */
+  const [prevActive, setPrevActive] = useState(false);
+  if (active !== prevActive) {
+    setPrevActive(active);
+    setPhase(active ? 'scanning' : 'idle');
     if (!active) {
-      setPhase('idle');
       setExpanded(null);
       setHoveredId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!active) {
       document.body.classList.remove('xray-active');
       return;
     }
 
     document.body.classList.add('xray-active');
-    setPhase('scanning');
     scanStartRef.current = performance.now();
 
     const t = window.setTimeout(() => setPhase('revealed'), SCAN_DURATION_MS);
@@ -345,6 +358,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
     // Compute placements (collision avoidance) using the initial outlines.
     const ds = getDocSize();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measuring layout and storing it is what a layout effect is for; reading the DOM during render is not allowed
     setDocSize(ds);
     docSizeRef.current = ds;
 
@@ -394,6 +408,8 @@ function XrayMode({ active, onClose, page, variant }: Props) {
   useEffect(() => {
     if (phase !== 'revealed') return;
     if (elementsRef.current.length === 0) return;
+    // The overlay this run animates, so the cleanup resets the same element.
+    const overlayAtStart = overlayRef.current;
 
     let lastScroll = window.scrollY;
     let lag = 0;
@@ -527,8 +543,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     return () => {
       running = false;
       cancelAnimationFrame(raf);
-      const overlay = overlayRef.current;
-      if (overlay) overlay.style.setProperty('--xray-scroll-lag', '0px');
+      if (overlayAtStart) overlayAtStart.style.setProperty('--xray-scroll-lag', '0px');
     };
   }, [phase, anchorsInit]);
 
@@ -548,16 +563,17 @@ function XrayMode({ active, onClose, page, variant }: Props) {
 
   // Helper to register/unregister a DOM ref for a given section.
   const setDomRef = (id: string, key: keyof AnchorDom, idx?: number) =>
-    (el: any) => {
+    (el: Element | null) => {
       let dom = domRefs.current.get(id);
       if (!dom) {
         dom = emptyDom();
         domRefs.current.set(id, dom);
       }
       if (key === 'cornerPaths' && typeof idx === 'number') {
-        dom.cornerPaths[idx] = el;
+        dom.cornerPaths[idx] = el as SVGPathElement | null;
       } else {
-        (dom as any)[key] = el;
+        // Each key holds exactly the element its ref callback is attached to.
+        (dom as unknown as Record<keyof AnchorDom, Element | null>)[key] = el;
       }
     };
 

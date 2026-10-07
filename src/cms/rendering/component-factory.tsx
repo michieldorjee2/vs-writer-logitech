@@ -61,6 +61,9 @@ function Component({ typeName, props }: ComponentFactoryProps) {
   if (!typeName) return null
 
   const Repo = rendererFor(typeName)
+  // A lookup in `repoRenderers`, a module-level map built once — the same component object
+  // every render, so nothing is created here and nothing remounts.
+  // eslint-disable-next-line react-hooks/static-components -- registry lookup, stable identity
   if (Repo) return <Repo {...props} />
 
   const lane = VENDORED[laneFor(typeName)]

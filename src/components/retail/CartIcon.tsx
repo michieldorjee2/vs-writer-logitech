@@ -14,12 +14,22 @@ export default function CartIcon() {
   const ref = useRef<HTMLButtonElement>(null);
   const [pulse, setPulse] = useState(false);
 
+  // Pulse whenever either timestamp moves. The two are keyed together rather
+  // than max()'d, so a save older than the last add still pulses. `prevStamp`
+  // starts at the both-zero key, so mounting with something already added
+  // pulses once, as the old effect did.
+  const stamp = `${lastAddedAt}|${lastSavedAt}`;
+  const [prevStamp, setPrevStamp] = useState('0|0');
+  if (stamp !== prevStamp) {
+    setPrevStamp(stamp);
+    if (lastAddedAt || lastSavedAt) setPulse(true);
+  }
+
   useEffect(() => {
-    if (!lastAddedAt && !lastSavedAt) return;
-    setPulse(true);
+    if (!pulse) return;
     const t = window.setTimeout(() => setPulse(false), 800);
     return () => window.clearTimeout(t);
-  }, [lastAddedAt, lastSavedAt]);
+  }, [pulse, stamp]);
 
   return (
     <button

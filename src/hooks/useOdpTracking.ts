@@ -49,7 +49,9 @@ function odpEvent(eventType: string, action: string, data?: Record<string, strin
 
 export function useOdpTracking(pageType: 'comparison' | 'abm' | 'use-case', slug?: string) {
   const viewedSections = useRef(new Set<string>());
-  const startTime = useRef(Date.now());
+  // Set on mount by the effect below, before anything reads it. Date.now() here
+  // would run on every render for a value that is thrown away (react-hooks/purity).
+  const startTime = useRef(0);
   const maxScrollPct = useRef(0);
   const engagementSent = useRef(false);
 

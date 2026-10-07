@@ -12,7 +12,7 @@ const BRANDFETCH_API = 'https://api.brandfetch.io/v2/brands/';
 const BRANDFETCH_KEY = process.env.BRANDFETCH_KEY || '';
 
 function cleanDomain(raw: string): string {
-  let d = raw.trim().replace(/^https?:\/\//, '').replace(/^www\./, '');
+  const d = raw.trim().replace(/^https?:\/\//, '').replace(/^www\./, '');
   return d.split('/')[0].split('?')[0];
 }
 
@@ -63,7 +63,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Brand not found' });
     }
 
-    const data = await apiRes.json() as any;
+    // Brandfetch's /v2/brands/{domain} — only the fields read below.
+    const data = await apiRes.json() as {
+      logos?: Array<{ type?: string; formats?: Array<{ format?: string; src?: string }> }>;
+    } | null;
     const logos = data?.logos || [];
 
     // Priority order: symbol, icon, logo — prefer SVG format

@@ -7,8 +7,8 @@ const Quote = (props: QuoteProps) => {
 
     return (
         <>
-            {size === 'default' && <StandardQuote {...(props as any)} />}
-            {size === 'small' && <SmallQuote {...(props as any)} />}
+            {size === 'default' && <StandardQuote {...props} />}
+            {size === 'small' && <SmallQuote {...props} />}
         </>
     );
 };

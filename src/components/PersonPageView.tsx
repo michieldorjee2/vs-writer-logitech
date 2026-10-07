@@ -186,7 +186,7 @@ export default function PersonPageView({ page, rootRef, editMode }: Props) {
     const tier: EngagementTier = page.engagementTier ?? 'known';
 
     // Same helper the company page uses: the attribute exists only in edit mode.
-    const epi = (prop: string) => (editMode ? { 'data-epi-edit': prop } : {});
+    const epi = (prop: string): Record<string, string> => (editMode ? { 'data-epi-edit': prop } : {});
 
     const accent = page.brandAccentColor ? readableAccentOnFir(page.brandAccentColor) : undefined;
     const companyHref = page.companySlug ? `/${page.companySlug}` : null;

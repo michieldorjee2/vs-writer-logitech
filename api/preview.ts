@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { graphItems } from '../src/lib/graph-envelope.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -112,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await queryGraphWithToken(previewToken, PREVIEW_QUERY, variables)
       : await queryGraph(singleKey!, PREVIEW_QUERY, variables);
 
-    const items = (json as any)?.data?._Content?.items;
+    const items = graphItems<Record<string, unknown>>(json, '_Content');
 
     if (!items || items.length === 0) {
       return res.status(404).json({ error: 'Content not found' });

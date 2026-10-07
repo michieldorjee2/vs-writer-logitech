@@ -17,11 +17,6 @@
  * query, and when a page 404s that should not.
  *
  * Usage:  npm run check:graph            (needs GRAPH_AUTH_KEY, or .env.local)
- *
- * Not scanned: src/lib/graph-query.ts and api/_lib/fetch-content.ts. Both still
- * hold the pre-flat nested-block queries and nothing imports either of them.
- * They would fail this check for the same reason; delete them rather than fix
- * them.
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 

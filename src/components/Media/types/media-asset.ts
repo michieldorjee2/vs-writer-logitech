@@ -20,7 +20,8 @@ type AssetBase = {
     background?: boolean;
     curved?: boolean;
     roundedCorners?: boolean;
-    assetAttributes: {}
+    /** Narrowed by each asset kind below; here it only promises an object. */
+    assetAttributes: object
 }
 
 interface AssetImage extends AssetBase {

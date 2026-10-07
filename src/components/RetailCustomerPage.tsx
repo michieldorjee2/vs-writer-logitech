@@ -53,8 +53,6 @@ interface Props {
   editMode?: boolean;
 }
 
-const STYLIST_MAILTO = 'mailto:stylist@maisonaurelle.example?subject=Re%3A%20The%20pieces%20held%20for%20me';
-
 export default function RetailCustomerPage({ page, deviceRecognized = true, editMode }: Props) {
   useEffect(() => {
     const t = setTimeout(() => {
@@ -77,7 +75,7 @@ export default function RetailCustomerPage({ page, deviceRecognized = true, edit
 
   // Resolve fields, preferring CMS values, falling back to demo content where the CMS is sparse.
   const editorialIntro =
-    (page as any).editorialIntro ||
+    page.editorialIntro ||
     demo?.editorialIntro ||
     page.MetaDescription ||
     null;
@@ -272,7 +270,7 @@ export default function RetailCustomerPage({ page, deviceRecognized = true, edit
       )}
 
       {atelierNote && (
-        <AtelierNote block={atelierNote as any} register={page.register} />
+        <AtelierNote block={atelierNote} register={page.register} />
       )}
 
       {smallInvitation && (

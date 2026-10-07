@@ -3,17 +3,14 @@
  * Uses static imports instead of React.lazy (which doesn't work with renderToString).
  */
 import { Suspense } from 'react';
-import parse from 'html-react-parser';
 import HeroGradient from './HeroGradient/hero-gradient.component';
 import { Button } from './Button/button-block.component';
 import LogoGrid from './LogoGrid/logo-grid.component';
 import ComparisonTable from './ComparisonTable/comparison-table.component';
 import QuoteList from './QuoteList/quote-list.component';
-import Accordion from './Accordion/accordion.component';
 import HighlightSection from './Highlight/highlight.component';
-import GridOverlay from './GridOverlay/_grid-overlay';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
-import { richTextAsTag, mapComparisonRows } from '../lib/content-mappers';
+import { mapComparisonRows } from '../lib/content-mappers';
 
 const quoteThemes = ['blue', 'light-blue', 'purple', 'green', 'orange'] as const;
 const quoteMarkColors: Record<string, string> = {
@@ -49,17 +46,6 @@ function mapTestimonials(page: CompetitorComparisonPage) {
         });
     }
 
-    if (testimonials.length === 0 && page.Testimonials?.length) {
-        const resolved = page.Testimonials.filter((t) => t.item != null);
-        resolved.forEach((t) => {
-            testimonials.push({
-                quote: t.item!.Quote,
-                spokesperson: t.item!.AuthorName,
-                jobTitle: t.item!.AuthorTitle ?? '',
-                company: '',
-            });
-        });
-    }
 
     return testimonials.map((t, i) => ({
         ...t,
@@ -70,21 +56,6 @@ function mapTestimonials(page: CompetitorComparisonPage) {
         quotesLength: testimonials.length,
         index: i,
     }));
-}
-
-function mapFaqItems(page: CompetitorComparisonPage) {
-    if (!page.FaqSection?.length) return null;
-    for (const entry of page.FaqSection) {
-        const faqJson = (entry as any)?._json;
-        if (faqJson?.Items?.length) {
-            return faqJson.Items.map((item: any) => ({
-                title: item.Heading ?? '',
-                defaultOpen: item.OpenedByDefault ?? false,
-                children: <div className="rte">{parse(item.MainContent?.html ?? '')}</div>,
-            }));
-        }
-    }
-    return null;
 }
 
 const fallbackLogos = [
@@ -103,8 +74,6 @@ interface Props {
 const DynamicComparisonPageServer = ({ page }: Props) => {
     const comparisonRows = page.comparisonTableRows ? mapComparisonRows(page.comparisonTableRows) : [];
     const testimonials = mapTestimonials(page);
-    const faqItems = mapFaqItems(page);
-    const features = page.FeatureSection;
 
     return (
         <Suspense fallback={null}>
@@ -138,28 +107,6 @@ const DynamicComparisonPageServer = ({ page }: Props) => {
                 </div>
             </section>
 
-            {features?.Headline?.html && features.Features?.length > 0 && (
-                <section className="outer-padding relative py-16 lg:py-24">
-                    <GridOverlay opacity={0} highlightOpacity={0.08} fade />
-                    <div className="container relative z-10">
-                        <div className="row">
-                            <div className="col-12 lg:col-8 lg:offset-2">
-                                <div className="rte mb-8">{parse(richTextAsTag(features.Headline.html, 'h2'))}</div>
-                                <div className="grid gap-6 md:grid-cols-2">
-                                    {features.Features.map((feat, i) => (
-                                        <div key={i} className="gf-card gf-card--hover p-6">
-                                            <h3 className="mb-2 text-xl font-medium text-cream">{feat.Title}</h3>
-                                            {feat.Description?.html && (
-                                                <div className="rte text-base text-fir-n4">{parse(feat.Description.html)}</div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {comparisonRows.length > 0 && (
                 <section className="outer-padding py-16 lg:py-24">
@@ -205,17 +152,6 @@ const DynamicComparisonPageServer = ({ page }: Props) => {
                 </section>
             )}
 
-            {faqItems && faqItems.length > 0 && (
-                <section className="outer-padding py-16 lg:py-24">
-                    <div className="container">
-                        <div className="row">
-                            <div className="col-12 lg:col-8 lg:offset-2">
-                                <Accordion accordionItems={faqItems} backgroundStyle={true} />
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {page.promoHeading && (
                 <section className="outer-padding py-16 lg:py-24">

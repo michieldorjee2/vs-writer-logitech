@@ -4,10 +4,19 @@ import type { CompetitorComparisonPage } from '../lib/graph-types';
 const SITE_URL = 'https://showcase.optimizely.com';
 
 /**
- * Manages <head> meta tags, canonical URL, and JSON-LD structured data
- * for a CompetitorComparisonPage. Cleans up on unmount.
+ * The hook runs for every page type PageLoader renders, not only account
+ * pages. `CanonicalUrl` is one field that differs: RetailCustomerPage selects
+ * it (empty on all ten retail pages today, but a real field), while
+ * CompetitorComparisonPage dropped it in the move to flat fields. Optional here
+ * so the retail value is honoured the day it is set.
  */
-export function useHeadMeta(page: CompetitorComparisonPage | null) {
+type HeadMetaPage = CompetitorComparisonPage & { CanonicalUrl?: { default: string } | null };
+
+/**
+ * Manages <head> meta tags, canonical URL, and JSON-LD structured data
+ * for a rendered page. Cleans up on unmount.
+ */
+export function useHeadMeta(page: HeadMetaPage | null) {
     useEffect(() => {
         if (!page) return;
 
@@ -67,28 +76,6 @@ export function useHeadMeta(page: CompetitorComparisonPage | null) {
         webPageScript.textContent = JSON.stringify(webPageLd);
         injectTag(webPageScript, '__ld_webpage');
 
-        // --- JSON-LD: FAQPage (FaqSection is now a list) ---
-        if (Array.isArray(page.FaqSection)) {
-            for (const entry of page.FaqSection) {
-                const faqJson = (entry as any)?._json;
-                if (faqJson?.Items?.length) {
-                    const faqLd = {
-                        '@context': 'https://schema.org',
-                        '@type': 'FAQPage',
-                        mainEntity: faqJson.Items.map((item: any) => ({
-                            '@type': 'Question',
-                            name: item.Heading ?? '',
-                            acceptedAnswer: { '@type': 'Answer', text: item.MainContent?.html ?? '' },
-                        })),
-                    };
-                    const faqScript = document.createElement('script');
-                    faqScript.type = 'application/ld+json';
-                    faqScript.textContent = JSON.stringify(faqLd);
-                    injectTag(faqScript, '__ld_faq');
-                    break;
-                }
-            }
-        }
 
         // --- JSON-LD: Review/testimonials (flat fields) ---
         const reviews: Array<Record<string, unknown>> = [];

@@ -35,8 +35,6 @@ interface Props {
   deviceRecognized?: boolean;
 }
 
-const STYLIST_MAILTO = 'mailto:stylist@maisonaurelle.example?subject=Re%3A%20The%20pieces%20held%20for%20me';
-
 export default function RetailCustomerPageServer({ page, deviceRecognized = true }: Props) {
   const degraded = page.deviceDegraded || !deviceRecognized;
   const slug =
@@ -45,7 +43,7 @@ export default function RetailCustomerPageServer({ page, deviceRecognized = true
   const demo = getDemoContent(slug, page.register);
 
   const editorialIntro =
-    (page as any).editorialIntro ||
+    page.editorialIntro ||
     demo?.editorialIntro ||
     page.MetaDescription ||
     null;
@@ -210,7 +208,7 @@ export default function RetailCustomerPageServer({ page, deviceRecognized = true
 
       {!degraded && setAside && <SetAside block={setAside} primaryCity={primaryCity} />}
 
-      {atelierNote && <AtelierNote block={atelierNote as any} register={page.register} />}
+      {atelierNote && <AtelierNote block={atelierNote} register={page.register} />}
 
       {smallInvitation && <SmallInvitation block={smallInvitation} register={page.register} />}
 

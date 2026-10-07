@@ -7,7 +7,10 @@ const GridOverlay = ({
     highlightOpacity = 0.1
 }) => {
     const ref = useRef<HTMLDivElement>(null);
-    const { elX, elY, elH } = useMouseHovered(ref, {
+    // elW/elH are the element's measured size, from the same hook that reports
+    // the pointer. Reading ref.current.clientWidth/Height here instead read a ref
+    // during render, which React does not track (react-hooks/refs).
+    const { elX, elY, elW, elH } = useMouseHovered(ref, {
         bound: true,
         whenHovered: false
     });
@@ -24,12 +27,12 @@ const GridOverlay = ({
                 className="design-grid-overlay pointer-events-none absolute left-0 top-0 z-[2] size-full"
                 style={{ opacity: opacity }}
             ></div>
-            {ref.current && (
+            {elH > 0 && (
                 <div
                     className="design-grid-overlay pointer-events-none absolute left-0 top-0 z-[3] size-full"
                     style={{
-                        maskImage: `radial-gradient(circle at center, black 0px, transparent ${ref.current.clientHeight / 2}px)`,
-                        maskPosition: `${elX + ref.current.clientWidth / 2}px ${elY + ref.current.clientHeight / 2}px`,
+                        maskImage: `radial-gradient(circle at center, black 0px, transparent ${elH / 2}px)`,
+                        maskPosition: `${elX + elW / 2}px ${elY + elH / 2}px`,
                         opacity: highlightOpacity
                     }}
                 ></div>

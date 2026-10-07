@@ -200,7 +200,6 @@ export const SIEMENS_USE_CASE_PAGE: UseCasePage = {
   newsItems: null,
   footerLinks: null,
   Logos: null,
-  Testimonials: null,
   xraySections: null,
   componentPlan: null,
 };

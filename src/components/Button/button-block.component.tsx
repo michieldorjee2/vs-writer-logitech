@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useRef, useState } from 'react';
+import React, { ReactNode } from 'react';
 import { AnchorHTMLAttributes } from 'react';
 import { ButtonHTMLAttributes } from 'react';
 
@@ -156,7 +156,7 @@ export const Button: React.FC<ButtonProps> = ({
         }
 
         if (variant) {
-            let buttonClasses = {
+            const buttonClasses = {
                 wrapper: `${variant.bg} ${icon ? '' : variant.pressed.noIcon} ${icon ? '' : variant.hover} ${variant.color} disabled:hover:cursor-not-allowed disabled:bg-gray-500 disabled:!text-gray-400`,
                 icon: `${variant.icon.hover} ${variant.pressed.iconBg} ${variant.pressed.iconColor} rounded-[4px] transition-colors ease-in-out`
             };

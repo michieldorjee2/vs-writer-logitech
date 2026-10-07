@@ -8,7 +8,6 @@ import { initWarpCTA, cleanupWarpCTA } from '../lib/abm-warp-cta';
 import { fireDemoWebhook } from '../lib/abm-demo-webhook';
 import { initHero3D, cleanupHero3D } from '../lib/abm-hero-3d';
 import GravatarAvatar from './GravatarAvatar';
-import { brandLogoUrl } from '../lib/brand-logo';
 import { readableAccentOnFir } from '../lib/brand-accent';
 import { useOdpTracking } from '../hooks/useOdpTracking';
 
@@ -122,9 +121,6 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
   // Helper: returns data-epi-edit attribute only in edit mode
   const epi = (propName: string) => editMode ? { 'data-epi-edit': propName } : {};
 
-  // Resolve brand logo: prefer customerLogo (SVG URL), fall back to Brandfetch CDN
-  const resolvedLogoUrl = page.customerLogo || (page.brandDomain ? brandLogoUrl(page.brandDomain) : null);
-
   // This page's own route segment, used to build links to child person pages
   // (/{companySlug}/{personSlug}). Graph stores locale-prefixed hierarchical
   // URLs like "/en/acme/", so strip the locale and the slashes.
@@ -153,6 +149,10 @@ const ABMHyperPage = ({ page, editMode }: Props) => {
       cleanupStickyCTA();
       cleanupWarpCTA();
     };
+    // Mount-once on purpose: these are imperative scenes (WebGL hero, GSAP
+    // timelines, the warp canvas) that tear down and rebuild on every re-run.
+    // `page` is fixed for the life of this component — a new page is a new mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once imperative init
   }, []);
 
   // Derive hero title lines from headline

@@ -103,6 +103,7 @@ export default function PersonPage({ page, editMode }: Props) {
         };
         // Depend on a stable key, not the array identity — page.solutions is a
         // fresh reference every render, which would re-init the scene each time.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- solutionKey stands in for page.solutions (51ad352)
     }, [
         solutionKey,
         page.companySlug,

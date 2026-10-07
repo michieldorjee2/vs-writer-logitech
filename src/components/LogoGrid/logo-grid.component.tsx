@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, type ForwardedRef } from 'react';
 import MediaBlock from '../Media/media.component';
 import useWindowSize from 'react-use/lib/useWindowSize';
 import useRafLoop from 'react-use/lib/useRafLoop';
@@ -12,7 +12,7 @@ type MarqueeItemProps = {
 };
 
 const MarqueeItem = forwardRef(
-    ({ nonLogos, children, isInMiddleThird }: MarqueeItemProps, parentRef: any) => {
+    ({ nonLogos, children, isInMiddleThird }: MarqueeItemProps, parentRef: ForwardedRef<HTMLDivElement>) => {
         const itemRef = useRef<HTMLDivElement>(null);
         const rectRef = useRef<DOMRect | null>(null);
 
@@ -46,14 +46,16 @@ const MarqueeItem = forwardRef(
         }, [size.width, size.height]);
 
         const loop = () => {
-            if (parentRef?.current?.dataset.ispaused == 'true') {
+            // forwardRef hands over either a ref object or a callback; only an object can be read.
+            const parent = parentRef && typeof parentRef === 'object' ? parentRef.current : null;
+            if (parent?.dataset.ispaused == 'true') {
                 return;
             }
             x.set(x.get() - speed);
             setX();
         };
 
-        const [_, loopStart] = useRafLoop(loop, false);
+        const [, loopStart] = useRafLoop(loop, false);
 
         useEffect(() => {
             loopStart();
@@ -81,10 +83,6 @@ const Marquee = ({ nonLogos, children }: MarqueeProps) => {
     const [isInMiddleThird, setIsInMiddleThird] = useState(false);
 
     const [isAnimationPaused, setIsAnimationPaused] = useState(false);
-
-    function isPaused() {
-        return isAnimationPaused;
-    }
 
     useEffect(() => {
         const handleScroll = () => {
@@ -146,7 +144,7 @@ const Marquee = ({ nonLogos, children }: MarqueeProps) => {
 };
 
 const LogoGrid = (props: LogoGridProps) => {
-    const { logoMedia, heading, nonLogos, mediaComponents = false } = props;
+    const { logoMedia = [], heading, nonLogos = false, mediaComponents = false } = props;
     const size = useWindowSize();
 
     const isMediumScreenStatic =

@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 /*
  * The Visual Builder queries are IMPORTED rather than copied. Every other query in this file
  * is a second copy of one in `api/content.ts`, and the copies HAD drifted: PAGE_QUERY and
@@ -13,6 +14,7 @@ import path from 'path'
  * same way it already fails for the other two files. One module, two callers.
  */
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries'
+import { graphItems, type GraphResponse } from './src/lib/graph-envelope'
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2'
 
@@ -133,7 +135,7 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
 `
 
 /** Helper to send a JSON response in Vite middleware */
-function jsonResponse(res: any, status: number, body: unknown) {
+function jsonResponse(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json')
   res.end(JSON.stringify(body))
@@ -146,7 +148,7 @@ async function fetchGraph(authKey: string, query: string, variables: Record<stri
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   })
-  return graphRes.json() as any
+  return graphRes.json() as Promise<GraphResponse>
 }
 
 /** Run a Graph query and return the first item from the given root field, or null */
@@ -179,7 +181,7 @@ function stripHtmlComments(): Plugin {
 }
 
 /** Read the JSON body off a Node IncomingMessage (Vite dev middleware). */
-async function readJsonBody(req: any): Promise<unknown> {
+async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let raw = ''
     req.on('data', (chunk: Buffer) => { raw += chunk.toString('utf-8') })
@@ -208,7 +210,7 @@ function opalFeedbackDevProxy(): Plugin {
         if (url.pathname !== '/api/opal-feedback') return next()
         if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'Method not allowed' })
 
-        let body: any = {}
+        let body: Record<string, unknown> = {}
         try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
         const { company_name, company_slug, suggested_edit, edit_user_email } = body || {}
 
@@ -260,7 +262,7 @@ function opalCreatePageDevProxy(): Plugin {
         if (url.pathname !== '/api/opal-create-page') return next()
         if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'Method not allowed' })
 
-        let body: any = {}
+        let body: Record<string, unknown> = {}
         try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
         const { company_name, edit_user_email } = body || {}
 
@@ -330,7 +332,7 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
                   if (json?.errors?.length) {
                     console.error(
                       `[graph-dev-proxy] ${typeName} query failed for ${s}: ` +
-                        json.errors.map((e: { message: string }) => e.message).join(' | '),
+                        json.errors.map((e) => e.message ?? '').join(' | '),
                     )
                     continue
                   }
@@ -372,7 +374,7 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
             const items: unknown[] = [...(first?.data?.CompetitorComparisonPage?.items ?? [])]
 
             const target = Math.min(total, SEARCH_INDEX_MAX)
-            const fetches: Promise<any>[] = []
+            const fetches: Promise<GraphResponse>[] = []
             for (let skip = SEARCH_INDEX_PAGE_SIZE; skip < target; skip += SEARCH_INDEX_PAGE_SIZE) {
               fetches.push(fetchGraph(authKey, SEARCH_INDEX_QUERY, {
                 limit: SEARCH_INDEX_PAGE_SIZE,
@@ -411,7 +413,7 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
 
           try {
             const json = await fetchGraph(authKey, STATUS_QUERY, { key })
-            const meta = (json as any)?.data?.CompetitorComparisonPage?.items?.[0]?._metadata
+            const meta = graphItems<{ _metadata?: Record<string, unknown> }>(json, 'CompetitorComparisonPage')?.[0]?._metadata
             if (!meta) return jsonResponse(res, 404, { error: 'Page not found' })
             // The dev server has no Vercel edge cache to purge; just
             // surface the same `changed` shape so the client behaves

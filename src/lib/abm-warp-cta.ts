@@ -7,6 +7,9 @@
 
 import gsap from 'gsap';
 
+/** The modal keeps its focus-trap handler on itself so closeModal() can remove it. */
+type TrapHost = HTMLElement & { __trapFocus?: (e: KeyboardEvent) => void };
+
 // ---- Module-level state for cleanup ----
 let rafId: number | null = null;
 let resizeHandler: (() => void) | null = null;
@@ -122,9 +125,10 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
 
   // ---- Warp tunnel particles ----
   const WARP_COUNT = 700;
-  const warpParticles: any[] = [];
+  interface WarpParticle { x: number; y: number; z: number; speed: number; color: string; size: number }
+  const warpParticles: WarpParticle[] = [];
 
-  function initWarpParticle(p: any): void {
+  function initWarpParticle(p: WarpParticle): void {
     const angle = Math.random() * Math.PI * 2;
     const dist = 10 + Math.random() * 80;
     p.x = Math.cos(angle) * dist;
@@ -135,7 +139,8 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
     p.size = 0.4 + Math.random() * 1.8;
   }
   for (let i = 0; i < WARP_COUNT; i++) {
-    const p: any = {};
+    // Every field is overwritten by initWarpParticle on the next line.
+    const p: WarpParticle = { x: 0, y: 0, z: 0, speed: 0, color: '', size: 0 };
     initWarpParticle(p);
     p.z = Math.random() * 2200;
     warpParticles.push(p);
@@ -143,7 +148,7 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
 
   // ---- Laser beams ----
   const LASER_COUNT = 48;
-  const lasers: any[] = [];
+  const lasers: Array<{ angle: number; length: number; maxLength: number; speed: number; width: number; color: string; delay: number }> = [];
   for (let i = 0; i < LASER_COUNT; i++) {
     lasers.push({
       angle:
@@ -304,7 +309,7 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
 
         modalTrap.addEventListener('keydown', trapFocus);
         // Store for cleanup
-        (modalTrap as any).__trapFocus = trapFocus;
+        (modalTrap as TrapHost).__trapFocus = trapFocus;
       }
     });
   }
@@ -319,9 +324,10 @@ export function initWarpCTA(brandAccentColor?: string | null): void {
 
     // Remove focus trap
     const modalTrap = document.querySelector('.modal') as HTMLElement;
-    if (modalTrap && (modalTrap as any).__trapFocus) {
-      modalTrap.removeEventListener('keydown', (modalTrap as any).__trapFocus);
-      delete (modalTrap as any).__trapFocus;
+    const trapped = (modalTrap as TrapHost | null)?.__trapFocus;
+    if (modalTrap && trapped) {
+      modalTrap.removeEventListener('keydown', trapped);
+      delete (modalTrap as TrapHost).__trapFocus;
     }
 
     // Snapshot laser lengths for retract animation

@@ -96,7 +96,6 @@ export function planToComparisonPageProps(plan: Plan, account: PlanAccount): Com
     _metadata: { key: account.id, url: { default: `/limitless-preview/${account.id}`, hierarchical: `/limitless-preview/${account.id}` }, published: plan.resolvedAt },
     PageTitle: `${account.companyName} — Optimizely`,
     MetaDescription: heroCopy.subheadline,
-    CanonicalUrl: null,
 
     eyebrow: heroCopy.eyebrow,
     headline: heroCopy.headline,
@@ -132,8 +131,6 @@ export function planToComparisonPageProps(plan: Plan, account: PlanAccount): Com
     testimonial2Company: null,
 
     Logos: null,
-    FeatureSection: null,
-    FaqSection: null,
 
     customerLogo: null,
     brandDomain: account.domain,
@@ -174,7 +171,6 @@ export function planToComparisonPageProps(plan: Plan, account: PlanAccount): Com
     footerLinks: null,
     analystCards: null,
 
-    Testimonials: null,
     xraySections: null,
   };
 }

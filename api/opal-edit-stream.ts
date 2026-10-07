@@ -54,7 +54,7 @@ async function* streamAgent(
     const preview = await res.text().catch(() => '');
     throw new Error(`stream-execute HTTP ${res.status}: ${preview.slice(0, 300)}`);
   }
-  const reader = (res.body as any).getReader();
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
   let dataLines: string[] = [];
@@ -63,13 +63,15 @@ async function* streamAgent(
     const json = dataLines.join('\n').trim();
     dataLines = [];
     if (!json) return undefined;
-    let raw: any;
-    try { raw = JSON.parse(json); } catch { return undefined; }
-    if (!raw || typeof raw !== 'object') return undefined;
+    let parsed: unknown;
+    try { parsed = JSON.parse(json); } catch { return undefined; }
+    if (!parsed || typeof parsed !== 'object') return undefined;
+    const raw = parsed as Record<string, unknown>;
     const eventType = raw.event_type;
     if (typeof eventType !== 'string' || !eventType) return undefined;
     const rawPayload = 'payload' in raw ? raw.payload : raw.data;
-    const payload = rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload) ? rawPayload : {};
+    const payload: Record<string, unknown> =
+      rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload) ? (rawPayload as Record<string, unknown>) : {};
     return { eventType, payload };
   };
   const handle = (line: string) => {

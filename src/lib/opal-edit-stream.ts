@@ -111,7 +111,12 @@ export async function* streamEdit(
       sse = sse.slice(bnd + 2);
       const dataLine = block.split('\n').find((l) => l.startsWith('data:'));
       if (!dataLine) continue;
-      let msg: any;
+      // What api/opal-edit-stream.ts writes, one object per SSE `data:` line.
+      let msg:
+        | { k: 'text'; t: string }
+        | { k: 'tool'; name: string; phase: 'call' | 'result'; ok?: boolean }
+        | { k: 'error'; message: string }
+        | { k: 'done' };
       try { msg = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
       if (msg.k === 'text') {
         agentText += msg.t;

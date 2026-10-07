@@ -63,7 +63,6 @@ export interface GalaxyOptions {
 
 const LIME = 0x9fe855;
 const PAPER = 0xeff6e9;
-const FIR = 0x08251a;
 const MIDFIR = 0x0d3a29;
 
 /** The slab's resting pose, and the rock it plays around it — the same

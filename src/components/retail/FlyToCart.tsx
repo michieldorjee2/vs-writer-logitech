@@ -36,6 +36,7 @@ export default function FlyToCart() {
       return;
     }
     const r = cartIcon.getBoundingClientRect();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the flight's end point is the cart icon's measured position, which only exists after layout
     setFlight({
       key: flyKey,
       fromX: flyOrigin.x,

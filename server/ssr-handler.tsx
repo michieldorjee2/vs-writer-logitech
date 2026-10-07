@@ -17,6 +17,17 @@ import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-
  */
 import UseCasePage from '../src/components/UseCasePage';
 import { includes, resolveComponentPlan } from '../src/lib/limitless/component-plan';
+import { resolveUrl } from '../src/lib/graph-types';
+import { graphItems } from '../src/lib/graph-envelope';
+import type {
+  AtelierNoteBlock,
+  CompetitorComparisonPage,
+  FinServHeroBlock,
+  FinServPage,
+  PersonPage,
+  RetailCustomerPage,
+  RetailHeroBlock,
+} from '../src/lib/graph-types';
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries';
 
 /*
@@ -218,7 +229,7 @@ async function getRetailQuery(authKey: string): Promise<string> {
     {},
   );
   const present = new Set<string>(
-    ((introspection as any)?.data?.__type?.fields || []).map((f: any) => f.name),
+    ((introspection as TypeProbe)?.data?.__type?.fields || []).map((f) => f.name),
   );
   const extras = Object.entries(EXTENDED_RETAIL_FIELDS_BY_NAME)
     .filter(([name]) => present.has(name))
@@ -279,7 +290,7 @@ async function getFinServQuery(authKey: string): Promise<string | null> {
     `{ __type(name: "FinServPage") { name } }`,
     {},
   );
-  const exists = !!(introspection as any)?.data?.__type?.name;
+  const exists = !!(introspection as TypeProbe)?.data?.__type?.name;
   if (!exists) {
     _finservTypeAbsent = true;
     return null;
@@ -351,56 +362,21 @@ query GetPage($slug: String!) {
 }
 `;
 
+/** The two introspection probes' answers. */
+type TypeProbe = { data?: { __type?: { name?: string; fields?: Array<{ name: string }> | null } | null } | null } | null | undefined;
+
 /**
- * Recover fields that the agent wrote to the CMS but the registered content
- * type doesn't yet expose (descriptor on items, image direction strings,
- * privateProvenance on set-aside items). The agent's create_page call sends
- * a propertiesJson blob; the CMS persists it verbatim under `_json` even when
- * it doesn't surface every key as a typed field. We re-merge those fields
- * into the page object so React components see the rich content the agent
- * actually generated.
+ * Everything fetchPageContent can return, tagged by which renderer owns it.
+ * Account pages come back untagged — they are the default arm — and every
+ * other type is tagged on its way out, which is what lets the dispatch below be
+ * a switch the compiler can narrow instead of a chain of casts.
  */
-function mergeRetailJson(page: any): any {
-  const raw = page?._json;
-  if (!raw || typeof raw !== 'object') return page;
-  const merge = (block: any, src: any) => {
-    if (!src || typeof src !== 'object') return block;
-    return { ...src, ...(block || {}) };
-  };
-  // Top-level scalars
-  if (raw.customerDisplayName && !page.customerDisplayName) page.customerDisplayName = raw.customerDisplayName;
-  // Hero
-  if (page.hero || raw.hero) {
-    page.hero = merge(page.hero, raw.hero);
-  }
-  // Held for you items — merge `descriptor` back onto each item by name
-  if (page.heldForYou && Array.isArray(raw.heldForYou?.items)) {
-    page.heldForYou = {
-      ...raw.heldForYou,
-      ...page.heldForYou,
-      items: page.heldForYou.items.map((it: any) => {
-        const fromRaw = raw.heldForYou.items.find((r: any) => r.name === it.name);
-        return fromRaw ? { ...fromRaw, ...it } : it;
-      }),
-    };
-  }
-  // Set-aside items
-  if (page.setAside && Array.isArray(raw.setAside?.items)) {
-    page.setAside = {
-      ...raw.setAside,
-      ...page.setAside,
-      items: page.setAside.items.map((it: any) => {
-        const fromRaw = raw.setAside.items.find((r: any) => r.name === it.name);
-        return fromRaw ? { ...fromRaw, ...it } : it;
-      }),
-    };
-  }
-  // Atelier note + small invitation + appointment — merge whole blocks
-  page.atelierNote = merge(page.atelierNote, raw.atelierNote);
-  page.smallInvitation = merge(page.smallInvitation, raw.smallInvitation);
-  page.appointment = merge(page.appointment, raw.appointment);
-  return page;
-}
+type ParentShot = Pick<PersonPage, 'siteScreenshotUrl' | 'siteScreenshotAlt' | 'siteScreenshotDomain'>;
+type FetchedPage =
+  | (PersonPage & ParentShot & { __template: 'person' })
+  | (RetailCustomerPage & { __template: 'retail' })
+  | (FinServPage & { __template: 'finserv' })
+  | (CompetitorComparisonPage & { __template?: undefined });
 
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
   const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
@@ -458,13 +434,13 @@ query GetParentShot($slug: String!) {
 async function fetchParentShot(
   authKey: string,
   companySlug: string | null | undefined,
-): Promise<Record<string, unknown>> {
+): Promise<ParentShot> {
   const slug = (companySlug || '').replace(/^\/+|\/+$/g, '');
   if (!slug) return {};
   try {
     for (const s of [`/${slug}/`, `/en/${slug}/`]) {
       const json = await queryGraph(authKey, PARENT_SHOT_QUERY, { slug: s });
-      const item = (json as any)?.data?.CompetitorComparisonPage?.items?.[0];
+      const item = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage')?.[0];
       if (item?.challengeScreenshotUrl?.default) {
         return {
           siteScreenshotUrl: item.challengeScreenshotUrl.default,
@@ -522,7 +498,7 @@ query GetPersonPage($slug: String!) {
 }
 `;
 
-async function fetchPageContent(authKey: string, slug: string) {
+async function fetchPageContent(authKey: string, slug: string): Promise<FetchedPage | null> {
   const normalizedSlug = `/${slug}/`;
 
   // Retail dispatch: try RetailCustomerPage first on every request. The CMS
@@ -543,7 +519,7 @@ async function fetchPageContent(authKey: string, slug: string) {
   if (!slug.startsWith('en/')) personTries.push(`/en/${slug}/`);
   for (const s of personTries) {
     const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
-    const items = (pJson as any)?.data?.PersonPage?.items;
+    const items = graphItems<PersonPage>(pJson, 'PersonPage');
     if (items && items.length > 0) {
       const shot = await fetchParentShot(authKey, items[0]?.companySlug);
       return { ...items[0], ...shot, __template: 'person' as const };
@@ -553,9 +529,9 @@ async function fetchPageContent(authKey: string, slug: string) {
   const retailQuery = await getRetailQuery(authKey);
   for (const s of retailTries) {
     const json = await queryGraph(authKey, retailQuery, { slug: s });
-    const items = (json as any)?.data?.RetailCustomerPage?.items;
+    const items = graphItems<RetailCustomerPage>(json, 'RetailCustomerPage');
     if (items && items.length > 0) {
-      return mergeRetailJson({ ...items[0], __template: 'retail' as const });
+      return { ...items[0], __template: 'retail' as const };
     }
   }
 
@@ -568,7 +544,7 @@ async function fetchPageContent(authKey: string, slug: string) {
   if (finservQuery) {
     for (const s of finservTries) {
       const fsJson = await queryGraph(authKey, finservQuery, { slug: s });
-      const items = (fsJson as any)?.data?.FinServPage?.items;
+      const items = graphItems<FinServPage>(fsJson, 'FinServPage');
       if (items && items.length > 0) {
         return { ...items[0], __template: 'finserv' as const };
       }
@@ -580,13 +556,13 @@ async function fetchPageContent(authKey: string, slug: string) {
   }
 
   let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
-  let items = (json as any)?.data?.CompetitorComparisonPage?.items;
+  let items = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage');
 
   // Fallback: try with /en/ prefix (Graph stores locale-prefixed URLs)
   if ((!items || items.length === 0) && !slug.startsWith('en/')) {
     const enSlug = `/en/${slug}/`;
     json = await queryGraph(authKey, PAGE_QUERY, { slug: enSlug });
-    items = (json as any)?.data?.CompetitorComparisonPage?.items;
+    items = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage');
   }
 
   if (!items || items.length === 0) return null;
@@ -607,10 +583,43 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function buildHeadHtml(page: any): string {
+/**
+ * The fields buildHeadHtml reads, from whichever of the four page types it was
+ * handed. Past the first three, each exists on only some of them, so they are
+ * optional — the function already tolerates their absence.
+ */
+interface HeadSource {
+  PageTitle?: string | null;
+  MetaDescription?: string | null;
+  _metadata: { url: { hierarchical: string }; published?: string | null };
+  __template?: string | null;
+  template?: string | null;
+  CanonicalUrl?: { default: string } | null;
+  /** Retail and FinServ both have a hero block; only the retail one carries an image. */
+  hero?: RetailHeroBlock | FinServHeroBlock | null;
+  atelierNote?: AtelierNoteBlock | null;
+  heroImageUrl?: string | { default: string } | null;
+  challengeScreenshotUrl?: { default: string } | null;
+  brand?: string | null;
+  companyName?: string | null;
+  ctaTitle?: string | null;
+  testimonial1?: string | null;
+  testimonial1JobTitle?: string | null;
+  testimonial1Company?: string | null;
+  testimonial2?: string | null;
+  testimonial2JobTitle?: string | null;
+  testimonial2Company?: string | null;
+  analystCards?: Array<{ Source?: string | null; Category?: string | null; Url?: { default?: string | null } | null }> | null;
+}
+
+function buildHeadHtml(page: HeadSource): string {
   const parts: string[] = [];
-  parts.push(`<title>${escapeHtml(page.PageTitle)}</title>`);
-  parts.push(`<meta name="description" content="${escapeHtml(page.MetaDescription)}" />`);
+  // PersonPage declares both as optional. A page missing one used to throw
+  // inside escapeHtml and fall through to the SPA shell; now it gets an empty tag.
+  const title = page.PageTitle ?? '';
+  const description = page.MetaDescription ?? '';
+  parts.push(`<title>${escapeHtml(title)}</title>`);
+  parts.push(`<meta name="description" content="${escapeHtml(description)}" />`);
   const canonicalHref =
     page.CanonicalUrl?.default || `${SITE_URL}${page._metadata.url.hierarchical}`;
   parts.push(`<link rel="canonical" href="${escapeHtml(canonicalHref)}" />`);
@@ -618,26 +627,21 @@ function buildHeadHtml(page: any): string {
   // Social card tags. Retail pages reuse the hero image; ABM and comparison
   // pages fall back to whatever featured image they expose. og:image is
   // required for clean Slack / iMessage / LinkedIn previews.
-  const isPersonPage = (page as any).__template === 'person' || page.template === 'person';
-  const isRetailPage = (page as any).__template === 'retail' || page.template === 'retail';
-  const isFinServPage = (page as any).__template === 'finserv' || page.template === 'finserv';
+  const isPersonPage = page.__template === 'person' || page.template === 'person';
+  const isRetailPage = page.__template === 'retail' || page.template === 'retail';
+  const isFinServPage = page.__template === 'finserv' || page.template === 'finserv';
   let socialImage: string | null = null;
   if (isRetailPage) {
-    socialImage =
-      page.hero?.imageUrl?.default ||
-      page.hero?.imageUrl ||
-      page.atelierNote?.imageUrl?.default ||
-      page.atelierNote?.imageUrl ||
-      null;
+    // resolveUrl reads either URL shape Graph has used ({ default } or a bare
+    // string). The old `x?.imageUrl?.default || x?.imageUrl` chain handed the
+    // OBJECT to escapeHtml whenever `default` was missing, and threw.
+    const heroImage = page.hero && 'imageUrl' in page.hero ? page.hero.imageUrl : null;
+    socialImage = resolveUrl(heroImage) || resolveUrl(page.atelierNote?.imageUrl) || null;
   } else if (isFinServPage) {
     // No hero image on the FinServ template — fall back to a summary card.
     socialImage = null;
   } else {
-    socialImage =
-      page.heroImageUrl?.default ||
-      page.heroImageUrl ||
-      page.challengeScreenshotUrl?.default ||
-      null;
+    socialImage = resolveUrl(page.heroImageUrl) || page.challengeScreenshotUrl?.default || null;
   }
   const siteName = isRetailPage
     ? 'Maison Aurelle'
@@ -649,16 +653,16 @@ function buildHeadHtml(page: any): string {
 
   parts.push(`<meta property="og:type" content="website" />`);
   parts.push(`<meta property="og:site_name" content="${escapeHtml(siteName)}" />`);
-  parts.push(`<meta property="og:title" content="${escapeHtml(page.PageTitle)}" />`);
-  parts.push(`<meta property="og:description" content="${escapeHtml(page.MetaDescription)}" />`);
+  parts.push(`<meta property="og:title" content="${escapeHtml(title)}" />`);
+  parts.push(`<meta property="og:description" content="${escapeHtml(description)}" />`);
   parts.push(`<meta property="og:url" content="${escapeHtml(canonicalHref)}" />`);
   if (socialImage) {
     parts.push(`<meta property="og:image" content="${escapeHtml(socialImage)}" />`);
-    parts.push(`<meta property="og:image:alt" content="${escapeHtml(page.PageTitle)}" />`);
+    parts.push(`<meta property="og:image:alt" content="${escapeHtml(title)}" />`);
   }
   parts.push(`<meta name="twitter:card" content="${socialImage ? 'summary_large_image' : 'summary'}" />`);
-  parts.push(`<meta name="twitter:title" content="${escapeHtml(page.PageTitle)}" />`);
-  parts.push(`<meta name="twitter:description" content="${escapeHtml(page.MetaDescription)}" />`);
+  parts.push(`<meta name="twitter:title" content="${escapeHtml(title)}" />`);
+  parts.push(`<meta name="twitter:description" content="${escapeHtml(description)}" />`);
   if (socialImage) {
     parts.push(`<meta name="twitter:image" content="${escapeHtml(socialImage)}" />`);
   }
@@ -689,25 +693,6 @@ function buildHeadHtml(page: any): string {
   }
   parts.push(`<script type="application/ld+json">${JSON.stringify(webPageLd)}</script>`);
 
-  // FAQ JSON-LD (FaqSection is now a list)
-  if (Array.isArray(page.FaqSection)) {
-    for (const entry of page.FaqSection) {
-      const faqJson = (entry as any)?._json;
-      if (faqJson?.Items?.length) {
-        const faqLd = {
-          '@context': 'https://schema.org',
-          '@type': 'FAQPage',
-          mainEntity: faqJson.Items.map((item: any) => ({
-            '@type': 'Question',
-            name: item.Heading ?? '',
-            acceptedAnswer: { '@type': 'Answer', text: item.MainContent?.html ?? '' },
-          })),
-        };
-        parts.push(`<script type="application/ld+json">${JSON.stringify(faqLd)}</script>`);
-        break;
-      }
-    }
-  }
 
   // Testimonial review JSON-LD (flat fields)
   const reviews: Array<Record<string, unknown>> = [];
@@ -749,7 +734,7 @@ function buildHeadHtml(page: any): string {
       '@context': 'https://schema.org',
       '@type': 'ItemList',
       name: 'Analyst Research',
-      itemListElement: page.analystCards.map((card: any, idx: number) => ({
+      itemListElement: page.analystCards.map((card, idx) => ({
         '@type': 'ListItem',
         position: idx + 1,
         name: card.Source ?? '',
@@ -1067,11 +1052,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ---- Render React component tree to HTML ----
     // Three templates: retail (luxury fashion), abm (B2B account-based), comparison (B2B vs-X).
     // Retail is tagged in fetchPageContent; ABM is signal-detected.
-    const isPerson = (page as any).__template === 'person' || page.template === 'person';
-    const isRetail =
-      !isPerson && ((page as any).__template === 'retail' || page.template === 'retail');
-    const isFinServ =
-      !isPerson && !isRetail && ((page as any).__template === 'finserv' || page.template === 'finserv');
     /*
      * The use-case arm must exist HERE as well as in src/App.tsx.
      *
@@ -1083,22 +1063,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
      * not after. Keep the two in step; see
      * aldus-ui/docs/limitless-use-case-template.md.
      */
-    const componentPlan = !isPerson && !isRetail && !isFinServ ? resolveComponentPlan(page as any) : null;
-    const isUseCase = !!componentPlan && includes(componentPlan, 'use-case-matrix');
-    const isABM =
-      !isPerson && !isRetail && !isFinServ && !isUseCase && !!(page.intelEyebrow || page.customerLogo);
-
-    const appHtml = isPerson
-      ? renderToString(<PersonPageServer page={page} />)
-      : isRetail
-        ? renderToString(<RetailCustomerPageServer page={page} />)
-        : isFinServ
-          ? renderToString(<FinServPageServer page={page} />)
-          : isUseCase
-            ? renderToString(<UseCasePage page={page as any} plan={componentPlan!} />)
-            : isABM
-              ? renderToString(<ABMHyperPageServer page={page} />)
-              : renderToString(<DynamicComparisonPageServer page={page} />);
+    let appHtml: string;
+    switch (page.__template) {
+      case 'person':
+        appHtml = renderToString(<PersonPageServer page={page} />);
+        break;
+      case 'retail':
+        appHtml = renderToString(<RetailCustomerPageServer page={page} />);
+        break;
+      case 'finserv':
+        appHtml = renderToString(<FinServPageServer page={page} />);
+        break;
+      default: {
+        const componentPlan = resolveComponentPlan(page);
+        appHtml = includes(componentPlan, 'use-case-matrix')
+          ? renderToString(<UseCasePage page={page} plan={componentPlan} />)
+          : page.intelEyebrow || page.customerLogo
+            ? renderToString(<ABMHyperPageServer page={page} />)
+            : renderToString(<DynamicComparisonPageServer page={page} />);
+      }
+    }
 
     // ---- Build SEO head tags ----
     const headHtml = buildHeadHtml(page);
