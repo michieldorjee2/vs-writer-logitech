@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { renderToString } from 'react-dom/server';
+import { Suspense, type ReactElement } from 'react';
 import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
 import ABMHyperPageServer from '../src/components/ABMHyperPage.server';
 import RetailCustomerPageServer from '../src/components/RetailCustomerPage.server';
@@ -812,13 +813,18 @@ function VbElement({
   if (!Renderer) return null;
   return (
     <EditableBlock blockId={element.key}>
-      <Renderer
-        {...element.component}
-        displaySettings={withContentTypeDefaults(typeName, element.displaySettings)}
-        isFirst={index === 0}
-        locale={locale}
-        preview={preview}
-      />
+      {/* The browser draws each of these through registry.ts's suspend(): a lazy chunk in its
+          own <Suspense fallback={null}>. The server imports them statically, but must still
+          emit the boundary — hydration expects its <!--$--> marker around every element. */}
+      <Suspense fallback={null}>
+        <Renderer
+          {...element.component}
+          displaySettings={withContentTypeDefaults(typeName, element.displaySettings)}
+          isFirst={index === 0}
+          locale={locale}
+          preview={preview}
+        />
+      </Suspense>
     </EditableBlock>
   );
 }
@@ -933,6 +939,29 @@ const htmlTemplate: string = __HTML_TEMPLATE__;
 // Vercel handler
 // ---------------------------------------------------------------------------
 
+/**
+ * Server-render a page inside the same shell the browser renders it in.
+ *
+ * src/App.tsx wraps every route in `<main>` (since 7bf27cb) and every page renderer in a
+ * `<Suspense>` boundary (the renderers are lazy chunks). React marks a server-rendered
+ * boundary with `<!--$-->` comments, and hydration walks the DOM expecting them. This used
+ * to render the page bare — no `<main>`, no marker — so React hit `<main class="abm-page">`
+ * where it expected the boundary, failed with #418 on every server-rendered page, threw the
+ * server HTML away and client-rendered the whole root. Measured 2026-10-08: 11 of 13 page
+ * types failing in production; the two "clean" ones were never hydrated at all.
+ *
+ * Keep this in step with App.tsx: a wrapper added there without being added here breaks
+ * every page again. The fallback is irrelevant on the server — content is rendered, never
+ * the fallback — so it is null rather than a copy of the client's spinner.
+ */
+function renderInAppShell(page: ReactElement): string {
+  return renderToString(
+    <main>
+      <Suspense fallback={null}>{page}</Suspense>
+    </main>,
+  );
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const slug = url.pathname.replace(/^\/|\/$/g, '');
@@ -1002,7 +1031,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      const appHtml = renderToString(
+      const appHtml = renderInAppShell(
         <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
           <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
         </div>,
@@ -1066,21 +1095,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let appHtml: string;
     switch (page.__template) {
       case 'person':
-        appHtml = renderToString(<PersonPageServer page={page} />);
+        appHtml = renderInAppShell(<PersonPageServer page={page} />);
         break;
       case 'retail':
-        appHtml = renderToString(<RetailCustomerPageServer page={page} />);
+        appHtml = renderInAppShell(<RetailCustomerPageServer page={page} />);
         break;
       case 'finserv':
-        appHtml = renderToString(<FinServPageServer page={page} />);
+        appHtml = renderInAppShell(<FinServPageServer page={page} />);
         break;
       default: {
         const componentPlan = resolveComponentPlan(page);
         appHtml = includes(componentPlan, 'use-case-matrix')
-          ? renderToString(<UseCasePage page={page} plan={componentPlan} />)
+          ? renderInAppShell(<UseCasePage page={page} plan={componentPlan} />)
           : page.intelEyebrow || page.customerLogo
-            ? renderToString(<ABMHyperPageServer page={page} />)
-            : renderToString(<DynamicComparisonPageServer page={page} />);
+            ? renderInAppShell(<ABMHyperPageServer page={page} />)
+            : renderInAppShell(<DynamicComparisonPageServer page={page} />);
       }
     }
 

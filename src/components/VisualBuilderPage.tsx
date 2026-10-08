@@ -21,20 +21,39 @@ import type { SafeVisualBuilderExperience } from '@/lib/optimizely/types/experie
  * walks.
  */
 
+type Experience = SafeVisualBuilderExperience & Record<string, unknown>;
+
 interface ExperienceState {
-  data: (SafeVisualBuilderExperience & Record<string, unknown>) | null;
+  data: Experience | null;
   isLoading: boolean;
   error: string | null;
 }
 
+/**
+ * Take the experience server/ssr-handler.tsx embedded, once. The first render has to draw
+ * exactly what the server drew, or hydration fails — and this hook used to ignore the
+ * embedded copy, render a spinner where the server had rendered the page, fail hydration
+ * (#418), throw the server HTML away and fetch the same experience again.
+ */
+function consumeSSRExperience(): Experience | null {
+  if (typeof window === 'undefined' || !window.__SSR_DATA__) return null;
+  const data = window.__SSR_DATA__ as Experience;
+  delete window.__SSR_DATA__;
+  return data;
+}
+
 function useExperience(slug: string): ExperienceState {
+  // Keyed to the slug it was rendered for: an in-app navigation to another /vb/ page must
+  // fetch, not keep showing the one the server embedded.
+  const [ssr] = useState(() => ({ slug, data: consumeSSRExperience() }));
   const [state, setState] = useState<ExperienceState>({
-    data: null,
-    isLoading: true,
+    data: ssr.data,
+    isLoading: !ssr.data,
     error: null,
   });
 
   useEffect(() => {
+    if (ssr.data && slug === ssr.slug) return;
     let cancelled = false;
 
     async function load() {
@@ -62,7 +81,7 @@ function useExperience(slug: string): ExperienceState {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, ssr]);
 
   return state;
 }

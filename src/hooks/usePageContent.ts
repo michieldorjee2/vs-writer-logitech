@@ -9,14 +9,18 @@ interface PageContentState {
 
 declare global {
     interface Window {
-        /** The page server/ssr-handler.tsx rendered, embedded so the client does not re-fetch it. */
-        __SSR_DATA__?: CompetitorComparisonPage;
+        /**
+         * The page server/ssr-handler.tsx rendered, embedded so the client does not re-fetch it.
+         * `unknown` because it is whichever type that request resolved to — a flat page here, a
+         * Visual Builder experience on /vb/ — so each consumer states what its route serves.
+         */
+        __SSR_DATA__?: unknown;
     }
 }
 
 function consumeSSRData(): CompetitorComparisonPage | null {
     if (typeof window === 'undefined') return null;
-    const data = window.__SSR_DATA__;
+    const data = window.__SSR_DATA__ as CompetitorComparisonPage | undefined;
     if (data) {
         delete window.__SSR_DATA__;
         return data;
