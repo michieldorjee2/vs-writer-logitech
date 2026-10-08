@@ -81,7 +81,7 @@ const GENERIC_CONTACT_NAMES = new Set([
   'solutions architect', 'solution architect', 'migration engineer', 'customer success manager',
 ]);
 function realContacts(
-  members?: Array<{ Name: string; Role: string; Email: string | null; Initials: string }>,
+  members?: Array<{ Name: string; Role: string; Email: string | null; Initials: string }> | null,
 ) {
   return (members || []).filter(
     (m) => !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()),

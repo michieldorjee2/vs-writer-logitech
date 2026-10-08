@@ -53,11 +53,14 @@ export function initRetailInteractions(): void {
 
   ensureCursor();
 
-  onMove = (e: MouseEvent) => {
+  // Bound through a const: the module-level `onMove` is typed `| null` for teardown, and a
+  // listener argument must not be.
+  const move = (e: MouseEvent) => {
     targetX = e.clientX;
     targetY = e.clientY;
   };
-  window.addEventListener('mousemove', onMove, { passive: true });
+  onMove = move;
+  window.addEventListener('mousemove', move, { passive: true });
   rafId = requestAnimationFrame(tick);
 
   // Default link hover
@@ -86,14 +89,16 @@ export function initRetailInteractions(): void {
     attachedHover.push(el);
   });
 
-  onEnter = () => {
+  const enter = () => {
     if (cursorEl) cursorEl.style.opacity = '1';
   };
-  onLeave = () => {
+  const leave = () => {
     if (cursorEl) cursorEl.style.opacity = '0';
   };
-  document.body.addEventListener('mouseenter', onEnter);
-  document.body.addEventListener('mouseleave', onLeave);
+  onEnter = enter;
+  onLeave = leave;
+  document.body.addEventListener('mouseenter', enter);
+  document.body.addEventListener('mouseleave', leave);
 }
 
 export function cleanupRetailInteractions(): void {

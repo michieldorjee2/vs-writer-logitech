@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { renderToString } from 'react-dom/server';
 import { Suspense, type ReactElement } from 'react';
 import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
-import ABMHyperPageServer from '../src/components/ABMHyperPage.server';
-import RetailCustomerPageServer from '../src/components/RetailCustomerPage.server';
+import ABMHyperPage from '../src/components/ABMHyperPage';
+import RetailCustomerPage from '../src/components/RetailCustomerPage';
 import FinServPageServer from '../src/components/FinServPage.server';
 import PersonPageServer from '../src/components/PersonPage.server';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content';
@@ -26,7 +26,7 @@ import type {
   FinServHeroBlock,
   FinServPage,
   PersonPage,
-  RetailCustomerPage,
+  RetailCustomerPage as RetailPageData,
   RetailHeroBlock,
 } from '../src/lib/graph-types';
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries';
@@ -375,7 +375,7 @@ type TypeProbe = { data?: { __type?: { name?: string; fields?: Array<{ name: str
 type ParentShot = Pick<PersonPage, 'siteScreenshotUrl' | 'siteScreenshotAlt' | 'siteScreenshotDomain'>;
 type FetchedPage =
   | (PersonPage & ParentShot & { __template: 'person' })
-  | (RetailCustomerPage & { __template: 'retail' })
+  | (RetailPageData & { __template: 'retail' })
   | (FinServPage & { __template: 'finserv' })
   | (CompetitorComparisonPage & { __template?: undefined });
 
@@ -530,7 +530,7 @@ async function fetchPageContent(authKey: string, slug: string): Promise<FetchedP
   const retailQuery = await getRetailQuery(authKey);
   for (const s of retailTries) {
     const json = await queryGraph(authKey, retailQuery, { slug: s });
-    const items = graphItems<RetailCustomerPage>(json, 'RetailCustomerPage');
+    const items = graphItems<RetailPageData>(json, 'RetailCustomerPage');
     if (items && items.length > 0) {
       return { ...items[0], __template: 'retail' as const };
     }
@@ -940,7 +940,7 @@ const htmlTemplate: string = __HTML_TEMPLATE__;
 // ---------------------------------------------------------------------------
 
 /**
- * Server-render a page inside the same shell the browser renders it in.
+ * Server-render a page inside the exact shell the browser renders it in.
  *
  * src/App.tsx wraps every route in `<main>` (since 7bf27cb) and every page renderer in a
  * `<Suspense>` boundary (the renderers are lazy chunks). React marks a server-rendered
@@ -950,11 +950,33 @@ const htmlTemplate: string = __HTML_TEMPLATE__;
  * server HTML away and client-rendered the whole root. Measured 2026-10-08: 11 of 13 page
  * types failing in production; the two "clean" ones were never hydrated at all.
  *
- * Keep this in step with App.tsx: a wrapper added there without being added here breaks
- * every page again. The fallback is irrelevant on the server — content is rendered, never
- * the fallback — so it is null rather than a copy of the client's spinner.
+ * The SHAPE of the children matters too, not just the wrappers. useId() encodes a
+ * component's position, and React counts a parent's children ARRAY: PageLoader renders
+ * `{body}{fromSearch && <FloatingSidebar/>}` — two slots, even when the second is `false`
+ * — while the /vb/ route renders one. Give the page one slot where the browser gives it
+ * two and every useId() below it differs (OpalStamp's ids, on every retail page). So there
+ * is one helper per route, each mirroring that route's element in App.tsx exactly.
+ *
+ * Keep these in step with App.tsx: a wrapper or a sibling added there without being added
+ * here breaks hydration again. The fallback is irrelevant on the server — content is
+ * rendered, never the fallback — so it is null rather than a copy of the client's spinner.
  */
-function renderInAppShell(page: ReactElement): string {
+
+/** Mirrors App.tsx's PageLoader: `<Suspense>{body}{fromSearch && <FloatingSidebar/>}</Suspense>`. */
+function renderPageRoute(page: ReactElement): string {
+  return renderToString(
+    <main>
+      <Suspense fallback={null}>
+        {page}
+        {/* FloatingSidebar's slot: booth-only, never server-rendered, but it is a slot. */}
+        {false}
+      </Suspense>
+    </main>,
+  );
+}
+
+/** Mirrors App.tsx's /vb/:slug route element: `<Suspense><VisualBuilderPage/></Suspense>`. */
+function renderExperienceRoute(page: ReactElement): string {
   return renderToString(
     <main>
       <Suspense fallback={null}>{page}</Suspense>
@@ -1031,7 +1053,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      const appHtml = renderInAppShell(
+      const appHtml = renderExperienceRoute(
         <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
           <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
         </div>,
@@ -1101,23 +1123,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // hydration succeed, every person page in ?ctx=edit lost its CMS edit hooks (6 and 8
         // on the two measured pages, 0 after). Before that, the failed hydration re-rendered
         // the page in the browser and hid the gap.
-        appHtml = renderInAppShell(
+        appHtml = renderPageRoute(
           <PersonPageServer page={page} editMode={url.searchParams.get('ctx') === 'edit'} />,
         );
         break;
       case 'retail':
-        appHtml = renderInAppShell(<RetailCustomerPageServer page={page} />);
+        appHtml = renderPageRoute(<RetailCustomerPage page={page} />);
         break;
       case 'finserv':
-        appHtml = renderInAppShell(<FinServPageServer page={page} />);
+        appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
       default: {
         const componentPlan = resolveComponentPlan(page);
         appHtml = includes(componentPlan, 'use-case-matrix')
-          ? renderInAppShell(<UseCasePage page={page} plan={componentPlan} />)
+          ? renderPageRoute(<UseCasePage page={page} plan={componentPlan} />)
           : page.intelEyebrow || page.customerLogo
-            ? renderInAppShell(<ABMHyperPageServer page={page} />)
-            : renderInAppShell(<DynamicComparisonPageServer page={page} />);
+            ? renderPageRoute(<ABMHyperPage page={page} />)
+            : renderPageRoute(<DynamicComparisonPageServer page={page} />);
       }
     }
 

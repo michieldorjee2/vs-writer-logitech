@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useSyncExternalStore } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
@@ -167,10 +167,23 @@ function renderPageBody(data: CompetitorComparisonPage, editMode: boolean) {
     return <DynamicComparisonPage page={data} />;
 }
 
+/*
+ * False during the server render AND during hydration, true from the first render after.
+ *
+ * React reads `getServerSnapshot` while hydrating, so anything gated on this renders exactly
+ * what the server rendered — then React re-renders with `getSnapshot` once hydration is done.
+ * The documented pattern for client-only content; nothing to subscribe to, hence the no-op.
+ */
+const noopSubscribe = () => () => {};
+function useHydrated(): boolean {
+    return useSyncExternalStore(noopSubscribe, () => true, () => false);
+}
+
 function PageLoader() {
     const { '*': slug } = useParams();
     const [searchParams] = useSearchParams();
     const { data, isLoading, error } = usePageContent(slug || '');
+    const hydrated = useHydrated();
 
     // Inject title, meta description, canonical, and JSON-LD
     useHeadMeta(data);
@@ -188,10 +201,14 @@ function PageLoader() {
     }
 
     // The whole sales sidebar (back-to-search + X-ray) is booth-only.
-    // Only mount it when we know the visitor came in via /search.
-    const fromSearch = searchParams.has('search');
+    // Only mount it when we know the visitor came in via /search — and only after
+    // hydration: the server never renders it, so drawing it in the hydration pass put a
+    // node where the server HTML had none and failed hydration for every booth visit.
+    const fromSearch = hydrated && searchParams.has('search');
 
     return (
+        // server/ssr-handler.tsx's renderPageRoute() reproduces this exact shape — including
+        // the second slot — because useId() counts a children array. Change one, change both.
         <Suspense fallback={<RouteSpinner />}>
             {renderPageBody(data, searchParams.get('ctx') === 'edit')}
             {fromSearch && !isRetailPage(data) && !isFinServPage(data) && (
