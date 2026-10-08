@@ -1095,7 +1095,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let appHtml: string;
     switch (page.__template) {
       case 'person':
-        appHtml = renderInAppShell(<PersonPageServer page={page} />);
+        // Edit mode, exactly as App.tsx's renderPageBody passes it — to person pages only.
+        // Missing here, the server drew no data-epi-edit hooks; production React keeps the
+        // server's attributes on hydration rather than patching them, so once c4cac94 made
+        // hydration succeed, every person page in ?ctx=edit lost its CMS edit hooks (6 and 8
+        // on the two measured pages, 0 after). Before that, the failed hydration re-rendered
+        // the page in the browser and hid the gap.
+        appHtml = renderInAppShell(
+          <PersonPageServer page={page} editMode={url.searchParams.get('ctx') === 'edit'} />,
+        );
         break;
       case 'retail':
         appHtml = renderInAppShell(<RetailCustomerPageServer page={page} />);
