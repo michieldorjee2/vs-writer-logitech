@@ -47,9 +47,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const upstream = await fetch(OPAL_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // requested_at keeps every body unique: Opal's webhook gateway drops a body
+      // identical to one it has seen, so a repeat request for the same website
+      // would otherwise vanish without a run or a reply.
       body: JSON.stringify({
         company_name: name.value,
         edit_user_email: email.value,
+        requested_at: new Date().toISOString(),
       }),
     });
 

@@ -282,6 +282,7 @@ function opalCreatePageDevProxy(): Plugin {
             body: JSON.stringify({
               company_name: company_name.trim(),
               edit_user_email,
+              requested_at: new Date().toISOString(),
             }),
           })
           const text = await upstream.text()
