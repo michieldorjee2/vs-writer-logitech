@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireIdentity } from './_lib/auth.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -15,6 +16,16 @@ const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
  */
 const PAGE_SIZE = 100;
 const MAX_ITEMS = 5000;
+
+/**
+ * The index lists every account page, so it is for signed-in Optimizely people
+ * only (api/_lib/auth.ts) — which also means it can no longer sit in the shared
+ * edge cache, where the CDN would hand it out without asking this function.
+ * It is held in this instance's memory instead, for as long as the edge used
+ * to hold it.
+ */
+const CACHE_MS = 5 * 60 * 1000;
+let cached: { at: number; body: { items: unknown[]; total: number } } | null = null;
 
 const INDEX_QUERY = `
 query SearchIndex($limit: Int!, $skip: Int!) {
@@ -48,7 +59,12 @@ async function fetchPage(authKey: string, skip: number) {
   return r.json() as Promise<{ data?: { CompetitorComparisonPage?: { total?: number; items?: unknown[] } } }>;
 }
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireIdentity(req, res)) return;
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  if (cached && Date.now() - cached.at < CACHE_MS) return res.status(200).json(cached.body);
+
   const authKey = process.env.GRAPH_AUTH_KEY;
   if (!authKey) return res.status(500).json({ error: 'GRAPH_AUTH_KEY not configured' });
 
@@ -67,8 +83,8 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       items.push(...(chunk?.data?.CompetitorComparisonPage?.items ?? []));
     }
 
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    // An empty answer is a Graph hiccup, not an empty site: don't keep it.
+    if (items.length) cached = { at: Date.now(), body: { items, total } };
     return res.status(200).json({ items, total });
   } catch (err) {
     console.error('[api/search-index] Graph fetch failed:', err);

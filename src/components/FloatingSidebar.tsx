@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
+import { signInHref, useAuth } from '../lib/auth';
 import XrayMode from './XrayMode';
 import EditMode from './EditMode';
 import '../styles/floating-sidebar.css';
@@ -96,6 +97,13 @@ function formatRemaining(ms: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/** This page as a visitor sees it: the same URL without the booth flag. */
+function livePageHref(): string {
+  const u = new URL(window.location.href);
+  u.searchParams.delete('search');
+  return u.pathname + (u.searchParams.toString() ? `?${u.searchParams.toString()}` : '') + u.hash;
+}
+
 /**
  * Booth-only floating action column rendered on top of the content page.
  *   • Back-to-search button: returns the visitor to /search.
@@ -106,9 +114,24 @@ function formatRemaining(ms: number): string {
  *     a "still working" popup instead of letting them resubmit.
  *
  * Mounted by App.tsx ONLY when `?search=1` is present in the URL — the
- * caller owns that gate, so this component always renders both buttons.
+ * caller owns that gate, so this component always renders the buttons.
+ *
+ * `?search=1` is an internal link, and a link travels: the tools work only
+ * for someone signed in with Optimizely (src/lib/auth.ts). Anyone else gets
+ * the buttons locked and a note saying what this link is, with the way in
+ * (sign in, and come straight back here) and the way out (the live page).
+ * The routes behind the tools check the session themselves; locking the
+ * buttons is the explanation, not the enforcement.
  */
 function FloatingSidebar({ page, variant }: Props) {
+  const auth = useAuth();
+  const identity = auth.status === 'signed-in' ? auth.identity : null;
+  /* Locked while /api/auth/me is still answering, too — the note waits for
+   * a definite "signed out" so a signed-in rep never sees it flash. */
+  const locked = !identity;
+  const [noticeOpen, setNoticeOpen] = useState(true);
+  const showNotice = auth.status === 'signed-out' && noticeOpen;
+
   const [xrayActive, setXrayActive] = useState(false);
   const [editActive, setEditActive] = useState(false);
   const [workingUntil, setWorkingUntil] = useState<number>(() => readWorkingUntil());
@@ -155,20 +178,36 @@ function FloatingSidebar({ page, variant }: Props) {
   }, [isWorking, workingUntil]);
 
   const handleBack = useCallback(() => {
+    if (locked) {
+      setNoticeOpen(true);
+      return;
+    }
     if (document.referrer && document.referrer.includes('/search')) {
       window.history.back();
     } else {
       window.location.href = '/search';
     }
-  }, []);
+  }, [locked]);
+
+  const handleXrayClick = useCallback(() => {
+    if (locked) {
+      setNoticeOpen(true);
+      return;
+    }
+    setXrayActive((v) => !v);
+  }, [locked]);
 
   const handleEditClick = useCallback(() => {
+    if (locked) {
+      setNoticeOpen(true);
+      return;
+    }
     if (isWorking) {
       setShowWorkingModal(true);
       return;
     }
     setEditActive((v) => !v);
-  }, [isWorking]);
+  }, [isWorking, locked]);
 
   /* Called by EditMode after the webhook resolves. Latches the
    * Working… timer for WORKING_DURATION_MS from now and snapshots
@@ -241,7 +280,11 @@ function FloatingSidebar({ page, variant }: Props) {
   return (
     <>
       <aside
-        className={'xray-sidebar' + (sidebarHidden ? ' xray-sidebar--hidden' : '')}
+        className={
+          'xray-sidebar' +
+          (sidebarHidden ? ' xray-sidebar--hidden' : '') +
+          (locked ? ' xray-sidebar--locked' : '')
+        }
         aria-label="Page tools"
         aria-hidden={sidebarHidden}
       >
@@ -249,8 +292,9 @@ function FloatingSidebar({ page, variant }: Props) {
           type="button"
           className="xray-sidebar__btn xray-sidebar__btn--back"
           onClick={handleBack}
-          aria-label="Back to search"
-          title="Back to search"
+          aria-disabled={locked}
+          aria-label={locked ? 'Search (sign in to use)' : 'Back to search'}
+          title={locked ? 'Sign in with Optimizely to use Search' : 'Back to search'}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5" />
@@ -265,10 +309,11 @@ function FloatingSidebar({ page, variant }: Props) {
             'xray-sidebar__btn xray-sidebar__btn--xray' +
             (xrayActive ? ' xray-sidebar__btn--active' : '')
           }
-          onClick={() => setXrayActive((v) => !v)}
+          onClick={handleXrayClick}
+          aria-disabled={locked}
           aria-pressed={xrayActive}
-          aria-label={xrayActive ? 'Exit X-ray mode' : 'Enter X-ray mode'}
-          title={xrayActive ? 'Exit X-ray' : 'X-ray this page'}
+          aria-label={locked ? 'X-ray (sign in to use)' : xrayActive ? 'Exit X-ray mode' : 'Enter X-ray mode'}
+          title={locked ? 'Sign in with Optimizely to use X-ray' : xrayActive ? 'Exit X-ray' : 'X-ray this page'}
         >
           <svg
             viewBox="0 0 24 24"
@@ -300,13 +345,20 @@ function FloatingSidebar({ page, variant }: Props) {
             (isWorking ? ' xray-sidebar__btn--working' : '')
           }
           onClick={handleEditClick}
+          aria-disabled={locked}
           aria-pressed={editActive}
           aria-label={
-            isWorking
-              ? `Opal is working on your edits — ${formatRemaining(remaining)} remaining`
-              : (editActive ? 'Exit edit mode' : 'Enter edit mode')
+            locked
+              ? 'Edit (sign in to use)'
+              : isWorking
+                ? `Opal is working on your edits — ${formatRemaining(remaining)} remaining`
+                : (editActive ? 'Exit edit mode' : 'Enter edit mode')
           }
-          title={isWorking ? 'Working on your edits' : (editActive ? 'Exit edit' : 'Edit this page')}
+          title={
+            locked
+              ? 'Sign in with Optimizely to use Edit'
+              : isWorking ? 'Working on your edits' : (editActive ? 'Exit edit' : 'Edit this page')
+          }
         >
           {isWorking ? (
             <span className="xray-sidebar__working-wrap" aria-hidden="true">
@@ -351,20 +403,61 @@ function FloatingSidebar({ page, variant }: Props) {
         </button>
       </aside>
 
-      <XrayMode
-        active={xrayActive}
-        onClose={() => setXrayActive(false)}
-        page={page}
-        variant={variant}
-      />
+      {showNotice && (
+        <section className="internal-link-note" aria-labelledby="internal-link-note-title">
+          <button
+            type="button"
+            className="internal-link-note__close"
+            onClick={() => setNoticeOpen(false)}
+            aria-label="Hide this note"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+          <span className="internal-link-note__eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+            Internal link
+          </span>
+          <h2 id="internal-link-note-title" className="internal-link-note__title">
+            This link opens Optimizely&rsquo;s sales tools
+          </h2>
+          <p className="internal-link-note__body">
+            Search, X-ray and Edit are for people signed in with Optimizely. Everyone else sees the live page.
+          </p>
+          <div className="internal-link-note__actions">
+            <a className="internal-link-note__btn internal-link-note__btn--primary" href={signInHref()}>
+              Log in with Optimizely
+            </a>
+            <a className="internal-link-note__btn" href={livePageHref()}>
+              See the live page
+            </a>
+          </div>
+        </section>
+      )}
 
-      <EditMode
-        active={editActive}
-        onClose={() => setEditActive(false)}
-        onSent={handleSent}
-        page={page}
-        variant={variant}
-      />
+      {identity && (
+        <>
+          <XrayMode
+            active={xrayActive}
+            onClose={() => setXrayActive(false)}
+            page={page}
+            variant={variant}
+          />
+
+          <EditMode
+            active={editActive}
+            onClose={() => setEditActive(false)}
+            onSent={handleSent}
+            page={page}
+            variant={variant}
+            editorEmail={identity.email}
+          />
+        </>
+      )}
 
       {editsLanded && (
         <div

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateCompanyWebsite, validateEmail } from './_lib/validate-input.js';
+import { validateCompanyWebsite } from './_lib/validate-input.js';
+import { requireIdentity } from './_lib/auth.js';
 
 /**
  * Proxy the search-page "Add new" payload to the Opal create-page webhook.
@@ -8,6 +9,9 @@ import { validateCompanyWebsite, validateEmail } from './_lib/validate-input.js'
  *
  * Payload shape:
  *   { company_name, edit_user_email }
+ *
+ * The browser sends `company_name`; `edit_user_email` is the signed-in
+ * person's address (api/_lib/auth.ts), never one the request names.
  *
  * `company_name` is the company's website. Opal resolves it to one Salesforce
  * account by exact domain, refreshes that account's wiki dossier, and builds the
@@ -23,7 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { company_name, edit_user_email } = (req.body ?? {}) as Record<string, unknown>;
+  const identity = requireIdentity(req, res);
+  if (!identity) return;
+  const { company_name } = (req.body ?? {}) as Record<string, unknown>;
 
   if (!OPAL_WEBHOOK_URL) {
     console.error('[opal-create-page] OPAL_CREATE_PAGE_WEBHOOK_URL is not set');
@@ -31,16 +37,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Each accepted request starts an Opal run that can publish a live page, so
-  // the bar for spending one is a website from an identifiable Optimizely
-  // address. See _lib/validate-input.
+  // the bar for spending one is a website from a signed-in Optimizely person.
+  // See _lib/validate-input.
   const name = validateCompanyWebsite(company_name);
   if (!name.ok) {
     console.warn('[opal-create-page] rejected company_name:', name.error);
     return res.status(400).json({ error: name.error });
-  }
-  const email = validateEmail(edit_user_email, { strict: true });
-  if (!email.ok) {
-    return res.status(400).json({ error: email.error });
   }
 
   try {
@@ -52,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // would otherwise vanish without a run or a reply.
       body: JSON.stringify({
         company_name: name.value,
-        edit_user_email: email.value,
+        edit_user_email: identity.email,
         requested_at: new Date().toISOString(),
       }),
     });

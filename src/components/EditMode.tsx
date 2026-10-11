@@ -9,7 +9,6 @@ import {
   type XraySectionInfo,
 } from '../lib/xray-defaults';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
-import { isValidOptimizelyEmail, loadStoredEmail, saveStoredEmail } from '../lib/stored-email';
 import { streamEdit, editKind, type EditKind } from '../lib/opal-edit-stream';
 import { animateSectionEdit } from '../lib/inplace-edit';
 import '../styles/edit-mode.css';
@@ -26,6 +25,12 @@ interface Props {
   onSent?: () => void;
   page: CompetitorComparisonPage;
   variant: 'abm' | 'dynamic' | 'person';
+  /**
+   * The signed-in person (src/lib/auth.ts). Shown so they know who the edit
+   * is attributed to, and not editable: the server sends Opal the session's
+   * address whatever the browser says.
+   */
+  editorEmail: string;
 }
 
 type DocSize = { w: number; h: number };
@@ -167,7 +172,7 @@ function clamp(v: number, lo: number, hi: number): number {
 
 type Phase = 'editing' | 'working' | 'thanks';
 
-function EditMode({ active, onClose, onSent, page, variant }: Props) {
+function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props) {
   const defaults =
     variant === 'abm' ? ABM_XRAY_DEFAULTS
       : variant === 'person' ? PERSON_XRAY_DEFAULTS
@@ -180,16 +185,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
   const [phase, setPhase] = useState<Phase>('editing');
   const [outlines, setOutlines] = useState<Array<{ section: XraySectionInfo; box: OutlineBox }>>([]);
   const [docSize, setDocSize] = useState<DocSize>({ w: 0, h: 0 });
-
-  // Email state
-  const [email, setEmail] = useState<string>('');
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [emailDraft, setEmailDraft] = useState('');
-  const [emailError, setEmailError] = useState<string | null>(null);
-  /** Tracks whether the *currently open* modal is the first-time-prompt
-   *  (cancel = exit mode) or an edit (cancel = just close modal). */
-  const emailModalIsBlocking = useRef(false);
-  const emailInputRef = useRef<HTMLInputElement>(null);
 
   // Comments — keyed by section id
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -249,8 +244,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       setOutlines([]);
       setComments({});
       setActiveSection(null);
-      setEmailModalOpen(false);
-      setEmailError(null);
       liveAbort.current?.abort();
       liveAbort.current = null;
       setLiveStatus('');
@@ -266,17 +259,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     }
 
     document.body.classList.add('edit-active');
-
-    // Decide: stored email? jump straight in. Otherwise open the blocking modal.
-    const stored = loadStoredEmail();
-    if (stored) {
-      setEmail(stored);
-      setEmailModalOpen(false);
-    } else {
-      setEmailDraft('');
-      emailModalIsBlocking.current = true;
-      setEmailModalOpen(true);
-    }
   }, [active]);
 
   /* ---- Measure sections once active + whenever doc geometry shifts ---- */
@@ -377,34 +359,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
     }
   }, [activeSection]);
 
-  /* ---- Focus the email input when the modal opens ---- */
-  useEffect(() => {
-    if (emailModalOpen) {
-      const t = setTimeout(() => emailInputRef.current?.focus(), 60);
-      return () => clearTimeout(t);
-    }
-  }, [emailModalOpen]);
-
-  /* ---- Email modal handlers ---- */
-  const openEmailEdit = useCallback(() => {
-    setEmailDraft(email);
-    setEmailError(null);
-    emailModalIsBlocking.current = false;
-    setEmailModalOpen(true);
-  }, [email]);
-
-  const cancelEmailModal = useCallback(() => {
-    setEmailModalOpen(false);
-    if (emailModalIsBlocking.current && !email) {
-      // First-time entry, no email committed → exit mode entirely
-      onClose();
-    }
-  }, [email, onClose]);
-
-  /* ---- ESC handling: prefer to close popup → email modal → exit mode ----
-   * Declared after cancelEmailModal because it lists it as a dependency: the
-   * callback reads `email`, and a listener holding a stale copy would see the
-   * pre-commit empty address and exit Edit mode instead of closing the modal. */
+  /* ---- ESC handling: close the open popup first, otherwise exit the mode ---- */
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
@@ -413,28 +368,11 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
         setActiveSection(null);
         return;
       }
-      if (emailModalOpen) {
-        cancelEmailModal();
-        return;
-      }
       onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, emailModalOpen, activeSection, onClose, cancelEmailModal]);
-
-  const commitEmail = useCallback(() => {
-    const trimmed = emailDraft.trim();
-    if (!isValidOptimizelyEmail(trimmed)) {
-      setEmailError('Please enter a valid @optimizely.com email');
-      return;
-    }
-    setEmail(trimmed);
-    saveStoredEmail(trimmed);
-    setEmailModalOpen(false);
-    setEmailError(null);
-    emailModalIsBlocking.current = false;
-  }, [emailDraft]);
+  }, [active, activeSection, onClose]);
 
   /* ---- Comment popup handlers ---- */
   const openCommentForSection = useCallback((sectionId: string) => {
@@ -474,7 +412,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
    * agent can split them back apart on its end. */
   const send = useCallback(async () => {
     const entries = Object.entries(comments);
-    if (entries.length === 0 || !email) return;
+    if (entries.length === 0) return;
 
     sendError.current = null;
     setActiveSection(null);
@@ -504,7 +442,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       company_name: companyName,
       company_slug: slug,
       suggested_edit: suggestedEdit,
-      edit_user_email: email,
     };
 
     const baselinePublished = page._metadata?.published ?? null;
@@ -659,7 +596,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       }
     }
     liveAbort.current = null;
-  }, [comments, email, page, sections, onSent, matchSectionId, scrollToSection]);
+  }, [comments, page, sections, onSent, matchSectionId, scrollToSection]);
 
   /** Dismiss the live overlay without reloading (Close on the live HUD). */
   const dismissLive = useCallback(() => {
@@ -671,7 +608,7 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
   if (!active) return null;
 
   const commentCount = Object.keys(comments).length;
-  const canSend = commentCount > 0 && !!email && phase === 'editing';
+  const canSend = commentCount > 0 && phase === 'editing';
 
   /* ============== RENDER LAYERS ============== */
 
@@ -846,21 +783,13 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
           </span>
         </div>
         <div className="edit-hud__right">
-          {email && (
-            <button
-              type="button"
-              className="edit-hud__email"
-              onClick={openEmailEdit}
-              aria-label={`Edit email (${email})`}
-              title="Click to edit your email"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-              <span>{email}</span>
-            </button>
-          )}
+          <span className="edit-hud__email" title={`Edits are sent as ${editorEmail}, the account you signed in with`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
+            <span>{editorEmail}</span>
+          </span>
           <button
             type="button"
             className={'edit-hud__send' + (canSend ? '' : ' edit-hud__send--disabled')}
@@ -903,78 +832,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       </div>
     </div>
   );
-
-  /** Email modal — first-time blocking prompt or later edit. */
-  const emailModal = emailModalOpen ? (
-    <div
-      className="edit-email-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Set your email"
-      onClick={cancelEmailModal}
-    >
-      <div className="edit-email-modal__card" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className="edit-email-modal__close"
-          onClick={cancelEmailModal}
-          aria-label="Close"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-        <div className="edit-email-modal__icon" aria-hidden="true">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-            <polyline points="22,6 12,13 2,6" />
-          </svg>
-        </div>
-        <h3 className="edit-email-modal__title">
-          {email ? 'Update your email' : 'Who is leaving feedback?'}
-        </h3>
-        <p className="edit-email-modal__sub">
-          We'll attach this to the edits you send to Opal so the right person can follow up.
-        </p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            commitEmail();
-          }}
-        >
-          <input
-            ref={emailInputRef}
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            className={'edit-email-modal__input' + (emailError ? ' edit-email-modal__input--error' : '')}
-            value={emailDraft}
-            placeholder="you@optimizely.com"
-            onChange={(e) => {
-              setEmailDraft(e.target.value);
-              if (emailError) setEmailError(null);
-            }}
-          />
-          {emailError && <div className="edit-email-modal__error">{emailError}</div>}
-          <div className="edit-email-modal__actions">
-            <button
-              type="button"
-              className="edit-email-modal__btn edit-email-modal__btn--ghost"
-              onClick={cancelEmailModal}
-            >
-              {email ? 'Cancel' : 'Cancel & exit'}
-            </button>
-            <button
-              type="submit"
-              className="edit-email-modal__btn edit-email-modal__btn--primary"
-            >
-              Set
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  ) : null;
 
   /** Thanks splash that animates in, holds, then animates out. */
   const thanksSplash = phase === 'thanks' ? (
@@ -1080,7 +937,6 @@ function EditMode({ active, onClose, onSent, page, variant }: Props) {
       {docLayer}
       {commentPopup}
       {hudLayer}
-      {emailModal}
       {thanksSplash}
       {liveCard}
       {liveHud}

@@ -22,9 +22,6 @@ export const MAX_COMPANY_NAME = 120;
 export const MAX_SUGGESTED_EDIT = 4000;
 export const MAX_SLUG = 200;
 
-const OPTIMIZELY_EMAIL_RE = /^[^\s@]+@optimizely\.com$/i;
-const GENERIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
-
 /**
  * C0/C1 control characters, minus tab, newline, and carriage return — a
  * multi-line `suggested_edit` is ordinary input, so rejecting newlines here
@@ -119,21 +116,4 @@ export function validateCompanyWebsite(raw: unknown): Validated<string> {
   if (!text.ok) return text;
   if (!websiteDomain(text.value)) return fail("company_name must be the company's website, for example anaplan.com");
   return text;
-}
-
-/**
- * Email of the Optimizely person making the request. `strict` requires an
- * @optimizely.com address — these endpoints spend credits and attribute
- * published pages, so the requester should be identifiable.
- */
-export function validateEmail(raw: unknown, { strict }: { strict: boolean }): Validated<string> {
-  if (typeof raw !== 'string') return fail('edit_user_email must be a string');
-  const value = raw.trim();
-  if (!value) return fail('edit_user_email is required');
-  if (value.length > 254) return fail('edit_user_email is too long');
-  const re = strict ? OPTIMIZELY_EMAIL_RE : GENERIC_EMAIL_RE;
-  if (!re.test(value)) {
-    return fail(strict ? 'edit_user_email must be an @optimizely.com address' : 'edit_user_email is not a valid email');
-  }
-  return { ok: true, value };
 }

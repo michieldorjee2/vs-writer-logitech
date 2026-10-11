@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireIdentity } from './_lib/auth.js';
 
 /**
  * POST /api/opal-create-person-page
@@ -11,12 +12,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * account page exists, creates it first if it does not, and only then builds the
  * person page underneath it. So a rep can ask for a person at a company we have
  * never built anything for, and get both.
+ *
+ * `optimizely_email` is the signed-in person's address (api/_lib/auth.ts), never
+ * one the request names.
  */
 
 const OPAL_WEBHOOK_URL =
   'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/3f7a8105-b0bf-4539-b204-bb8140fddbbe';
 
-const OPTIMIZELY_EMAIL_RE = /^[^\s@]+@optimizely\.com$/i;
 const MAX_COMPANY_NAME_LEN = 120;
 const MAX_PERSON_NAME_LEN = 120;
 const MAX_TITLE_LEN = 160;
@@ -26,13 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { company_name, person_name, person_title, edit_user_email } =
+  const identity = requireIdentity(req, res);
+  if (!identity) return;
+  const { company_name, person_name, person_title } =
     (req.body ?? {}) as Record<string, unknown>;
 
   const company = typeof company_name === 'string' ? company_name.trim() : '';
   const person = typeof person_name === 'string' ? person_name.trim() : '';
   const title = typeof person_title === 'string' ? person_title.trim() : '';
-  const email = typeof edit_user_email === 'string' ? edit_user_email.trim() : '';
 
   if (!company || company.length > MAX_COMPANY_NAME_LEN) {
     return res.status(400).json({ error: 'Missing or invalid company_name' });
@@ -42,11 +46,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (title.length > MAX_TITLE_LEN) {
     return res.status(400).json({ error: 'person_title too long' });
-  }
-  // Same gate as the account-page route: this triggers real spend and writes to
-  // a customer-facing site, so it stays inside the company.
-  if (!OPTIMIZELY_EMAIL_RE.test(email)) {
-    return res.status(400).json({ error: 'Missing or invalid edit_user_email' });
   }
 
   try {
@@ -60,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // when it is not supplied, and an empty string reads as "known to be
         // blank" instead of "not provided".
         ...(title ? { person_title: title } : {}),
-        optimizely_email: email,
+        optimizely_email: identity.email,
       }),
     });
     const text = await upstream.text();

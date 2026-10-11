@@ -3,11 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { startSearchStarfield } from '../lib/search-starfield';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
-import {
-  isValidOptimizelyEmail,
-  loadStoredEmail,
-  saveStoredEmail,
-} from '../lib/stored-email';
+import { signInHref, useAuth } from '../lib/auth';
+import ProfileMenu from './ProfileMenu';
 import '../styles/search.css';
 
 const CREATE_PAGE_ENDPOINT = '/api/opal-create-page';
@@ -20,11 +17,19 @@ function looksLikeWebsite(value: string): boolean {
   const domain = host.startsWith('www.') ? host.slice(4) : host;
   return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain);
 }
+/** A send that failed because the session ended reads differently from one Opal didn't answer. */
+function sendErrorMessage(err: unknown): string {
+  return err instanceof Error && err.message === 'signed-out'
+    ? 'Your Optimizely sign-in has ended. Reload the page to sign in again.'
+    : "Couldn't reach Opal. Try again.";
+}
+
 const COOLDOWN_MS = 60 * 1000;
 const COOLDOWN_KEY = 'opti.add-new.last-sent.v1';
 
-/** Inline "add new" phases: replaces the search input + Open button while active. */
-type AddPhase = null | 'email' | 'company' | 'person' | 'sent';
+/** Inline "add new" phases: replaces the search input + Open button while active.
+ *  There is no email step: the request goes out as the signed-in person. */
+type AddPhase = null | 'company' | 'person' | 'sent';
 
 /* Which kind of page the rep is asking for. An account page is the company
    pitch we have always offered; a person page is the 1:1 one built for a named
@@ -338,6 +343,15 @@ function SearchPage() {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
+  /* The server already sent anyone signed out to Opti ID before this page
+     loaded (server/ssr-handler.tsx). This catches the rest: a session that
+     ended while the tab stayed open, or a page restored from history. */
+  const auth = useAuth();
+  const identity = auth.status === 'signed-in' ? auth.identity : null;
+  useEffect(() => {
+    if (auth.status === 'signed-out') window.location.replace(signInHref());
+  }, [auth.status]);
+
   const [entries, setEntries] = useState<Entry[]>([]);
   /** Raw page count from Graph (pre-dedupe). Used as the placeholder metric. */
   const [totalPages, setTotalPages] = useState<number | null>(null);
@@ -353,18 +367,11 @@ function SearchPage() {
   const [addKind, setAddKind] = useState<AddKind>('account');
   const [addPerson, setAddPerson] = useState('');
   const [addCompany, setAddCompany] = useState('');
-  const [addEmail, setAddEmail] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [lastSent, setLastSent] = useState<number>(() => readLastSent());
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const addInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Email-edit popup, opened by clicking the address in the hint line.
-  const [emailEditOpen, setEmailEditOpen] = useState(false);
-  const [emailEditDraft, setEmailEditDraft] = useState('');
-  const [emailEditError, setEmailEditError] = useState<string | null>(null);
-  const emailEditRef = useRef<HTMLInputElement | null>(null);
 
   /* Load the search index on mount, then refresh silently every 5 min so
      the count stays fresh on a booth-mode iPad without a full reload. */
@@ -374,6 +381,11 @@ function SearchPage() {
     async function load() {
       try {
         const r = await fetch('/api/search-index', { cache: 'no-store' });
+        if (r.status === 401) {
+          // Signed out since the page loaded: back through Opti ID, then here.
+          window.location.replace(signInHref());
+          return;
+        }
         if (!r.ok) throw new Error(`${r.status}`);
         const json = (await r.json()) as { items: IndexItem[]; total?: number };
         if (cancelled) return;
@@ -639,19 +651,12 @@ function SearchPage() {
    */
   const enterAddMode = useCallback((presetCompany?: string, kind: AddKind = 'account') => {
     if (inCooldown) return;
-    const stored = loadStoredEmail();
     setAddKind(kind);
     setAddPerson('');
     setAddCompany(presetCompany?.trim() || '');
     setAddError(null);
     setSubmitting(false);
-    if (stored) {
-      setAddEmail(stored);
-      setAddPhase('company');
-    } else {
-      setAddEmail('');
-      setAddPhase('email');
-    }
+    setAddPhase('company');
   }, [inCooldown]);
 
   const exitAddMode = useCallback(() => {
@@ -659,18 +664,6 @@ function SearchPage() {
     setAddPhase(null);
     setAddError(null);
   }, [submitting]);
-
-  const submitAddEmail = useCallback(() => {
-    const v = addEmail.trim();
-    if (!isValidOptimizelyEmail(v)) {
-      setAddError('Use your @optimizely.com email');
-      return;
-    }
-    saveStoredEmail(v);
-    setAddEmail(v);
-    setAddError(null);
-    setAddPhase('company');
-  }, [addEmail]);
 
   const submitAddCompany = useCallback(async () => {
     const company = addCompany.trim();
@@ -688,15 +681,6 @@ function SearchPage() {
       return;
     }
 
-    const email = (loadStoredEmail() || addEmail).trim();
-    if (!isValidOptimizelyEmail(email)) {
-      // Stored email got cleared / invalidated — fall back to email step.
-      setAddEmail('');
-      setAddPhase('email');
-      setAddError('Use your @optimizely.com email');
-      return;
-    }
-
     // A person request needs one more field before it can go anywhere.
     if (addKind === 'person') {
       setAddError(null);
@@ -710,11 +694,9 @@ function SearchPage() {
       const r = await fetch(CREATE_PAGE_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company_name: company,
-          edit_user_email: email,
-        }),
+        body: JSON.stringify({ company_name: company }),
       });
+      if (r.status === 401) throw new Error('signed-out');
       if (!r.ok) throw new Error(`${r.status}`);
       const t = Date.now();
       setLastSent(t);
@@ -725,12 +707,12 @@ function SearchPage() {
         setAddPhase(null);
         setAddError(null);
       }, 2400);
-    } catch {
-      setAddError("Couldn't reach Opal. Try again.");
+    } catch (err) {
+      setAddError(sendErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
-  }, [addCompany, addEmail, addKind]);
+  }, [addCompany, addKind]);
 
   const submitAddPerson = useCallback(async () => {
     const person = addPerson.trim();
@@ -739,14 +721,6 @@ function SearchPage() {
       setAddError("Enter the person's name");
       return;
     }
-    const email = (loadStoredEmail() || addEmail).trim();
-    if (!isValidOptimizelyEmail(email)) {
-      setAddEmail('');
-      setAddPhase('email');
-      setAddError('Use your @optimizely.com email');
-      return;
-    }
-
     setSubmitting(true);
     setAddError(null);
     try {
@@ -756,9 +730,9 @@ function SearchPage() {
         body: JSON.stringify({
           company_name: company,
           person_name: person,
-          edit_user_email: email,
         }),
       });
+      if (r.status === 401) throw new Error('signed-out');
       if (!r.ok) throw new Error(`${r.status}`);
       const t = Date.now();
       setLastSent(t);
@@ -769,69 +743,37 @@ function SearchPage() {
         setAddPhase(null);
         setAddError(null);
       }, 2400);
-    } catch {
-      setAddError("Couldn't reach Opal. Try again.");
+    } catch (err) {
+      setAddError(sendErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
-  }, [addPerson, addCompany, addEmail]);
+  }, [addPerson, addCompany]);
 
   /* ---- Focus the active add-mode input on phase change ---- */
   useEffect(() => {
-    if (addPhase !== 'email' && addPhase !== 'company') return;
-    if (emailEditOpen) return;
+    if (addPhase !== 'company') return;
     const t = window.setTimeout(() => addInputRef.current?.focus(), 60);
     return () => window.clearTimeout(t);
-  }, [addPhase, emailEditOpen]);
+  }, [addPhase]);
 
-  /* ---- Email-edit popup handlers ---- */
-  const openEmailEdit = useCallback(() => {
-    setEmailEditDraft(addEmail);
-    setEmailEditError(null);
-    setEmailEditOpen(true);
-  }, [addEmail]);
-
-  const cancelEmailEdit = useCallback(() => {
-    setEmailEditOpen(false);
-    setEmailEditError(null);
-  }, []);
-
-  const submitEmailEdit = useCallback(() => {
-    const v = emailEditDraft.trim();
-    if (!isValidOptimizelyEmail(v)) {
-      setEmailEditError('Use your @optimizely.com email');
-      return;
-    }
-    saveStoredEmail(v);
-    setAddEmail(v);
-    setEmailEditOpen(false);
-    setEmailEditError(null);
-    setAddError(null);
-  }, [emailEditDraft]);
-
-  /* Focus the popup input when it opens. */
+  /* ---- ESC exits add mode ---- */
   useEffect(() => {
-    if (!emailEditOpen) return;
-    const t = window.setTimeout(() => emailEditRef.current?.focus(), 60);
-    return () => window.clearTimeout(t);
-  }, [emailEditOpen]);
-
-  /* ---- ESC closes the email popup first, otherwise exits add mode ---- */
-  useEffect(() => {
-    if (!addPhase && !emailEditOpen) return;
+    if (!addPhase) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (emailEditOpen) cancelEmailEdit();
-      else exitAddMode();
+      exitAddMode();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addPhase, emailEditOpen, exitAddMode, cancelEmailEdit]);
+  }, [addPhase, exitAddMode]);
 
   return (
     <div className="search-page">
       <canvas ref={canvasRef} className="search-page__starfield" />
       <div className="search-page__orb" />
+
+      {identity && <ProfileMenu identity={identity} />}
 
       <div className="search-page__app">
         <div className="search-page__brand">
@@ -951,17 +893,8 @@ function SearchPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  {addPhase === 'email' ? (
-                    <>
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </>
-                  ) : (
-                    <>
-                      <path d="M12 5v14" />
-                      <path d="M5 12h14" />
-                    </>
-                  )}
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
                 </svg>
 
                 <div className="search-page__field">
@@ -969,39 +902,29 @@ function SearchPage() {
                     key={addPhase}
                     ref={addInputRef}
                     className="search-page__input"
-                    type={addPhase === 'email' ? 'email' : 'text'}
-                    inputMode={addPhase === 'email' ? 'email' : 'text'}
-                    autoComplete={addPhase === 'email' ? 'email' : 'organization'}
+                    type="text"
+                    inputMode="text"
+                    autoComplete="organization"
                     spellCheck={false}
                     maxLength={addPhase === 'company' ? MAX_COMPANY_NAME_LEN : undefined}
                     placeholder={
-                      addPhase === 'email'
-                        ? 'you@optimizely.com'
-                        : addPhase === 'person'
-                          ? `Who at ${addCompany || 'this company'}?`
-                          : addKind === 'person'
-                            ? 'Company they work at'
-                            : 'Company website, e.g. anaplan.com'
+                      addPhase === 'person'
+                        ? `Who at ${addCompany || 'this company'}?`
+                        : addKind === 'person'
+                          ? 'Company they work at'
+                          : 'Company website, e.g. anaplan.com'
                     }
-                    value={
-                      addPhase === 'email'
-                        ? addEmail
-                        : addPhase === 'person'
-                          ? addPerson
-                          : addCompany
-                    }
+                    value={addPhase === 'person' ? addPerson : addCompany}
                     disabled={submitting}
                     onChange={(e) => {
-                      if (addPhase === 'email') setAddEmail(e.target.value);
-                      else if (addPhase === 'person') setAddPerson(e.target.value);
+                      if (addPhase === 'person') setAddPerson(e.target.value);
                       else setAddCompany(e.target.value);
                       if (addError) setAddError(null);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (addPhase === 'email') submitAddEmail();
-                        else if (addPhase === 'person') submitAddPerson();
+                        if (addPhase === 'person') submitAddPerson();
                         else submitAddCompany();
                       } else if (e.key === 'Escape') {
                         e.preventDefault();
@@ -1024,13 +947,9 @@ function SearchPage() {
                 <button
                   className="search-page__action search-page__action--add"
                   type="button"
-                  disabled={
-                    submitting ||
-                    (addPhase === 'email' && !addEmail.trim()) ||
-                    (addPhase === 'company' && !addCompany.trim())
-                  }
+                  disabled={submitting || (addPhase === 'company' && !addCompany.trim())}
                   onClick={() => {
-                    if (addPhase === 'email') submitAddEmail();
+                    if (addPhase === 'person') submitAddPerson();
                     else submitAddCompany();
                   }}
                 >
@@ -1041,7 +960,7 @@ function SearchPage() {
                     </>
                   ) : (
                     <>
-                      <span>{addPhase === 'email' ? 'Next' : 'Confirm'}</span>
+                      <span>Confirm</span>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M5 12h14" />
                         <path d="M13 5l7 7-7 7" />
@@ -1136,86 +1055,15 @@ function SearchPage() {
             <div className="search-page__add-hint" role="status">
               {addError ? (
                 <span className="search-page__add-hint--error">{addError}</span>
-              ) : addPhase === 'email' ? (
-                <span>We'll remember this and ping you on Teams when the page is ready.</span>
               ) : (
                 <span>
-                  Opal will build a fresh comparison page. Sending as{' '}
-                  <button
-                    type="button"
-                    className="search-page__email-link"
-                    onClick={openEmailEdit}
-                    title="Click to change"
-                  >
-                    {addEmail}
-                  </button>
-                  .
+                  Opal will build a fresh comparison page and message you on Teams
+                  {identity ? <> at <b>{identity.email}</b></> : null} when it&rsquo;s ready.
                 </span>
               )}
             </div>
           )}
         </div>
-
-        {emailEditOpen && (
-          <div
-            className="search-page__email-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Update your email"
-            onClick={cancelEmailEdit}
-          >
-            <div
-              className="search-page__email-modal-card"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="search-page__email-modal-title">Update email</h3>
-              <p className="search-page__email-modal-sub">
-                We'll use this address to ping you on Teams when the page is ready.
-              </p>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitEmailEdit();
-                }}
-              >
-                <input
-                  ref={emailEditRef}
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  className={
-                    'search-page__email-modal-input' +
-                    (emailEditError ? ' search-page__email-modal-input--error' : '')
-                  }
-                  value={emailEditDraft}
-                  placeholder="you@optimizely.com"
-                  onChange={(e) => {
-                    setEmailEditDraft(e.target.value);
-                    if (emailEditError) setEmailEditError(null);
-                  }}
-                />
-                {emailEditError && (
-                  <div className="search-page__email-modal-error">{emailEditError}</div>
-                )}
-                <div className="search-page__email-modal-actions">
-                  <button
-                    type="button"
-                    className="search-page__email-modal-btn search-page__email-modal-btn--ghost"
-                    onClick={cancelEmailEdit}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="search-page__email-modal-btn search-page__email-modal-btn--primary"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {!query && !addPhase && recentEntries.length > 0 && (
           <div

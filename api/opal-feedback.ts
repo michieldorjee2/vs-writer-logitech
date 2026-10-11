@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateText, validateEmail, MAX_COMPANY_NAME, MAX_SUGGESTED_EDIT, MAX_SLUG } from './_lib/validate-input.js';
+import { validateText, MAX_COMPANY_NAME, MAX_SUGGESTED_EDIT, MAX_SLUG } from './_lib/validate-input.js';
+import { requireIdentity } from './_lib/auth.js';
 
 /**
  * Proxy the edit-mode "send feedback" payload to the Opal webhook so the
@@ -8,6 +9,9 @@ import { validateText, validateEmail, MAX_COMPANY_NAME, MAX_SUGGESTED_EDIT, MAX_
  * the booth domain fails). The payload shape is fixed by the Opal side:
  *
  *   { company_name, company_slug, suggested_edit, edit_user_email }
+ *
+ * The browser sends the first three; `edit_user_email` is the signed-in
+ * person's address (api/_lib/auth.ts), never one the request names.
  */
 
 const OPAL_WEBHOOK_URL =
@@ -18,12 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { company_name, company_slug, suggested_edit, edit_user_email } = (req.body ?? {}) as Record<string, unknown>;
+  const identity = requireIdentity(req, res);
+  if (!identity) return;
+  const { company_name, company_slug, suggested_edit } = (req.body ?? {}) as Record<string, unknown>;
 
   // Every field here lands in an agent prompt that then edits a live page, so
-  // each one is length-bounded and screened for payload shapes. The email stays
-  // non-strict: Edit mode is used at booths where a non-Optimizely address is
-  // sometimes the right attribution.
+  // each one is length-bounded and screened for payload shapes.
   const fields = {
     company_name: validateText(company_name, 'company_name', MAX_COMPANY_NAME, { requireLetter: true }),
     company_slug: validateText(company_slug, 'company_slug', MAX_SLUG),
@@ -35,10 +39,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: result.error });
     }
   }
-  const email = validateEmail(edit_user_email, { strict: false });
-  if (!email.ok) {
-    return res.status(400).json({ error: email.error });
-  }
 
   try {
     const upstream = await fetch(OPAL_WEBHOOK_URL, {
@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         company_name: (fields.company_name as { value: string }).value,
         company_slug: (fields.company_slug as { value: string }).value,
         suggested_edit: (fields.suggested_edit as { value: string }).value,
-        edit_user_email: email.value,
+        edit_user_email: identity.email,
       }),
     });
 

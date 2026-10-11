@@ -30,6 +30,8 @@ import type {
   RetailHeroBlock,
 } from '../src/lib/graph-types';
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries';
+import { authEnabled, currentIdentity, safeNext, signInPath } from '../api/_lib/auth';
+import { renderLoginPage } from './login-page';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -995,8 +997,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send(template);
   }
 
+  // /login — where a refused sign-in or a sign-out lands. See server/login-page.ts.
+  if (slug === 'login') {
+    const next = safeNext(url.searchParams.get('next'));
+    const reason = url.searchParams.has('signed_out') ? 'signed_out' : url.searchParams.get('error');
+    res.setHeader('Cache-Control', 'no-store');
+    // Already signed in and nothing to explain: carry on to where they were going.
+    if (!reason && currentIdentity(req, res)) {
+      res.setHeader('Location', next);
+      return res.status(302).end();
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(renderLoginPage({ reason, signInHref: signInPath(next) }));
+  }
+
   // /search — SPA shell with explicit meta for social cards / search engines.
+  // Signed-in Optimizely people only: it is the index of every account page.
   if (slug === 'search') {
+    // Per person from here on, so never in the shared edge cache.
+    if (authEnabled()) res.setHeader('Cache-Control', 'private, no-store');
+    if (authEnabled() && !currentIdentity(req, res)) {
+      res.setHeader('Location', signInPath(`${url.pathname}${url.search}`));
+      return res.status(302).end();
+    }
+
     const title = 'Optimizely Showcase — Every brand deserves its own story';
     const description =
       'Search 1,000+ AI-generated brand experiences. Opal builds 1:1 landing pages for every company you pitch, grounded in Optimizely Graph.';
@@ -1024,7 +1048,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     html = html.replace('</head>', `    ${headHtml}\n  </head>`);
 
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    if (!authEnabled()) res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
     return res.status(200).send(html);
   }
 

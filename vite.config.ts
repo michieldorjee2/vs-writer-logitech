@@ -194,13 +194,32 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
 }
 
 /**
+ * Dev-only stand-in for sign-in. The dev server has no Opti ID round trip
+ * (api/_lib/auth.ts runs only as Vercel functions), so DEV_AUTH_EMAIL in
+ * .env.local plays the signed-in person — the same variable the functions
+ * fall back to when OPTIID_RELAY_SECRET is unset. Unset means signed out.
+ */
+function devAuthProxy(devEmail: string | null): Plugin {
+  return {
+    name: 'auth-dev-proxy',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = new URL(req.url || '', 'http://localhost')
+        if (url.pathname !== '/api/auth/me') return next()
+        if (!devEmail) return jsonResponse(res, 401, { error: 'signed_out' })
+        return jsonResponse(res, 200, { email: devEmail, name: null })
+      })
+    },
+  }
+}
+
+/**
  * Dev-only same-origin proxy for the Opal "send feedback" webhook.
  * Mirrors api/opal-feedback.ts so the dev server behaves like prod.
  */
-function opalFeedbackDevProxy(): Plugin {
+function opalFeedbackDevProxy(devEmail: string | null): Plugin {
   const OPAL_WEBHOOK_URL =
     'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/4a159bac-e9fb-43d1-82c1-a4431baebedc'
-  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i
 
   return {
     name: 'opal-feedback-dev-proxy',
@@ -209,16 +228,17 @@ function opalFeedbackDevProxy(): Plugin {
         const url = new URL(req.url || '', 'http://localhost')
         if (url.pathname !== '/api/opal-feedback') return next()
         if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'Method not allowed' })
+        if (!devEmail) return jsonResponse(res, 401, { error: 'Sign in with Optimizely first.' })
+        const edit_user_email = devEmail
 
         let body: Record<string, unknown> = {}
         try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
-        const { company_name, company_slug, suggested_edit, edit_user_email } = body || {}
+        const { company_name, company_slug, suggested_edit } = body || {}
 
         if (
           typeof company_name !== 'string' || !company_name.trim() ||
           typeof company_slug !== 'string' || !company_slug.trim() ||
-          typeof suggested_edit !== 'string' || !suggested_edit.trim() ||
-          typeof edit_user_email !== 'string' || !EMAIL_RE.test(edit_user_email)
+          typeof suggested_edit !== 'string' || !suggested_edit.trim()
         ) {
           return jsonResponse(res, 400, { error: 'Missing or invalid fields' })
         }
@@ -248,9 +268,8 @@ function opalFeedbackDevProxy(): Plugin {
  * Dev-only same-origin proxy for the Opal "create page" webhook.
  * Mirrors api/opal-create-page.ts so the dev server behaves like prod.
  */
-function opalCreatePageDevProxy(): Plugin {
+function opalCreatePageDevProxy(devEmail: string | null): Plugin {
   const OPAL_WEBHOOK_URL = process.env.OPAL_CREATE_PAGE_WEBHOOK_URL || ''
-  const OPTIMIZELY_EMAIL_RE = /^[^\s@]+@optimizely\.com$/i
   const MAX_COMPANY_NAME_LEN = 120
 
   return {
@@ -260,17 +279,17 @@ function opalCreatePageDevProxy(): Plugin {
         const url = new URL(req.url || '', 'http://localhost')
         if (url.pathname !== '/api/opal-create-page') return next()
         if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'Method not allowed' })
+        if (!devEmail) return jsonResponse(res, 401, { error: 'Sign in with Optimizely first.' })
+        const edit_user_email = devEmail
 
         let body: Record<string, unknown> = {}
         try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
-        const { company_name, edit_user_email } = body || {}
+        const { company_name } = body || {}
 
         if (
           typeof company_name !== 'string' ||
           !company_name.trim() ||
-          company_name.trim().length > MAX_COMPANY_NAME_LEN ||
-          typeof edit_user_email !== 'string' ||
-          !OPTIMIZELY_EMAIL_RE.test(edit_user_email)
+          company_name.trim().length > MAX_COMPANY_NAME_LEN
         ) {
           return jsonResponse(res, 400, { error: 'Missing or invalid fields' })
         }
@@ -463,14 +482,16 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const authKey = env.GRAPH_AUTH_KEY || ''
   const singleKey = env.GRAPH_SINGLE_KEY || authKey
+  const devEmail = (env.DEV_AUTH_EMAIL || '').trim().toLowerCase() || null
 
   return {
     plugins: [
       react(),
       stripHtmlComments(),
       ...(authKey ? [graphDevProxy(authKey, singleKey)] : []),
-      opalFeedbackDevProxy(),
-      opalCreatePageDevProxy(),
+      devAuthProxy(devEmail),
+      opalFeedbackDevProxy(devEmail),
+      opalCreatePageDevProxy(devEmail),
     ],
     resolve: {
       alias: {

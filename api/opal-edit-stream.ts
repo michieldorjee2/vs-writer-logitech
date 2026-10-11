@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireIdentity } from './_lib/auth.js';
 
 /**
  * Live edit-mode streaming endpoint. Replaces the fire-and-forget
@@ -14,6 +15,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  *   { k: "done" }                          — execution complete
  *   { k: "error", message }
  *
+ * Signed-in Optimizely people only (api/_lib/auth.ts). The agent's
+ * `edit_user_email` is the signed-in person's address, never one the request
+ * names — the agent attributes the edit to it and messages it on Teams.
+ *
  * Env (set on the Vercel project): OPAL_PAT (required), OPAL_BASE_URL,
  * OPAL_INSTANCE_ID, OPAL_AGENT_ID.
  */
@@ -23,7 +28,6 @@ export const config = { maxDuration: 300 };
 const BASE_URL = process.env.OPAL_BASE_URL || 'https://opal.optimizely.com';
 const INSTANCE_ID = process.env.OPAL_INSTANCE_ID || '4f42a24e93f945bcb262bff01a9a1562';
 const AGENT_ID = process.env.OPAL_AGENT_ID || '6c6d1d88-55ee-4f9c-a2d3-28de4bee1149';
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
@@ -111,12 +115,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  const { company_name, company_slug, suggested_edit, edit_user_email } = (req.body ?? {}) as Record<string, unknown>;
+  const identity = requireIdentity(req, res);
+  if (!identity) return;
+  const { company_name, company_slug, suggested_edit } = (req.body ?? {}) as Record<string, unknown>;
   if (
     typeof company_name !== 'string' || !company_name.trim() ||
     typeof company_slug !== 'string' || !company_slug.trim() ||
-    typeof suggested_edit !== 'string' || !suggested_edit.trim() ||
-    typeof edit_user_email !== 'string' || !EMAIL_RE.test(edit_user_email)
+    typeof suggested_edit !== 'string' || !suggested_edit.trim()
   ) {
     return res.status(400).json({ error: 'Missing or invalid fields' });
   }
@@ -141,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     for await (const ev of streamAgent(
       pat,
-      { company_name, company_slug, suggested_edit, edit_user_email },
+      { company_name, company_slug, suggested_edit, edit_user_email: identity.email },
       ac.signal,
     )) {
       const p = ev.payload;

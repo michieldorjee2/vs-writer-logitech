@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { GraphResponse } from '../src/lib/graph-envelope.js';
+import { requireIdentity } from './_lib/auth.js';
 
 /**
  * Edit-mode polling endpoint. The FloatingSidebar hits this every 15s
@@ -93,6 +94,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // Only the sidebar's Edit flow polls this, and it can purge the edge cache.
+  if (!requireIdentity(req, res)) return;
 
   const key = req.query.key;
   const since = req.query.since;
