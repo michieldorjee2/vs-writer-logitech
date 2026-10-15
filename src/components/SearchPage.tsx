@@ -26,6 +26,8 @@ function sendErrorMessage(err: unknown): string {
 
 const COOLDOWN_MS = 60 * 1000;
 const COOLDOWN_KEY = 'opti.add-new.last-sent.v1';
+/* How long the "sent" bar stays up: long enough to read a sentence. */
+const SENT_MS = 6000;
 
 /** Inline "add new" phases: replaces the search input + Open button while active.
  *  There is no email step: the request goes out as the signed-in person. */
@@ -369,6 +371,8 @@ function SearchPage() {
   const [addCompany, setAddCompany] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // What the "sent" bar says, when it isn't the default line.
+  const [sentNote, setSentNote] = useState<ReactNode>(null);
   const [lastSent, setLastSent] = useState<number>(() => readLastSent());
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const addInputRef = useRef<HTMLInputElement | null>(null);
@@ -697,16 +701,31 @@ function SearchPage() {
         body: JSON.stringify({ company_name: company }),
       });
       if (r.status === 401) throw new Error('signed-out');
+      // The website was asked for minutes ago and is still being built: say
+      // so instead of starting a second build.
+      if (r.status === 409) {
+        const body = (await r.json().catch(() => null)) as { message?: string } | null;
+        setSentNote(body?.message || 'This page was asked for a few minutes ago and is still being built.');
+        setAddPhase('sent');
+        window.setTimeout(() => {
+          setAddPhase(null);
+          setAddError(null);
+        }, SENT_MS);
+        return;
+      }
       if (!r.ok) throw new Error(`${r.status}`);
       const t = Date.now();
       setLastSent(t);
       setNowMs(t);
       writeLastSent(t);
+      setSentNote(
+        <>Sent to Opal. <b>{company}</b> takes about 15 minutes; we'll ping you on Teams when it's live.</>,
+      );
       setAddPhase('sent');
       window.setTimeout(() => {
         setAddPhase(null);
         setAddError(null);
-      }, 2400);
+      }, SENT_MS);
     } catch (err) {
       setAddError(sendErrorMessage(err));
     } finally {
@@ -738,11 +757,12 @@ function SearchPage() {
       setLastSent(t);
       setNowMs(t);
       writeLastSent(t);
+      setSentNote(null);
       setAddPhase('sent');
       window.setTimeout(() => {
         setAddPhase(null);
         setAddError(null);
-      }, 2400);
+      }, SENT_MS);
     } catch (err) {
       setAddError(sendErrorMessage(err));
     } finally {
@@ -877,7 +897,9 @@ function SearchPage() {
                 </svg>
                 <div className="search-page__field">
                   <div className="search-page__add-status">
-                    Sent to Opal — we'll ping you on Teams when <b>{addCompany.trim() || 'the page'}</b> is ready.
+                    {sentNote ?? (
+                      <>Sent to Opal — we'll ping you on Teams when <b>{addCompany.trim() || 'the page'}</b> is ready.</>
+                    )}
                   </div>
                 </div>
               </>
