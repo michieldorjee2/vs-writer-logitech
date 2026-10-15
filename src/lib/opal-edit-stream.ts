@@ -47,11 +47,11 @@ export type LiveEvent =
   | { kind: 'tool'; name: string; phase: 'call' | 'result'; ok?: boolean }
   | { kind: 'error'; message: string };
 
+/** Who is editing is not part of it: the route takes that from the session. */
 export interface EditStreamPayload {
   company_name: string;
   company_slug: string;
   suggested_edit: string;
-  edit_user_email: string;
 }
 
 /** Pull every complete top-level {…} object out of `buf`; return the rest. */
@@ -91,6 +91,10 @@ export async function* streamEdit(
     body: JSON.stringify(payload),
     signal,
   });
+  if (res.status === 401) {
+    yield { kind: 'error', message: 'Your Optimizely sign-in has ended. Reload the page to sign in again.' };
+    return;
+  }
   if (!res.ok || !res.body) {
     yield { kind: 'error', message: `Stream failed (HTTP ${res.status})` };
     return;

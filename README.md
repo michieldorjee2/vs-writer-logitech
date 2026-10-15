@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-09-17
+updated: 2026-10-11
 ---
 
 # vs-writer-logitech
@@ -52,6 +52,28 @@ Three things it covers that the build does not:
 - **`server/` and `api/` are type-checked** (`typecheck:server`, `tsconfig.server.json`). The app config includes only `src/`, so the code that server-renders every page had never been checked; it now is, with `strictNullChecks` on, which is what the `api/` handlers' `if (!x.ok)` narrowing was written for. The app config is unchanged.
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
 - **`check:render`** server-renders the use-case template and asserts against the HTML.
+
+## Sign-in
+
+`/search`, the booth sidebar on `?search=1` links (Search, X-ray, Edit) and the routes behind them are for people signed in with Optimizely. Sign-in is "Log in with Optimizely" through the Mark Down wiki's sign-in relay (`md.optimizely.com/api/auth/relay`, app id `showcase`), the same way aldus-ui and Mark AEO sign in: the wiki runs Opti ID, then hands back a signed two-minute assertion that `api/auth/optimizely/callback.ts` verifies, burns (Redis `SET NX`) and swaps for this app's own 180-day session cookie. The code is `api/_lib/auth.ts`; the registered callbacks are `https://showcase.optimizely.com/api/auth/optimizely/callback` and the same path on `aldus-preprod.vercel.app`.
+
+What each surface does:
+
+- **`/search`** redirects into sign-in when there is no session, and is served `private, no-store` (it used to sit in the edge cache).
+- **Account pages stay public and edge-cached.** Nothing identity-specific is server-rendered into them; on `?search=1` the sidebar asks `/api/auth/me` from the browser. Signed out, its buttons are locked and a note explains the internal link, with "Log in with Optimizely" (which returns to the same URL) and "See the live page".
+- **Edit and "add new"** send the signed-in address. `api/opal-edit-stream`, `opal-feedback`, `opal-create-page` and `opal-create-person-page` take the email from the session and ignore one in the body; there is no email prompt anymore.
+- **`/api/search-index` and `/api/edit-status`** answer 401 without a session. The index is now cached in function memory for five minutes instead of at the edge.
+- **Only `@optimizely.com` identities** get a session; anyone else lands on `/login?error=not_optimizely`.
+- **Log out** is a POST to `/api/auth/logout` from the search page's profile menu. It lands on `/login`, not `/search`, which would sign the person straight back in while Okta still remembers them.
+
+```bash
+OPTIID_RELAY_SECRET=   # required in production; the wiki's AUTH_RELAY_SECRET_SHOWCASE
+SESSION_SECRET=        # optional; rotating it signs everyone out
+WIKI_URL=              # optional; defaults to https://md.optimizely.com
+DEV_AUTH_EMAIL=        # local dev only: the dev server's stand-in for a signed-in person
+```
+
+Unset `OPTIID_RELAY_SECRET` means no gate, and no identity unless `DEV_AUTH_EMAIL` is set — a deploy that forgot the secret cannot edit or create anything. The Vite dev server has no Opti ID round trip, so set `DEV_AUTH_EMAIL` in `.env.local` to work on the signed-in UI and leave it out to see the signed-out one.
 
 ## Edit mode (live)
 
