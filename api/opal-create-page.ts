@@ -1,6 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateCompanyWebsite } from './_lib/validate-input.js';
+import { validateCompanyWebsite, websiteDomain } from './_lib/validate-input.js';
 import { requireIdentity } from './_lib/auth.js';
+import {
+  alreadyRequestedMessage,
+  claimWebsite,
+  lockStore,
+  releaseWebsite,
+  type LockStore,
+} from './_lib/page-request-lock.js';
 
 /**
  * Proxy the search-page "Add new" payload to the Opal create-page webhook.
@@ -14,8 +21,12 @@ import { requireIdentity } from './_lib/auth.js';
  * person's address (api/_lib/auth.ts), never one the request names.
  *
  * `company_name` is the company's website. Opal resolves it to one Salesforce
- * account by exact domain, refreshes that account's wiki dossier, and builds the
- * page from it; a request it cannot resolve is answered on Teams with the reason.
+ * account by its domain (or the parent domain's account), refreshes that
+ * account's wiki dossier, and builds the page from it; a request it cannot
+ * resolve is answered on Teams with the reason.
+ *
+ * 409 `already_requested` (with a `message` for the rep): the same website was
+ * requested less than 15 minutes ago, so no second build is started.
  */
 
 // The one-off workflow's webhook. The URL is the credential, so it lives in the
@@ -45,6 +56,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: name.error });
   }
 
+  // A second request for a website that is still being built would start a
+  // second build. The store being down must not stop requests, so any error
+  // here lets the request through unlocked.
+  const domain = websiteDomain(name.value) as string;
+  let store: LockStore | null = null;
+  try {
+    store = lockStore();
+    const earlier = store ? await claimWebsite(store, domain, identity.email) : null;
+    if (earlier) {
+      return res.status(409).json({
+        error: 'already_requested',
+        message: alreadyRequestedMessage(domain, earlier, identity.email),
+      });
+    }
+  } catch (err) {
+    console.error('[opal-create-page] lock', err);
+    store = null;
+  }
+  const release = () => store && releaseWebsite(store, domain).catch(() => {});
+
   try {
     const upstream = await fetch(OPAL_WEBHOOK_URL, {
       method: 'POST',
@@ -60,6 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const text = await upstream.text();
+    if (!upstream.ok) await release();
     res.status(upstream.ok ? 200 : 502).json({
       ok: upstream.ok,
       status: upstream.status,
@@ -67,6 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error('[opal-create-page]', err);
+    await release();
     res.status(502).json({ error: 'Upstream fetch failed' });
   }
 }
