@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-10-11
+updated: 2026-10-15
 ---
 
 # vs-writer-logitech
@@ -60,11 +60,11 @@ Three things it covers that the build does not:
 What each surface does:
 
 - **`/search`** redirects into sign-in when there is no session, and is served `private, no-store` (it used to sit in the edge cache).
-- **Account pages stay public and edge-cached.** Nothing identity-specific is server-rendered into them; on `?search=1` the sidebar asks `/api/auth/me` from the browser. Signed out, its buttons are locked and a note explains the internal link, with "Log in with Optimizely" (which returns to the same URL) and "See the live page".
+- **Account pages stay public and edge-cached.** Nothing identity-specific is server-rendered into them; on `?search=1` the sidebar asks `/api/auth/me` from the browser. Signed out, no tools render: an alert says this is the employee URL, and after five seconds the page drops `?search=1` (a client-side replace, no reload), so the address the visitor copies next is the public one. Employees get the tools back by signing in on `/search`.
 - **Edit and "add new"** send the signed-in address. `api/opal-edit-stream`, `opal-feedback`, `opal-create-page` and `opal-create-person-page` take the email from the session and ignore one in the body; there is no email prompt anymore.
 - **`/api/search-index` and `/api/edit-status`** answer 401 without a session. The index is now cached in function memory for five minutes instead of at the edge.
 - **Only `@optimizely.com` identities** get a session; anyone else lands on `/login?error=not_optimizely`.
-- **Log out** is a POST to `/api/auth/logout` from the search page's profile menu. It lands on `/login`, not `/search`, which would sign the person straight back in while Okta still remembers them.
+- **Log out** is a POST to `/api/auth/logout` from the search page's profile menu, which shows the person's Gravatar (initials when they have none). It lands on `/login`, not `/search`, which would sign the person straight back in while Okta still remembers them.
 
 ```bash
 OPTIID_RELAY_SECRET=   # required in production; the wiki's AUTH_RELAY_SECRET_SHOWCASE

@@ -17,11 +17,11 @@ function looksLikeWebsite(value: string): boolean {
   const domain = host.startsWith('www.') ? host.slice(4) : host;
   return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain);
 }
-/** A send that failed because the session ended reads differently from one Opal didn't answer. */
+/** A send that failed because the session ended reads differently from one Mark didn't answer. */
 function sendErrorMessage(err: unknown): string {
   return err instanceof Error && err.message === 'signed-out'
     ? 'Your Optimizely sign-in has ended. Reload the page to sign in again.'
-    : "Couldn't reach Opal. Try again.";
+    : "Couldn't reach Mark. Try again.";
 }
 
 const COOLDOWN_MS = 60 * 1000;
@@ -719,7 +719,7 @@ function SearchPage() {
       setNowMs(t);
       writeLastSent(t);
       setSentNote(
-        <>Sent to Opal. <b>{company}</b> takes about 15 minutes; we'll ping you on Teams when it's live.</>,
+        <>Sent to Mark. <b>{company}</b> takes about 15 minutes; we'll ping you on Teams when it's live.</>,
       );
       setAddPhase('sent');
       window.setTimeout(() => {
@@ -898,7 +898,7 @@ function SearchPage() {
                 <div className="search-page__field">
                   <div className="search-page__add-status">
                     {sentNote ?? (
-                      <>Sent to Opal — we'll ping you on Teams when <b>{addCompany.trim() || 'the page'}</b> is ready.</>
+                      <>Sent to Mark — we'll ping you on Teams when <b>{addCompany.trim() || 'the page'}</b> is ready.</>
                     )}
                   </div>
                 </div>
@@ -1079,7 +1079,7 @@ function SearchPage() {
                 <span className="search-page__add-hint--error">{addError}</span>
               ) : (
                 <span>
-                  Opal will build a fresh comparison page and message you on Teams
+                  Mark will build a fresh comparison page and message you on Teams
                   {identity ? <> at <b>{identity.email}</b></> : null} when it&rsquo;s ready.
                 </span>
               )}

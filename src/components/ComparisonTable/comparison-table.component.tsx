@@ -28,7 +28,7 @@ const renderCell = (value: boolean | string, emphasize = false) => {
     return <span className={`${emphasize ? 'text-cream' : 'text-fir-n5'} text-[1.4rem]`}>{value}</span>;
 };
 
-const ComparisonTable = ({ rows, opalLabel = 'Optimizely Opal', writerLabel = 'Writer AI' }: ComparisonTableProps) => (
+const ComparisonTable = ({ rows, opalLabel = 'Optimizely Mark', writerLabel = 'Writer AI' }: ComparisonTableProps) => (
     <div className="overflow-x-auto rounded-[24px] border border-fir-light/50">
         <table className="w-full border-collapse text-left text-[1.6rem]">
             <thead>

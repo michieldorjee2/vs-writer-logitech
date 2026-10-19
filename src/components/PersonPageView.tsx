@@ -70,7 +70,7 @@ const TIER_LABEL: Record<EngagementTier, string> = {
  */
 export const PRODUCT_LABEL: Record<string, string> = {
     cms: 'Content Management',
-    opal: 'Opal',
+    opal: 'Mark',
     experimentation: 'Experimentation',
     cmp: 'Content Marketing',
     commerce: 'Commerce',
@@ -78,7 +78,7 @@ export const PRODUCT_LABEL: Record<string, string> = {
 
 const PRODUCT_HREF: Record<string, string> = {
     cms: 'https://www.optimizely.com/products/content-management',
-    opal: 'https://www.optimizely.com/products/opal',
+    opal: 'https://www.optimizely.com/products/ai',
     experimentation: 'https://www.optimizely.com/products/experimentation',
     cmp: 'https://www.optimizely.com/products/content-marketing',
     commerce: 'https://www.optimizely.com/products/commerce',
@@ -266,7 +266,7 @@ export default function PersonPageView({ page, rootRef, editMode }: Props) {
                 <div className="person__nav-links">
                     <a href="https://www.optimizely.com/products/content-management">Content Management</a>
                     <a href="https://www.optimizely.com/products/experimentation">Experimentation</a>
-                    <a href="https://www.optimizely.com/products/opal">Opal</a>
+                    <a href="https://www.optimizely.com/products/ai">Mark</a>
                     <a href="https://www.optimizely.com/plans">Plans</a>
                 </div>
                 <a className="person__nav-cta" href={ctaHref}>{page.ctaButtonText || 'Book a call'}</a>
