@@ -92,7 +92,7 @@ export interface DemoCustomer {
 const ISABELLA: DemoCustomer = {
   displayName: 'Isabella Chen',
   primaryCity: 'New York',
-  stylistName: 'Opal',
+  stylistName: 'Mark',
   stylistBoutique: 'Crosby Street',
   initials: 'I.C.',
   neighborhood: 'Tribeca',
@@ -105,12 +105,12 @@ const ISABELLA: DemoCustomer = {
   letter: {
     greeting: 'Dear Isabella,',
     paragraphs: [
-      "Opal here, from the Crosby Street atelier. I've been holding the Plis pair since your last fitting — they came in on Tuesday morning, on the same delivery as the new oat merino. I thought of you when I unwrapped them.",
+      "Mark here, from the Crosby Street atelier. I've been holding the Plis pair since your last fitting — they came in on Tuesday morning, on the same delivery as the new oat merino. I thought of you when I unwrapped them.",
       "The Anna is in its third winter this fall. There's a way the wool-cashmere goes when it's been worn well — the shoulders settle, the lining loosens just slightly at the seams. We can re-line it without changing the fall. I've kept a swatch from the original run aside in case you'd like.",
       "The Marais has been the quieter friend, I think — it's the trench you take to the early appointments, not the long lunches. The blazer I've set out this week is meant to bridge the two: warm enough for May, soft enough that it doesn't fight with the silk.",
       "Come in when you can. I'll have everything ready.",
     ],
-    signoff: '— Opal',
+    signoff: '— Mark',
   },
 
   polaroids: [
@@ -259,7 +259,7 @@ const ISABELLA: DemoCustomer = {
 const MARCUS: DemoCustomer = {
   displayName: 'Marcus Whitfield',
   primaryCity: 'London',
-  stylistName: 'Opal',
+  stylistName: 'Mark',
   stylistBoutique: 'Mount Street',
   initials: 'M.W.',
   neighborhood: 'Mayfair',
@@ -275,7 +275,7 @@ const MARCUS: DemoCustomer = {
       "I'd suggest the Walnut Wholecut for the second pair — a warmer register without leaving the family. And a third shirt cloth alongside the poplin and voile when you're ready.",
       "Tea at four if it suits.",
     ],
-    signoff: '— Opal',
+    signoff: '— Mark',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80', caption: 'The 1972, on the desk.', rotate: -7 },
@@ -362,7 +362,7 @@ const ARIA: DemoCustomer = {
       "The Lume family was made to travel together. The shoulder in warm amber arrived ahead of the others; it sits one shade quieter than the fuchsia and one warmer than the citron. The collection adds up the way a colour study does.",
       "Come by, or send word. The bag will wait.",
     ],
-    signoff: '— Opal',
+    signoff: '— Mark',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=600&q=80', caption: 'The new Lume — third colour.', rotate: -8 },
@@ -433,7 +433,7 @@ const ARIA: DemoCustomer = {
 const SEBASTIAN: DemoCustomer = {
   displayName: 'Sebastian Laurent',
   primaryCity: 'Paris',
-  stylistName: 'Opal',
+  stylistName: 'Mark',
   stylistBoutique: 'rue Saint-Honoré',
   initials: 'S.L.',
   neighborhood: '1er arrondissement',
@@ -449,7 +449,7 @@ const SEBASTIAN: DemoCustomer = {
       "Raw linen by the metre is now available; the same cloth that lines the capsule, before it becomes anything. For those who work with their hands, or simply want the material itself.",
       "Le cabinet est ouvert mardi et jeudi de 10h à 18h. Une note avant suffit.",
     ],
-    signoff: '— Opal',
+    signoff: '— Mark',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&w=600&q=80', caption: '12/40, kept on the rail.', rotate: -7 },
@@ -537,7 +537,7 @@ const OLIVIA: DemoCustomer = {
       "Anything reserved can be sent to Aspen or to Sag Harbor — whichever is current the week it ships.",
       "Crosby Street, Tuesday through Saturday, by appointment.",
     ],
-    signoff: '— Opal',
+    signoff: '— Mark',
   },
   polaroids: [
     { imageUrl: 'https://images.unsplash.com/photo-1485518882345-15568b007407?auto=format&fit=crop&w=600&q=80', caption: 'The ski parka, hung for the season.', rotate: -8 },

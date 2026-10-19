@@ -1,6 +1,6 @@
 /**
  * OrderSummaryModal — a paper-card receipt that lists the cart, the
- * shipping context, and a single "Confirm and notify Opal" button.
+ * shipping context, and a single "Confirm and notify Mark" button.
  * Confirming flips the modal into a wax-seal "Held for you" state and
  * empties the cart.
  *
@@ -121,12 +121,12 @@ export default function OrderSummaryModal({
 
                 <p className="retail-order__fine">
                   Each piece is wrapped in unbleached linen and travels by appointment courier.
-                  No charge until Opal confirms availability — usually within the hour.
+                  No charge until Mark confirms availability — usually within the hour.
                 </p>
 
                 <div className="retail-order__actions">
                   <button type="button" className="retail-order__primary" onClick={handleConfirm}>
-                    Confirm and notify Opal
+                    Confirm and notify Mark
                   </button>
                   <button type="button" className="retail-order__quiet" onClick={() => { setOpen(false); openDrawer('cart'); }}>
                     Back to the bag
@@ -143,7 +143,7 @@ export default function OrderSummaryModal({
                 <OpalStamp size={132} />
                 <h3 className="retail-order__seal-title">Held for {customerName.split(' ')[0]}</h3>
                 <p className="retail-order__seal-line">
-                  Opal will write back within the hour — the pieces are off the floor and on hold.
+                  Mark will write back within the hour — the pieces are off the floor and on hold.
                 </p>
                 {initials && <span className="retail-order__seal-initials">{initials}</span>}
                 <button

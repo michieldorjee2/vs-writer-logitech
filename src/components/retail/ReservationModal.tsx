@@ -81,7 +81,7 @@ export default function ReservationModal({ customerName, initials, boutique, sty
               <>
                 <header className="retail-reserve__head">
                   <span className="retail-reserve__eyebrow">A private viewing</span>
-                  <h2 className="retail-reserve__title">Reserve with {stylistName || 'Opal'}</h2>
+                  <h2 className="retail-reserve__title">Reserve with {stylistName || 'Mark'}</h2>
                   <p className="retail-reserve__sub">
                     {customerName} · {boutique || 'Maison Aurelle'}
                   </p>
@@ -89,7 +89,7 @@ export default function ReservationModal({ customerName, initials, boutique, sty
 
                 <div className="retail-reserve__slots" role="radiogroup" aria-label="Available slots">
                   {slots.length === 0 ? (
-                    <p className="retail-reserve__nosllots">No published slots — write to Opal and the cabinet will be opened on your time.</p>
+                    <p className="retail-reserve__nosllots">No published slots — write to Mark and the cabinet will be opened on your time.</p>
                   ) : (
                     slots.map((s) => (
                       <button
@@ -107,7 +107,7 @@ export default function ReservationModal({ customerName, initials, boutique, sty
                 </div>
 
                 <p className="retail-reserve__fine">
-                  No payment is taken. Opal will confirm by email within the hour, and the cabinet is held for you in the meantime.
+                  No payment is taken. Mark will confirm by email within the hour, and the cabinet is held for you in the meantime.
                 </p>
 
                 <div className="retail-reserve__actions">
@@ -134,7 +134,7 @@ export default function ReservationModal({ customerName, initials, boutique, sty
                 <OpalStamp size={132} />
                 <h3 className="retail-reserve__seal-title">{picked} — held</h3>
                 <p className="retail-reserve__seal-line">
-                  The cabinet is set aside; Opal will be ready when you arrive.
+                  The cabinet is set aside; Mark will be ready when you arrive.
                 </p>
                 {initials && <span className="retail-reserve__seal-initials">{initials}</span>}
                 <button

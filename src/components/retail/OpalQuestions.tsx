@@ -1,10 +1,10 @@
 /**
  * OpalQuestions — interactive Q&A module (not a chatbot).
  *
- * Pre-canned questions sit as floating chips around a centered Opal mark.
+ * Pre-canned questions sit as floating chips around a centered Mark stamp.
  * Clicking a chip animates the answer into a card below. Closing collapses
  * back to the chip view. Each answer is a hand-written-feeling reply from
- * Opal — the kind of question a customer would actually ask their stylist
+ * Mark — the kind of question a customer would actually ask their stylist
  * over text.
  *
  * Per-customer Q&A bank is keyed by slug in retail-demo-content; falls
@@ -16,7 +16,7 @@ import OpalStamp from './OpalStamp';
 import type { OpalQuestion } from '../../lib/graph-types';
 
 interface Props {
-  /** Heading line above the chip cloud, e.g. "Ask Opal". */
+  /** Heading line above the chip cloud, e.g. "Ask Mark". */
   heading?: string;
   /** Subhead positioning the section. */
   deck?: string;
@@ -24,8 +24,8 @@ interface Props {
 }
 
 export default function OpalQuestions({
-  heading = 'Ask Opal',
-  deck = 'A handful of things our clients have asked this week. Tap one to read what Opal had to say.',
+  heading = 'Ask Mark',
+  deck = 'A handful of things our clients have asked this week. Tap one to read what Mark had to say.',
   questions,
 }: Props) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -71,7 +71,7 @@ export default function OpalQuestions({
             <>
               <p className="retail-questions__panel-q">{questions[activeIndex].question}</p>
               <p className="retail-questions__panel-a">{questions[activeIndex].answer}</p>
-              <span className="retail-questions__panel-signed">— Opal</span>
+              <span className="retail-questions__panel-signed">— Mark</span>
             </>
           )}
         </div>

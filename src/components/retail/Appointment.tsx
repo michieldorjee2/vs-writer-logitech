@@ -72,7 +72,7 @@ export default function Appointment({ block }: Props) {
               className="retail-btn-quiet"
               onClick={() => {
                 // Open reservation with the other slots emphasized
-                const slots = (block.slots && block.slots.length > 0) ? block.slots : ['Write to Opal for an alternative time'];
+                const slots = (block.slots && block.slots.length > 0) ? block.slots : ['Write to Mark for an alternative time'];
                 window.dispatchEvent(new CustomEvent('aurelle:open-reservation', { detail: { slots } }));
               }}
             >
