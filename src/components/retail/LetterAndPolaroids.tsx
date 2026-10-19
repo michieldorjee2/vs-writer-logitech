@@ -154,8 +154,8 @@ export default function LetterAndPolaroids({ letter, polaroids, register }: Prop
           A letter, attached
         </h2>
         <p className="retail-letter-section__deck">
-          Hand-written from Opal this week, with a few stills from where these pieces are kept.
-          Tap any photo to see what Opal would pair with that moment.
+          Hand-written from Mark this week, with a few stills from where these pieces are kept.
+          Tap any photo to see what Mark would pair with that moment.
         </p>
 
         <div className="retail-collage" data-retail-collage>
@@ -173,7 +173,7 @@ export default function LetterAndPolaroids({ letter, polaroids, register }: Prop
                 } as React.CSSProperties
               }
               onClick={() => openAt(i)}
-              aria-label={`${p.caption} — see Opal's curated picks`}
+              aria-label={`${p.caption} — see Mark's curated picks`}
               data-retail-polaroid={i}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }}
             >
@@ -329,7 +329,7 @@ function CuratedLookLightbox({
         <section className="retail-look__picks" aria-label="Curated picks">
           <header className="retail-look__picks-head">
             <span className="retail-label-gold">Curated for this moment</span>
-            <h3 className="retail-look__picks-title">Opal's picks</h3>
+            <h3 className="retail-look__picks-title">Mark's picks</h3>
             <p className="retail-look__picks-deck">
               What goes with the moment in the photograph. Each pick is held in your size,
               same week.

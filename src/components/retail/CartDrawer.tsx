@@ -179,7 +179,7 @@ export default function CartDrawer({ customerName, initials, city, boutique }: P
                 reservations.length === 0 ? (
                   <div className="retail-drawer__empty">
                     <p className="retail-drawer__empty-title">No appointments yet.</p>
-                    <p className="retail-drawer__empty-line">Reserve a viewing in the Appointments section below — Opal confirms within the hour.</p>
+                    <p className="retail-drawer__empty-line">Reserve a viewing in the Appointments section below — Mark confirms within the hour.</p>
                   </div>
                 ) : (
                   <ul className="retail-drawer__list retail-drawer__list--reservations">
@@ -220,7 +220,7 @@ export default function CartDrawer({ customerName, initials, city, boutique }: P
                     closeDrawer();
                   }}
                 >
-                  Send to Opal for confirmation
+                  Send to Mark for confirmation
                 </button>
                 <button
                   type="button"

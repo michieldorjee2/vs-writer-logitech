@@ -1,7 +1,7 @@
 /**
  * OpalStamp — circular wax-stamp-feeling mark.
  * Pure SVG. Used on the letter corner, the lightbox header, and anywhere
- * the page wants to signal "this came from Opal."
+ * the page wants to signal "this came from Mark."
  *
  * Layered:
  *   - circular gold ring with subtle inner shadow
@@ -38,7 +38,7 @@ export default function OpalStamp({ size = 96, className, style, decorative = tr
       className={className}
       style={style}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : 'Opal'}
+      aria-label={decorative ? undefined : 'Mark'}
     >
       <defs>
         <radialGradient id={`${id}-paper`} cx="50%" cy="50%" r="50%">
@@ -100,7 +100,7 @@ export default function OpalStamp({ size = 96, className, style, decorative = tr
         </textPath>
       </text>
 
-      {/* Bottom arc text — PAR OPAL */}
+      {/* Bottom arc text — PAR MARK */}
       <text
         fill="#7b5f3c"
         opacity="0.85"
@@ -109,7 +109,7 @@ export default function OpalStamp({ size = 96, className, style, decorative = tr
         letterSpacing="2.8"
       >
         <textPath href={`#${id}-circle-bottom`} startOffset="50%" textAnchor="middle">
-          ✦ PAR OPAL ✦
+          ✦ PAR MARK ✦
         </textPath>
       </text>
 
