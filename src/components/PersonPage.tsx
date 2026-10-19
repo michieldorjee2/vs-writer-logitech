@@ -59,7 +59,7 @@ export default function PersonPage({ page, editMode }: Props) {
             : [
                   { label: 'Content Management', rank: 0 },
                   { label: 'Experimentation', rank: 1 },
-                  { label: 'Opal', rank: 2 },
+                  { label: 'Mark', rank: 2 },
               ];
 
         let dispose: (() => void) | null = null;

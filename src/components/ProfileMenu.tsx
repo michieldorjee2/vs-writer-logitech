@@ -1,11 +1,38 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { SIGN_OUT_ACTION, type Identity } from '../lib/auth';
+import { gravatarUrl } from '../lib/gravatar';
 
 function initialsOf(identity: Identity): string {
   const source = identity.name?.trim() || identity.email.split('@')[0].replace(/[._-]+/g, ' ');
   const words = source.split(/\s+/).filter(Boolean);
   const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : source.slice(0, 2);
   return letters.toUpperCase();
+}
+
+/**
+ * The person's Gravatar over their initials. The initials are always drawn, so
+ * the corner never sits empty while the photo loads; Gravatar answers 404 for
+ * an address with no photo (`d=404`), and the initials are what stays.
+ */
+function Avatar({ identity, size }: { identity: Identity; size: number }) {
+  const [photo, setPhoto] = useState<'loading' | 'shown' | 'none'>('loading');
+  return (
+    <span className="search-page__avatar-face" aria-hidden="true">
+      {photo !== 'shown' && initialsOf(identity)}
+      {photo !== 'none' && (
+        <img
+          className="search-page__avatar-photo"
+          src={gravatarUrl(identity.email, size * 2)}
+          alt=""
+          width={size}
+          height={size}
+          hidden={photo === 'loading'}
+          onLoad={() => setPhoto('shown')}
+          onError={() => setPhoto('none')}
+        />
+      )}
+    </span>
+  );
 }
 
 /**
@@ -54,13 +81,18 @@ export default function ProfileMenu({ identity }: { identity: Identity }) {
         title={identity.email}
         onClick={() => setOpen((v) => !v)}
       >
-        {initialsOf(identity)}
+        <Avatar identity={identity} size={40} />
       </button>
       {open && (
         <div className="search-page__profile-menu" id={menuId} role="menu" aria-label="Account">
           <div className="search-page__profile-who">
-            {identity.name && <strong>{identity.name}</strong>}
-            <span>{identity.email}</span>
+            <span className="search-page__profile-avatar">
+              <Avatar identity={identity} size={36} />
+            </span>
+            <span className="search-page__profile-id">
+              {identity.name && <strong>{identity.name}</strong>}
+              <span>{identity.email}</span>
+            </span>
           </div>
           <form method="post" action={SIGN_OUT_ACTION}>
             <button type="submit" role="menuitem" className="search-page__profile-item" autoFocus>

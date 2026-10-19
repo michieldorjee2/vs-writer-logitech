@@ -99,7 +99,7 @@ export default function FinServPage({ page }: Props) {
       <a href="#main-content" className="abm-skip-link">Skip to main content</a>
 
       <div className="finserv-demobar">
-        <strong>DEMO</strong> · Brightstream experience personalized by Optimizely Opal{page.targetName ? ` for ${page.targetName}` : ''}
+        <strong>DEMO</strong> · Brightstream experience personalized by Optimizely Mark{page.targetName ? ` for ${page.targetName}` : ''}
       </div>
 
       <FinServHeader brand={brand} navLinks={navLinks} cta={headerCta} onPrimary={openModal} onLogin={openModal} />

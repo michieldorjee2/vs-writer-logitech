@@ -416,7 +416,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
 
     sendError.current = null;
     setActiveSection(null);
-    setLiveStatus('Connecting to Opal…');
+    setLiveStatus('Connecting to Mark…');
     setLiveSummary('');
     setFocusSectionId(null);
     setActiveCard(null);
@@ -569,7 +569,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         setLiveDone({ changes: ['Changes saved.'] });
         setLiveStatus('Changes saved');
       } else {
-        setLiveError('Opal stopped before confirming. Some edits may not have been applied — try again.');
+        setLiveError('Mark stopped before confirming. Some edits may not have been applied — try again.');
         setLiveStatus('Incomplete');
       }
     }
@@ -779,7 +779,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           <span className="edit-hud__dot" />
           <span className="edit-hud__title">Edit Mode</span>
           <span className="edit-hud__hint">
-            Click any section to leave feedback for Opal
+            Click any section to leave feedback for Mark
           </span>
         </div>
         <div className="edit-hud__right">
@@ -856,7 +856,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           </svg>
         </div>
         <div className="edit-thanks__title">Thanks! I'll get right on that</div>
-        <div className="edit-thanks__sig">~ Opal</div>
+        <div className="edit-thanks__sig">~ Mark</div>
       </div>
     </div>
   ) : null;

@@ -1023,7 +1023,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const title = 'Optimizely Showcase — Every brand deserves its own story';
     const description =
-      'Search 1,000+ AI-generated brand experiences. Opal builds 1:1 landing pages for every company you pitch, grounded in Optimizely Graph.';
+      'Search 1,000+ AI-generated brand experiences. Mark builds 1:1 landing pages for every company you pitch, grounded in Optimizely Graph.';
     const canonical = `${SITE_URL}/search`;
     const headHtml = [
       `<title>${escapeHtml(title)}</title>`,

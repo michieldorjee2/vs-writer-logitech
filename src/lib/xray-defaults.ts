@@ -6,7 +6,7 @@
    sources actually populated it. Tool names are drawn from a
    curated set that maps 1:1 to icons in `xray-tool-icons.tsx`:
 
-     Salesforce, BuiltWith, Opal, ODP, CMS, Web browsing,
+     Salesforce, BuiltWith, Mark, ODP, CMS, Web browsing,
      Sitemap, LinkedIn, 6sense, Gravatar, Brandfetch
 
    When the CMS supplies overrides via `xraySections`, those win
@@ -47,21 +47,21 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'hero-title',
     selector: '.hero__title',
     title: 'Hero headline',
-    tools: ['Opal'],
+    tools: ['Mark'],
     sources: ['Custom pitch copy', 'Persona-targeted messaging', 'Approved terms'],
   },
   {
     id: 'hero-subtitle',
     selector: '.hero__subtitle',
     title: 'Hero subtitle',
-    tools: ['Opal'],
+    tools: ['Mark'],
     sources: ['Personalised supporting line', 'Approved messaging frameworks'],
   },
   {
     id: 'intel-headline',
     selector: '.intel__headline',
     title: 'Account intel headline',
-    tools: ['Opal', '6sense'],
+    tools: ['Mark', '6sense'],
     sources: ['Account name', 'Industry', 'Funnel stage'],
   },
   {
@@ -122,7 +122,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'challenge-headline',
     selector: '.challenge__headline',
     title: 'Challenge headline',
-    tools: ['Opal'],
+    tools: ['Mark'],
     sources: [
       'Competitive positioning',
       'Messaging frameworks',
@@ -133,7 +133,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'challenge-screenshot',
     selector: '.challenge__screenshot',
     title: 'Current website capture',
-    tools: ['Opal', 'Web browsing'],
+    tools: ['Mark', 'Web browsing'],
     sources: ['Live screenshot of brand site', 'Customer website URL'],
     notes: 'Real capture, not stock imagery.',
   },
@@ -141,7 +141,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'pain-points',
     selector: '.challenge__pain',
     title: 'Pain points',
-    tools: ['Opal', 'Web browsing'],
+    tools: ['Mark', 'Web browsing'],
     sources: [
       'Site-derived pain narrative',
       'Competitive positioning',
@@ -152,7 +152,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'comparison-row',
     selector: '.comparison__row',
     title: 'Comparison row',
-    tools: ['CMS', 'Opal'],
+    tools: ['CMS', 'Mark'],
     sources: [
       'Competitive pages',
       'Approved product language',
@@ -211,7 +211,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'timeline-phases',
     selector: '.timeline__phase',
     title: 'Migration phase',
-    tools: ['Opal'],
+    tools: ['Mark'],
     sources: ['Phased rollout copy', 'Approved migration template'],
   },
   {
@@ -230,7 +230,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'cta-title',
     selector: '.cta__title',
     title: 'Closing CTA headline',
-    tools: ['Opal', 'ODP'],
+    tools: ['Mark', 'ODP'],
     sources: [
       'Approved CTA copy',
       'One-click form-less action',
@@ -241,7 +241,7 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'cta-description',
     selector: '.cta__description',
     title: 'CTA description',
-    tools: ['Opal'],
+    tools: ['Mark'],
     sources: ['Closing supporting line', 'Approved messaging'],
   },
 ];
@@ -249,15 +249,15 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
 /* Dynamic comparison page — non-ABM variant. Falls back to section IDs
  * since the dynamic layout is content-driven and less themed. */
 export const DYNAMIC_XRAY_DEFAULTS: XraySectionInfo[] = [
-  { id: 'hero',         selector: '#hero',         title: 'Hero',          tools: ['Opal'],         sources: ['Eyebrow, headline, subheadline', 'Primary CTA copy'] },
+  { id: 'hero',         selector: '#hero',         title: 'Hero',          tools: ['Mark'],         sources: ['Eyebrow, headline, subheadline', 'Primary CTA copy'] },
   { id: 'logos',        selector: '#logos',        title: 'Logo Bar',      tools: ['CMS'],          sources: ['Approved customer logos'] },
-  { id: 'features',     selector: '#features',     title: 'Features',      tools: ['Opal', 'CMS'],  sources: ['Feature headlines + descriptions', 'Approved product language'] },
-  { id: 'comparison',   selector: '#comparison',   title: 'Comparison',    tools: ['CMS', 'Opal'],  sources: ['Competitive pages', 'Approved product language'] },
+  { id: 'features',     selector: '#features',     title: 'Features',      tools: ['Mark', 'CMS'],  sources: ['Feature headlines + descriptions', 'Approved product language'] },
+  { id: 'comparison',   selector: '#comparison',   title: 'Comparison',    tools: ['CMS', 'Mark'],  sources: ['Competitive pages', 'Approved product language'] },
   { id: 'analyst',      selector: '#analyst',      title: 'Analyst Quote', tools: ['CMS'],          sources: ['Analyst reports', 'Forrester / Gartner quotes'] },
   { id: 'testimonials', selector: '#testimonials', title: 'Testimonials',  tools: ['CMS'],          sources: ['Customer stories', 'Approved quotes'] },
-  { id: 'faq',          selector: '#faq',          title: 'FAQ',           tools: ['Opal'],         sources: ['Curated questions + answers'] },
-  { id: 'promo',        selector: '#promo',        title: 'Promo Card',    tools: ['Opal'],         sources: ['Promo headline + CTA'] },
-  { id: 'final-cta',    selector: '#final-cta',    title: 'Closing CTA',   tools: ['Opal', 'ODP'],  sources: ['Closing headline + CTA', 'One-click form-less action'] },
+  { id: 'faq',          selector: '#faq',          title: 'FAQ',           tools: ['Mark'],         sources: ['Curated questions + answers'] },
+  { id: 'promo',        selector: '#promo',        title: 'Promo Card',    tools: ['Mark'],         sources: ['Promo headline + CTA'] },
+  { id: 'final-cta',    selector: '#final-cta',    title: 'Closing CTA',   tools: ['Mark', 'ODP'],  sources: ['Closing headline + CTA', 'One-click form-less action'] },
 ];
 
 /** Merge any CMS-supplied overrides into the defaults. */
@@ -273,7 +273,7 @@ export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'person-galaxy',
     selector: '.person__sky',
     title: 'Hero galaxy',
-    tools: ['Opal', 'Web browsing', 'CMS'],
+    tools: ['Mark', 'Web browsing', 'CMS'],
     sources: ["The company page's site screenshot", 'Products drawn from this seat\u2019s scorecard'],
     notes: 'WebGL. The screenshot is inherited from the parent account page, not re-captured.',
   },
@@ -296,14 +296,14 @@ export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'person-opening',
     selector: '.person__opening',
     title: 'The opening',
-    tools: ['Opal', 'Web browsing'],
+    tools: ['Mark', 'Web browsing'],
     sources: ['One specific published detail', 'Named account executive'],
   },
   {
     id: 'person-measures',
     selector: '.person__measure',
     title: 'What the job is scored on',
-    tools: ['Opal'],
+    tools: ['Mark'],
     sources: ['Seat inference from title and department', "The parent page's pain points"],
     notes: 'A hypothesis about the role, not a record about the person.',
   },
@@ -318,7 +318,7 @@ export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'person-practice',
     selector: '.person__case',
     title: 'In practice',
-    tools: ['Opal', 'CMS'],
+    tools: ['Mark', 'CMS'],
     sources: ['Product claims from the parent page', 'Reframed to this seat\u2019s vocabulary'],
   },
   {
@@ -333,14 +333,14 @@ export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'person-number',
     selector: '.roi__value-3d',
     title: 'The one number',
-    tools: ['Opal', 'Web browsing'],
+    tools: ['Mark', 'Web browsing'],
     sources: ['Published customer story or third-party research', 'Cited, never computed'],
   },
   {
     id: 'person-proof',
     selector: '.person__quote-card',
     title: 'Peer proof',
-    tools: ['CMS', 'Opal'],
+    tools: ['CMS', 'Mark'],
     sources: ['optimizely.com customer stories', 'Matched on role first, industry second'],
   },
   {
@@ -354,11 +354,14 @@ export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = [
     id: 'person-working',
     selector: '.person__working',
     title: 'Why you\u2019re seeing this',
-    tools: ['Opal', 'Salesforce'],
+    tools: ['Mark', 'Salesforce'],
     sources: ['Their own words', 'Our labelled assumption about the seat'],
     notes: 'The disclosure that earns the rest of the page.',
   },
 ];
+
+/** Tools renamed since CMS pages stored their own `Tools` overrides. */
+const RENAMED_TOOLS: Record<string, string> = { 'Opal': 'Mark' };
 
 export function resolveXraySections(
   defaults: XraySectionInfo[],
@@ -379,7 +382,7 @@ export function resolveXraySections(
       id: d.id,
       selector: d.selector,
       title: o.Title || d.title,
-      tools: o.Tools && o.Tools.length ? o.Tools : d.tools,
+      tools: o.Tools && o.Tools.length ? o.Tools.map((t) => RENAMED_TOOLS[t] ?? t) : d.tools,
       sources: o.Sources && o.Sources.length ? o.Sources : d.sources,
       notes: o.Notes ?? d.notes,
     };

@@ -6,7 +6,7 @@ import type { ReactElement } from 'react';
    so they pick up the chip's text colour.
 
    Names match the canonical strings in xray-defaults.ts:
-     'Salesforce', 'BuiltWith', 'Opal', 'ODP', 'CMS',
+     'Salesforce', 'BuiltWith', 'Mark', 'ODP', 'CMS',
      'Web browsing', 'Sitemap', 'LinkedIn', '6sense',
      'Gravatar', 'Brandfetch'
    ============================================================ */
@@ -49,10 +49,11 @@ const BuiltWith = ({ size }: IconProps) => (
   </Wrap>
 );
 
-const Opal = ({ size }: IconProps) => (
+const Mark = ({ size }: IconProps) => (
+  // four-point spark with a small companion spark
   <Wrap size={size}>
-    <path d="M8 2 L13 6 L13 10 L8 14 L3 10 L3 6 Z" />
-    <path d="M5 7l3 4 3-4" strokeWidth="1" opacity="0.6" />
+    <path d="M7 2.5 L8.4 6.6 L12.5 8 L8.4 9.4 L7 13.5 L5.6 9.4 L1.5 8 L5.6 6.6 Z" />
+    <path d="M12.5 2v3M11 3.5h3" strokeWidth="1.1" opacity="0.7" />
   </Wrap>
 );
 
@@ -132,7 +133,7 @@ const Brandfetch = ({ size }: IconProps) => (
 const ICONS: Record<string, (p: IconProps) => ReactElement> = {
   'Salesforce': Salesforce,
   'BuiltWith': BuiltWith,
-  'Opal': Opal,
+  'Mark': Mark,
   'ODP': ODP,
   'CMS': CMS,
   'Web browsing': WebBrowsing,
