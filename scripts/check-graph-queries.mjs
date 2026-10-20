@@ -28,6 +28,8 @@ const FILES = [
   // The Visual Builder experience queries. They live in one module because api/content.ts
   // and vite.config.ts both serve them, so scanning the module covers both callers.
   'src/lib/experience-queries.ts',
+  // /home's account, person and team queries, served by api/home-index.ts and the dev proxy.
+  'src/lib/home-index.ts',
   // The dev server's own copies of PAGE_QUERY and PREVIEW_QUERY. Missing from this list is
   // exactly how they were free to drift from api/content.ts's fixed versions and still ship:
   // `check:graph` was green while `npm run dev` 400'd on every page. See the comment at the
