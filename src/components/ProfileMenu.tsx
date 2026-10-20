@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { SIGN_OUT_ACTION, type Identity } from '../lib/auth';
 import { gravatarUrl } from '../lib/gravatar';
 import { clearOfflineCopies } from '../lib/home-offline';
+import type { RunningOffer } from '../lib/offer-looks';
 
 function initialsOf(identity: Identity): string {
   const source = identity.name?.trim() || identity.email.split('@')[0].replace(/[._-]+/g, ' ');
@@ -43,15 +44,32 @@ function firstNameOf(identity: Identity): string {
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
+/** "until 5 Nov": when the offer stops running. */
+function untilOf(offer: RunningOffer): string {
+  const end = new Date(`${offer.windowEnd.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(end.getTime()) ? '' : `until ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
+}
+
 /**
- * The search page's corner: "Hi, Michiel", which opens who is signed in and
- * the way out.
+ * The search page's corner: "Hi, Michiel", which opens who is signed in, the
+ * running offers the page can be run as (one at a time), and the way out.
  *
  * Log out is a form POST (a GET that signs you out is a link anyone can make
  * you follow), and it lands on /login — /search would sign the person straight
  * back in while their Okta session is still live.
  */
-export default function ProfileMenu({ identity }: { identity: Identity }) {
+export default function ProfileMenu({
+  identity,
+  offers = null,
+  chosen = null,
+  onChoose,
+}: {
+  identity: Identity;
+  /** Aldus UI's running offers; null until they are read, and none to list when there are none. */
+  offers?: RunningOffer[] | null;
+  chosen?: string | null;
+  onChoose?: (offerId: string | null) => void;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -107,6 +125,46 @@ export default function ProfileMenu({ identity }: { identity: Identity }) {
               <span>{identity.email}</span>
             </span>
           </div>
+          {onChoose && offers && offers.length > 0 && (
+            <div className="search-page__profile-offers" role="group" aria-labelledby={`${menuId}-offers`}>
+              <p className="search-page__profile-heading" id={`${menuId}-offers`}>
+                Run this page as
+              </p>
+              {[null, ...offers].map((offer) => {
+                const id = offer?.id ?? null;
+                const on = chosen === id;
+                return (
+                  <button
+                    key={id ?? 'none'}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={on}
+                    className={'search-page__profile-item search-page__profile-offer' + (on ? ' is-on' : '')}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!on) onChoose(id);
+                    }}
+                  >
+                    <span className="search-page__profile-check" aria-hidden="true">
+                      {on && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12.5l4.5 4.5L19 7.5" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="search-page__profile-offer-text">
+                      <span className="search-page__profile-offer-name">{offer ? offer.title : 'Every account'}</span>
+                      <span className="search-page__profile-offer-meta">
+                        {offer
+                          ? [`${offer.pages.length} ${offer.pages.length === 1 ? 'page' : 'pages'}`, untilOf(offer), offer.look ? null : 'no look yet'].filter(Boolean).join(' · ')
+                          : 'The usual search page'}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <form
             method="post"
             action={SIGN_OUT_ACTION}
@@ -117,7 +175,7 @@ export default function ProfileMenu({ identity }: { identity: Identity }) {
               void clearOfflineCopies().finally(() => form.submit());
             }}
           >
-            <button type="submit" role="menuitem" className="search-page__profile-item" autoFocus>
+            <button type="submit" role="menuitem" className="search-page__profile-item" autoFocus={!offers?.length}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <path d="M16 17l5-5-5-5" />

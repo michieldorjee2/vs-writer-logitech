@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { signInHref, useAuth } from '../lib/auth';
 import { cutoutPath, easeOut, type CutoutBox } from '../lib/home-cutout';
 import type { HomeIndexBody, PersonItem } from '../lib/home-index';
+import { slugify, type BuildSummary } from '../lib/page-builds';
 import {
   cleanSlug,
   dedupeByName,
@@ -15,7 +16,18 @@ import {
 } from '../lib/search-entries';
 import { usePageRequest } from '../hooks/usePageRequest';
 import { clearOfflineCopies, INDEX_URL, keepIndex, readKeptIndex } from '../lib/home-offline';
-import { sceneSizes, sceneSrc, sceneSrcSet, TALL_MEDIA, type Scene } from '../lib/home-scenes';
+import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from '../lib/home-scenes';
+import {
+  headlineParts,
+  isOfferId,
+  logoSrc,
+  lookBackdrop,
+  OFFER_COOKIE,
+  type LookJob,
+  type OfferPage,
+  type RunningOffer,
+  type ShownOffer,
+} from '../lib/offer-looks';
 import OptimizelyWordmark from './OptimizelyWordmark';
 import ProfileMenu from './ProfileMenu';
 import '../styles/search-home.css';
@@ -59,8 +71,10 @@ const COMPACT_MEDIA = '(max-width: 799.98px)';
 const INTRO_DELAY = 250; // let the first frame paint before anything moves
 const INTRO_MS = 1250;
 const SWAP_MS = 750;
-const LEAVE_MS = 240; // rows drop out before the next view's rows rise
+const LEAVE_MS = 160; // rows drop out before the next view's rows rise (search-home.css: the drop fits inside it)
 const START_DEPTH = -24; // the cut-out starts just below the scene's bottom edge
+/* How far below their place the rows start on the way in, behind the rising edge. */
+const INTRO_TRAIL = 110;
 /* Data that lands this soon after the rise begins skips the loading line's exit. */
 const LOADING_GLANCE_MS = 200;
 
@@ -169,18 +183,129 @@ function Tile({ sources, label }: { sources: Array<string | null>; label: string
   );
 }
 
+const BADGE: Record<BuildSummary['status'], string> = {
+  waiting: 'Queued',
+  running: 'Generating',
+  done: 'Ready',
+  failed: 'Not built',
+};
+
+/** The logo's place while Mark builds the page: a ring that fills with the run. */
+function BuildTile({ build }: { build: BuildSummary }) {
+  const r = 18;
+  const around = 2 * Math.PI * r;
+  return (
+    <span className={`sh-tile sh-tile--build is-${build.status}`} aria-hidden="true">
+      <svg className="sh-ring" viewBox="0 0 44 44">
+        <circle className="sh-ring__track" cx="22" cy="22" r={r} />
+        <circle
+          className="sh-ring__arc"
+          cx="22"
+          cy="22"
+          r={r}
+          strokeDasharray={around}
+          strokeDashoffset={around * (1 - (build.status === 'done' ? 1 : build.progress))}
+        />
+      </svg>
+      <span className="sh-ring__label">
+        {build.status === 'done' ? '✓' : build.status === 'failed' ? '!' : `${Math.round(build.progress * 100)}%`}
+      </span>
+    </span>
+  );
+}
+
 const PlusIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
     <path d="M12 5v14M5 12h14" />
   </svg>
 );
 
+/* ---------- Running the page as an offer (lib/offer-looks.ts) ---------- */
+
+function readOfferCookie(): string | null {
+  const m = new RegExp(`(?:^|;\\s*)${OFFER_COOKIE}=([^;]*)`).exec(document.cookie);
+  const id = m ? decodeURIComponent(m[1]) : null;
+  return isOfferId(id) ? id : null;
+}
+
+/** The server draws /search with it on the next load; the offline copy is asked to fetch that one. */
+function writeOfferCookie(id: string | null) {
+  document.cookie = id
+    ? `${OFFER_COOKIE}=${encodeURIComponent(id)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`
+    : `${OFFER_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  navigator.serviceWorker?.controller?.postMessage({ refreshPage: true });
+}
+
+/**
+ * The scene's photograph. A new one (an offer picked, or its look just made)
+ * is laid over the last and fades in once it has loaded.
+ */
+function SceneLayer({ backdrop, fresh, onShown }: { backdrop: Backdrop; fresh: boolean; onShown?: () => void }) {
+  const [loaded, setLoaded] = useState(!fresh);
+  return (
+    <div
+      className={'sh-scene__layer' + (fresh ? ' is-new' : '') + (loaded ? ' is-in' : '')}
+      style={{ '--sh-lqip': `url("${backdrop.lqip}")` } as CSSProperties}
+      onTransitionEnd={(e) => e.target === e.currentTarget && onShown?.()}
+    >
+      <picture>
+        <source media={TALL_MEDIA} type="image/avif" srcSet={backdrop.srcSet('tall', 'avif')} sizes={sceneSizes(backdrop, 'tall')} />
+        <source media={TALL_MEDIA} type="image/webp" srcSet={backdrop.srcSet('tall', 'webp')} sizes={sceneSizes(backdrop, 'tall')} />
+        <source type="image/avif" srcSet={backdrop.srcSet('wide', 'avif')} sizes={sceneSizes(backdrop, 'wide')} />
+        <img
+          className="sh-scene__img"
+          src={backdrop.fallback}
+          srcSet={backdrop.srcSet('wide', 'webp')}
+          sizes={sceneSizes(backdrop, 'wide')}
+          alt=""
+          fetchPriority={fresh ? 'auto' : 'high'}
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+        />
+      </picture>
+    </div>
+  );
+}
+
+/** Mark at work on the offer's look: what it is doing now, the last few steps, and a bar. */
+function LookCard({ job, title, onRetry }: { job: LookJob; title: string; onRetry: () => void }) {
+  const steps = job.events.filter((e) => e.kind === 'tool' || e.kind === 'text').slice(-4);
+  const heading =
+    job.status === 'done' ? `Ready: ${title}` : job.status === 'failed' ? 'Mark could not finish the look' : `Mark is setting up the page for ${title}`;
+  return (
+    <aside className={`sh-look is-${job.status}`} aria-live="polite" aria-label="Mark setting up the page">
+      <p className="sh-look__head">{heading}</p>
+      <div className="sh-look__bar" aria-hidden="true">
+        <span style={{ transform: `scaleX(${Math.max(0.03, job.progress)})` }} />
+      </div>
+      {job.status === 'failed' ? (
+        <>
+          <p className="sh-look__line">{job.error || job.statusLine}</p>
+          <button type="button" className="sh-look__retry" onClick={onRetry}>
+            Try again
+          </button>
+        </>
+      ) : (
+        <ol className="sh-look__steps">
+          {steps.map((e) => (
+            <li key={e.seq} className={`sh-look__step is-${e.kind}`}>
+              {e.kind === 'text' ? e.text.split(/(?<=[.!?])\s/)[0] : e.text}
+            </li>
+          ))}
+          {job.status === 'cutting' && <li className="sh-look__step is-tool">Cutting the photograph into sizes</li>}
+        </ol>
+      )}
+    </aside>
+  );
+}
+
 /** Stagger slot for the rise and drop animations: rows down a column, columns slightly apart. */
 const slot = (row: number, col: number) => ({ '--i': row + col * 0.7 }) as CSSProperties;
 
-export default function SearchHome({ scene }: { scene: Scene }) {
+export default function SearchHome({ scene, offer: servedOffer = null }: { scene: Scene; offer?: ShownOffer | null }) {
   const heroRef = useRef<HTMLElement | null>(null);
   const liftRef = useRef<HTMLDivElement | null>(null);
+  const listsRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   /* The server already sent anyone signed out to Opti ID (server/ssr-handler.tsx).
@@ -190,6 +315,94 @@ export default function SearchHome({ scene }: { scene: Scene }) {
   useEffect(() => {
     if (auth.status === 'signed-out') window.location.replace(signInHref());
   }, [auth.status]);
+
+  /* ---------- Running as an offer ---------- */
+
+  /* The offer the page is run as: as the server drew it, then as this browser's
+     cookie says once the running offers are read (an offline copy of the page can
+     be a pick behind). Its look, once Mark has made one, is the scene and headline. */
+  const [asOffer, setAsOffer] = useState<ShownOffer | null>(servedOffer);
+  const [offers, setOffers] = useState<RunningOffer[] | null>(null);
+  const [job, setJob] = useState<LookJob | null>(null);
+  const look = asOffer?.look ?? null;
+  const running = useMemo(() => (asOffer ? (offers?.find((o) => o.id === asOffer.id) ?? null) : null), [offers, asOffer]);
+
+  const signedInEmail = identity?.email ?? null;
+  useEffect(() => {
+    if (!signedInEmail) return;
+    let cancelled = false;
+    fetch('/api/offers', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<{ offers: RunningOffer[] }>) : null))
+      .then((body) => {
+        if (cancelled || !body) return;
+        setOffers(body.offers);
+        const wanted = readOfferCookie();
+        const offer = wanted ? body.offers.find((o) => o.id === wanted) : undefined;
+        if (wanted && !offer) writeOfferCookie(null); // it stopped running
+        setAsOffer(offer ? { id: offer.id, title: offer.title, look: offer.look } : null);
+      })
+      .catch(() => {
+        /* Offline: the page stays as it was drawn. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedInEmail]);
+
+  /* An offer with no look yet: Mark makes one (or the run already under way is followed). */
+  const makeLook = useCallback(async (offerId: string, how: 'start' | 'follow' | 'retry') => {
+    try {
+      const path = `/api/offers/${encodeURIComponent(offerId)}/look${how === 'retry' ? '?retry=1' : ''}`;
+      const r = await fetch(path, { method: how === 'follow' ? 'GET' : 'POST', cache: 'no-store' });
+      const body = (await r.json()) as LookJob & { look?: RunningOffer['look']; error?: string };
+      if (r.status === 409 && body.look) {
+        setAsOffer((cur) => (cur?.id === offerId ? { ...cur, look: body.look ?? null } : cur));
+        return;
+      }
+      if (!r.ok) throw new Error(body.error || String(r.status));
+      setJob(body);
+    } catch (err) {
+      setJob({ offerId, status: 'failed', startedAt: Date.now(), statusLine: '', progress: 0, events: [], look: null, error: err instanceof Error ? err.message : String(err) });
+    }
+  }, []);
+  const needsLook = Boolean(asOffer && !asOffer.look && offers?.some((o) => o.id === asOffer.id));
+  useEffect(() => {
+    if (needsLook && asOffer && job?.offerId !== asOffer.id) void makeLook(asOffer.id, 'start');
+  }, [needsLook, asOffer, job?.offerId, makeLook]);
+
+  /* Follow the run; when it is done the look is the page's. */
+  useEffect(() => {
+    if (!job || (job.status !== 'making' && job.status !== 'cutting')) return;
+    const timer = window.setTimeout(() => void makeLook(job.offerId, 'follow'), document.hidden ? 15_000 : 2500);
+    return () => window.clearTimeout(timer);
+  }, [job, makeLook]);
+  useEffect(() => {
+    if (job?.status !== 'done' || !job.look) return;
+    const made = job.look;
+    setAsOffer((cur) => (cur?.id === job.offerId ? { ...cur, look: made } : cur));
+    setOffers((list) => list?.map((o) => (o.id === job.offerId ? { ...o, look: made } : o)) ?? list);
+    // The offline copy was kept before the look existed: the next visit should open on it.
+    navigator.serviceWorker?.controller?.postMessage({ refreshPage: true });
+    const timer = window.setTimeout(() => setJob(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [job]);
+
+  const chooseOffer = useCallback(
+    (offerId: string | null) => {
+      writeOfferCookie(offerId);
+      const offer = offerId ? offers?.find((o) => o.id === offerId) : undefined;
+      setJob(null);
+      setAsOffer(offer ? { id: offer.id, title: offer.title, look: offer.look } : null);
+    },
+    [offers],
+  );
+
+  /* The scene's layers: the photograph drawn first, and the one replacing it. */
+  const backdrop = useMemo(() => (look ? lookBackdrop(look) : sceneBackdrop(scene)), [look, scene]);
+  const [layers, setLayers] = useState<Array<{ backdrop: Backdrop; fresh: boolean }>>(() => [{ backdrop, fresh: false }]);
+  if (layers[layers.length - 1].backdrop.key !== backdrop.key) {
+    setLayers([...layers.slice(-1), { backdrop, fresh: true }]);
+  }
 
   const reduceMotion = useMemo(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -303,7 +516,65 @@ export default function SearchHome({ scene }: { scene: Scene }) {
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
-  const req = usePageRequest();
+
+  /* ---------- Pages Mark is building (api/page-builds) ---------- */
+
+  /* The rep's builds: polled while one is under way, so each row's ring and line
+     move with the run. A row stays a while after it finishes (Ready, or why not). */
+  const [builds, setBuilds] = useState<BuildSummary[]>([]);
+  const [buildsAsked, setBuildsAsked] = useState(0);
+  const addBuilds = useCallback((started: BuildSummary[]) => {
+    setBuilds((current) => [...started, ...current.filter((b) => !started.some((s) => s.id === b.id))]);
+    setBuildsAsked((n) => n + 1);
+  }, []);
+  const signedInAs = identity?.email ?? null;
+  useEffect(() => {
+    if (!signedInAs) return;
+    let cancelled = false;
+    let timer = 0;
+    async function poll() {
+      try {
+        const r = await fetch('/api/page-builds', { cache: 'no-store' });
+        if (!r.ok) throw new Error(String(r.status));
+        const body = (await r.json()) as { builds: BuildSummary[] };
+        if (cancelled) return;
+        setBuilds(body.builds);
+        if (body.builds.some((b) => b.status === 'running' || b.status === 'waiting')) {
+          timer = window.setTimeout(poll, document.hidden ? 30_000 : 5000);
+        }
+      } catch {
+        if (!cancelled) timer = window.setTimeout(poll, 30_000);
+      }
+    }
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [signedInAs, buildsAsked]);
+  const shownBuilds = useMemo(
+    () =>
+      builds.filter(
+        (b) =>
+          b.status === 'running' ||
+          b.status === 'waiting' ||
+          // Finished: until the index lists the page itself.
+          (Date.now() - (b.finishedAt ?? 0) < 30 * 60 * 1000 && !bySlug.has(b.route) && !peopleBySlug.has(b.route)),
+      ),
+    [builds, bySlug, peopleBySlug],
+  );
+
+  /* A company the index has a page for, by name, website or address. */
+  const findCompany = useCallback(
+    (text: string) => {
+      const t = text.trim().toLowerCase();
+      const domain = t.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      const hit = companies.find((e) => e.name.toLowerCase() === t || e.domain.toLowerCase() === domain || e.slug === t);
+      return hit ? { route: hit.slug, name: hit.name } : null;
+    },
+    [companies],
+  );
+  const req = usePageRequest({ findCompany, onStarted: addBuilds });
 
   /* `?q=`: the browser's "search Showcase" entry (public/opensearch.xml) lands here
      with the query. Filled in after the first render, so the server's HTML and the
@@ -370,7 +641,7 @@ export default function SearchHome({ scene }: { scene: Scene }) {
   const searchRows = box
     ? Math.max(
         IDLE_ROWS,
-        Math.min(MAX_SEARCH_ROWS, Math.floor((box.h - rhythm.above - panelHeight(0, rhythm)) / (rhythm.row + rhythm.gap))),
+        Math.min(MAX_SEARCH_ROWS, Math.floor((box.h - rhythm.above - (look?.location || look?.dates ? 34 : 0) - panelHeight(0, rhythm)) / (rhythm.row + rhythm.gap))),
       )
     : IDLE_ROWS;
   const rowsFor = (v: View) => (v === 'search' ? searchRows : IDLE_ROWS);
@@ -386,6 +657,9 @@ export default function SearchHome({ scene }: { scene: Scene }) {
     const d = motion.current.depth;
     hero.style.clipPath = `path("${cutoutPath(b, d)}")`;
     if (liftRef.current) liftRef.current.style.transform = `translate3d(0, ${-Math.max(0, d)}px, 0)`;
+    // The lists hang from the same edge, frame by frame. Placed at the target depth
+    // instead, they jumped the whole distance the moment search opened or closed.
+    if (listsRef.current) listsRef.current.style.transform = `translate3d(0, ${b.h - Math.max(0, d)}px, 0)`;
   }, []);
 
   const animateTo = useCallback(
@@ -435,22 +709,22 @@ export default function SearchHome({ scene }: { scene: Scene }) {
 
   useEffect(() => () => cancelAnimationFrame(motion.current.raf), []);
 
-  /* Rows trail the cut-out up. Data that is here almost at once rides the first
-     rise; later data waits for the loading line to drop, then the cut-out grows
-     again from the line's height and the rows trail that. */
-  const [intro, setIntro] = useState({ base: INTRO_DELAY + 70, travel: panelHeight(IDLE_ROWS, RHYTHM.regular) + 64 });
+  /* Rows trail the cut-out up: they ride its edge (draw()) and rise INTRO_TRAIL
+     further behind it. Data that is here almost at once rides the first rise;
+     later data waits for the loading line to drop, then the cut-out grows again
+     from the line's height and the rows trail that. */
+  const [introBase, setIntroBase] = useState(INTRO_DELAY + 70);
   useEffect(() => {
     if (!loaded || ready || introAt.current === null) return;
     const since = performance.now() - introAt.current;
-    const full = panelHeight(IDLE_ROWS, rhythm);
     if (since < LOADING_GLANCE_MS) {
-      setIntro({ base: Math.max(0, 70 - since), travel: full + 64 });
+      setIntroBase(Math.max(0, 70 - since));
       setReady(true);
       return;
     }
     setLoadingOut(true);
     const t = window.setTimeout(() => {
-      setIntro({ base: 70, travel: full - loadingHeight(rhythm) + 64 });
+      setIntroBase(70);
       setEnter('intro');
       setReady(true);
     }, LEAVE_MS);
@@ -478,6 +752,8 @@ export default function SearchHome({ scene }: { scene: Scene }) {
   /* The two columns for the current view, and the arrow keys' walk through them. */
   type Row =
     | { key: string; kind: 'item'; item: Item; meta: string | null }
+    | { key: string; kind: 'build'; build: BuildSummary }
+    | { key: string; kind: 'offer'; page: OfferPage }
     | { key: string; kind: 'add'; add: 'account' | 'person' };
   const columns = useMemo((): Array<{ title: string; rows: Row[]; empty: string | null }> => {
     const asRow = (item: Item, withMeta: boolean): Row =>
@@ -490,20 +766,54 @@ export default function SearchHome({ scene }: { scene: Scene }) {
             meta: withMeta ? [item.person.title, item.person.company].filter(Boolean).join(' · ') : null,
           };
 
+    const buildRow = (build: BuildSummary): Row => ({ key: `b:${build.id}`, kind: 'build', build });
+    const offerRow = (page: OfferPage): Row => ({ key: `o:${page.route}`, kind: 'offer', page });
+    const offerPages = running?.pages ?? [];
     if (view === 'search') {
       const q = query.trim();
-      const cs = rankCompanies(companies, q, recentSlugs, rows).map((entry) => asRow({ kind: 'company', entry }, true));
-      const ps = rankPeople(people, q, recentSlugs, rows).map((person) => asRow({ kind: 'person', person }, true));
+      // Run as an offer, its page for a company is the first answer to a search for that company.
+      const ql = q.toLowerCase();
+      const offerHits = q ? offerPages.filter((p) => p.companyName.toLowerCase().includes(ql) || p.route.includes(slugify(q))) : offerPages;
+      // A page being built is the best answer to a search for it, so it leads its column.
+      // A person queued under a company matches the company too (its address starts with it).
+      const building = (kind: BuildSummary['kind']) =>
+        shownBuilds
+          .filter((b) => b.kind === kind && (!q || b.name.toLowerCase().includes(q.toLowerCase()) || b.route.includes(slugify(q))))
+          .map(buildRow);
+      const cs = [
+        ...building('account'),
+        ...offerHits.map(offerRow),
+        ...rankCompanies(companies, q, recentSlugs, rows).map((entry) => asRow({ kind: 'company', entry }, true)),
+      ].slice(0, rows);
+      const ps = [
+        ...building('person'),
+        ...rankPeople(people, q, recentSlugs, rows).map((person) => asRow({ kind: 'person', person }, true)),
+      ].slice(0, rows);
       return [
         { title: 'Companies', rows: q && !cs.length ? [{ key: 'add:account', kind: 'add', add: 'account' }] : cs, empty: null },
         { title: 'People', rows: q && !ps.length ? [{ key: 'add:person', kind: 'add', add: 'person' }] : ps, empty: null },
+      ];
+    }
+    if (view === 'idle' && running) {
+      // Run as an offer: its pages first; what you opened recently stays, the way back to everything else.
+      return [
+        {
+          title: 'Offer pages',
+          rows: offerPages.slice(0, rows).map(offerRow),
+          empty: 'No pages for this offer yet.',
+        },
+        {
+          title: 'Recently opened',
+          rows: [...shownBuilds.map(buildRow), ...recentItems.map((i) => asRow(i, false))].slice(0, rows),
+          empty: 'Pages you open show up here.',
+        },
       ];
     }
     if (view === 'idle') {
       return [
         {
           title: 'Recently opened',
-          rows: recentItems.slice(0, rows).map((i) => asRow(i, false)),
+          rows: [...shownBuilds.map(buildRow), ...recentItems.map((i) => asRow(i, false))].slice(0, rows),
           empty: 'Pages you open show up here.',
         },
         {
@@ -514,7 +824,7 @@ export default function SearchHome({ scene }: { scene: Scene }) {
       ];
     }
     return [];
-  }, [view, query, companies, people, recentSlugs, recentItems, mine, rows]);
+  }, [view, query, companies, people, recentSlugs, recentItems, mine, rows, shownBuilds, running]);
 
   // Nothing to walk (or offer to add) until the lists are on screen.
   const navRows = ready ? columns.flatMap((c) => c.rows) : [];
@@ -523,6 +833,15 @@ export default function SearchHome({ scene }: { scene: Scene }) {
     if (row.kind === 'add') {
       req.start(row.add, query);
       inputRef.current?.focus();
+      return;
+    }
+    if (row.kind === 'build') {
+      // The page's own address: Mark's build while it works, the page once it is done.
+      window.open(`/${row.build.route}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (row.kind === 'offer') {
+      window.open(`/${row.page.route}`, '_blank', 'noopener,noreferrer');
       return;
     }
     open(row.item.kind === 'company' ? row.item.entry.slug : row.item.person.slug);
@@ -586,14 +905,16 @@ export default function SearchHome({ scene }: { scene: Scene }) {
   const requestHint =
     req.error ??
     (req.phase === 'sent'
-      ? "We'll message you on Teams when it's live."
+      ? 'It shows up in your list while Mark works; open it to watch.'
       : req.phase === 'person'
-        ? "Mark builds a page for this person and messages you on Teams when it's ready."
+        ? req.companyIsNew
+          ? "Mark builds the company's page first (about 15 minutes), then this person's (about 4 more)."
+          : 'Mark builds a page for this person in about 4 minutes. It shows up in your list while it works.'
         : req.kind === 'person'
-          ? 'First the company they work at, then their name.'
-          : `Mark builds the page from the company's website and messages you on Teams${
+          ? 'First the company they work at: one that has a page, or its website if it has none yet. Then their name.'
+          : `Mark finds the company by its website, researches it and builds the page in about 15 minutes. It shows up in your list while it works, and Mark messages you on Teams${
               identity ? ` at ${identity.email}` : ''
-            } when it's ready, in about 15 minutes.`);
+            } when it's live.`);
 
   /* The go button turns into a + when what it would do is ask Mark for a page. */
   const activeRow = view === 'search' && !leaving ? navRows[activeIdx] : undefined;
@@ -616,35 +937,52 @@ export default function SearchHome({ scene }: { scene: Scene }) {
       <section className="sh-hero" ref={heroRef} aria-label="Search">
         {/* Decorative. A blurred 24px preview holds the place until the photograph
             arrives; portrait screens get a 3:4 slice instead of the whole frame. */}
-        <div className="sh-scene" aria-hidden="true" style={{ '--sh-lqip': `url("${scene.lqip}")` } as CSSProperties}>
-          <picture>
-            <source media={TALL_MEDIA} type="image/avif" srcSet={sceneSrcSet(scene.id, 'tall', 'avif')} sizes={sceneSizes(scene, 'tall')} />
-            <source media={TALL_MEDIA} type="image/webp" srcSet={sceneSrcSet(scene.id, 'tall', 'webp')} sizes={sceneSizes(scene, 'tall')} />
-            <source type="image/avif" srcSet={sceneSrcSet(scene.id, 'wide', 'avif')} sizes={sceneSizes(scene, 'wide')} />
-            <img
-              className="sh-scene__img"
-              src={sceneSrc(scene.id, 'wide', 1600, 'webp')}
-              srcSet={sceneSrcSet(scene.id, 'wide', 'webp')}
-              sizes={sceneSizes(scene, 'wide')}
-              alt=""
-              fetchPriority="high"
-              decoding="async"
+        <div className="sh-scene" aria-hidden="true">
+          {layers.map((layer, i) => (
+            <SceneLayer
+              key={layer.backdrop.key}
+              backdrop={layer.backdrop}
+              fresh={layer.fresh}
+              // Once the new one is in, the one under it goes.
+              onShown={i === layers.length - 1 && layers.length > 1 ? () => setLayers((l) => l.slice(-1)) : undefined}
             />
-          </picture>
+          ))}
           <div className="sh-scene__shade" />
         </div>
 
         <header className="sh-top">
-          <OptimizelyWordmark className="sh-top__logo" />
-          {identity && <ProfileMenu identity={identity} />}
+          <div className="sh-top__brand">
+            <OptimizelyWordmark className="sh-top__logo" />
+            {look?.logo && (
+              <>
+                <span className="sh-top__rule" aria-hidden="true" />
+                <img className="sh-top__event" key={look.logo.sourceUrl} src={logoSrc(look.logo.svg)} alt={asOffer?.title ?? ''} />
+              </>
+            )}
+          </div>
+          {identity && <ProfileMenu identity={identity} offers={offers} chosen={asOffer?.id ?? null} onChoose={chooseOffer} />}
         </header>
+        {job && asOffer && job.offerId === asOffer.id && (
+          <LookCard job={job} title={asOffer.title} onRetry={() => void makeLook(asOffer.id, 'retry')} />
+        )}
 
         <div className="sh-lift" ref={liftRef}>
-          <h1 className="sh-h1">
-            Every brand deserves
-            <br />
-            <em>its own</em> story
-          </h1>
+          {look ? (
+            <div className="sh-headline is-offer" key={`look:${look.headline}`}>
+              {(look.location || look.dates) && <p className="sh-eyebrow">{[look.location, look.dates].filter(Boolean).join(' · ')}</p>}
+              <h1 className="sh-h1">
+                {headlineParts(look)[0]}
+                {look.accent && <em>{headlineParts(look)[1]}</em>}
+                {headlineParts(look)[2]}
+              </h1>
+            </div>
+          ) : (
+            <h1 className="sh-h1">
+              Every brand deserves
+              <br />
+              <em>its own</em> story
+            </h1>
+          )}
           <form
             className={'sh-search' + (req.phase ? ' is-request' : '')}
             role="search"
@@ -736,13 +1074,13 @@ export default function SearchHome({ scene }: { scene: Scene }) {
             '--sh-head-gap': `${rhythm.headGap}px`,
             '--sh-row': `${rhythm.row}px`,
             '--sh-row-gap': `${rhythm.gap}px`,
-            '--sh-travel': `${intro.travel}px`,
-            '--sh-base': `${intro.base}ms`,
+            '--sh-travel': `${INTRO_TRAIL}px`,
+            '--sh-base': `${introBase}ms`,
           } as CSSProperties
         }
         aria-busy={!ready}
       >
-        <div className="sh-panel__body">
+        <div className="sh-panel__body" ref={listsRef}>
           {!ready && view !== 'request' ? (
             <p className={'sh-loading' + (loadingOut ? ' is-leaving' : '')}>Finding recent &amp; your brands…</p>
           ) : view === 'request' ? (
@@ -776,22 +1114,48 @@ export default function SearchHome({ scene }: { scene: Scene }) {
                     };
                     if (row.kind === 'add') {
                       return (
-                        <button
-                          key={row.key}
-                          {...common}
-                          className={'sh-row sh-row--add' + (active ? ' is-active' : '')}
-                          disabled={req.inCooldown}
-                        >
+                        <button key={row.key} {...common} className={'sh-row sh-row--add' + (active ? ' is-active' : '')}>
                           <span className="sh-tile" aria-hidden="true">
                             <PlusIcon />
                           </span>
                           <span className="sh-row__text">
                             <span className="sh-row__name">{row.add === 'account' ? 'Add company' : 'Add person'}</span>
-                            <span className="sh-row__meta">
-                              {req.inCooldown
-                                ? `One request a minute. Try again in ${req.cooldownRemaining}s.`
-                                : `Ask Mark to build a page for “${query.trim()}”`}
+                            <span className="sh-row__meta">{`Ask Mark to build a page for “${query.trim()}”`}</span>
+                          </span>
+                        </button>
+                      );
+                    }
+                    if (row.kind === 'offer') {
+                      const { page } = row;
+                      const logo = page.logoUrl ?? companies.find((e) => e.name === page.companyName)?.logoUrl ?? null;
+                      return (
+                        <button key={row.key} {...common} className={'sh-row sh-row--offer' + (active ? ' is-active' : '')}>
+                          <Tile sources={[logo]} label={initialsOf(page.companyName)} />
+                          <span className="sh-row__text">
+                            <span className="sh-row__name">
+                              {view === 'search' ? highlight(page.companyName, query) : page.companyName}
+                              {view === 'search' && <span className="sh-badge">Offer</span>}
                             </span>
+                            <span className="sh-row__meta">{page.domain || `/${page.route}`}</span>
+                          </span>
+                        </button>
+                      );
+                    }
+                    if (row.kind === 'build') {
+                      const { build } = row;
+                      return (
+                        <button
+                          key={row.key}
+                          {...common}
+                          className={`sh-row sh-row--build is-${build.status}` + (active ? ' is-active' : '')}
+                        >
+                          <BuildTile build={build} />
+                          <span className="sh-row__text">
+                            <span className="sh-row__name">
+                              {build.name}
+                              <span className="sh-badge">{BADGE[build.status]}</span>
+                            </span>
+                            <span className="sh-row__meta">{build.statusLine}</span>
                           </span>
                         </button>
                       );

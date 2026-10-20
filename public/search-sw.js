@@ -6,6 +6,7 @@
  *   /home/scenes           cache first, and the other two photos at the same size as well,
  *                          so whichever one the next page picks is there offline
  *   /api/auth/me           network first; the last answer when offline, so the page stays signed in
+ *   (the page asks)        the /search document again, when the rep runs it as another offer
  *   everything else        untouched (the page keeps /api/home-index itself)
  *
  * A redirect to sign-in or a 401 means the session is over, and every copy is
@@ -64,6 +65,11 @@ self.addEventListener('fetch', (event) => {
 /* The page's first visit loads its photo before this worker is running; the
    page names it once the worker is ready (src/lib/home-offline.ts). */
 self.addEventListener('message', (event) => {
+  // The page was switched to (or off) an offer: the kept copy is fetched again, so the next visit opens on it.
+  if (event.data && event.data.refreshPage) {
+    event.waitUntil(refreshPage().catch(() => {}));
+    return;
+  }
   const src = event.data && event.data.scene;
   if (typeof src !== 'string') return;
   const url = new URL(src, self.location.origin);

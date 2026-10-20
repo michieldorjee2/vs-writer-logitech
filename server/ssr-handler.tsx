@@ -33,7 +33,11 @@ import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experien
 import { authEnabled, currentIdentity, safeNext, signInPath } from '../api/_lib/auth';
 import { renderLoginPage } from './login-page';
 import SearchHome from '../src/components/SearchHome';
+import { buildForRoute, buildStore } from '../api/_lib/page-builds-store';
+import type { BuildRecord } from '../src/lib/page-builds';
 import { randomScene } from '../src/lib/home-scenes';
+import { isOfferId, OFFER_COOKIE, type ShownOffer } from '../src/lib/offer-looks';
+import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -941,6 +945,53 @@ const htmlTemplate: string = __HTML_TEMPLATE__;
 /** The search page's own document (home.html): no router, no Tailwind, no third-party tags. */
 declare const __HOME_TEMPLATE__: string;
 const homeTemplate: string = __HOME_TEMPLATE__;
+/** A page's address while Mark builds it (build.html → BuildView.tsx). */
+declare const __BUILD_TEMPLATE__: string;
+const buildTemplate: string = __BUILD_TEMPLATE__;
+
+/* A build owns its address for this long after it finishes, so a reload that beats
+   Graph's indexing of the new page still finds the build, not "not found". */
+const BUILD_GRACE_MS = 10 * 60 * 1000;
+
+/**
+ * The offer /search is run as, from the profile menu's cookie, with its look (lib/offer-looks.ts).
+ * Null when there is none, it no longer runs, or Aldus UI is slow to say: the page then draws
+ * as usual and takes the offer on itself.
+ */
+async function shownOfferFor(cookie: unknown): Promise<ShownOffer | null> {
+  if (!isOfferId(cookie) || !aldusConfigured()) return null;
+  try {
+    const quickly = <T,>(p: Promise<T>) => Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500))]);
+    let offer = (await quickly(runningOffers()))?.find((o) => o.id === cookie);
+    // An offer without a look is the one whose look may have just been made: ask again rather than trust the held list.
+    if (offer && !offer.look) offer = (await quickly(runningOffers(true)))?.find((o) => o.id === cookie) ?? offer;
+    return offer ? { id: offer.id, title: offer.title, look: offer.look } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The build that owns this address, if any (only page-shaped paths are looked up). */
+async function buildAt(slug: string): Promise<BuildRecord | null> {
+  if (!/^[a-z0-9-]+(\/[a-z0-9-]+)?$/.test(slug)) return null;
+  const store = buildStore();
+  if (!store) return null;
+  try {
+    return await buildForRoute(store, slug);
+  } catch (err) {
+    console.error('[ssr] build lookup', err);
+    return null;
+  }
+}
+
+function sendBuildView(res: VercelResponse, build: BuildRecord): void {
+  const attrs = `data-build="${escapeHtml(build.id)}" data-route="${escapeHtml(build.finalRoute ?? build.route)}"`;
+  const html = buildTemplate
+    .replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(`Mark is building ${build.name}`)} · Optimizely Showcase</title>`)
+    .replace('<div id="root"></div>', `<div id="root" ${attrs}></div>`);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(html);
+}
 
 // ---------------------------------------------------------------------------
 // Vercel handler
@@ -1061,12 +1112,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Drawn with a photograph picked per request, so it paints before any script runs;
     // src/home-main.tsx reads the pick off #root and hydrates the same tree.
     const scene = randomScene();
-    const body = renderToString(<SearchHome scene={scene} />);
-    html = html.replace('<div id="root"></div>', `<div id="root" data-scene="${scene.id}">${body}</div>`);
+    // Run as an offer (the profile menu's pick, kept in a cookie): its look is drawn here, so it is
+    // the first paint. Aldus UI is asked briefly; a slow answer draws the usual page, which takes
+    // the offer on itself once it has read the running offers.
+    const offer = await shownOfferFor(req.cookies?.[OFFER_COOKIE]);
+    const body = renderToString(<SearchHome scene={scene} offer={offer} />);
+    const offerAttr = offer ? ` data-offer="${escapeHtml(JSON.stringify(offer))}"` : '';
+    html = html.replace('<div id="root"></div>', `<div id="root" data-scene="${scene.id}"${offerAttr}>${body}</div>`);
 
     res.setHeader('Content-Type', 'text/html');
     if (!authEnabled()) res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
     return res.status(200).send(html);
+  }
+
+  /*
+   * An address Mark is building a page at (api/page-builds). Signed-in people see the
+   * build there (BuildView.tsx) until the page is done; everyone else sees what is there.
+   * While a build owns the address nothing is cached, for anyone: the edge would hand the
+   * "not found" shell it cached for a prospect to the rep. `?view=page` is the page so far,
+   * for the build view's preview.
+   */
+  const build = await buildAt(slug);
+  const buildOpen = build && (build.status !== 'done' || Date.now() - (build.finishedAt ?? 0) < BUILD_GRACE_MS);
+  if (build?.status === 'done' && build.finalRoute && build.finalRoute !== slug) {
+    // Mark put the page somewhere else than the address it was given: send that address there.
+    res.setHeader('Location', `/${build.finalRoute}${url.search}`);
+    return res.status(302).end();
+  }
+  if (buildOpen) {
+    const setHeader = res.setHeader.bind(res);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader = ((name: string, value: number | string | readonly string[]) =>
+      name.toLowerCase() === 'cache-control' ? res : setHeader(name, value)) as typeof res.setHeader;
+    if (build.status !== 'done' && url.searchParams.get('view') !== 'page' && currentIdentity(req, res)) {
+      return sendBuildView(res, build);
+    }
   }
 
   const authKey = process.env.GRAPH_AUTH_KEY;
@@ -1135,6 +1215,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const page = await fetchPageContent(authKey, slug);
 
     if (!page) {
+      // Built a moment ago and not in Graph yet: the build view, which reloads into the page.
+      if (buildOpen && currentIdentity(req, res)) return sendBuildView(res, build);
       // Unknown slug → SPA shell (client renders NotFound component)
       res.setHeader('Content-Type', 'text/html');
       res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');

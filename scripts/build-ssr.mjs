@@ -23,19 +23,25 @@ try {
   console.warn('⚠ dist/index.html not found, using fallback shell');
 }
 
-// The search page's own document (home.html, served at /search), rendered into by the same handler.
-// Its one stylesheet (~3.5 kB compressed) goes inline: the first paint then waits on
-// no request but the document, which is most of what a phone on a slow network sees.
-let homeTemplate;
-try {
-  homeTemplate = readFileSync('dist/home.html', 'utf-8').replace(
-    /<link rel="stylesheet"[^>]*href="(\/assets\/home-[^"]+\.css)"[^>]*>/,
-    (_tag, href) => `<style>${readFileSync(path.join('dist', href), 'utf-8')}</style>`,
-  );
-} catch {
-  homeTemplate = htmlTemplate;
-  console.warn('⚠ dist/home.html not found, /search falls back to the main shell');
+/*
+ * The search page's own document (home.html, served at /search) and a page's address
+ * while Mark builds it (build.html), rendered into by the same handler. Each has one
+ * small stylesheet, inlined: the first paint then waits on no request but the document,
+ * which is most of what a phone on a slow network sees.
+ */
+function ownDocument(file, entry) {
+  try {
+    return readFileSync(`dist/${file}`, 'utf-8').replace(
+      new RegExp(`<link rel="stylesheet"[^>]*href="(/assets/${entry}-[^"]+\\.css)"[^>]*>`),
+      (_tag, href) => `<style>${readFileSync(path.join('dist', href), 'utf-8')}</style>`,
+    );
+  } catch {
+    console.warn(`⚠ dist/${file} not found, its routes fall back to the main shell`);
+    return htmlTemplate;
+  }
 }
+const homeTemplate = ownDocument('home.html', 'home');
+const buildTemplate = ownDocument('build.html', 'build');
 
 await esbuild.build({
   entryPoints: ['server/ssr-handler.tsx'],
@@ -80,6 +86,7 @@ await esbuild.build({
   define: {
     '__HTML_TEMPLATE__': JSON.stringify(htmlTemplate),
     '__HOME_TEMPLATE__': JSON.stringify(homeTemplate),
+    '__BUILD_TEMPLATE__': JSON.stringify(buildTemplate),
   },
 
   // Source maps for Vercel runtime error traces

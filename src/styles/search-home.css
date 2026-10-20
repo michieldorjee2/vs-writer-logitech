@@ -43,6 +43,17 @@ html, body { margin: 0; background: #f9fcf8; }
   --sh-accent: #abff44;      /* bg.accent: LFGreen, the same in both themes */
   --sh-accent-hover: #99f141; /* bg.accent.hovered */
   --sh-mark: rgb(171 255 68 / 0.55);
+  /* The glass on the search bar and the account menu (made of --sh-page, see .sh-search). */
+  --sh-glass-edge: rgb(255 255 255 / 0.6);
+  --sh-glass-highlight: rgb(255 255 255 / 0.85);
+  --sh-glass-sheen: rgb(255 255 255 / 0.4);
+  --sh-glass-rule: rgb(32 35 32 / 0.08);
+  --sh-glass-shadow: rgb(8 37 26 / 0.35);
+  --sh-glass-placeholder: #484e46; /* fg.secondary */
+  /* A build's ring in the list: a green that reads on the light page. */
+  --sh-ring: #3d8b14;
+  --sh-ring-track: rgb(32 35 32 / 0.1);
+  --sh-badge-live: rgb(171 255 68 / 0.45);
 
   /* The scene is the brand's, the same in both themes. */
   --sh-fir: #08251a;
@@ -81,6 +92,15 @@ html, body { margin: 0; background: #f9fcf8; }
     --sh-focus: #409aab;
     --sh-accent-hover: #c5ff7e;
     --sh-mark: rgb(171 255 68 / 0.3);
+    --sh-glass-edge: rgb(255 255 255 / 0.1);
+    --sh-glass-highlight: rgb(255 255 255 / 0.08);
+    --sh-glass-sheen: rgb(255 255 255 / 0.05);
+    --sh-glass-rule: rgb(210 222 194 / 0.1);
+    --sh-glass-shadow: rgb(0 0 0 / 0.55);
+    --sh-glass-placeholder: #a1ac8d; /* fg.tertiary */
+    --sh-ring: #abff44;
+    --sh-ring-track: rgb(210 222 194 / 0.14);
+    --sh-badge-live: rgb(171 255 68 / 0.2);
     color-scheme: dark;
   }
 }
@@ -107,8 +127,13 @@ html, body { margin: 0; background: #f9fcf8; }
   inset: 0;
 }
 .sh-scene { overflow: hidden; }
+/* One photograph per layer. A new one (an offer's look) is laid over the last
+   and fades in once it has loaded; then the one under it goes. */
+.sh-scene__layer { position: absolute; inset: 0; overflow: hidden; }
+.sh-scene__layer.is-new { opacity: 0; transition: opacity 0.9s var(--sh-ease); }
+.sh-scene__layer.is-new.is-in { opacity: 1; }
 /* The 24px preview, blurred, until the photograph is decoded on top of it. */
-.sh-scene::before {
+.sh-scene__layer::before {
   content: '';
   position: absolute;
   inset: -48px;
@@ -136,7 +161,23 @@ html, body { margin: 0; background: #f9fcf8; }
   align-items: flex-start;
   justify-content: space-between;
 }
-.sh-top__logo { display: block; width: 166px; height: 40px; }
+.sh-top__brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.sh-top__logo { display: block; flex: none; width: 166px; height: 40px; color: #fff; }
+/* The event's logo beside ours, drawn white whatever its colours (it sits on the photograph). */
+.sh-top__rule { flex: none; width: 1px; height: 34px; background: rgb(255 255 255 / 0.45); }
+.sh-top__event {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  object-position: left center;
+  filter: brightness(0) invert(1);
+  animation: sh-fade-in 0.6s var(--sh-ease) both;
+}
+@keyframes sh-fade-in {
+  from { opacity: 0; }
+}
 .sh-top .search-page__profile { position: relative; top: auto; right: auto; margin-top: -6px; }
 
 /* The headline and search ride the cut-out's top edge (transform set per frame).
@@ -166,17 +207,119 @@ html, body { margin: 0; background: #f9fcf8; }
 }
 .sh-h1 em { font-style: normal; color: var(--sh-accent); }
 
+/* Run as an offer: the event's where and when over its headline. */
+.sh-headline { display: flex; flex-direction: column; gap: 12px; }
+.sh-headline.is-offer { animation: sh-headline-in 0.7s var(--sh-ease) both; }
+@keyframes sh-headline-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+.sh-eyebrow {
+  margin: 0;
+  padding-left: 18px;
+  color: rgb(255 255 255 / 0.82);
+  font: 500 15px/20px var(--sp-font-body);
+  letter-spacing: 0.01em;
+}
+
+/* Mark at work on the offer's look: the same glass as the menu, under the corner. */
+.sh-look {
+  position: absolute;
+  top: 84px;
+  right: 25px;
+  z-index: 4;
+  width: min(340px, calc(100% - 50px));
+  padding: 14px 16px 14px;
+  border-radius: 18px;
+  color: var(--sh-fg);
+  background:
+    linear-gradient(150deg, var(--sh-glass-sheen) 0%, transparent 55%),
+    color-mix(in srgb, var(--sh-page) 80%, transparent);
+  border: 1px solid var(--sh-glass-edge);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 var(--sh-glass-highlight),
+    0 24px 56px -16px var(--sh-glass-shadow);
+  font-family: var(--sp-font-body);
+  animation: sh-glass-in 0.3s var(--sh-ease);
+}
+.sh-look__head { margin: 0 0 10px; font: 500 15px/19px var(--sp-font-body); }
+.sh-look__bar { height: 3px; margin-bottom: 10px; border-radius: 3px; background: var(--sh-glass-rule); overflow: hidden; }
+.sh-look__bar span {
+  display: block;
+  height: 100%;
+  background: var(--sh-accent);
+  transform-origin: left;
+  transition: transform 1.2s var(--sh-ease);
+}
+.sh-look.is-failed .sh-look__bar { display: none; }
+.sh-look__steps { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sh-look__step {
+  position: relative;
+  padding-left: 14px;
+  color: var(--sh-fg-2);
+  font-size: 13px;
+  line-height: 17px;
+  animation: sh-step-in 0.4s var(--sh-ease) both;
+}
+.sh-look__step::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+.sh-look__step.is-text { color: var(--sh-fg); }
+.sh-look__step:last-child::before { background: var(--sh-accent); opacity: 1; }
+@keyframes sh-step-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+.sh-look__line { margin: 0 0 10px; color: var(--sh-fg-2); font-size: 13px; line-height: 17px; }
+.sh-look__retry {
+  appearance: none;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sh-fir);
+  color: #fff;
+  font: 500 13px/16px var(--sp-font-body);
+  cursor: pointer;
+}
+
+/* Liquid glass, for the search bar and the account menu: the page's own surface
+   (light or dark) frosted over the photograph, so both read as pieces of the page
+   laid over it. A top highlight and a faint sheen give the pane its edge; where
+   backdrop blur is missing it is simply the page colour. */
+.sh-search,
+.sh .search-page__profile-menu {
+  background:
+    linear-gradient(150deg, var(--sh-glass-sheen) 0%, transparent 55%),
+    color-mix(in srgb, var(--sh-page) 76%, transparent);
+  border: 1px solid var(--sh-glass-edge);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sh-search,
+  .sh .search-page__profile-menu { background: var(--sh-page); }
+}
+
 .sh-search {
+  --sh-search-lift: inset 0 1px 0 var(--sh-glass-highlight), 0 18px 40px -20px var(--sh-glass-shadow);
   display: flex;
   align-items: center;
   gap: 12px;
   height: 62px;
   padding: 0 11px 0 18px;
   border-radius: 10px;
-  background: var(--sh-page);
   color: var(--sh-fg);
+  box-shadow: var(--sh-search-lift);
 }
-.sh-search:focus-within { box-shadow: 0 0 0 2px var(--sh-accent); }
+.sh-search:focus-within { box-shadow: 0 0 0 2px var(--sh-accent), var(--sh-search-lift); }
 .sh-search__input {
   flex: 1;
   min-width: 0;
@@ -187,7 +330,9 @@ html, body { margin: 0; background: #f9fcf8; }
   color: inherit;
   font: 400 16px/1 var(--sp-font-body);
 }
-.sh-search__input::placeholder { color: var(--sh-fg-3); }
+/* Glass lets the photograph darken the bar a little, so the placeholder sits a step
+   darker than the page's tertiary text to stay readable (light mode). */
+.sh-search__input::placeholder { color: var(--sh-glass-placeholder); }
 .sh-search__status {
   flex: 1;
   min-width: 0;
@@ -257,9 +402,7 @@ html, body { margin: 0; background: #f9fcf8; }
 .search-page__greeting[aria-expanded='true'] { color: var(--sp-accent); }
 .search-page__greeting:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 3px; border-radius: 4px; }
 
-/* The account menu: light frosted glass over the photograph, the same in both
-   themes (it sits on the scene, not on the page). A top highlight and a soft
-   sheen give the pane its edge; where backdrop blur is missing it goes near-opaque. */
+/* The account menu: the same glass as the search bar (see .sh-search). */
 .sh .search-page__profile { position: relative; z-index: 20; font-family: var(--sp-font-body); }
 .sh .search-page__profile-menu {
   position: absolute;
@@ -269,23 +412,13 @@ html, body { margin: 0; background: #f9fcf8; }
   max-width: calc(100vw - 32px);
   padding: 6px;
   border-radius: 18px;
-  color: #202320;
-  background:
-    linear-gradient(150deg, rgb(255 255 255 / 0.62) 0%, rgb(255 255 255 / 0.22) 48%, rgb(255 255 255 / 0.38) 100%),
-    rgb(244 249 241 / 0.42);
-  border: 1px solid rgb(255 255 255 / 0.55);
+  color: var(--sh-fg);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.85),
-    inset 0 -1px 0 rgb(255 255 255 / 0.25),
-    0 24px 56px -16px rgb(8 37 26 / 0.45),
-    0 6px 16px -6px rgb(8 37 26 / 0.25);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  backdrop-filter: blur(22px) saturate(170%);
+    inset 0 1px 0 var(--sh-glass-highlight),
+    0 24px 56px -16px var(--sh-glass-shadow),
+    0 6px 16px -6px var(--sh-glass-shadow);
   transform-origin: top right;
   animation: sh-glass-in 0.22s var(--sh-ease);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .sh .search-page__profile-menu { background: rgb(249 252 248 / 0.96); }
 }
 @keyframes sh-glass-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.97); }
@@ -297,7 +430,7 @@ html, body { margin: 0; background: #f9fcf8; }
   min-width: 0;
   margin-bottom: 6px;
   padding: 10px 10px 12px;
-  border-bottom: 1px solid rgb(8 37 26 / 0.09);
+  border-bottom: 1px solid var(--sh-glass-rule);
 }
 .sh .search-page__profile-avatar {
   flex: none;
@@ -305,9 +438,9 @@ html, body { margin: 0; background: #f9fcf8; }
   height: 38px;
   border-radius: 50%;
   overflow: hidden;
-  background: rgb(255 255 255 / 0.7);
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85), 0 2px 6px rgb(8 37 26 / 0.18);
-  color: #484e46;
+  background: var(--sh-tile);
+  box-shadow: 0 0 0 2px var(--sh-glass-edge);
+  color: var(--sh-fg-2);
   font: 700 12px/1 var(--sp-font-body);
   letter-spacing: 0.04em;
 }
@@ -315,14 +448,14 @@ html, body { margin: 0; background: #f9fcf8; }
 .sh .search-page__avatar-photo { display: block; width: 100%; height: 100%; object-fit: cover; }
 .sh .search-page__avatar-photo[hidden] { display: none; }
 .sh .search-page__profile-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sh .search-page__profile-id strong { font: 500 15px/18px var(--sp-font-body); color: #202320; }
+.sh .search-page__profile-id strong { font: 500 15px/18px var(--sp-font-body); color: var(--sh-fg); }
 .sh .search-page__profile-id span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
   line-height: 16px;
-  color: #484e46;
+  color: var(--sh-fg-2);
 }
 .sh .search-page__profile-menu form { margin: 0; }
 .sh .search-page__profile-item {
@@ -335,17 +468,34 @@ html, body { margin: 0; background: #f9fcf8; }
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: #202320;
+  color: var(--sh-fg);
   font: 400 15px/18px var(--sp-font-body);
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s var(--sh-ease), box-shadow 0.15s var(--sh-ease);
+  transition: background 0.15s var(--sh-ease);
 }
-.sh .search-page__profile-item:hover {
-  background: rgb(255 255 255 / 0.6);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 3px rgb(8 37 26 / 0.1);
+.sh .search-page__profile-item:hover { background: var(--sh-hover); }
+.sh .search-page__profile-item:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: 1px; }
+/* Run this page as: the running offers, one at a time. */
+.sh .search-page__profile-offers {
+  width: 320px;
+  max-width: 100%;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sh-glass-rule);
 }
-.sh .search-page__profile-item:focus-visible { outline: 2px solid #197a94; outline-offset: 1px; }
+.sh .search-page__profile-heading {
+  margin: 4px 12px 4px;
+  color: var(--sh-fg-2);
+  font: 600 12px/16px var(--sp-font-body);
+  letter-spacing: 0.02em;
+}
+.sh .search-page__profile-offer { align-items: flex-start; }
+.sh .search-page__profile-check { flex: none; display: grid; place-items: center; width: 16px; height: 18px; color: var(--sh-fg); }
+.sh .search-page__profile-offer-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sh .search-page__profile-offer-name { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sh .search-page__profile-offer.is-on .search-page__profile-offer-name { font-weight: 500; }
+.sh .search-page__profile-offer-meta { color: var(--sh-fg-2); font-size: 13px; line-height: 16px; }
 
 /* ---------- Lists (behind the scene, shown through the cut-out) ---------- */
 
@@ -355,16 +505,20 @@ html, body { margin: 0; background: #f9fcf8; }
   bottom: var(--sh-frame-b);
   left: var(--sh-frame-l);
   z-index: 1;
+  overflow: hidden;
   /* The cut-out: the left half of the scene. */
   width: calc((100% - var(--sh-frame-l) - var(--sh-frame-r)) / 2);
 }
-/* The lists start at the cut-out's top edge, --sh-panel-h above the bottom. They are
-   moved there, not laid out there: a box that changes size on screen is a layout
-   shift (CLS), even behind the scene, and the cut-out grows when the data lands. */
+/* The lists hang from the cut-out's top edge. They are moved there, not laid out
+   there: a box that changes size on screen is a layout shift (CLS), even behind the
+   scene. SearchHome.tsx moves them with the edge every frame; this is where they sit
+   before any script runs. The panel clips at the scene's bottom edge, so rows rising
+   in or dropping out never show in the page margin below it. */
 .sh-panel__body {
   height: 100%;
   padding-block: var(--sh-pad-t) var(--sh-pad-b);
   transform: translateY(calc(100% - var(--sh-panel-h)));
+  will-change: transform;
 }
 
 .sh-loading {
@@ -377,7 +531,7 @@ html, body { margin: 0; background: #f9fcf8; }
 }
 @keyframes sh-breathe { 50% { opacity: 0.45; } }
 /* The data is in: the line drops out like a view's rows before the lists rise. */
-.sh-loading.is-leaving { animation: sh-drop 240ms cubic-bezier(0.5, 0, 0.75, 0) both; }
+.sh-loading.is-leaving { animation: sh-drop 150ms cubic-bezier(0.5, 0, 0.75, 0) both; }
 
 .sh-cols { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
 .sh-cols--single { grid-template-columns: 1fr; }
@@ -448,6 +602,32 @@ html, body { margin: 0; background: #f9fcf8; }
 .sh-row--add .sh-tile { color: var(--sh-fg); }
 
 .sh-row__text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* A page Mark is building: a ring in the logo's place fills with the run, and the
+   line under the name is what Mark is doing now. */
+.sh-tile--build { position: relative; background: var(--sh-tile); color: var(--sh-fg-2); }
+.sh-ring { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); transform: rotate(-90deg); }
+.sh-ring circle { fill: none; stroke-width: 3.5; }
+.sh-ring__track { stroke: var(--sh-ring-track); }
+.sh-ring__arc { stroke: var(--sh-ring); stroke-linecap: round; transition: stroke-dashoffset 1.2s var(--sh-ease); }
+.sh-tile--build.is-failed .sh-ring__arc { stroke: var(--sh-error); }
+.sh-tile--build.is-running .sh-ring { animation: sh-ring-breathe 2.4s ease-in-out infinite; }
+@keyframes sh-ring-breathe { 50% { opacity: 0.7; } }
+.sh-ring__label { position: relative; font: 500 11px/1 var(--sp-font-body); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.sh-tile--build.is-done .sh-ring__label { color: var(--sh-ring); font-size: 16px; }
+.sh-tile--build.is-failed .sh-ring__label { color: var(--sh-error); font-size: 15px; }
+.sh-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px 2px;
+  border-radius: 999px;
+  background: var(--sh-tile);
+  color: var(--sh-fg-2);
+  font: 500 11px/16px var(--sp-font-body);
+  vertical-align: 2px;
+}
+.sh-row--build.is-running .sh-badge { background: var(--sh-badge-live); color: var(--sh-fg); }
+.sh-row--build.is-failed .sh-badge { color: var(--sh-error); }
+
 .sh-row__name,
 .sh-row__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sh-row__meta { font-size: 13px; line-height: 16px; color: var(--sh-fg-3); }
@@ -468,19 +648,24 @@ html, body { margin: 0; background: #f9fcf8; }
 }
 
 /* Swapping views: the old rows drop away, the new ones rise in. */
+/* Short enough, stagger included, to finish inside LEAVE_MS (SearchHome.tsx), so no
+   row is cut off mid-fall when the next view takes its place. */
 .sh-cols[data-anim='leave'] > .sh-col > * {
-  animation: sh-drop 240ms cubic-bezier(0.5, 0, 0.75, 0) both;
-  animation-delay: calc(var(--i, 0) * 25ms);
+  animation: sh-drop 130ms cubic-bezier(0.5, 0, 0.75, 0) both;
+  animation-delay: calc(var(--i, 0) * 4ms);
 }
 @keyframes sh-drop {
-  to { transform: translateY(70px); opacity: 0; }
+  to { transform: translateY(36px); opacity: 0; }
 }
+/* The new rows are visible within ~150ms (the opacity keyframe), so the panel is
+   never empty between views; the move keeps its long, soft landing. */
 .sh-cols[data-anim='swap'] > .sh-col > * {
-  animation: sh-rise 700ms var(--sh-ease) both;
-  animation-delay: calc(var(--i, 0) * 45ms);
+  animation: sh-rise 620ms var(--sh-ease) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
 }
 @keyframes sh-rise {
-  from { transform: translateY(calc(56px + var(--i, 0) * 12px)); opacity: 0; }
+  from { transform: translateY(calc(40px + var(--i, 0) * 10px)); opacity: 0; }
+  25% { opacity: 1; }
   to { transform: none; opacity: 1; }
 }
 
@@ -489,6 +674,9 @@ html, body { margin: 0; background: #f9fcf8; }
   .sh-loading, .sh-loading.is-leaving { animation: none; }
   .sh-search__go > svg { transition: none; }
   .sh .search-page__profile-menu { animation: none; }
+  .sh-tile--build.is-running .sh-ring { animation: none; }
+  .sh-scene__layer.is-new { transition: none; }
+  .sh-headline.is-offer, .sh-top__event, .sh-look, .sh-look__step { animation: none; }
 }
 
 /* ---------- Phones: the cut-out spans the scene ----------
@@ -507,6 +695,11 @@ html, body { margin: 0; background: #f9fcf8; }
   }
   .sh-top { top: 20px; left: 20px; right: 18px; }
   .sh-top__logo { width: 128px; height: 31px; }
+  .sh-top__brand { gap: 12px; }
+  .sh-top__rule { height: 24px; }
+  .sh-top__event { height: 32px; max-width: 120px; }
+  .sh-look { top: 64px; right: 18px; width: calc(100% - 38px); }
+  .sh-eyebrow { padding-left: 16px; font-size: 13px; line-height: 17px; }
   .sh .sh-top .search-page__profile { margin-top: -5px; }
   .search-page__greeting { font-size: 14px; }
 
