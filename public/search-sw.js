@@ -124,6 +124,16 @@ async function keepPage(res) {
     if (path.startsWith('/assets/') && !named.has(path)) await files.delete(req);
   }
   await (await caches.open(SHELL)).put(PAGE, res);
+  await keepMe();
+}
+
+/* Who is signed in, kept with the page. The page asks on every load; on the first
+   visit it asked before this worker ran, so without this an offline second visit
+   would have no answer to give it. */
+async function keepMe() {
+  const res = await fetch(ME, { credentials: 'same-origin', cache: 'no-store' });
+  if (res.status === 401) return dropEverything();
+  if (res.ok) await (await caches.open(DATA)).put(ME, res);
 }
 
 async function cacheFirst(event, request) {
