@@ -4,8 +4,8 @@
  * Each comes as an AVIF ladder (WebP for browsers without AVIF) in two cuts:
  * the whole frame, and a 3:4 slice from its middle for portrait screens, so a
  * phone never downloads the two-thirds of a landscape photo it would crop
- * away. The files are made by a one-off sharp script (quality 36 AVIF / 62
- * WebP: the scene sits under a dark shade, which hides the compression).
+ * away. The files are made by scripts/home-scenes/gen-scenes.mjs (quality 36
+ * AVIF / 62 WebP: the scene sits under a dark shade, which hides the compression).
  *
  * Pure: the server renders the same <picture> the browser hydrates.
  */
@@ -65,7 +65,7 @@ export function sceneSrcSet(id: Scene['id'], cut: Cut, format: Format): string {
  * How wide the photograph is drawn. It covers the scene, so on a screen
  * narrower than the photo's shape it is as tall as the scene and wider than it.
  */
-export function sceneSizes(scene: Scene, cut: Cut): string {
+export function sceneSizes(scene: Pick<Scene, 'aspect'>, cut: Cut): string {
   if (cut === 'tall') return `calc((100vh - ${FRAME}) * ${TALL_ASPECT})`;
   const a = scene.aspect;
   return `(max-aspect-ratio: ${Math.round(a * 1000)}/1000) calc((100vh - ${FRAME}) * ${a}), calc(100vw - ${FRAME})`;
@@ -77,4 +77,27 @@ export function sceneById(id: string | null | undefined): Scene | undefined {
 
 export function randomScene(): Scene {
   return SCENES[Math.floor(Math.random() * SCENES.length)];
+}
+
+/**
+ * What the scene draws: one of the photographs above, or an offer's own
+ * (lib/offer-looks.ts lookBackdrop). Both come as the same two cuts.
+ */
+export type Backdrop = {
+  key: string;
+  aspect: number;
+  lqip: string;
+  srcSet: (cut: Cut, format: Format) => string;
+  /** The <img>'s own src, for browsers that take neither srcset. */
+  fallback: string;
+};
+
+export function sceneBackdrop(scene: Scene): Backdrop {
+  return {
+    key: `scene:${scene.id}`,
+    aspect: scene.aspect,
+    lqip: scene.lqip,
+    srcSet: (cut, format) => sceneSrcSet(scene.id, cut, format),
+    fallback: sceneSrc(scene.id, 'wide', 1600, 'webp'),
+  };
 }

@@ -1,24 +1,19 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import type { BuildSummary } from '../lib/page-builds';
 import { looksLikeWebsite } from '../lib/search-entries';
 
 /*
- * Asking Mark for a page that does not exist yet, from the search page: the
- * two endpoints, their rules and the one-a-minute throttle, held in a hook so
- * the page only draws it.
+ * Asking Mark for a page that does not exist yet, from the search page, held
+ * in a hook so the page only draws it. Builds start at /api/page-builds and
+ * show up in the page's lists while Mark works (onStarted).
  *
  * An account page is asked for by the company's website. A person page needs
- * the company and the person; the workflow behind it builds the account page
- * first when the company has none.
+ * the company and the person: a company that has a page already, or the
+ * website of one that doesn't, whose page Mark then builds first.
  */
 
-const CREATE_PAGE_ENDPOINT = '/api/opal-create-page';
-const CREATE_PERSON_PAGE_ENDPOINT = '/api/opal-create-person-page';
-const MAX_COMPANY_NAME_LEN = 120;
-
-/* Shared with /search, so the one-a-minute limit holds across both pages. */
-const COOLDOWN_MS = 60 * 1000;
-const COOLDOWN_KEY = 'opti.add-new.last-sent.v1';
+const BUILDS_ENDPOINT = '/api/page-builds';
 /* How long the "sent" line stays up: long enough to read a sentence. */
 const SENT_MS = 6000;
 
@@ -26,21 +21,8 @@ export type RequestKind = 'account' | 'person';
 /** Which field the search bar is asking for, or 'sent' once Mark has it. */
 export type RequestPhase = null | 'company' | 'person' | 'sent';
 
-function readLastSent(): number {
-  try {
-    return Number(window.localStorage.getItem(COOLDOWN_KEY)) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeLastSent(t: number): void {
-  try {
-    window.localStorage.setItem(COOLDOWN_KEY, String(t));
-  } catch {
-    /* ignore */
-  }
-}
+/** The company a person page hangs off: one with a page, or the website of one without. */
+export type CompanyRef = { route: string; name: string } | { website: string; name?: string };
 
 /** A send that failed because the session ended reads differently from one Mark didn't answer. */
 function sendErrorMessage(err: unknown): string {
@@ -49,25 +31,32 @@ function sendErrorMessage(err: unknown): string {
     : "Couldn't reach Mark. Try again.";
 }
 
-export function usePageRequest() {
+const linkTo = (route: string) => (
+  <a href={`/${route}`} target="_blank" rel="noopener noreferrer">
+    showcase.optimizely.com/{route}
+  </a>
+);
+
+export function usePageRequest({
+  findCompany,
+  onStarted,
+}: {
+  /** A company the index has a page for, by name or website. */
+  findCompany: (text: string) => { route: string; name: string } | null;
+  onStarted: (builds: BuildSummary[]) => void;
+}) {
   const [phase, setPhase] = useState<RequestPhase>(null);
   const [kind, setKind] = useState<RequestKind>('account');
   const [company, setCompany] = useState('');
   const [person, setPerson] = useState('');
+  /* What was typed in search when the request began: a name, the page's address. */
+  const [askedFor, setAskedFor] = useState('');
+  const [companyRef, setCompanyRef] = useState<CompanyRef | null>(null);
+  /* A company typed by name that has no page: the website comes next, the name names the page. */
+  const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sentNote, setSentNote] = useState<ReactNode>(null);
-  const [lastSent, setLastSent] = useState(readLastSent);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  const cooldownRemaining = Math.max(0, Math.ceil((lastSent + COOLDOWN_MS - nowMs) / 1000));
-  const inCooldown = cooldownRemaining > 0;
-
-  useEffect(() => {
-    if (!inCooldown) return;
-    const id = window.setInterval(() => setNowMs(Date.now()), 500);
-    return () => window.clearInterval(id);
-  }, [inCooldown]);
 
   useEffect(() => {
     if (phase !== 'sent') return;
@@ -79,19 +68,18 @@ export function usePageRequest() {
   }, [phase]);
 
   /** Account pages start from the website; a person page from the company, then the name. */
-  const start = useCallback(
-    (nextKind: RequestKind, query: string) => {
-      if (inCooldown) return;
-      const q = query.trim();
-      setKind(nextKind);
-      setCompany(nextKind === 'account' ? q : '');
-      setPerson(nextKind === 'person' ? q : '');
-      setError(null);
-      setSubmitting(false);
-      setPhase('company');
-    },
-    [inCooldown],
-  );
+  const start = useCallback((nextKind: RequestKind, query: string) => {
+    const q = query.trim();
+    setKind(nextKind);
+    setAskedFor(q);
+    setCompany(nextKind === 'account' ? q : '');
+    setPerson(nextKind === 'person' ? q : '');
+    setCompanyRef(null);
+    setCompanyName('');
+    setError(null);
+    setSubmitting(false);
+    setPhase('company');
+  }, []);
 
   const cancel = useCallback(() => {
     if (submitting) return;
@@ -99,76 +87,80 @@ export function usePageRequest() {
     setError(null);
   }, [submitting]);
 
-  const markSent = (note: ReactNode) => {
-    const t = Date.now();
-    setLastSent(t);
-    setNowMs(t);
-    writeLastSent(t);
-    setSentNote(note);
-    setPhase('sent');
-  };
-
-  const submit = useCallback(async () => {
-    if (phase === 'company') {
-      const name = company.trim();
-      if (!name) return setError(kind === 'person' ? 'Enter the company they work at' : 'Enter a company website');
-      if (name.length > MAX_COMPANY_NAME_LEN) return setError(`Keep it under ${MAX_COMPANY_NAME_LEN} characters`);
-      // An account page is found by the company's website, exactly — never by name.
-      if (kind === 'account' && !looksLikeWebsite(name)) {
-        return setError("Enter the company's website, e.g. anaplan.com");
-      }
-      if (kind === 'person') {
-        setError(null);
-        setPhase('person');
-        return;
-      }
+  const send = useCallback(
+    async (body: Record<string, unknown>, note: (builds: { build: BuildSummary; company?: BuildSummary }) => ReactNode) => {
       setSubmitting(true);
       setError(null);
       try {
-        const r = await fetch(CREATE_PAGE_ENDPOINT, {
+        const r = await fetch(BUILDS_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ company_name: name }),
+          body: JSON.stringify(body),
         });
         if (r.status === 401) throw new Error('signed-out');
         // Asked for minutes ago and still being built: say so instead of starting a second build.
         if (r.status === 409) {
-          const body = (await r.json().catch(() => null)) as { message?: string } | null;
-          setSentNote(body?.message || 'This page was asked for a few minutes ago and is still being built.');
+          const answer = (await r.json().catch(() => null)) as { message?: string } | null;
+          setSentNote(answer?.message || 'This page was asked for a few minutes ago and is still being built.');
           setPhase('sent');
           return;
         }
         if (!r.ok) throw new Error(`${r.status}`);
-        markSent(<>Sent to Mark. <b>{name}</b> takes about 15 minutes; we'll ping you on Teams when it's live.</>);
+        const started = (await r.json()) as { build: BuildSummary; company?: BuildSummary };
+        onStarted([started.company, started.build].filter((b): b is BuildSummary => !!b));
+        setSentNote(note(started));
+        setPhase('sent');
       } catch (err) {
         setError(sendErrorMessage(err));
       } finally {
         setSubmitting(false);
       }
+    },
+    [onStarted],
+  );
+
+  const submit = useCallback(async () => {
+    if (phase === 'company') {
+      const text = company.trim();
+      if (kind === 'account') {
+        if (!text) return setError('Enter the company website');
+        // An account page is found by the company's website, exactly — never by name.
+        if (!looksLikeWebsite(text)) return setError("Enter the company's website, e.g. anaplan.com");
+        return send({ kind: 'account', website: text, name: looksLikeWebsite(askedFor) ? undefined : askedFor }, ({ build }) => (
+          <>
+            Mark is building <b>{build.name}</b>. Follow along at {linkTo(build.route)}.
+          </>
+        ));
+      }
+      if (!text) return setError('Enter the company they work at');
+      const known = findCompany(text);
+      if (known) setCompanyRef(known);
+      else if (looksLikeWebsite(text)) setCompanyRef({ website: text, ...(companyName ? { name: companyName } : {}) });
+      else {
+        setCompanyName(text);
+        return setError(`No page for ${text} yet: enter its website, e.g. anaplan.com`);
+      }
+      setError(null);
+      setPhase('person');
       return;
     }
 
-    if (phase === 'person') {
+    if (phase === 'person' && companyRef) {
       const who = person.trim();
       if (!who) return setError("Enter the person's name");
-      setSubmitting(true);
-      setError(null);
-      try {
-        const r = await fetch(CREATE_PERSON_PAGE_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ company_name: company.trim(), person_name: who }),
-        });
-        if (r.status === 401) throw new Error('signed-out');
-        if (!r.ok) throw new Error(`${r.status}`);
-        markSent(<>Sent to Mark. We'll ping you on Teams when <b>{who}</b>'s page is ready.</>);
-      } catch (err) {
-        setError(sendErrorMessage(err));
-      } finally {
-        setSubmitting(false);
-      }
+      return send({ kind: 'person', personName: who, company: companyRef }, ({ build, company: first }) =>
+        first ? (
+          <>
+            Mark builds <b>{first.name}</b>'s page first, then <b>{build.name}</b>'s at {linkTo(build.route)}.
+          </>
+        ) : (
+          <>
+            Mark is building <b>{build.name}</b>'s page. Follow along at {linkTo(build.route)}.
+          </>
+        ),
+      );
     }
-  }, [phase, kind, company, person]);
+  }, [phase, kind, company, person, askedFor, companyRef, companyName, findCompany, send]);
 
   /** What the bar's field edits in the current phase. */
   const value = phase === 'person' ? person : company;
@@ -181,11 +173,12 @@ export function usePageRequest() {
     [phase],
   );
 
+  const companyLabel = companyRef ? ('route' in companyRef ? companyRef.name : companyRef.website) : '';
   const placeholder =
     phase === 'person'
-      ? `Who at ${company.trim() || 'this company'}?`
+      ? `Who at ${companyLabel || 'this company'}?`
       : kind === 'person'
-        ? 'Company they work at'
+        ? 'Company they work at, or its website'
         : 'Company website, e.g. anaplan.com';
 
   return {
@@ -197,8 +190,8 @@ export function usePageRequest() {
     error,
     submitting,
     sentNote,
-    inCooldown,
-    cooldownRemaining,
+    /** Person requests: the company will need its page built first. */
+    companyIsNew: !!companyRef && !('route' in companyRef),
     start,
     cancel,
     submit,

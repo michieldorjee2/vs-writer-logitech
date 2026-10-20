@@ -195,6 +195,58 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
 }
 
 /**
+ * Dev-only: the page-build and offer routes run their own files (api/page-builds/*,
+ * api/offers/*), loaded through Vite, with the request and response shape @vercel/node gives them. No
+ * second copy of their logic lives here; they read .env.local like the rest of dev.
+ */
+function pageBuildsDev(env: Record<string, string>): Plugin {
+  return {
+    name: 'page-builds-dev',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = new URL(req.url || '', 'http://localhost')
+        // The functions this serves, as Vercel routes them: [pattern, file, the path segment that is `id`].
+        const routes: Array<[RegExp, string]> = [
+          [/^\/api\/page-builds$/, '/api/page-builds/index.ts'],
+          [/^\/api\/page-builds\/([^/]+)$/, '/api/page-builds/[id].ts'],
+          [/^\/api\/offers$/, '/api/offers/index.ts'],
+          [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
+        ]
+        let file: string | null = null
+        let id: string | null = null
+        for (const [pattern, path] of routes) {
+          const m = pattern.exec(url.pathname)
+          if (m) {
+            file = path
+            id = m[1] ? decodeURIComponent(m[1]) : null
+            break
+          }
+        }
+        if (!file) return next()
+        for (const [k, v] of Object.entries(env)) if (!(k in process.env)) process.env[k] = v
+        try {
+          const mod = await server.ssrLoadModule(file)
+          const vreq = Object.assign(req, {
+            query: { ...Object.fromEntries(url.searchParams), ...(id ? { id } : {}) },
+            cookies: Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter((p) => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))])),
+            body: req.method === 'POST' ? await readJsonBody(req) : undefined,
+          })
+          const vres = Object.assign(res, {
+            status(code: number) { res.statusCode = code; return vres },
+            json(body: unknown) { if (!res.getHeader('Content-Type')) res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); return vres },
+            send(body: unknown) { res.end(typeof body === 'string' ? body : JSON.stringify(body)); return vres },
+          })
+          await mod.default(vreq, vres)
+        } catch (err) {
+          console.error('[page-builds-dev]', err)
+          if (!res.writableEnded) jsonResponse(res, 500, { error: String(err) })
+        }
+      })
+    },
+  }
+}
+
+/**
  * Dev-only: /search is home.html, its own document, as it is in production
  * (server/ssr-handler.tsx renders it there, and sends /home to it). Without
  * this the SPA fallback would hand both to index.html.
@@ -526,6 +578,7 @@ export default defineConfig(({ mode }) => {
       opalFeedbackDevProxy(devEmail),
       opalCreatePageDevProxy(devEmail),
       homeEntryDev(),
+      pageBuildsDev(env),
     ],
     resolve: {
       alias: {
@@ -568,6 +621,8 @@ export default defineConfig(({ mode }) => {
         input: {
           main: path.resolve(__dirname, 'index.html'),
           home: path.resolve(__dirname, 'home.html'),
+          // A page's address while Mark builds it (BuildView.tsx).
+          build: path.resolve(__dirname, 'build.html'),
         },
         output: {
           /*
