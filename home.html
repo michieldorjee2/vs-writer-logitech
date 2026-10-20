@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- The search page's own document (/search): the server renders the page into #root (server/ssr-handler.tsx),
+         so the scene and headline paint before any script runs. Nothing third-party loads here. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f9fcf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#252825" media="(prefers-color-scheme: dark)" />
+    <title>Optimizely Showcase</title>
+    <meta name="description" content="Optimizely Showcase — find an account page, or ask Mark to build one." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Showcase" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/vc-nudge/NudgeSemiNormal-SemiNormalExtraBold.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/die-grotesk/die-grotesk-b-regular.woff2" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/home-main.tsx"></script>
+  </body>
+</html>

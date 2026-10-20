@@ -203,16 +203,14 @@ const ROUTES = [
     {
         name: 'search',
         url: '/search',
-        ready: '.search-page',
-        template: 'SearchPage',
-        note: 'Booth search. Content comes from /api/search-index, which the dev proxy does serve.',
+        ready: '.sh',
+        template: 'SearchHome',
+        note: 'Search page (home.html). Content comes from /api/home-index, which the dev proxy does serve.',
         nondeterministic: [
-            '.search-page__orb (animated gradient)',
-            'SearchPage.tsx seeds state from Date.now() and re-ticks it every 500ms, ' +
-                'so time-derived copy differs between runs. Measured: two captures of ' +
-                'the same commit differed by 13% (desktop) and 30% (mobile) in PNG ' +
-                'bytes, against 0% for finserv and use-case-preview. Compare this ' +
-                'route by eye, not by byte count.',
+            '.sh-scene__img (one of three photographs, picked per load)',
+            'The cut-out rises in and the company count counts up over ~1.6s, ' +
+                'so a capture depends on when it is taken. Compare this route by eye, ' +
+                'not by byte count.',
         ],
         noiseFloorPct: 30,
     },

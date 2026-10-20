@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { SIGN_OUT_ACTION, type Identity } from '../lib/auth';
 import { gravatarUrl } from '../lib/gravatar';
+import { clearOfflineCopies } from '../lib/home-offline';
 
 function initialsOf(identity: Identity): string {
   const source = identity.name?.trim() || identity.email.split('@')[0].replace(/[._-]+/g, ' ');
@@ -35,8 +36,16 @@ function Avatar({ identity, size }: { identity: Identity; size: number }) {
   );
 }
 
+/** "Michiel" from "Michiel Dorjee", or from michiel.dorjee@… when Opti ID gave no name. */
+function firstNameOf(identity: Identity): string {
+  const source = identity.name?.trim() || identity.email.split('@')[0].replace(/[._-]+/g, ' ');
+  const first = source.split(/\s+/).filter(Boolean)[0] || source;
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
 /**
- * The search page's corner: who is signed in, and the way out.
+ * The search page's corner: "Hi, Michiel", which opens who is signed in and
+ * the way out.
  *
  * Log out is a form POST (a GET that signs you out is a link anyone can make
  * you follow), and it lands on /login — /search would sign the person straight
@@ -73,15 +82,19 @@ export default function ProfileMenu({ identity }: { identity: Identity }) {
       <button
         ref={buttonRef}
         type="button"
-        className="search-page__avatar"
+        className="search-page__greeting"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={`Signed in as ${identity.name || identity.email}`}
+        // The name starts with what it shows, so voice control can say it.
+        aria-label={`Hi, ${firstNameOf(identity)}: account menu`}
         title={identity.email}
         onClick={() => setOpen((v) => !v)}
       >
-        <Avatar identity={identity} size={40} />
+        Hi, {firstNameOf(identity)}
+        <svg width="7" height="6" viewBox="0 0 7 5.33" aria-hidden="true">
+          <path fill="currentColor" d="M.2 1.6C-.29.94.18 0 1 0h5c.82 0 1.29.94.8 1.6L4.3 4.93a1 1 0 0 1-1.6 0z" />
+        </svg>
       </button>
       {open && (
         <div className="search-page__profile-menu" id={menuId} role="menu" aria-label="Account">
@@ -94,7 +107,16 @@ export default function ProfileMenu({ identity }: { identity: Identity }) {
               <span>{identity.email}</span>
             </span>
           </div>
-          <form method="post" action={SIGN_OUT_ACTION}>
+          <form
+            method="post"
+            action={SIGN_OUT_ACTION}
+            onSubmit={(e) => {
+              // The search page's offline copy holds this person's accounts: it goes before the session does.
+              e.preventDefault();
+              const form = e.currentTarget;
+              void clearOfflineCopies().finally(() => form.submit());
+            }}
+          >
             <button type="submit" role="menuitem" className="search-page__profile-item" autoFocus>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

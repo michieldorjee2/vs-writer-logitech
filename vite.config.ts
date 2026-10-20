@@ -15,6 +15,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
  */
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries'
 import { graphItems, type GraphResponse } from './src/lib/graph-envelope'
+import { homeIndexFor, loadHomeIndex } from './src/lib/home-index'
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2'
 
@@ -194,6 +195,24 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
 }
 
 /**
+ * Dev-only: /search is home.html, its own document, as it is in production
+ * (server/ssr-handler.tsx renders it there, and sends /home to it). Without
+ * this the SPA fallback would hand both to index.html.
+ */
+function homeEntryDev(): Plugin {
+  return {
+    name: 'home-entry-dev',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const url = new URL(req.url || '', 'http://localhost')
+        if (/^\/(search|home)\/?$/.test(url.pathname)) req.url = `/home.html${url.search}`
+        next()
+      })
+    },
+  }
+}
+
+/**
  * Dev-only stand-in for sign-in. The dev server has no Opti ID round trip
  * (api/_lib/auth.ts runs only as Vercel functions), so DEV_AUTH_EMAIL in
  * .env.local plays the signed-in person — the same variable the functions
@@ -323,7 +342,7 @@ function opalCreatePageDevProxy(devEmail: string | null): Plugin {
  * Vite plugin that proxies /api/content and /api/preview during dev.
  * Auth keys stay server-side — never shipped to the browser.
  */
-function graphDevProxy(authKey: string, singleKey: string): Plugin {
+function graphDevProxy(authKey: string, singleKey: string, devEmail: string | null): Plugin {
   return {
     name: 'graph-dev-proxy',
     configureServer(server) {
@@ -414,6 +433,20 @@ function graphDevProxy(authKey: string, singleKey: string): Plugin {
           return
         }
 
+        // Mirrors api/home-index.ts, with DEV_AUTH_EMAIL as the signed-in person.
+        if (url.pathname === '/api/home-index') {
+          if (!devEmail) return jsonResponse(res, 401, { error: 'signed_out' })
+          try {
+            const source = await loadHomeIndex((query, variables) => fetchGraph(authKey, query, variables))
+            res.setHeader('Cache-Control', 'no-store')
+            jsonResponse(res, 200, homeIndexFor(source, devEmail))
+          } catch (err) {
+            console.error('[graph-dev-proxy]', err)
+            jsonResponse(res, 500, { error: 'Graph fetch failed' })
+          }
+          return
+        }
+
         if (url.pathname === '/api/edit-status') {
           const key = url.searchParams.get('key')
           const since = url.searchParams.get('since')
@@ -488,10 +521,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       stripHtmlComments(),
-      ...(authKey ? [graphDevProxy(authKey, singleKey)] : []),
+      ...(authKey ? [graphDevProxy(authKey, singleKey, devEmail)] : []),
       devAuthProxy(devEmail),
       opalFeedbackDevProxy(devEmail),
       opalCreatePageDevProxy(devEmail),
+      homeEntryDev(),
     ],
     resolve: {
       alias: {
@@ -530,11 +564,25 @@ export default defineConfig(({ mode }) => {
           ),
       },
       rollupOptions: {
+        // The search page is its own document (home.html): no router, no Tailwind, no third-party tags.
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          home: path.resolve(__dirname, 'home.html'),
+        },
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-motion': ['framer-motion'],
-            'vendor-utils': ['react-use', 'react-use-measure'],
+          /*
+           * By module path, not by package entry. The object form ({ 'vendor-react': ['react', …] })
+           * left react/jsx-runtime to whichever chunk imported it first — framer-motion's — so every
+           * page, the search page included, loaded vendor-motion to render JSX at all, and react-dom's
+           * client fell into a shared chunk. The router has its own chunk: the search page does not route.
+           */
+          manualChunks(id) {
+            if (!id.includes('/node_modules/')) return undefined
+            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+            if (/\/node_modules\/(react-router|react-router-dom|@remix-run\/router)\//.test(id)) return 'vendor-router'
+            if (/\/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'vendor-motion'
+            if (/\/node_modules\/(react-use|react-use-measure)\//.test(id)) return 'vendor-utils'
+            return undefined
           },
         },
       },

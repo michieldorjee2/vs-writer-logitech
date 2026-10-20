@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, useParams, useSearchParams } from 'react-
 import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
-import SearchPage from './components/SearchPage';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 import { includes, resolveComponentPlan } from './lib/limitless/component-plan';
 import type {
@@ -285,7 +284,6 @@ function App() {
             <main>
                 <Routes>
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/search" element={<SearchPage />} />
                     <Route path="/preview" element={<PreviewLoader />} />
                     {/* Limitless ladder preview — added ahead of the catch-all so it
                         intercepts only its own prefix; PageLoader's shape-sniffed

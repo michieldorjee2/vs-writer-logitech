@@ -23,6 +23,20 @@ try {
   console.warn('⚠ dist/index.html not found, using fallback shell');
 }
 
+// The search page's own document (home.html, served at /search), rendered into by the same handler.
+// Its one stylesheet (~3.5 kB compressed) goes inline: the first paint then waits on
+// no request but the document, which is most of what a phone on a slow network sees.
+let homeTemplate;
+try {
+  homeTemplate = readFileSync('dist/home.html', 'utf-8').replace(
+    /<link rel="stylesheet"[^>]*href="(\/assets\/home-[^"]+\.css)"[^>]*>/,
+    (_tag, href) => `<style>${readFileSync(path.join('dist', href), 'utf-8')}</style>`,
+  );
+} catch {
+  homeTemplate = htmlTemplate;
+  console.warn('⚠ dist/home.html not found, /search falls back to the main shell');
+}
+
 await esbuild.build({
   entryPoints: ['server/ssr-handler.tsx'],
   outfile: 'api/_ssr-bundle.mjs',
@@ -33,6 +47,10 @@ await esbuild.build({
 
   // Only Vercel runtime type is external — everything else bundled.
   external: ['@vercel/node'],
+
+  // Stylesheets a server-rendered component imports (SearchHome's) are the browser
+  // build's business; on the server they are nothing, so no stray CSS bundle is written.
+  loader: { '.css': 'empty' },
 
   // Replace browser-only hooks with SSR-safe stubs.
   // These hooks use browser APIs (window, rAF, mouse events) that don't
@@ -61,6 +79,7 @@ await esbuild.build({
   // Avoids needing fs.readFileSync + includeFiles at runtime.
   define: {
     '__HTML_TEMPLATE__': JSON.stringify(htmlTemplate),
+    '__HOME_TEMPLATE__': JSON.stringify(homeTemplate),
   },
 
   // Source maps for Vercel runtime error traces

@@ -32,6 +32,8 @@ import type {
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries';
 import { authEnabled, currentIdentity, safeNext, signInPath } from '../api/_lib/auth';
 import { renderLoginPage } from './login-page';
+import SearchHome from '../src/components/SearchHome';
+import { randomScene } from '../src/lib/home-scenes';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -936,6 +938,9 @@ function buildExperienceHeadHtml(item: ExperienceItem): string {
 
 declare const __HTML_TEMPLATE__: string;
 const htmlTemplate: string = __HTML_TEMPLATE__;
+/** The search page's own document (home.html): no router, no Tailwind, no third-party tags. */
+declare const __HOME_TEMPLATE__: string;
+const homeTemplate: string = __HOME_TEMPLATE__;
 
 // ---------------------------------------------------------------------------
 // Vercel handler
@@ -1011,11 +1016,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send(renderLoginPage({ reason, signInHref: signInPath(next) }));
   }
 
-  // /search — SPA shell with explicit meta for social cards / search engines.
+  // /home was the new search page's preview address; it is /search now.
+  if (slug === 'home') {
+    res.setHeader('Location', `/search${url.search}`);
+    return res.status(308).end();
+  }
+
+  // /search — the search page (SearchHome), its own document (home.html), drawn here.
   // Signed-in Optimizely people only: it is the index of every account page.
   if (slug === 'search') {
-    // Per person from here on, so never in the shared edge cache.
-    if (authEnabled()) res.setHeader('Cache-Control', 'private, no-store');
+    // Per person from here on, so never in the shared edge cache. The document itself carries
+    // nobody's data (the page fetches it), so the browser may keep it for back/forward.
+    if (authEnabled()) res.setHeader('Cache-Control', 'private, no-cache');
     if (authEnabled() && !currentIdentity(req, res)) {
       res.setHeader('Location', signInPath(`${url.pathname}${url.search}`));
       return res.status(302).end();
@@ -1024,7 +1036,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const title = 'Optimizely Showcase — Every brand deserves its own story';
     const description =
       'Search 1,000+ AI-generated brand experiences. Mark builds 1:1 landing pages for every company you pitch, grounded in Optimizely Graph.';
-    const canonical = `${SITE_URL}/search`;
+    const canonical = `${SITE_URL}/${slug}`;
     const headHtml = [
       `<title>${escapeHtml(title)}</title>`,
       `<meta name="description" content="${escapeHtml(description)}" />`,
@@ -1041,11 +1053,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Strip fallback title/description (and the leading whitespace they
     // occupy) then inject the /search-specific head just before </head>.
-    let html = template;
+    let html = homeTemplate;
     html = html.replace(/^\s*<title>[^<]*<\/title>\s*$/m, '');
     html = html.replace(/^\s*<meta name="description" content="[^"]*"\s*\/?>\s*$/m, '');
     html = html.replace(/\n{3,}/g, '\n\n');
     html = html.replace('</head>', `    ${headHtml}\n  </head>`);
+    // Drawn with a photograph picked per request, so it paints before any script runs;
+    // src/home-main.tsx reads the pick off #root and hydrates the same tree.
+    const scene = randomScene();
+    const body = renderToString(<SearchHome scene={scene} />);
+    html = html.replace('<div id="root"></div>', `<div id="root" data-scene="${scene.id}">${body}</div>`);
 
     res.setHeader('Content-Type', 'text/html');
     if (!authEnabled()) res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
