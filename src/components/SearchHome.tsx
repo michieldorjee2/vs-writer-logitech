@@ -220,10 +220,6 @@ export default function SearchHome({ scene }: { scene: Scene }) {
         /* Offline, or Graph hiccuped: keep what we have; the next refresh retries. */
       }
     }
-    // Last visit's lists first, so they are there at once; the network's answer replaces them.
-    readKeptIndex<HomeIndexBody>().then((kept) => {
-      if (kept && !cancelled) setIndex((current) => current ?? kept);
-    });
     load();
     const id = window.setInterval(load, 5 * 60 * 1000);
     return () => {
@@ -231,6 +227,21 @@ export default function SearchHome({ scene }: { scene: Scene }) {
       window.clearInterval(id);
     };
   }, []);
+
+  /* Last visit's lists, so they are there at once while the network answers; only once
+     it is clear they were this person's (a shared browser can change hands between
+     sessions). /api/auth/me answers from the offline copy too, so this works offline. */
+  const viewer = identity?.email.trim().toLowerCase() ?? null;
+  useEffect(() => {
+    if (!viewer) return;
+    let cancelled = false;
+    readKeptIndex<HomeIndexBody>().then((kept) => {
+      if (!cancelled && kept?.viewer === viewer) setIndex((current) => current ?? kept);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewer]);
 
   const { companies, bySlug, mine, people, peopleBySlug } = useMemo(() => {
     const all = (index?.companies ?? []).map(toEntry).filter((e) => e.slug);

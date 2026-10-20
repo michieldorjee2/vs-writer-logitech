@@ -11,22 +11,27 @@ export type Identity = { email: string; name: string | null };
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signed-in'; identity: Identity }
-  | { status: 'signed-out' };
+  | { status: 'signed-out' }
+  /** /api/auth/me could not answer (offline, or the server failed): not a sign-out, so no
+   *  page sends the person back through Opti ID for it. */
+  | { status: 'unreachable' };
 
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   useEffect(() => {
     let cancelled = false;
     fetch('/api/auth/me', { cache: 'no-store', credentials: 'same-origin' })
-      .then(async (r) => {
-        if (!r.ok) return null;
+      .then(async (r): Promise<AuthState> => {
+        if (r.status === 401) return { status: 'signed-out' };
+        if (!r.ok) return { status: 'unreachable' };
         const body = (await r.json()) as Partial<Identity>;
-        return typeof body.email === 'string' && body.email ? { email: body.email, name: body.name ?? null } : null;
+        return typeof body.email === 'string' && body.email
+          ? { status: 'signed-in', identity: { email: body.email, name: body.name ?? null } }
+          : { status: 'signed-out' };
       })
-      .catch(() => null)
-      .then((identity) => {
-        if (cancelled) return;
-        setState(identity ? { status: 'signed-in', identity } : { status: 'signed-out' });
+      .catch((): AuthState => ({ status: 'unreachable' }))
+      .then((next) => {
+        if (!cancelled) setState(next);
       });
     return () => {
       cancelled = true;

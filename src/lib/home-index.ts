@@ -96,6 +96,8 @@ export type HomeIndexBody = {
   people: PersonItem[];
   /** `_metadata.url.hierarchical` of the account pages that list this person on the team. */
   mine: string[];
+  /** Whose answer this is (lowercased email). A copy kept for offline is only shown to them. */
+  viewer: string;
 };
 
 export type RunGraph = (query: string, variables: Record<string, unknown>) => Promise<GraphResponse>;
@@ -130,5 +132,5 @@ export function homeIndexFor(source: HomeIndexSource, email: string): HomeIndexB
     }
     return item;
   });
-  return { companies, total: source.total, people: source.people, mine: mine.filter(Boolean) };
+  return { companies, total: source.total, people: source.people, mine: mine.filter(Boolean), viewer: me };
 }
