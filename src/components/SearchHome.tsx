@@ -1197,15 +1197,21 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
                     if (row.kind === 'offer') {
                       const { page } = row;
                       const logo = page.logoUrl ?? companies.find((e) => e.name === page.companyName)?.logoUrl ?? null;
+                      // The offer's own list is names only; among search results it carries the domain, as companies do.
+                      const meta = view === 'search' ? page.domain : null;
                       return (
-                        <button key={row.key} {...common} className={'sh-row sh-row--offer' + (active ? ' is-active' : '')}>
+                        <button
+                          key={row.key}
+                          {...common}
+                          className={'sh-row sh-row--offer' + (meta ? '' : ' sh-row--plain') + (active ? ' is-active' : '')}
+                        >
                           <Tile sources={[logo]} label={initialsOf(page.companyName)} />
                           <span className="sh-row__text">
                             <span className="sh-row__name">
                               {view === 'search' ? highlight(page.companyName, query) : page.companyName}
                               {view === 'search' && <span className="sh-badge">Offer</span>}
                             </span>
-                            <span className="sh-row__meta">{page.domain || `/${page.route}`}</span>
+                            {meta && <span className="sh-row__meta">{meta}</span>}
                           </span>
                         </button>
                       );
