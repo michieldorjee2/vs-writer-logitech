@@ -15,7 +15,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!aldusConfigured()) return res.status(200).json({ offers: [] });
   try {
-    return res.status(200).json({ offers: await listRunning(req.query.fresh === '1') });
+    const offers = await listRunning(req.query.fresh === '1');
+    console.log(`[offers] ${offers.length} running, ${offers.filter((o) => o.look).length} with a look`);
+    return res.status(200).json({ offers });
   } catch (err) {
     console.error('[offers] list', err);
     return res.status(502).json({ error: 'Could not read the running offers' });

@@ -18,9 +18,11 @@ import {
   type AgentLook,
   type LookJob,
   type LookJobStatus,
+  type LookStep,
+  type LookTool,
   type ShowcaseLook,
 } from '../../src/lib/offer-looks.js';
-import { eventsFrom, toolLabel, type MarkChunk } from '../../src/lib/page-builds.js';
+import { toolLabel, type MarkChunk } from '../../src/lib/page-builds.js';
 import { saveLook, type AldusOffer } from './aldus.js';
 import { getAgentExecution, getMemoryChunks, isMarkFile, LOOK_AGENT_ID, markFileHeaders, startAgent, type MarkAgentExecution } from './mark.js';
 import type { BuildStore } from './page-builds-store.js';
@@ -133,7 +135,7 @@ export async function refreshJob(store: BuildStore, job: JobRecord, offer: Aldus
   return { job, execution };
 }
 
-/** What the browser draws: the job, Mark's narration and tool calls so far, one line and a ring. */
+/** What the browser draws: the job, its steps so far in Mark's own short words, one line and a bar. */
 export async function jobView(job: JobRecord, execution: MarkAgentExecution | null): Promise<LookJob> {
   let chunks: MarkChunk[] = [];
   const memoryId = execution?.memory_id;
@@ -141,23 +143,13 @@ export async function jobView(job: JobRecord, execution: MarkAgentExecution | nu
     const settled = job.status !== 'making';
     chunks = await cached(`lookmem:${memoryId}`, () => getMemoryChunks(memoryId), settled ? 600_000 : 3000).catch(() => []);
   }
-  const events = eventsFrom(chunks).map((e) => (e.kind === 'tool' && e.tool ? { ...e, text: lookToolLabel(e.tool, chunks, e.seq) } : e));
+  const steps = lookSteps(chunks);
+  if (job.status === 'cutting' || job.status === 'done') steps.push({ id: 'cut', text: 'Cutting the photo', tool: 'cut' });
   const elapsed = Date.now() - job.startedAt;
   const progress =
     job.status === 'done' ? 1 : job.status === 'cutting' ? 0.92 : job.status === 'failed' ? 0 : Math.min(0.85, 0.04 + (elapsed / TYPICAL_MS) * 0.8);
-  const last = [...events].reverse().find((e) => e.kind === 'tool' || e.kind === 'text');
   const statusLine =
-    job.status === 'done'
-      ? 'Ready'
-      : job.status === 'failed'
-        ? job.error || 'Mark could not make the look'
-        : job.status === 'cutting'
-          ? 'Cutting the photograph into sizes…'
-          : last
-            ? last.kind === 'tool'
-              ? `${last.text}…`
-              : last.text.split(/(?<=[.!?])\s/)[0].slice(0, 120)
-            : 'Starting…';
+    job.status === 'done' ? 'Ready' : job.status === 'failed' ? job.error || 'Mark could not make the look' : (steps.at(-1)?.text ?? 'Starting');
   return {
     offerId: job.offerId,
     status: job.status,
@@ -165,27 +157,82 @@ export async function jobView(job: JobRecord, execution: MarkAgentExecution | nu
     finishedAt: job.finishedAt,
     statusLine,
     progress,
-    events: events.slice(-40),
+    steps: steps.slice(-12),
     look: job.look ?? null,
     error: job.error,
   };
 }
 
-/** The look agent's own tools, in words; the rest as the page builds say them. */
-function lookToolLabel(tool: string, chunks: MarkChunk[], seq: string): string {
-  const chunk = chunks.find((c) => c.id === seq);
-  const input = ((chunk?.content as { input?: Record<string, unknown> } | undefined)?.input ?? {}) as Record<string, unknown>;
-  switch (tool) {
+const STATUS_WORDS = 5;
+
+/**
+ * The card's lines, in the order Mark wrote them (timestamps tie within one
+ * turn, so they are not sorted): its status before a tool call ("Finding
+ * photos"), with that tool's icon, or the tool's own words when it wrote none
+ * or wrote a sentence. Thinking and the final answer are left out.
+ */
+export function lookSteps(chunks: MarkChunk[]): LookStep[] {
+  const steps: LookStep[] = [];
+  let open: LookStep | null = null; // Mark's last status, waiting for the tool it announced
+  for (const c of chunks) {
+    const content = (c.content ?? {}) as Record<string, unknown>;
+    if (c.type === 'text' && typeof content.text === 'string') {
+      const text = content.text.trim().replace(/[.!…:]+$/, '');
+      open = null;
+      if (!text || text.startsWith('{') || text.split(/\s+/).length > STATUS_WORDS) continue;
+      open = { id: c.id, text };
+      steps.push(open);
+    } else if (c.type === 'tool_use' && typeof content.name === 'string') {
+      const input = (content.input ?? {}) as Record<string, unknown>;
+      const tool = toolOf(content.name, input);
+      if (open && !open.tool) {
+        open.tool = tool;
+        continue;
+      }
+      const words = toolWords(content.name, input);
+      // Searches run side by side read as one line, not two the same.
+      const last = steps.at(-1);
+      if (last && last.text === words && last.tool === tool) continue;
+      steps.push({ id: c.id, text: words, tool });
+    }
+  }
+  return steps;
+}
+
+function toolOf(name: string, input: Record<string, unknown>): LookTool | undefined {
+  switch (name) {
     case 'search_web':
-      return input.result_type === 'images' ? `Looking for photos: “${String(input.search_query ?? '').slice(0, 60)}”` : toolLabel(tool, input);
+      return input.result_type === 'images' ? 'photos' : 'search';
+    case 'browse_web':
+      return 'browse';
     case 'tracelab_vectorize':
-      return 'Tracing the logo into a vector';
     case 'tracelab_get_svg':
-      return 'Reading the traced logo';
+      return 'trace';
     case 'generate_or_edit_image':
-      return 'Generating a photograph';
+      return 'generate';
     default:
-      return toolLabel(tool, input);
+      return undefined;
+  }
+}
+
+/** Two or three words for a tool call. */
+function toolWords(name: string, input: Record<string, unknown>): string {
+  switch (name) {
+    case 'search_web':
+      return input.result_type === 'images' ? 'Finding photos' : 'Searching the web';
+    case 'browse_web': {
+      const first = Array.isArray(input.urls) ? input.urls[0] : null;
+      const url = typeof first === 'string' ? first : (first as { url?: unknown } | null)?.url;
+      return typeof url === 'string' ? `Reading ${hostOf(url).replace(/^www\./, '')}` : 'Reading a page';
+    }
+    case 'tracelab_vectorize':
+      return 'Tracing the logo';
+    case 'tracelab_get_svg':
+      return 'Reading the logo';
+    case 'generate_or_edit_image':
+      return 'Generating a photo';
+    default:
+      return toolLabel(name, input);
   }
 }
 
