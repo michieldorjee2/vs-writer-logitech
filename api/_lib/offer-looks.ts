@@ -266,6 +266,24 @@ async function download(url: string, accept: string): Promise<{ bytes: Buffer; t
 }
 
 /**
+ * Unsplash draws a photo at whatever size it is asked for, and its search
+ * results link to small, low-quality ones: ask for the ladder's widest cut.
+ */
+export function photoAtSize(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== 'images.unsplash.com') return url;
+    u.searchParams.delete('h');
+    u.searchParams.set('w', String(LOOK_LADDER.wide.avif.at(-1)));
+    u.searchParams.set('q', '85');
+    u.searchParams.set('fm', 'jpg');
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
  * The first of Mark's photographs that is big enough and landscape, cut into
  * LOOK_LADDER's sizes (the whole frame, and a 3:4 slice from its middle) and
  * kept in Blob under looks/<offer>/<hash of the photo>/.
@@ -275,7 +293,7 @@ async function cutBackground(offerId: string, photos: AgentLook['photos']): Prom
   const tried: string[] = [];
   for (const photo of photos) {
     try {
-      const { bytes, type } = await download(photo.url, 'image/avif,image/webp,image/jpeg,image/png,image/*');
+      const { bytes, type } = await download(photoAtSize(photo.url), 'image/avif,image/webp,image/jpeg,image/png,image/*');
       if (type && !type.startsWith('image/')) throw new Error(`not an image (${type})`);
       // Upright, sRGB and 8-bit once, so every cut starts from the same pixels.
       const { data: upright, info } = await sharp(bytes, { failOn: 'none', limitInputPixels: 80_000_000 })
