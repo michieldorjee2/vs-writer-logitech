@@ -50,9 +50,14 @@ function untilOf(offer: RunningOffer): string {
   return Number.isNaN(end.getTime()) ? '' : `until ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
 }
 
+/** "1 page · until 5 Nov" */
+const metaOf = (offer: RunningOffer) => [`${offer.pages.length} ${offer.pages.length === 1 ? 'page' : 'pages'}`, untilOf(offer)].filter(Boolean).join(' · ');
+
 /**
  * The search page's corner: "Hi, Michiel", which opens who is signed in, the
- * running offers the page can be run as (one at a time), and the way out.
+ * running offers the page can be run as (one at a time: the active one on
+ * top, with "make the look again" and ✕ to go back to the usual page), and
+ * the way out.
  *
  * Log out is a form POST (a GET that signs you out is a link anyone can make
  * you follow), and it lands on /login — /search would sign the person straight
@@ -63,13 +68,18 @@ export default function ProfileMenu({
   offers = null,
   chosen = null,
   onChoose,
+  onRemake,
 }: {
   identity: Identity;
   /** Aldus UI's running offers; null until they are read, and none to list when there are none. */
   offers?: RunningOffer[] | null;
   chosen?: string | null;
   onChoose?: (offerId: string | null) => void;
+  /** Clear the active offer's look so Mark makes it again. */
+  onRemake?: (offerId: string) => void;
 }) {
+  const active = (chosen && offers?.find((o) => o.id === chosen)) || null;
+  const others = (offers ?? []).filter((o) => o.id !== chosen);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -125,44 +135,68 @@ export default function ProfileMenu({
               <span>{identity.email}</span>
             </span>
           </div>
-          {onChoose && offers && offers.length > 0 && (
+          {onChoose && active && (
+            <div className="search-page__profile-active" role="group" aria-label="Active offer">
+              <span className="search-page__profile-offer-text">
+                <span className="search-page__profile-offer-name">{active.title}</span>
+                <span className="search-page__profile-offer-meta">{metaOf(active)}</span>
+              </span>
+              {onRemake && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="search-page__profile-icon"
+                  aria-label="Clear the look and let Mark make it again"
+                  title="Make the look again"
+                  onClick={() => {
+                    setOpen(false);
+                    onRemake(active.id);
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                className="search-page__profile-icon"
+                aria-label={`Stop running the page as ${active.title}`}
+                title="Back to the usual page"
+                onClick={() => {
+                  setOpen(false);
+                  onChoose(null);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {onChoose && others.length > 0 && (
             <div className="search-page__profile-offers" role="group" aria-labelledby={`${menuId}-offers`}>
               <p className="search-page__profile-heading" id={`${menuId}-offers`}>
-                Run this page as
+                Offers
               </p>
-              {[null, ...offers].map((offer) => {
-                const id = offer?.id ?? null;
-                const on = chosen === id;
-                return (
-                  <button
-                    key={id ?? 'none'}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={on}
-                    className={'search-page__profile-item search-page__profile-offer' + (on ? ' is-on' : '')}
-                    onClick={() => {
-                      setOpen(false);
-                      if (!on) onChoose(id);
-                    }}
-                  >
-                    <span className="search-page__profile-check" aria-hidden="true">
-                      {on && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 12.5l4.5 4.5L19 7.5" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="search-page__profile-offer-text">
-                      <span className="search-page__profile-offer-name">{offer ? offer.title : 'Every account'}</span>
-                      <span className="search-page__profile-offer-meta">
-                        {offer
-                          ? [`${offer.pages.length} ${offer.pages.length === 1 ? 'page' : 'pages'}`, untilOf(offer), offer.look ? null : 'no look yet'].filter(Boolean).join(' · ')
-                          : 'The usual search page'}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+              {others.map((offer) => (
+                <button
+                  key={offer.id}
+                  type="button"
+                  role="menuitem"
+                  className="search-page__profile-item search-page__profile-offer"
+                  onClick={() => {
+                    setOpen(false);
+                    onChoose(offer.id);
+                  }}
+                >
+                  <span className="search-page__profile-offer-text">
+                    <span className="search-page__profile-offer-name">{offer.title}</span>
+                    <span className="search-page__profile-offer-meta">{metaOf(offer)}</span>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
           <form

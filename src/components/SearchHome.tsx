@@ -24,6 +24,7 @@ import {
   lookBackdrop,
   OFFER_COOKIE,
   type LookJob,
+  type LookTool,
   type OfferPage,
   type RunningOffer,
   type ShownOffer,
@@ -267,9 +268,42 @@ function SceneLayer({ backdrop, fresh, onShown }: { backdrop: Backdrop; fresh: b
   );
 }
 
-/** Mark at work on the offer's look: what it is doing now, the last few steps, and a bar. */
+/* A step's icon: what the tool does, at 14px in the step's colour. */
+const TOOL_ICON: Record<LookTool, ReactNode> = {
+  search: <path d="M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15zM21 21l-5.2-5.2" />,
+  photos: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <circle cx="9" cy="10" r="1.8" />
+      <path d="M21 16l-5-5L6 20" />
+    </>
+  ),
+  browse: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+    </>
+  ),
+  trace: (
+    <>
+      <path d="M12 19l7-7 3 3-7 7-3-3z" />
+      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5zM2 2l7.6 7.6" />
+      <circle cx="11" cy="11" r="2" />
+    </>
+  ),
+  generate: <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />,
+  cut: (
+    <>
+      <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+      <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+    </>
+  ),
+};
+
+/** Mark at work on the offer's look: its last few steps, each a few words with its tool's icon, and a bar. */
 function LookCard({ job, title, onRetry }: { job: LookJob; title: string; onRetry: () => void }) {
-  const steps = job.events.filter((e) => e.kind === 'tool' || e.kind === 'text').slice(-4);
+  const steps = job.steps.slice(-4);
+  const working = job.status === 'making' || job.status === 'cutting';
   const heading =
     job.status === 'done' ? `Ready: ${title}` : job.status === 'failed' ? 'Mark could not finish the look' : `Mark is setting up the page for ${title}`;
   return (
@@ -286,13 +320,21 @@ function LookCard({ job, title, onRetry }: { job: LookJob; title: string; onRetr
           </button>
         </>
       ) : (
-        <ol className="sh-look__steps">
-          {steps.map((e) => (
-            <li key={e.seq} className={`sh-look__step is-${e.kind}`}>
-              {e.kind === 'text' ? e.text.split(/(?<=[.!?])\s/)[0] : e.text}
+        <ol className={'sh-look__steps' + (working ? ' is-working' : '')}>
+          {steps.map((step) => (
+            <li key={step.id} className="sh-look__step">
+              <span className="sh-look__icon" aria-hidden="true">
+                {step.tool ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {TOOL_ICON[step.tool]}
+                  </svg>
+                ) : (
+                  <span className="sh-look__dot" />
+                )}
+              </span>
+              <span className="sh-look__label">{step.text}</span>
             </li>
           ))}
-          {job.status === 'cutting' && <li className="sh-look__step is-tool">Cutting the photograph into sizes</li>}
         </ol>
       )}
     </aside>
@@ -350,9 +392,12 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
   }, [signedInEmail]);
 
   /* An offer with no look yet: Mark makes one (or the run already under way is followed). */
-  const makeLook = useCallback(async (offerId: string, how: 'start' | 'follow' | 'retry') => {
+  /* While a start is on its way, polls wait: one could still read the run before it. */
+  const starting = useRef(false);
+  const makeLook = useCallback(async (offerId: string, how: 'start' | 'follow' | 'retry' | 'remake') => {
+    if (how !== 'follow') starting.current = true;
     try {
-      const path = `/api/offers/${encodeURIComponent(offerId)}/look${how === 'retry' ? '?retry=1' : ''}`;
+      const path = `/api/offers/${encodeURIComponent(offerId)}/look${how === 'retry' ? '?retry=1' : how === 'remake' ? '?remake=1' : ''}`;
       const r = await fetch(path, { method: how === 'follow' ? 'GET' : 'POST', cache: 'no-store' });
       const body = (await r.json()) as LookJob & { look?: RunningOffer['look']; error?: string };
       if (r.status === 409 && body.look) {
@@ -362,7 +407,9 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       if (!r.ok) throw new Error(body.error || String(r.status));
       setJob(body);
     } catch (err) {
-      setJob({ offerId, status: 'failed', startedAt: Date.now(), statusLine: '', progress: 0, events: [], look: null, error: err instanceof Error ? err.message : String(err) });
+      setJob({ offerId, status: 'failed', startedAt: Date.now(), statusLine: '', progress: 0, steps: [], look: null, error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      if (how !== 'follow') starting.current = false;
     }
   }, []);
   const needsLook = Boolean(asOffer && !asOffer.look && offers?.some((o) => o.id === asOffer.id));
@@ -373,7 +420,10 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
   /* Follow the run; when it is done the look is the page's. */
   useEffect(() => {
     if (!job || (job.status !== 'making' && job.status !== 'cutting')) return;
-    const timer = window.setTimeout(() => void makeLook(job.offerId, 'follow'), document.hidden ? 15_000 : 2500);
+    const timer = window.setTimeout(() => {
+      // A start under way answers with the run itself, which sets the job and polls again.
+      if (!starting.current) void makeLook(job.offerId, 'follow');
+    }, document.hidden ? 15_000 : 2500);
     return () => window.clearTimeout(timer);
   }, [job, makeLook]);
   useEffect(() => {
@@ -395,6 +445,17 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       setAsOffer(offer ? { id: offer.id, title: offer.title, look: offer.look } : null);
     },
     [offers],
+  );
+
+  /* Try again: the look goes, and Mark makes a new one (the Offers menu's refresh). */
+  const remakeLook = useCallback(
+    (offerId: string) => {
+      setAsOffer((cur) => (cur?.id === offerId ? { ...cur, look: null } : cur));
+      setOffers((list) => list?.map((o) => (o.id === offerId ? { ...o, look: null } : o)) ?? list);
+      setJob({ offerId, status: 'making', startedAt: Date.now(), statusLine: 'Starting', progress: 0.03, steps: [], look: null });
+      void makeLook(offerId, 'remake');
+    },
+    [makeLook],
   );
 
   /* The scene's layers: the photograph drawn first, and the one replacing it. */
@@ -656,6 +717,8 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
     if (!b || !hero) return;
     const d = motion.current.depth;
     hero.style.clipPath = `path("${cutoutPath(b, d)}")`;
+    // On phones the cut-out spans the scene, so the photograph is sized to what shows above it (search-home.css).
+    hero.style.setProperty('--sh-cut', `${Math.max(0, d)}px`);
     if (liftRef.current) liftRef.current.style.transform = `translate3d(0, ${-Math.max(0, d)}px, 0)`;
     // The lists hang from the same edge, frame by frame. Placed at the target depth
     // instead, they jumped the whole distance the moment search opened or closed.
@@ -798,7 +861,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       // Run as an offer: its pages first; what you opened recently stays, the way back to everything else.
       return [
         {
-          title: 'Offer pages',
+          title: 'Companies',
           rows: offerPages.slice(0, rows).map(offerRow),
           empty: 'No pages for this offer yet.',
         },
@@ -810,16 +873,22 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       ];
     }
     if (view === 'idle') {
+      const recent = [...shownBuilds.map(buildRow), ...recentItems.map((i) => asRow(i, false))].slice(0, rows);
+      // An account opened from here moves to Recently opened: it is never listed twice.
+      const shownSlugs = new Set(recentItems.slice(0, rows).map((i) => (i.kind === 'company' ? i.entry.slug : i.person.slug)));
       return [
         {
           title: 'Recently opened',
-          rows: [...shownBuilds.map(buildRow), ...recentItems.map((i) => asRow(i, false))].slice(0, rows),
+          rows: recent,
           empty: 'Pages you open show up here.',
         },
         {
           title: 'My accounts',
-          rows: mine.slice(0, rows).map((entry) => asRow({ kind: 'company', entry }, false)),
-          empty: 'No account page lists you on its team yet.',
+          rows: mine
+            .filter((entry) => !shownSlugs.has(entry.slug))
+            .slice(0, rows)
+            .map((entry) => asRow({ kind: 'company', entry }, false)),
+          empty: mine.length ? 'Your accounts are all in Recently opened.' : 'No account page lists you on its team yet.',
         },
       ];
     }
@@ -960,7 +1029,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
               </>
             )}
           </div>
-          {identity && <ProfileMenu identity={identity} offers={offers} chosen={asOffer?.id ?? null} onChoose={chooseOffer} />}
+          {identity && <ProfileMenu identity={identity} offers={offers} chosen={asOffer?.id ?? null} onChoose={chooseOffer} onRemake={remakeLook} />}
         </header>
         {job && asOffer && job.offerId === asOffer.id && (
           <LookCard job={job} title={asOffer.title} onRetry={() => void makeLook(asOffer.id, 'retry')} />

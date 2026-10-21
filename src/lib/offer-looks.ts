@@ -11,7 +11,6 @@
  * Pure: the server and the browser share it.
  */
 import type { Backdrop } from './home-scenes.js';
-import type { BuildEvent } from './page-builds.js';
 
 /** As Aldus UI stores it (aldus-ui lib/offers/showcase-look-types.ts). */
 export type ShowcaseLook = {
@@ -57,6 +56,12 @@ export type ShownOffer = Pick<RunningOffer, 'id' | 'title' | 'look'>;
 
 export type LookJobStatus = 'making' | 'cutting' | 'done' | 'failed';
 
+/** What a step of Mark's run was doing, for its icon. */
+export type LookTool = 'search' | 'photos' | 'browse' | 'trace' | 'generate' | 'cut';
+
+/** One line of the card: Mark's two- or three-word status, or the tool's own words. */
+export type LookStep = { id: string; text: string; tool?: LookTool };
+
 /** A look being made, as GET /api/offers/{id}/look answers. */
 export type LookJob = {
   offerId: string;
@@ -66,7 +71,7 @@ export type LookJob = {
   /** One line for the card: the latest thing Mark is doing. */
   statusLine: string;
   progress: number;
-  events: BuildEvent[];
+  steps: LookStep[];
   look: ShowcaseLook | null;
   error?: string;
 };

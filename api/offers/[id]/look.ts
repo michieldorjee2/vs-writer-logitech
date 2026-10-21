@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isOfferId } from '../../../src/lib/offer-looks.js';
-import { aldusConfigured } from '../../_lib/aldus.js';
+import { aldusConfigured, clearLook } from '../../_lib/aldus.js';
 import { requireIdentity } from '../../_lib/auth.js';
 import { markConfigured } from '../../_lib/mark.js';
 import { getJob, jobView, refreshJob, startLook } from '../../_lib/offer-looks.js';
@@ -12,7 +12,8 @@ import { aldusOffer } from '../../_lib/offers.js';
  *
  *   POST → LookJob: starts Mark on it, unless the offer has a look or a run
  *          is under way (then that run), or one failed in the last half hour
- *          (then that one; `?retry=1` starts anew). 409 when the offer has a look.
+ *          (then that one; `?retry=1` starts anew). 409 when the offer has a look,
+ *          unless `?remake=1`: then the look is cleared in Aldus UI first.
  *   GET  → LookJob: the run so far, polled every few seconds. When Mark is
  *          done, the request that sees it first cuts the photograph and
  *          stores the look in Aldus UI (it can take half a minute).
@@ -36,8 +37,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const offer = await aldusOffer(id, req.method === 'POST');
     if (req.method === 'POST') {
       if (!offer) return res.status(404).json({ error: 'That offer is not running' });
-      if (offer.look) return res.status(409).json({ error: 'That offer has a look already', look: offer.look });
-      const job = await startLook(store, offer, identity.email, req.query.retry === '1');
+      const remake = req.query.remake === '1';
+      if (offer.look && !remake) return res.status(409).json({ error: 'That offer has a look already', look: offer.look });
+      if (offer.look) await clearLook(offer.id, identity.email);
+      const job = await startLook(store, { ...offer, look: null }, identity.email, remake || req.query.retry === '1');
       const { job: fresh, execution } = await refreshJob(store, job, offer);
       return res.status(202).json(await jobView(fresh, execution));
     }

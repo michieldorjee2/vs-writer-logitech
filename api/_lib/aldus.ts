@@ -44,6 +44,16 @@ export async function runningOffers(fresh = false): Promise<AldusOffer[]> {
   return offers;
 }
 
+/** Clears the offer's look in Aldus UI, so Mark makes a new one; who asked is recorded there. */
+export async function clearLook(offerId: string, by: string): Promise<void> {
+  await call(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/look`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ by }),
+  });
+  held = null;
+}
+
 export async function saveLook(offerId: string, look: Omit<ShowcaseLook, 'madeAt'>): Promise<ShowcaseLook> {
   const { look: saved } = await call<{ look: ShowcaseLook }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/look`, {
     method: 'PUT',
