@@ -852,9 +852,17 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
         ...building('person'),
         ...rankPeople(people, q, recentSlugs, rows).map((person) => asRow({ kind: 'person', person }, true)),
       ].slice(0, rows);
+      // "+ Add" takes a column's last row whenever nothing in it is exactly what was typed.
+      // Offered only to an empty column, it never showed for a company another page merely
+      // contains: "Target" listed TechTarget and Darden, and left no way to ask for Target.
+      const named = (name: string) => name.toLowerCase() === ql;
+      const companyHere = !!findCompany(q) || shownBuilds.some((b) => b.kind === 'account' && named(b.name));
+      const personHere = people.some((p) => named(p.name)) || shownBuilds.some((b) => b.kind === 'person' && named(b.name));
+      const withAdd = (found: Row[], here: boolean, add: 'account' | 'person'): Row[] =>
+        !q || here ? found : [...found.slice(0, rows - 1), { key: `add:${add}`, kind: 'add', add }];
       return [
-        { title: 'Companies', rows: q && !cs.length ? [{ key: 'add:account', kind: 'add', add: 'account' }] : cs, empty: null },
-        { title: 'People', rows: q && !ps.length ? [{ key: 'add:person', kind: 'add', add: 'person' }] : ps, empty: null },
+        { title: 'Companies', rows: withAdd(cs, companyHere, 'account'), empty: null },
+        { title: 'People', rows: withAdd(ps, personHere, 'person'), empty: null },
       ];
     }
     if (view === 'idle' && running) {
@@ -893,7 +901,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       ];
     }
     return [];
-  }, [view, query, companies, people, recentSlugs, recentItems, mine, rows, shownBuilds, running]);
+  }, [view, query, companies, people, recentSlugs, recentItems, mine, rows, shownBuilds, running, findCompany]);
 
   // Nothing to walk (or offer to add) until the lists are on screen.
   const navRows = ready ? columns.flatMap((c) => c.rows) : [];

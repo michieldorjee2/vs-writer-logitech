@@ -29,6 +29,7 @@ import { parseDisplaySettings } from '@/lib/hooks/parseDisplaySettings'
 import type { DisplaySettings } from '@/lib/optimizely/types/display-settings'
 import { cn } from '@/lib/utils'
 
+import { linkTarget } from '../../link-target'
 import type { AbmStickyCtaElementProps } from './types'
 
 type ButtonVariant =
@@ -90,7 +91,7 @@ export default function AbmStickyCtaElement({
 
   const button = (
     <Button variant={variant} size={size} asChild>
-      <a href={Url} data-epi-edit="Text">
+      <a href={Url} {...linkTarget(Url)} data-epi-edit="Text">
         {Text}
       </a>
     </Button>

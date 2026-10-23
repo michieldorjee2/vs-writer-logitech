@@ -126,6 +126,9 @@ export function usePageRequest({
         if (!text) return setError('Enter the company website');
         // An account page is found by the company's website, exactly — never by name.
         if (!looksLikeWebsite(text)) return setError("Enter the company's website, e.g. anaplan.com");
+        // "+ Add" also sits beside near matches, so the website may be one we have a page for.
+        const existing = findCompany(text);
+        if (existing) return setError(`${existing.name} already has a page: showcase.optimizely.com/${existing.route}`);
         return send({ kind: 'account', website: text, name: looksLikeWebsite(askedFor) ? undefined : askedFor }, ({ build }) => (
           <>
             Mark is building <b>{build.name}</b>. Follow along at {linkTo(build.route)}.

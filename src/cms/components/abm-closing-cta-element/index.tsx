@@ -28,6 +28,7 @@ import { EditableField } from '@/lib/optimizely/features/draft'
 import type { DisplaySettings } from '@/lib/optimizely/types/display-settings'
 import { cn } from '@/lib/utils'
 
+import { linkTarget } from '../../link-target'
 import type { AbmClosingCtaElementProps } from './types'
 
 type ButtonVariant =
@@ -99,7 +100,7 @@ export default function AbmClosingCtaElement({
   // the destination is set but the label has not been written yet.
   const button = ScheduleUrl ? (
     <Button variant={variant} size={size} asChild>
-      <a href={ScheduleUrl} data-epi-edit="ButtonText">
+      <a href={ScheduleUrl} {...linkTarget(ScheduleUrl)} data-epi-edit="ButtonText">
         {ButtonText ?? 'Update Link Text'}
       </a>
     </Button>
