@@ -12,7 +12,9 @@
  *      `Link.title`, `Link.target`. A content reference is a 400 on an `elementEnabled`
  *      type, so the two values we keep arrive as the scalars `ButtonUrl` and `ButtonText`,
  *      and `title` / `target` are gone. `data-epi-edit` therefore names `ButtonText`, the
- *      field an editor actually edits, where upstream names `Link`.
+ *      field an editor actually edits, where upstream names `Link`. With no `target`
+ *      to read, the target comes from the URL (`src/cms/link-target.ts`): an http(s)
+ *      destination opens in a new tab, an in-page `#about` stays in the tab.
  *
  *   2. `buttonVariant` (display setting) stays the source of truth, exactly as upstream has
  *      it. The content-level `Variant` property exists because a generating agent writes
@@ -34,6 +36,7 @@ import { StrokeButtonWrapper } from '@/components/_ui/button/stroke-wrapper'
 import { parseDisplaySettings } from '@/lib/hooks/parseDisplaySettings'
 import type { DisplaySettings } from '@/lib/optimizely/types/display-settings'
 
+import { linkTarget } from '../../link-target'
 import type { ButtonBlockProps } from './types'
 
 type ButtonVariant =
@@ -112,7 +115,7 @@ export default function ButtonBlock({
     ) : null
 
   const label = (
-    <a href={ButtonUrl} data-epi-edit="ButtonText">
+    <a href={ButtonUrl} {...linkTarget(ButtonUrl)} data-epi-edit="ButtonText">
       {text}
       {icon}
     </a>

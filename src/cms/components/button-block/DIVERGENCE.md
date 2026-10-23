@@ -7,7 +7,9 @@ when the destination is missing. A content reference is a 400 on a type declarin
 `compositionBehaviors: ['elementEnabled']` (`The property 'Link' is not allowed when content
 type has ElementEnabled.`), so we flatten it to two scalars, `ButtonText` (shortString, 40) and
 `ButtonUrl` (url, the only required property, mirroring upstream's refusal to render without a
-destination); we drop `title` and `target`, which no Limitless page sets, and we add a
+destination); we drop `title` and `target`, which no Limitless page sets (the renderer derives the target
+from the URL instead: an http(s) destination opens in a new tab, see `src/cms/link-target.ts`),
+and we add a
 `Variant` selectOne (`primary` / `secondary` / `ghost`) because an agent composing a page writes
 content properties and has no display settings to write into — the upstream `buttonVariant`
 display setting is kept verbatim alongside it and stays the renderer's source of truth, so
