@@ -734,7 +734,10 @@ html, body { margin: 0; background: #f9fcf8; }
   .sh {
     --sh-tile-size: 44px;
     --sh-tile-r: 9px;
-    --sh-frame-t: max(12px, env(safe-area-inset-top));
+    /* A sliver, not 12px: iPhone Safari already starts the page below the status bar (62pt,
+       inset 0), so a full margin stacked a second gap on top of it. At 0 Safari tints the
+       status bar with the photo and the card's rounded corners leave notches under it. */
+    --sh-frame-t: max(4px, env(safe-area-inset-top));
     --sh-frame-b: max(12px, env(safe-area-inset-bottom));
     --sh-frame-l: max(12px, env(safe-area-inset-left));
     --sh-frame-r: max(12px, env(safe-area-inset-right));

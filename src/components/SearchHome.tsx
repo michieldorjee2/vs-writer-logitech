@@ -988,10 +988,12 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
           ? "Mark builds the company's page first (about 15 minutes), then this person's (about 4 more)."
           : 'Mark builds a page for this person in about 4 minutes. It shows up in your list while it works.'
         : req.kind === 'person'
-          ? 'First the company they work at: one that has a page, or its website if it has none yet. Then their name.'
-          : `Mark finds the company by its website, researches it and builds the page in about 15 minutes. It shows up in your list while it works, and Mark messages you on Teams${
-              identity ? ` at ${identity.email}` : ''
-            } when it's live.`);
+          ? 'First the company they work at: one that has a page, or its domain if it has none yet. Then their name.'
+          : req.askedName
+            ? `Multiple companies might match “${req.askedName}”. Enter the company's domain, e.g. anaplan.com, so we know we're building the right one. Mark then builds the page in about 15 minutes and messages you on Teams when it's live.`
+            : `Mark finds the company by its domain, researches it and builds the page in about 15 minutes. It shows up in your list while it works, and Mark messages you on Teams${
+                identity ? ` at ${identity.email}` : ''
+              } when it's live.`);
 
   /* The go button turns into a + when what it would do is ask Mark for a page. */
   const activeRow = view === 'search' && !leaving ? navRows[activeIdx] : undefined;
