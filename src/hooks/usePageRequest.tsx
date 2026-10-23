@@ -72,7 +72,9 @@ export function usePageRequest({
     const q = query.trim();
     setKind(nextKind);
     setAskedFor(q);
-    setCompany(nextKind === 'account' ? q : '');
+    // A name is not a domain: the field starts empty so its placeholder asks for one, and
+    // the hint says why (askedName). Pre-filled, the name invited a submit that could only fail.
+    setCompany(nextKind === 'account' && looksLikeWebsite(q) ? q : '');
     setPerson(nextKind === 'person' ? q : '');
     setCompanyRef(null);
     setCompanyName('');
@@ -123,9 +125,10 @@ export function usePageRequest({
     if (phase === 'company') {
       const text = company.trim();
       if (kind === 'account') {
-        if (!text) return setError('Enter the company website');
+        if (!text) return setError("Enter the company's domain, e.g. anaplan.com");
         // An account page is found by the company's website, exactly — never by name.
-        if (!looksLikeWebsite(text)) return setError("Enter the company's website, e.g. anaplan.com");
+        if (!looksLikeWebsite(text))
+          return setError("Multiple companies might match a name. Enter the company's domain, e.g. anaplan.com, so we know we're building the right one.");
         // "+ Add" also sits beside near matches, so the website may be one we have a page for.
         const existing = findCompany(text);
         if (existing) return setError(`${existing.name} already has a page: showcase.optimizely.com/${existing.route}`);
@@ -141,7 +144,7 @@ export function usePageRequest({
       else if (looksLikeWebsite(text)) setCompanyRef({ website: text, ...(companyName ? { name: companyName } : {}) });
       else {
         setCompanyName(text);
-        return setError(`No page for ${text} yet: enter its website, e.g. anaplan.com`);
+        return setError(`No page for ${text} yet, and multiple companies might match that name. Enter its domain, e.g. anaplan.com.`);
       }
       setError(null);
       setPhase('person');
@@ -181,8 +184,8 @@ export function usePageRequest({
     phase === 'person'
       ? `Who at ${companyLabel || 'this company'}?`
       : kind === 'person'
-        ? 'Company they work at, or its website'
-        : 'Company website, e.g. anaplan.com';
+        ? 'Company they work at, or its domain'
+        : 'Company domain, e.g. anaplan.com';
 
   return {
     phase,
@@ -195,6 +198,8 @@ export function usePageRequest({
     sentNote,
     /** Person requests: the company will need its page built first. */
     companyIsNew: !!companyRef && !('route' in companyRef),
+    /** An account request begun from a company's name, which still needs its domain. */
+    askedName: kind === 'account' && askedFor && !looksLikeWebsite(askedFor) ? askedFor : null,
     start,
     cancel,
     submit,
