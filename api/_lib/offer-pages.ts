@@ -32,7 +32,8 @@ type Item = {
   componentPlan: string | null;
 };
 
-const offerIdOf = (plan: string | null): string | null => {
+/** The offer a page was written for: componentPlan's `offerId` (also read by api/_lib/offer-signup.ts). */
+export const offerIdOf = (plan: string | null): string | null => {
   try {
     const id = (JSON.parse(plan || '{}') as { offerId?: unknown }).offerId;
     return typeof id === 'string' ? id : null;

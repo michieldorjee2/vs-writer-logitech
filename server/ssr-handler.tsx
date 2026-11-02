@@ -38,6 +38,7 @@ import type { BuildRecord } from '../src/lib/page-builds';
 import { randomScene } from '../src/lib/home-scenes';
 import { isOfferId, OFFER_COOKIE, type ShownOffer } from '../src/lib/offer-looks';
 import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
+import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -780,7 +781,7 @@ async function fetchExperienceContent(authKey: string, expSlug: string): Promise
       const json = await queryGraph(authKey, query, { slug: s });
       const items = (json as { data?: Record<string, { items?: unknown[] }> })?.data?.[typeName]?.items;
       if (items && items.length > 0) {
-        return normalizeExperienceItem({ ...(items[0] as object), __typename: typeName, __template: template }) as ExperienceItem;
+        return (await withOfferSignup(normalizeExperienceItem({ ...(items[0] as object), __typename: typeName, __template: template }))) as ExperienceItem;
       }
     }
   }
@@ -1195,7 +1196,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const wantsFresh = url.searchParams.has('refresh');
       res.setHeader(
         'Cache-Control',
-        wantsFresh ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=300',
+        wantsFresh ? 'no-store' : signupCacheControl(item, 'public, s-maxage=60, stale-while-revalidate=300'),
       );
       if (!wantsFresh && item._metadata?.key) {
         res.setHeader('Cache-Tag', `page:${item._metadata.key}`);

@@ -1,8 +1,10 @@
 /**
- * Aldus UI's three routes for the showcase (aldus-ui lib/offers/showcase-look.ts):
- * the running offers, saving one offer's look, and whether a signed-in person
+ * Aldus UI's routes for the showcase (aldus-ui lib/offers/showcase-look.ts):
+ * the running offers, saving one offer's look, whether a signed-in person
  * gets the search page's links back to Limitless (aldus-ui
- * lib/offers/showcase-viewer.ts). Its own token, which may do nothing else.
+ * lib/offers/showcase-viewer.ts), and (lib/offers/signup.ts) an offer's
+ * sign-up choice and adding one sign-up. Its own token, which may do
+ * nothing else.
  *
  * Env: ALDUS_UI_URL, ALDUS_SHOWCASE_TOKEN. Unset: no offers, no links, and
  * the search page is the usual one.
@@ -112,4 +114,36 @@ export async function saveLook(offerId: string, look: Omit<ShowcaseLook, 'madeAt
   });
   held = null;
   return saved;
+}
+
+/** How people sign up on an offer's pages (aldus-ui lib/offers/signup.ts). Throws when Aldus UI can't say. */
+export async function signupFormFor(offerId: string, signal: AbortSignal): Promise<'link' | 'email'> {
+  const { form } = await call<{ form?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, { signal });
+  return form === 'email' ? 'email' : 'link';
+}
+
+export type SignupEntry = {
+  email: string;
+  route: string;
+  account: string | null;
+  domain: string | null;
+  utm: Partial<Record<'source' | 'medium' | 'campaign' | 'term' | 'content', string>>;
+};
+
+/**
+ * Keeps one sign-up in Aldus UI. Answers the offer's conversion campaign id, or null; `kept` is
+ * false when the offer takes no sign-ups (409: its pages link out, and have for a while).
+ */
+export async function addSignup(offerId: string, entry: SignupEntry): Promise<{ campaignId: string | null; kept: boolean }> {
+  try {
+    const body = await call<{ campaignId?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    });
+    return { campaignId: typeof body.campaignId === 'string' ? body.campaignId : null, kept: true };
+  } catch (err) {
+    if ((err as { status?: unknown }).status === 409) return { campaignId: null, kept: false };
+    throw err;
+  }
 }
