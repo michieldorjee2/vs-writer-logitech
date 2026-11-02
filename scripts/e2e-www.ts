@@ -21,7 +21,8 @@
  * every section present, sticky bar, the one-click connect panel (pings once per view, from the
  * sticky bar or the close), the review layer and state switch, the offer FAQ, X-ray mode
  * outlining every section, Edit mode rewriting the hero headline in place from a (mocked) Mark
- * stream, and the legacy renderers unchanged without ?design=www.
+ * stream, the www design as the default with no parameter, and the previous renderers unchanged on
+ * ?design=classic.
  */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import fs from 'node:fs'
@@ -490,14 +491,23 @@ console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
   await ctx.close()
 }
 
-console.log('\nlegacy renderers without ?design=www')
-await test('the account page is still ABMHyperPage', async () => {
-  const html = await (await fetch(`${BASE}${ACCOUNT}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
-  expect(html.includes('abm-page') && !html.includes('www-page'), 'legacy account page changed')
+console.log('\nthe default (no parameter) and ?design=classic')
+const fetchHtml = async (href: string) => (await fetch(href, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+await test('an account page with no parameter is the agent platform page', async () => {
+  const html = await fetchHtml(`${BASE}${ACCOUNT}`)
+  expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the default account page is not the agent platform page')
 })
-await test('the offer page is still the Visual Builder renderer', async () => {
-  const html = await (await fetch(`${BASE}${OFFER}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
-  expect(html.includes('vb-experience') && !html.includes('www-page'), 'legacy offer page changed')
+await test('an offer page with no parameter is the www offer page', async () => {
+  const html = await fetchHtml(`${BASE}${OFFER}`)
+  expect(html.includes('www-page') && html.includes('id="hero"'), 'the default offer page is not the www design')
+})
+await test('?design=classic: the account page is ABMHyperPage, as before', async () => {
+  const html = await fetchHtml(url(ACCOUNT, 'design=classic'))
+  expect(html.includes('abm-page') && !html.includes('www-page'), 'the classic account page changed')
+})
+await test('?design=classic: the offer page is the Visual Builder renderer, as before', async () => {
+  const html = await fetchHtml(url(OFFER, 'design=classic'))
+  expect(html.includes('vb-experience') && !html.includes('www-page'), 'the classic offer page changed')
 })
 
 await browser.close()

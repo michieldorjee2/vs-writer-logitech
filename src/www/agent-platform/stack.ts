@@ -35,7 +35,7 @@ export type Category =
 
 /** Lower-cased name fragments → category. First match wins, so specific names come first. */
 const CATEGORIES: Array<[RegExp, Category]> = [
-  [/adobe experience manager|\baem\b|sitecore|acquia|drupal|wordpress|contentful|contentstack|storyblok|sanity|kentico|umbraco|episerver|dnn|evoq|bloomreach content|magnolia|hubspot cms|squarespace|wix|webflow|sharepoint/, 'CMS'],
+  [/adobe experience manager|\baem\b|sitecore|acquia|drupal|wordpress|contentful|contentstack|storyblok|sanity|kentico|umbraco|episerver|dnn|evoq|bloomreach content|magnolia|hubspot cms|squarespace|wix|webflow|sharepoint|dynamicweb|liferay dxp|crownpeak|hippo cms|terminalfour|opentext/, 'CMS'],
   [/adobe experience cloud|experience cloud|liferay|\bdxp\b/, 'Digital experience platform'],
   [/sap commerce|hybris|shopify|salesforce commerce|bigcommerce|magento|adobe commerce|commercetools|vtex/, 'Commerce'],
   [/marketo|eloqua|pardot|account engagement|hubspot|braze|iterable|klaviyo|salesforce marketing cloud|mailchimp|acoustic/, 'Marketing automation'],
@@ -110,10 +110,14 @@ export function readStack(
     seen.add(name.toLowerCase())
     const category = categoryOf(name)
     const ours = OPTIMIZELY.test(name)
+    // The competitor's own product line counts too, by name: "DynamicWeb PIM" and "DynamicWeb
+    // eCommerce" when the competitor is "DynamicWeb" (Norsk Stål, found by the live-page sweep).
+    const lower = name.toLowerCase()
+    const sameBrand = !!comp && comp.length >= 3 && (lower === comp || new RegExp(`(^|[^a-z0-9])${comp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(lower))
     const competitor =
       !ours &&
       (/orange/.test(t.ColorTag || '') ||
-        (!!comp && name.toLowerCase() === comp) ||
+        sameBrand ||
         (!!compCategory && compCategory !== 'Tool' && category === compCategory))
     out.push({ name, category, competitor, ours, label: competitor ? competitorLabel(category) : name })
   }

@@ -1178,7 +1178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      // ?design=www: the www-design concept (src/www). Mirrors VisualBuilderPage.tsx.
+      // The www design (src/www), the default; ?design=classic for the previous one. Mirrors VisualBuilderPage.tsx.
       const appHtml = wantsWwwDesign(url.searchParams) && isOfferExperience(item)
         ? renderExperienceRoute(<WwwOfferPage experience={item} />)
         : renderExperienceRoute(
@@ -1266,7 +1266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
       default: {
-        // ?design=www: the www-design concept (src/www). Mirrors App.tsx's renderPageBody.
+        // The www design (src/www), the default; ?design=classic for the previous one. Mirrors App.tsx's renderPageBody.
         if (wantsWwwDesign(url.searchParams)) {
           appHtml = renderPageRoute(<WwwAccountPage page={page} search={url.search} />);
           if (!wantsTakeout(url.searchParams)) headSource = agentPlatformHead(page);

@@ -52,7 +52,7 @@ const FloatingSidebar = lazy(() => import('./components/FloatingSidebar'));
  * and no legacy page should download a byte of it.
  */
 const VisualBuilderPage = lazy(() => import('./components/VisualBuilderPage'));
-/* The www-design concept (?design=www): optimizely.com's own components. See src/www. */
+/* The www design, the default for account pages (?design=classic for the previous one): optimizely.com's own components. See src/www. */
 const WwwAccountPage = lazy(() => import('./www/WwwAccountRoute'));
 
 function RouteSpinner() {

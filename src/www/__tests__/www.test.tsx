@@ -34,7 +34,7 @@ import { plain, richToStacked } from '../ui'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import offerBlueprint from '../../cms/blueprints/offer'
 import WwwAccountRoute from '../WwwAccountRoute'
-import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, USED_FIELDS } from '../agent-platform/content'
+import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
 import { readStack, stackTiles } from '../agent-platform/stack'
 import { DEFAULT_TEAMS, IDENTITY_SENTENCE, THEME_ORDER } from '../agent-platform/library'
 
@@ -350,12 +350,11 @@ test('the proof logos are labelled with the brand each image shows', () => {
   )
 })
 
-test('wantsWwwDesign is ?design=www and nothing else', () => {
-  assert.equal(wantsWwwDesign('?design=www'), true)
-  assert.equal(wantsWwwDesign(new URLSearchParams('a=1&design=www')), true)
-  assert.equal(wantsWwwDesign('?design=legacy'), false)
-  assert.equal(wantsWwwDesign(''), false)
-  assert.equal(wantsWwwDesign(null), false)
+test('the www design is the default; ?design=classic renders the previous one', () => {
+  for (const q of ['', null, undefined, '?search=1', '?design=www', new URLSearchParams('a=1&design=www'), new URLSearchParams(''), '?template=takeout'])
+    assert.equal(wantsWwwDesign(q), true, String(q))
+  assert.equal(wantsWwwDesign('?design=classic'), false)
+  assert.equal(wantsWwwDesign(new URLSearchParams('search=1&design=classic')), false)
 })
 
 test('isOfferExperience: by template, or by the component plan the offer workflow writes', () => {
@@ -853,6 +852,37 @@ test('homework runs through the page: one fact per scene, not one homework secti
   assert.match(textOf(html), /In your stack Bynder On your agenda Global content localization/)
   assert.match(textOf(html), /In your stack Tealium On your agenda Customer data unification/)
   assert.equal(sceneOf('Where Northwind Freight is investing'), 'language')
+})
+
+test('N2: the competitor\'s own product line is shown by category too (Norsk Stål, from the live sweep)', () => {
+  const tools = readStack(
+    [{ Name: 'DynamicWeb CMS', ColorTag: null }, { Name: 'DynamicWeb PIM', ColorTag: null }, { Name: 'DynamicWeb eCommerce', ColorTag: null }, { Name: 'Google Tag Manager', ColorTag: null }],
+    'DynamicWeb',
+  )
+  assert.deepEqual(tools.filter((t) => t.competitor).map((t) => t.name), ['DynamicWeb CMS', 'DynamicWeb PIM', 'DynamicWeb eCommerce'])
+  const html = renderToString(<WwwAccountRoute page={stackPage({ competitorName: 'DynamicWeb', techStack: tools.map((t) => ({ Name: t.name, ColorTag: null })) })} search="" />)
+  assert.ok(!/DynamicWeb/i.test(textOf(html.replace(/<script[\s\S]*?<\/script>/g, ''))), 'DynamicWeb is on the page')
+  assert.match(textOf(html), /Your CMS/)
+})
+
+test('N3: stored small print that names one of the account\'s people is left off (UpGuard, from the live sweep)', () => {
+  const c = fromLegacyPage(stackPage({ footerTagline: 'Personalized for Pat Example at Northwind Freight', footerLegal: 'This page was created for Northwind Freight.' }))
+  assert.equal(c.smallPrint.tagline, null)
+  assert.equal(c.smallPrint.legal, 'This page was created for Northwind Freight.')
+  assert.ok(!personMatcher([{ Name: 'Pat Example' }])('Examples of the platform'), 'matches inside a word')
+  // Investments and facts that name their people are left off too (MDA National, SEI, Saxo Bank).
+  const d = fromLegacyPage(
+    stackPage({
+      investments: [{ Name: 'Executive team led by CEO Pat Example', IsPrimary: true }, { Name: 'Global content localization', IsPrimary: false }],
+      intelStats: [{ Value: '12000', Label: 'employees' }, { Value: 'Sitecore CMS', Label: 'in place today' }, { Value: '40', Label: 'countries served' }, { Value: '1', Label: 'new CMO, Sam Example' }],
+      competitorName: 'Sitecore',
+    }),
+  )
+  assert.deepEqual(d.priorities.value, ['Global content localization'])
+  assert.ok(![...d.pills.value, ...d.stats.value.map((x) => `${x.value} ${x.label}`)].some((t) => /Sitecore|Sam Example/.test(t)))
+  // Not names: a role stored as a name, the account's own name, an Optimizely person listed as a stakeholder.
+  const m = personMatcher([{ Name: 'Marketing leadership' }, { Name: 'Sam Edelman' }, { Name: 'Caleb Ping' }], { account: 'Sam Edelman', team: [{ Name: 'Caleb Ping' }] })
+  assert.ok(!m('Marketing leadership') && !m('Sam Edelman footwear') && !m('Caleb Ping'))
 })
 
 test('a use-case homework line never names a competitor (N2)', () => {

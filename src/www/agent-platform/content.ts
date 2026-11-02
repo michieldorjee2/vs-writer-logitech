@@ -100,6 +100,35 @@ export function competitorMatcher(tools: StackTool[], competitorName: string | n
   return (text) => !!text && re.test(text)
 }
 
+/** A personal name: two or more capitalized words ("Tim Plant", "Nguyen Thanh Son"), not a role ("Marketing leadership"). */
+const PERSON_NAME = /^\p{Lu}[\p{L}'’.-]+(?:\s+\p{Lu}[\p{L}'’.-]+)+$/u
+
+/**
+ * Rule N3 for stored free text: a line that names one of the page's stakeholders is left off.
+ * Only person-shaped names count (some pages store a role group as a stakeholder's name), and
+ * not the account's own name (Sam Edelman, Tangerine Bank) or an Optimizely team member listed
+ * among the stakeholders. Found by the live-page sweep, 2 Nov 2026: investments such as
+ * "Executive team led by CEO Tim Plant" and small print such as "Personalized for <name> at …".
+ */
+export function personMatcher(
+  people: Array<{ Name?: string | null }> | null | undefined,
+  opts: { account?: string; team?: Array<{ Name?: string | null }> | null } = {},
+): (text: string | null | undefined) => boolean {
+  const account = (opts.account || '').toLowerCase()
+  const team = new Set((opts.team ?? []).map((m) => (m.Name || '').trim().toLowerCase()))
+  const names = new Set<string>()
+  for (const p of people ?? []) {
+    const n = (p.Name || '').trim().replace(/\s+/g, ' ')
+    if (!PERSON_NAME.test(n) || team.has(n.toLowerCase())) continue
+    if (account && (account.includes(n.toLowerCase()) || n.toLowerCase().includes(account))) continue
+    names.add(n)
+  }
+  if (!names.size) return () => false
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`(^|[^\\p{L}])(${[...names].map(esc).join('|')})(?![\\p{L}])`, 'iu')
+  return (text) => !!text && re.test(text)
+}
+
 /** The roles that count as the account executive for rule N4. */
 const AE_ROLE = /account executive|\bAE\b|account director|client director/i
 
@@ -171,11 +200,21 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
 
   const tools = readStack(page.techStack, page.competitorName)
   const namesCompetitor = competitorMatcher(tools, page.competitorName)
+  const namesPerson = personMatcher(page.stakeholders, { account, team: page.teamMembers })
 
   // Facts: the page's own stats, minus unsourced traffic (N8), stats about Optimizely, and any
   // that name the replaced platform (N2).
   const facts = (page.intelStats ?? [])
-    .filter((s) => s.Value && s.Label && !UNSOURCED_TRAFFIC.test(s.Label) && !ABOUT_US.test(s.Label) && !namesCompetitor(s.Label))
+    .filter(
+      (s) =>
+        s.Value &&
+        s.Label &&
+        !UNSOURCED_TRAFFIC.test(s.Label) &&
+        !ABOUT_US.test(s.Label) &&
+        // N2 and N3 on the value as well as the label: "Sitecore CMS" / "in place today".
+        !namesCompetitor(`${s.Value} ${s.Label}`) &&
+        !namesPerson(`${s.Value} ${s.Label}`),
+    )
     .map((s) => (isYear(s) ? { value: s.Value.trim(), label: s.Label, year: true } : { value: formatStatValue(s.Value), label: s.Label, year: false }))
   // "Founded 1998", not "2K founded".
   const pills = facts.slice(0, 3).map((f) => (f.year ? `${f.label.charAt(0).toUpperCase()}${f.label.slice(1)} ${f.value}` : `${f.value} ${f.label}`))
@@ -197,7 +236,8 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
   const priorities = [...(page.investments ?? [])]
     .sort((a, b) => Number(!!b.IsPrimary) - Number(!!a.IsPrimary))
     .map((i) => i.Name)
-    .filter((n) => n && !namesCompetitor(n))
+    // N2 and N3: no investment line that names the replaced platform or one of their people.
+    .filter((n) => n && !namesCompetitor(n) && !namesPerson(n))
     .slice(0, 4)
   // Each stored tool or investment backs one use case only, the highest-ranked it fits: two cards
   // side by side never show the same homework (Carhartt: Tealium counts for personalization and
@@ -261,9 +301,11 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
     // The stored sticky line was written for the takeout pitch ("Your <competitor> exit plan is
     // ready"): N1 and N2 keep it off. The bar repeats the state's closing line instead.
     stickyText: STATES[state.value].closeLine,
+    // Stored small print that names the replaced platform (N2) or one of the account's people (N3:
+    // "Personalized for <name> at <company>", found by the live-page sweep) is left off.
     smallPrint: {
-      tagline: namesCompetitor(page.footerTagline) ? null : page.footerTagline || null,
-      legal: namesCompetitor(page.footerLegal) ? null : page.footerLegal || null,
+      tagline: namesCompetitor(page.footerTagline) || namesPerson(page.footerTagline) ? null : page.footerTagline || null,
+      legal: namesCompetitor(page.footerLegal) || namesPerson(page.footerLegal) ? null : page.footerLegal || null,
     },
     notShown: NOT_SHOWN,
   }

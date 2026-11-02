@@ -151,7 +151,7 @@ export default function VisualBuilderPage() {
     );
   }
 
-  // The www-design concept, ?design=www on an offer page. Mirrored in server/ssr-handler.tsx.
+  // The www design, the default for offer pages (?design=classic for the previous one). Mirrored in server/ssr-handler.tsx.
   if (wantsWwwDesign(searchParams) && isOfferExperience(data)) {
     return <WwwOfferPage experience={data} />;
   }
