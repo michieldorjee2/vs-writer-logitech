@@ -12,7 +12,7 @@
  *   head  rendered into <head> by the server (buildHeadHtml), unchanged by the new design
  *   none  identity metadata no renderer displays (also not fetched by PAGE_QUERY)
  *
- * `legacy` marks the 14 fields the old ABMHyperPage stored but never showed.
+ * `legacy` marks the 16 fields the old ABMHyperPage stored but never showed.
  */
 export type FieldUse = 'text' | 'attr' | 'head' | 'none'
 
