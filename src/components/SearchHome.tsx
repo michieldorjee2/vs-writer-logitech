@@ -18,6 +18,7 @@ import { usePageRequest } from '../hooks/usePageRequest';
 import { cardLines } from '../lib/badge-card';
 import { useBadgeReady } from '../lib/badge-scan';
 import { clearOfflineCopies, INDEX_URL, keepIndex, readKeptIndex } from '../lib/home-offline';
+import { fillOfferWords, OFFER_ASK_WORDS, offerAddShown } from '../lib/offer-from-search';
 import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from '../lib/home-scenes';
 import {
   headlineParts,
@@ -647,7 +648,7 @@ export default function SearchHome({
       const t = text.trim().toLowerCase();
       const domain = t.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
       const hit = companies.find((e) => e.name.toLowerCase() === t || e.domain.toLowerCase() === domain || e.slug === t);
-      return hit ? { route: hit.slug, name: hit.name } : null;
+      return hit ? { route: hit.slug, name: hit.name, domain: hit.domain || undefined } : null;
     },
     [companies],
   );
@@ -840,7 +841,7 @@ export default function SearchHome({
     | { key: string; kind: 'item'; item: Item; meta: string | null }
     | { key: string; kind: 'build'; build: BuildSummary }
     | { key: string; kind: 'offer'; page: OfferPage }
-    | { key: string; kind: 'add'; add: 'account' | 'person' };
+    | { key: string; kind: 'add'; add: 'account' | 'person' | 'offer' };
   const columns = useMemo((): Array<{ title: string; rows: Row[]; empty: string | null }> => {
     const asRow = (item: Item, withMeta: boolean): Row =>
       item.kind === 'company'
@@ -883,8 +884,15 @@ export default function SearchHome({
       const personHere = people.some((p) => named(p.name)) || shownBuilds.some((b) => b.kind === 'person' && named(b.name));
       const withAdd = (found: Row[], here: boolean, add: 'account' | 'person'): Row[] =>
         !q || here ? found : [...found.slice(0, rows - 1), { key: `add:${add}`, kind: 'add', add }];
+      // Run as an offer that takes pages from search, "Add offer page" leads the column's adds
+      // whenever none of the offer's pages is named exactly what was typed, account page or not.
+      const offerAdds = (found: Row[]): Row[] => {
+        if (!offerAddShown(running, q)) return withAdd(found, companyHere, 'account');
+        const adds: Row[] = [{ key: 'add:offer', kind: 'add', add: 'offer' }, ...(companyHere ? [] : [{ key: 'add:account', kind: 'add' as const, add: 'account' as const }])];
+        return [...found.slice(0, Math.max(0, rows - adds.length)), ...adds];
+      };
       return [
-        { title: 'Companies', rows: withAdd(cs, companyHere, 'account'), empty: null },
+        { title: 'Companies', rows: offerAdds(cs), empty: null },
         { title: 'People', rows: withAdd(ps, personHere, 'person'), empty: null },
       ];
     }
@@ -931,7 +939,8 @@ export default function SearchHome({
 
   const pick = (row: Row) => {
     if (row.kind === 'add') {
-      req.start(row.add, query);
+      const offer = row.add === 'offer' && running && running.fromSearch !== 'off' ? { id: running.id, fromSearch: running.fromSearch } : undefined;
+      req.start(row.add, query, offer);
       inputRef.current?.focus();
       return;
     }
@@ -1005,7 +1014,9 @@ export default function SearchHome({
   const badgeLines = req.card ? cardLines(req.card, req.cardCompany) : null;
   const requestHint =
     req.error ??
-    (req.phase === 'sent'
+    (req.offerMode
+      ? OFFER_ASK_WORDS.hint[req.offerMode]
+      : req.phase === 'sent'
       ? 'It shows up in your list while Mark works; open it to watch.'
       : req.phase === 'person'
         ? req.companyIsNew
@@ -1023,7 +1034,17 @@ export default function SearchHome({
   const activeRow = view === 'search' && !leaving ? navRows[activeIdx] : undefined;
   const addRow = activeRow?.kind === 'add' ? activeRow : null;
   const adding = req.phase === 'company' || req.phase === 'person' || !!addRow;
-  const goLabel = req.phase ? 'Send to Mark' : addRow ? (addRow.add === 'account' ? 'Add company' : 'Add person') : 'Open';
+  const goLabel = req.phase
+    ? req.offerMode
+      ? OFFER_ASK_WORDS.go[req.offerMode]
+      : 'Send to Mark'
+    : addRow
+      ? addRow.add === 'account'
+        ? 'Add company'
+        : addRow.add === 'offer'
+          ? OFFER_ASK_WORDS.row
+          : 'Add person'
+      : 'Open';
 
   /* What a screen reader hears as the results change, rather than the whole panel again. */
   const hits = (c: number) => columns[c]?.rows.filter((r) => r.kind === 'item').length ?? 0;
@@ -1231,7 +1252,7 @@ export default function SearchHome({
           ) : view === 'request' ? (
             <div className="sh-cols sh-cols--single" data-anim={anim ?? undefined} key="request">
               <div className="sh-col">
-                <h2 style={slot(0, 0)}>{req.kind === 'person' ? 'New person page' : 'New company page'}</h2>
+                <h2 style={slot(0, 0)}>{req.kind === 'person' ? 'New person page' : req.kind === 'offer' ? OFFER_ASK_WORDS.heading : 'New company page'}</h2>
                 <p className={'sh-note' + (req.error ? ' sh-note--error' : '')} style={slot(1, 0)}>
                   {requestHint}
                 </p>
@@ -1264,8 +1285,12 @@ export default function SearchHome({
                             <PlusIcon />
                           </span>
                           <span className="sh-row__text">
-                            <span className="sh-row__name">{row.add === 'account' ? 'Add company' : 'Add person'}</span>
-                            <span className="sh-row__meta">{`Ask Mark to build a page for “${query.trim()}”`}</span>
+                            <span className="sh-row__name">{row.add === 'account' ? 'Add company' : row.add === 'offer' ? OFFER_ASK_WORDS.row : 'Add person'}</span>
+                            <span className="sh-row__meta">
+                              {row.add === 'offer' && running && running.fromSearch !== 'off'
+                                ? fillOfferWords(OFFER_ASK_WORDS.meta[running.fromSearch], { q: query.trim() })
+                                : `Ask Mark to build a page for “${query.trim()}”`}
+                            </span>
                           </span>
                         </button>
                       );

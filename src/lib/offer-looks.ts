@@ -41,6 +41,14 @@ export type OfferPage = {
   published: string | null;
 };
 
+/**
+ * Whether the search page may ask for one more page of the offer (Aldus UI's
+ * Offer.fromSearch): 'off', 'on' (Mark writes it at once) or 'approval' (the
+ * offer's team approves each ask first). Aldus UI says 'off' too while the
+ * offer can't write pages; anything else reads as 'off'.
+ */
+export type FromSearch = 'off' | 'on' | 'approval';
+
 /** A running offer, as GET /api/offers lists it. */
 export type RunningOffer = {
   id: string;
@@ -49,6 +57,24 @@ export type RunningOffer = {
   windowEnd: string;
   look: ShowcaseLook | null;
   pages: OfferPage[];
+  fromSearch: FromSearch;
+};
+
+/**
+ * What POST /api/offers/{id}/pages answers (Aldus UI's machine route, its
+ * known fields only): the page started or waiting in the queue, an ask sent
+ * for approval (`choices`: how many accounts the domain names; `again`: it
+ * was asked already), or a refusal with its `code`.
+ */
+export type OfferPageAsk = {
+  outcome?: 'started' | 'waiting' | 'asked';
+  account?: { name: string };
+  choices?: number;
+  again?: boolean;
+  code?: string;
+  error?: string;
+  domain?: string;
+  pageUrl?: string;
 };
 
 /** What the server draws /search with, and the browser hydrates (#root data-offer). */

@@ -4,6 +4,7 @@
  * the record of what it wrote; Graph is what is live on this site, so a page
  * is listed when either has it. Shared by api/offers/* and the SSR handler.
  */
+import { isFromSearch } from '../../src/lib/offer-from-search.js';
 import type { OfferPage, RunningOffer } from '../../src/lib/offer-looks.js';
 import { runningOffers, type AldusOffer } from './aldus.js';
 import { offerPagesByOffer } from './offer-pages.js';
@@ -26,7 +27,15 @@ export function withPages(offer: AldusOffer, graph: Map<string, OfferPage[]>): R
     pages.push({ route, companyName: p.accountName, domain: null, logoUrl: null, published: p.liveSince });
   }
   pages.sort((a, b) => (b.published ?? '').localeCompare(a.published ?? '') || a.companyName.localeCompare(b.companyName));
-  return { id: offer.id, title: offer.title, windowStart: offer.windowStart, windowEnd: offer.windowEnd, look: offer.look, pages };
+  return {
+    id: offer.id,
+    title: offer.title,
+    windowStart: offer.windowStart,
+    windowEnd: offer.windowEnd,
+    look: offer.look,
+    pages,
+    fromSearch: isFromSearch(offer.fromSearch) ? offer.fromSearch : 'off',
+  };
 }
 
 export async function listRunning(fresh = false): Promise<RunningOffer[]> {

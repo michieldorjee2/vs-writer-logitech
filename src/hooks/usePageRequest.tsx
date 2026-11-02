@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { askAnswerOf, askNote } from '../lib/offer-from-search';
+import type { FromSearch } from '../lib/offer-looks';
 import type { BuildSummary } from '../lib/page-builds';
 import { looksLikeWebsite } from '../lib/search-entries';
 import { READ_FAILURE } from '../lib/badge-scan';
@@ -13,13 +15,21 @@ import { useBadgeCard } from './useBadgeCard';
  * An account page is asked for by the company's website. A person page needs
  * the company and the person: a company that has a page already, or the
  * website of one that doesn't, whose page Mark then builds first.
+ *
+ * Run as an offer that takes pages from search, an offer page is asked for by
+ * the company's website too (kind 'offer'): Aldus UI finds the account and
+ * writes the offer's page, at once or once the offer's team approves
+ * (src/lib/offer-from-search.ts). It isn't a build, so it shows no ring.
  */
 
 const BUILDS_ENDPOINT = '/api/page-builds';
 /* How long the "sent" line stays up: long enough to read a sentence. */
 const SENT_MS = 6000;
 
-export type RequestKind = 'account' | 'person';
+export type RequestKind = 'account' | 'person' | 'offer';
+
+/** The offer an offer page is asked for, and how it takes pages from search. */
+export type OfferRef = { id: string; fromSearch: Exclude<FromSearch, 'off'> };
 /** Which field the search bar is asking for, or 'sent' once Mark has it. */
 export type RequestPhase = null | 'company' | 'person' | 'sent';
 
@@ -60,8 +70,8 @@ export function usePageRequest({
   findCompany,
   onStarted,
 }: {
-  /** A company the index has a page for, by name or website. */
-  findCompany: (text: string) => { route: string; name: string } | null;
+  /** A company the index has a page for, by name or website (and its domain, when the index has one). */
+  findCompany: (text: string) => { route: string; name: string; domain?: string } | null;
   onStarted: (builds: BuildSummary[]) => void;
 }) {
   const [phase, setPhase] = useState<RequestPhase>(null);
@@ -71,6 +81,7 @@ export function usePageRequest({
   /* What was typed in search when the request began: a name, the page's address. */
   const [askedFor, setAskedFor] = useState('');
   const [companyRef, setCompanyRef] = useState<CompanyRef | null>(null);
+  const [offerRef, setOfferRef] = useState<OfferRef | null>(null);
   /* A company typed by name that has no page: the website comes next, the name names the page. */
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -86,21 +97,24 @@ export function usePageRequest({
     return () => window.clearTimeout(id);
   }, [phase]);
 
-  /** Account pages start from the website; a person page from the company, then the name. */
-  const start = useCallback((nextKind: RequestKind, query: string) => {
+  /** Account and offer pages start from the website; a person page from the company, then the name. */
+  const start = useCallback((nextKind: RequestKind, query: string, offer?: OfferRef) => {
     const q = query.trim();
     setKind(nextKind);
     setAskedFor(q);
     // A name is not a domain: the field starts empty so its placeholder asks for one, and
     // the hint says why (askedName). Pre-filled, the name invited a submit that could only fail.
-    setCompany(nextKind === 'account' && looksLikeWebsite(q) ? q : '');
+    // An offer page for a company the index knows starts with its domain.
+    const known = nextKind === 'offer' && !looksLikeWebsite(q) ? (findCompany(q)?.domain ?? '') : '';
+    setCompany(nextKind !== 'person' && looksLikeWebsite(q) ? q : known);
     setPerson(nextKind === 'person' ? q : '');
+    setOfferRef(nextKind === 'offer' ? (offer ?? null) : null);
     setCompanyRef(null);
     setCompanyName('');
     setError(null);
     setSubmitting(false);
     setPhase('company');
-  }, []);
+  }, [findCompany]);
 
   /* A badge the rep scanned (phones, useBadgeCard): it has the bar and the panel until it is sent or put away. */
   const badge = useBadgeCard({
@@ -159,9 +173,39 @@ export function usePageRequest({
     [onStarted],
   );
 
+  /** An offer page: Aldus UI answers whether Mark writes it now, it waits for approval, or why not. */
+  const askOffer = useCallback(
+    async (offer: OfferRef, website: string) => {
+      setSubmitting(true);
+      setError(null);
+      try {
+        const r = await fetch(`/api/offers/${encodeURIComponent(offer.id)}/pages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website }),
+        });
+        const note = askNote(r.status, askAnswerOf(await r.json().catch(() => null)), website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0]);
+        if (note.kind === 'error') return setError(note.text);
+        setSentNote(note.text);
+        setPhase('sent');
+      } catch {
+        setError("Couldn't reach Mark. Try again.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [],
+  );
+
   const submit = useCallback(async () => {
     if (phase === 'company') {
       const text = company.trim();
+      if (kind === 'offer' && offerRef) {
+        if (!text) return setError("Enter the company's domain, e.g. anaplan.com");
+        if (!looksLikeWebsite(text))
+          return setError("Multiple companies might match a name. Enter the company's domain, e.g. anaplan.com, so we know we're asking for the right one.");
+        return askOffer(offerRef, text);
+      }
       if (kind === 'account') {
         if (!text) return setError("Enter the company's domain, e.g. anaplan.com");
         // An account page is found by the company's website, exactly — never by name.
@@ -174,7 +218,8 @@ export function usePageRequest({
       }
       if (!text) return setError('Enter the company they work at');
       const known = findCompany(text);
-      if (known) setCompanyRef(known);
+      // Its route and name only: the person page's request is as it was before findCompany also gave the domain.
+      if (known) setCompanyRef({ route: known.route, name: known.name });
       else if (looksLikeWebsite(text)) setCompanyRef({ website: text, ...(companyName ? { name: companyName } : {}) });
       else {
         setCompanyName(text);
@@ -190,7 +235,7 @@ export function usePageRequest({
       if (!who) return setError("Enter the person's name");
       return send({ kind: 'person', personName: who, company: companyRef }, personNote);
     }
-  }, [phase, kind, company, person, askedFor, companyRef, companyName, findCompany, send]);
+  }, [phase, kind, company, person, askedFor, companyRef, companyName, findCompany, send, offerRef, askOffer]);
 
   /** What the bar's field edits in the current phase. */
   const value = phase === 'person' ? person : company;
@@ -252,6 +297,8 @@ export function usePageRequest({
     edit: editCard,
     /** An account request begun from a company's name, which still needs its domain. */
     askedName: kind === 'account' && askedFor && !looksLikeWebsite(askedFor) ? askedFor : null,
+    /** An offer page request: how the offer takes pages from search. */
+    offerMode: kind === 'offer' ? (offerRef?.fromSearch ?? null) : null,
     start,
     cancel,
     submit: shown ? sendCard : submit,
