@@ -1,0 +1,24 @@
+/* The search bar's camera (BadgeScanButton.tsx): phones only, a quiet icon
+   beside the green go button. Below 800px, the same switch as search-home.css. */
+.sh-search__scan,
+.sh-search__scan-input { display: none; }
+
+@media (max-width: 799.98px) {
+  .sh-search__scan {
+    appearance: none;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    margin-right: -6px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--sh-fg-2);
+    cursor: pointer;
+  }
+  .sh-search__scan:hover { background: var(--sh-hover); color: var(--sh-fg); }
+  .sh-search__scan:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: 2px; }
+}
