@@ -211,6 +211,8 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/page-builds\/([^/]+)$/, '/api/page-builds/[id].ts'],
           [/^\/api\/offers$/, '/api/offers/index.ts'],
           [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
+          [/^\/api\/offer-signup$/, '/api/offer-signup.ts'],
+          [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],
         ]
         let file: string | null = null
         let id: string | null = null
@@ -394,7 +396,7 @@ function opalCreatePageDevProxy(devEmail: string | null): Plugin {
  * Vite plugin that proxies /api/content and /api/preview during dev.
  * Auth keys stay server-side — never shipped to the browser.
  */
-function graphDevProxy(authKey: string, singleKey: string, devEmail: string | null): Plugin {
+function graphDevProxy(authKey: string, singleKey: string, devEmail: string | null, env: Record<string, string>): Plugin {
   return {
     name: 'graph-dev-proxy',
     configureServer(server) {
@@ -428,10 +430,13 @@ function graphDevProxy(authKey: string, singleKey: string, devEmail: string | nu
                   }
                   const item = json?.data?.[typeName]?.items?.[0]
                   if (item) {
+                    // The offer's email form, as api/content.ts adds it (api/_lib/offer-signup.ts reads .env.local like the dev routes).
+                    for (const [k, v] of Object.entries(env)) if (!(k in process.env)) process.env[k] = v
+                    const { withOfferSignup } = await server.ssrLoadModule('/api/_lib/offer-signup.ts')
                     return jsonResponse(
                       res,
                       200,
-                      normalizeExperienceItem({ ...item, __typename: typeName, __template: template }),
+                      await withOfferSignup(normalizeExperienceItem({ ...item, __typename: typeName, __template: template })),
                     )
                   }
                 }
@@ -573,7 +578,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       stripHtmlComments(),
-      ...(authKey ? [graphDevProxy(authKey, singleKey, devEmail)] : []),
+      ...(authKey ? [graphDevProxy(authKey, singleKey, devEmail, env)] : []),
       devAuthProxy(devEmail),
       opalFeedbackDevProxy(devEmail),
       opalCreatePageDevProxy(devEmail),

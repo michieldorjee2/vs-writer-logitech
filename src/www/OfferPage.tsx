@@ -19,6 +19,7 @@ import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { cn } from '../vendor/www/lib/utils'
 import { AccountMark, Card, Colophon, Eyebrow, Heading, HeroFrame, Initials, Paragraphs, Reveal, Scene, Steps, StickyCta, WwwPage, plain } from './ui'
 import { list, readOffer, str, type ElementData, type OfferSection } from './offer-content'
+import OfferSignupForm from '../components/offer-signup/OfferSignupForm'
 import { SCENE } from './account-helpers'
 
 interface Experience {
@@ -452,8 +453,13 @@ function QuoteCard({ q }: { q: ElementData }) {
 function SignUp({ close, company, leftovers }: { close?: ElementData; company: string; leftovers: ReactNode }) {
   if (!close && !leftovers) return null
   const url = str(close, 'ScheduleUrl')
+  // The offer chose the email form in Limitless (src/lib/offer-signup.ts tags the close band with
+  // SignupOfferId and points the hero's main button at #signup): the form takes the button's
+  // place, as on the classic page. The form carries the "signup" anchor itself then, so the band
+  // takes another id (one id per page); the hero link and the sticky bar land on the form.
+  const signupId = str(close, 'SignupOfferId')
   return (
-    <section id="signup" data-scene data-tone="dark" className="www-scene www-scene--dark www-scene--fill">
+    <section id={signupId ? 'signup-band' : 'signup'} data-scene data-tone="dark" data-band="dark" className="www-scene www-scene--dark www-scene--fill">
       <div className="www-scene__inner vb-container mx-auto w-full px-4 lg:px-8">
         <div className="grid items-center gap-[min(6vh,56px)] lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-7">
@@ -465,14 +471,20 @@ function SignUp({ close, company, leftovers }: { close?: ElementData; company: s
                 {str(close, 'Description')}
               </Reveal>
             )}
-            {str(close, 'ButtonText') && (
+            {signupId ? (
               <Reveal i={2} className="mt-10">
-                <Button asChild variant="primary" className="www-btn">
-                  <a href={url || '#'} {...external(url)}>
-                    {str(close, 'ButtonText')}
-                  </a>
-                </Button>
+                <OfferSignupForm offerId={signupId} buttonText={str(close, 'ButtonText') || undefined} variant="primary" />
               </Reveal>
+            ) : (
+              str(close, 'ButtonText') && (
+                <Reveal i={2} className="mt-10">
+                  <Button asChild variant="primary" className="www-btn">
+                    <a href={url || '#'} {...external(url)}>
+                      {str(close, 'ButtonText')}
+                    </a>
+                  </Button>
+                </Reveal>
+              )
             )}
           </div>
           <Reveal i={3} className="www-signup-photo lg:col-span-5">

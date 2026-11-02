@@ -35,6 +35,8 @@ const FILES = [
   // `check:graph` was green while `npm run dev` 400'd on every page. See the comment at the
   // top of vite.config.ts.
   'vite.config.ts',
+  // The offer page a sign-up names (the email form's endpoint).
+  'api/offer-signup.ts',
 ];
 
 function authKey() {

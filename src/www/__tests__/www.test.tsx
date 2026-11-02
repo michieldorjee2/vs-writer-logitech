@@ -595,6 +595,20 @@ test('offer links keep their targets', () => {
     assert.ok(offerHtml.includes(w), `${w} missing`)
 })
 
+test('offer sign-up: when the offer chose the email form, the www close shows it in place of the button', () => {
+  const offer = fullOffer() as unknown as { composition: unknown }
+  const tagged = JSON.parse(JSON.stringify(offer), (k, v) => (v && v.__typename === 'AbmClosingCtaElement' ? { ...v, SignupOfferId: 'offer-123' } : v))
+  const html = renderToString(<OfferPage experience={tagged} />)
+  assert.match(html, /data-offer-signup=""/)
+  assert.match(html, /<input[^>]*type="email"/)
+  assert.ok(!html.includes('href="https://example.test/O-close-url"'), 'the close still links out')
+  assert.match(html, /O-close-button/)
+  assert.equal((html.match(/id="signup"/g) ?? []).length, 1, 'the signup anchor twice')
+  // Without the tag: the button, as before.
+  const plainHtml = renderToString(<OfferPage experience={fullOffer()} />)
+  assert.ok(!/data-offer-signup/.test(plainHtml) && plainHtml.includes('href="https://example.test/O-close-url"'))
+})
+
 test('the about section keeps its anchor and the hero run is extruded', () => {
   assert.match(offerHtml, /id="about"/)
   assert.ok((offerHtml.match(/O-run/g) ?? []).length > 1, 'an extruded run renders once per layer')

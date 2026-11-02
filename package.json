@@ -12,12 +12,15 @@
     "check:render": "node scripts/check-use-case-render.mjs",
     "check:www": "node scripts/check-www.mjs",
     "e2e:www": "tsx scripts/e2e-www.ts",
+    "check:limitless": "node scripts/check-limitless-links.mjs",
+    "check:signup": "node scripts/check-offer-signup.mjs",
     "check:rem-scale": "node scripts/check-rem-scale.mjs",
     "cms:apply": "tsx src/cms/apply.ts",
     "cms:apply:dry": "tsx src/cms/apply.ts --dry-run",
     "tokens:build": "node scripts/build-tokens.js",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:www"
+    "check:from-search": "tsx scripts/check-offer-from-search.ts",
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:www"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.20",
