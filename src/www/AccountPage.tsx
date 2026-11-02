@@ -37,17 +37,18 @@ import { PortraitTextQuoteCard } from '../vendor/www/components/block/portrait-t
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { cn } from '../vendor/www/lib/utils'
 import {
+  AccountMark,
   Card,
   Colophon,
   CountUp,
   Eyebrow,
   Heading,
+  HeroFrame,
   Initials,
   Reveal,
   Scene,
   Steps,
   StickyCta,
-  TopStrip,
   WwwPage,
   plain,
   richToStacked,
@@ -56,6 +57,11 @@ import { formatStatValue, comparisonTableHtml, realContacts, PROOF_LOGOS, SCENE 
 
 interface Props {
   page: CompetitorComparisonPage
+}
+
+/** What the connect panel shows on this template: the stored team, and the stored "Schedule a call" link. */
+export function connectProps(page: CompetitorComparisonPage) {
+  return { people: toPeople(page.teamMembers), scheduleUrl: page.modalScheduleUrl?.default || null }
 }
 
 export default function AccountPage({ page }: Props) {
@@ -67,13 +73,13 @@ export default function AccountPage({ page }: Props) {
       .replace(/^\/+|\/+$/g, '') || null
 
   return (
-    <ConnectProvider page={page} people={toPeople(page.teamMembers)} scheduleUrl={page.modalScheduleUrl?.default || null}>
+    <ConnectProvider page={page} {...connectProps(page)}>
     <WwwPage accent={page.brandAccentColor}>
       <div id="main-content">
         <Hero page={page} company={company} />
         <Intel page={page} company={company} companySlug={companySlug} />
         <Signals page={page} company={company} />
-        <Challenge page={page} />
+        <Challenge page={page} company={company} />
         <Comparison page={page} />
         <Proof page={page} company={company} />
         <Analysts page={page} />
@@ -97,77 +103,36 @@ function localHref(url: string | null | undefined, fallback = '#cta'): string {
 /* ======================================================================= 1 HERO */
 
 function Hero({ page, company }: { page: CompetitorComparisonPage; company: string }) {
-  const firstStat = page.intelStats?.[0]
   return (
-    <section id="hero" data-scene className="www-hero is-in">
-      <TopStrip account={{ name: company, logo: page.customerLogo }} />
-      <div className="vb-container mx-auto w-full px-3 lg:px-6">
-        <div className="www-hero__card">
-          <div className="www-hero__copy">
-            {page.eyebrow && (
-              <Reveal i={0}>
-                <p className="www-eyebrow www-eyebrow--on-dark">{page.eyebrow}</p>
-              </Reveal>
-            )}
-            <Reveal i={1} data-xray="hero-title">
-              <Heading text={plain(page.headline) || `Built for ${company}`} level="h1" className="text-white" />
-            </Reveal>
-            {page.subheadline && (
-              <Reveal i={2} as="p" data-xray="hero-subtitle" className="www-lead text-white/85">
-                {page.subheadline}
-              </Reveal>
-            )}
-            <Reveal i={3} className="flex flex-wrap gap-3">
-              <Button asChild variant="primary" className="www-btn">
-                <a href="#cta">Talk to your team</a>
-              </Button>
-              {page.cta && page.link?.default && (
-                <Button asChild variant="white" className="www-btn">
-                  <a href={localHref(page.link.default)}>{page.cta}</a>
-                </Button>
-              )}
-            </Reveal>
-          </div>
-          <Reveal i={2} className="www-hero__visual">
-            <picture>
-              <source type="image/avif" srcSet={`${SCENE}-960.avif 960w, ${SCENE}-1600.avif 1600w`} sizes="(min-width: 992px) 50vw, 100vw" />
-              <img src={`${SCENE}-960.webp`} alt="" className="absolute inset-0 size-full object-cover" loading="eager" decoding="async" />
-            </picture>
-            {page.challengeScreenshotUrl?.default && (
-              <figure data-xray="challenge-screenshot" className="www-browser">
-                <div className="www-browser__bar">
-                  <span />
-                  <span />
-                  <span />
-                  <span className="www-browser__url">{page.challengeBrowserUrl || page.brandDomain || ''}</span>
-                </div>
-                <img
-                  src={page.challengeScreenshotUrl.default}
-                  alt={page.challengeScreenshotAlt || `${company}'s website today`}
-                  loading="eager"
-                />
-              </figure>
-            )}
-            <div data-xray="hero-3d" className="www-built-for www-accent-bar">
-              {page.customerLogo ? (
-                <img src={page.customerLogo} alt={`${company} logo`} className="size-11 rounded-xl bg-white object-contain p-1" />
-              ) : (
-                <Initials initials={company.slice(0, 2).toUpperCase()} className="size-11 text-lg" />
-              )}
-              <div className="min-w-0">
-                <p className="www-caption">Built for</p>
-                <p className="font-nudge text-xl leading-tight font-extrabold">{company}</p>
-                {firstStat && (
-                  <p className="text-body-3xs leading-snug">
-                    {formatStatValue(firstStat.Value)} {firstStat.Label}
-                  </p>
-                )}
-              </div>
-            </div>
+    <HeroFrame
+      scene={SCENE}
+      copy={
+        <>
+          {/* Whose page this is, once: their logo and the stored eyebrow, above the headline. */}
+          <Reveal i={0} fx="scale">
+            <AccountMark name={company} logo={page.customerLogo} label={page.eyebrow || `Personalized for ${company}`} xray="hero-3d" accent={!!page.brandAccentColor} />
           </Reveal>
-        </div>
-      </div>
-    </section>
+          <Reveal i={1} data-xray="hero-title">
+            <Heading text={plain(page.headline) || `Built for ${company}`} level="h1" className="text-white" />
+          </Reveal>
+          {page.subheadline && (
+            <Reveal i={2} as="p" data-xray="hero-subtitle" className="www-lead text-white/85">
+              {page.subheadline}
+            </Reveal>
+          )}
+          <Reveal i={3} className="flex flex-wrap gap-3">
+            <Button asChild variant="primary" className="www-btn">
+              <a href="#cta">Talk to your team</a>
+            </Button>
+            {page.cta && page.link?.default && (
+              <Button asChild variant="white" className="www-btn">
+                <a href={localHref(page.link.default)}>{page.cta}</a>
+              </Button>
+            )}
+          </Reveal>
+        </>
+      }
+    />
   )
 }
 
@@ -325,24 +290,43 @@ function Signals({ page, company }: { page: CompetitorComparisonPage; company: s
 
 /* ================================================================== 4 CHALLENGE */
 
-function Challenge({ page }: { page: CompetitorComparisonPage }) {
-  if (!page.challengeHeadline) return null
+function Challenge({ page, company }: { page: CompetitorComparisonPage; company: string }) {
   const pains = page.painPoints ?? []
+  const shot = page.challengeScreenshotUrl?.default
+  if (!page.challengeHeadline && !shot) return null
   return (
     <Scene id="challenge">
-      <div className="grid gap-[min(6vh,56px)] lg:grid-cols-12 lg:gap-12">
-        <div data-xray="challenge-headline" className="lg:col-span-5">
-          <Reveal i={0}>
-            <Eyebrow>The challenge</Eyebrow>
-          </Reveal>
-          <Reveal i={1}>
-            <Heading text={richToStacked(page.challengeHeadline)} />
-          </Reveal>
+      <div className="grid gap-[min(4vh,40px)] lg:grid-cols-12 lg:gap-12">
+        <div data-xray="challenge-headline" className="flex flex-col gap-[min(4vh,32px)] lg:col-span-5">
+          <div>
+            <Reveal i={0}>
+              <Eyebrow>The challenge</Eyebrow>
+            </Reveal>
+            <Reveal i={1}>
+              <Heading text={richToStacked(page.challengeHeadline) || `${company}'s site today`} />
+            </Reveal>
+          </div>
+          {shot && (
+            // Their site today. The stored capture is small (often 374px wide), so it is shown no
+            // wider than it was taken and scrolls through the page inside the frame: sharp, never
+            // stretched.
+            <Reveal i={2} fx="scale" as="figure" data-xray="challenge-screenshot" className="www-browser">
+              <div className="www-browser__bar">
+                <span />
+                <span />
+                <span />
+                <span className="www-browser__url">{page.challengeBrowserUrl || page.brandDomain || ''}</span>
+              </div>
+              <div className="www-browser__view">
+                <img src={shot} alt={page.challengeScreenshotAlt || `${company}'s website today`} loading="lazy" decoding="async" />
+              </div>
+            </Reveal>
+          )}
         </div>
         {pains.length > 0 && (
           <ol className="www-pains lg:col-span-7" role="list">
             {pains.map((p, i) => (
-              <Reveal key={i} as="li" i={2 + i} data-xray="pain-points" className="www-pain">
+              <Reveal key={i} as="li" i={2 + i} fx="right" data-xray="pain-points" className="www-pain">
                 <span className="www-pain__n" aria-hidden="true">
                   {String(i + 1).padStart(2, '0')}
                 </span>
@@ -672,7 +656,6 @@ function StickyAsk({ text }: { text: string }) {
 
 function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<typeof realContacts> }) {
   const { connect, sent } = useConnect()
-  const schedule = page.modalScheduleUrl?.default
   return (
     <section id="cta" data-scene data-tone="dark" className="www-scene www-scene--dark www-scene--fill">
       <div id="form" className="www-scene__inner vb-container mx-auto w-full px-4 lg:px-8">
@@ -696,21 +679,10 @@ function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<
                   </span>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="primary"
-                    className="www-btn"
-                    id="cta-connect-btn"
-                    onClick={() => connect('cta-connect-btn')}
-                  >
-                    {page.ctaButtonText || 'Get in touch with your Optimizely team'}
-                  </Button>
-                  {schedule && (
-                    <Button asChild variant="white" className="www-btn">
-                      <a href={schedule}>Schedule a call</a>
-                    </Button>
-                  )}
-                </div>
+                // One call to action. "Schedule a call" (modalScheduleUrl) is in the panel it opens.
+                <Button variant="primary" className="www-btn" id="cta-connect-btn" onClick={() => connect('cta-connect-btn')}>
+                  {page.ctaButtonText || 'Get in touch with your Optimizely team'}
+                </Button>
               )}
               <p className="www-small mt-4 text-white/60">One click lets your team know. No form to fill in.</p>
             </Reveal>

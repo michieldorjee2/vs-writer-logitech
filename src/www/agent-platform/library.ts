@@ -24,15 +24,16 @@ export interface StateCopy {
   sub: string
   closeHeading: string
   closeLine: string
+  /**
+   * The close's one call to action (Michiel, 2 November 2026: one CTA, not two; Laura's table
+   * had a second, "Explore the agent platform", which is gone). It opens the connect panel.
+   */
   primaryCta: string
-  secondaryCta: { label: string; href: string }
   /** Named AE allowed on the page (open opp, customer). Otherwise the team pod. */
   namedRep: boolean
   /** Proof track: B = verified stories, A = educational assets with no logos. */
   proofTrack: 'A' | 'B'
 }
-
-const EXPLORE = { label: 'Explore the agent platform', href: 'https://www.optimizely.com/ai/' }
 
 export const STATES: Record<LifecycleState, StateCopy> = {
   prospect: {
@@ -43,7 +44,6 @@ export const STATES: Record<LifecycleState, StateCopy> = {
     closeHeading: 'Why we put this together for {account}',
     closeLine: 'See it running on your stack.',
     primaryCta: 'Arrange a session',
-    secondaryCta: EXPLORE,
     namedRep: false,
     proofTrack: 'A',
   },
@@ -55,7 +55,6 @@ export const STATES: Record<LifecycleState, StateCopy> = {
     closeHeading: 'Where the conversation goes from here',
     closeLine: "Bring the team. We'll bring the plan.",
     primaryCta: 'Arrange a session',
-    secondaryCta: EXPLORE,
     namedRep: true,
     proofTrack: 'B',
   },
@@ -67,7 +66,6 @@ export const STATES: Record<LifecycleState, StateCopy> = {
     closeHeading: 'Worth a second look',
     closeLine: 'Thirty minutes. A different platform.',
     primaryCta: 'See the new platform',
-    secondaryCta: EXPLORE,
     namedRep: false,
     proofTrack: 'B',
   },
@@ -79,7 +77,6 @@ export const STATES: Record<LifecycleState, StateCopy> = {
     closeHeading: "What's next for {account} on Optimizely",
     closeLine: 'Your next use case is already connected.',
     primaryCta: 'Map your next use case',
-    secondaryCta: { label: 'See the agent platform roadmap', href: 'https://www.optimizely.com/ai/' },
     namedRep: true,
     proofTrack: 'B',
   },
@@ -91,7 +88,6 @@ export const STATES: Record<LifecycleState, StateCopy> = {
     closeHeading: "See what's changed, on your terms",
     closeLine: "Come see what's new.",
     primaryCta: "See what's changed",
-    secondaryCta: EXPLORE,
     namedRep: false,
     proofTrack: 'B',
   },

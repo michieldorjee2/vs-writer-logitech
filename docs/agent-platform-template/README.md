@@ -11,7 +11,8 @@ The renderer reads one shape, `AgentPlatformContent` (`src/www/agent-platform/co
 | Part of the page | Today (from the stored page) | Waits for the agents |
 |---|---|---|
 | Lifecycle state | Customer if Optimizely is in the stored stack or stats, else prospect | Open opp, previously evaluated, ex-customer (Agent 1) |
-| Hero fact pills, homework stats | `intelStats`, minus traffic figures (N8) and stats about Optimizely | A visible source per fact (N6) |
+| Hero fact pills, homework facts (one per scene) | `intelStats`, minus traffic figures (N8) and stats about Optimizely | A visible source per fact (N6) |
+| "Our homework" on each use case | The stored stack tools and investments behind that theme, in their stored wording | Observed lines with a public source |
 | Teams layer, "Built for" | Role groups from `stakeholders` (names never shown, N3), else an industry default | Persona groups from Salesforce contacts |
 | Stack layer | `techStack`; the replaced platform and its category shown by category only (N2) | The 12-month, primary-domain stack pull |
 | Use-case ranking | Stack and stated investments only | The full five-theme score: 6QA, stage, intent, opps, seller override |
@@ -22,6 +23,12 @@ The renderer reads one shape, `AgentPlatformContent` (`src/www/agent-platform/co
 `?review=1` on a page shows this provenance for every part, and lets a reviewer switch the state (`?state=prospect|open-opp|evaluated|customer|ex-customer`). That layer never renders without the parameter (rule N12).
 
 Ten of the 67 stored fields feed the template (`USED_FIELDS` in `content.ts`); the other 57 are deliberately not shown, each with the rule that keeps it off (`NOT_SHOWN`). Two of those, `eyebrow` and `intelHeadline`, are still read for the account's name. A unit test fails if any field is in neither list. Nothing is deleted: the fields stay in the CMS untouched and `?template=takeout` still renders every one of them.
+
+## Changes after Michiel's review (2 November 2026)
+
+- **One closing CTA.** Laura's state table had two ("Explore the agent platform" as the second). The close now has only the one-click ask; scheduling and the contact are in the panel it opens.
+- **Homework through the page.** The facts after the hero's three are no longer a block in one section: one sits in each of where it fits, use cases, proof and the first 90 days. The stack, the investments and each use case carry the same "Our homework" tag. Agent 2's `stats` field feeds these, so the output contract is unchanged.
+- **Hero.** Full screen at 75% of the window, the account logo above the headline, "Personalized for" said once.
 
 ## The three drafts
 

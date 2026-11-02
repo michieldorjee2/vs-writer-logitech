@@ -14,7 +14,7 @@
 | `jobs[theme]` | For the two lead themes: the job line in the account's language ("One content engine for every county you serve") | 70 chars |
 | `observed[theme]` | For the two lead themes: one public fact that shows the need, with its source from `public_facts`. No fact, no line | 160 chars |
 | `pills` | Up to three public scale facts from `public_facts` | 32 chars each |
-| `stats` | Up to four homework facts not used in the pills, with one source line | 24 chars each |
+| `stats` | Up to four homework facts not used in the pills, with one source line. The page shows one per scene (where it fits, use cases, proof, first 90 days), so each should stand on its own | 24 chars each |
 | `priorities` | Up to four priority chips from news under 12 months | 40 chars each |
 | `quote` | Optional: one executive quote, verbatim, with source URL | 220 chars |
 
@@ -31,6 +31,7 @@ Everything else on the page comes from Account state (state, themes, stack, rep,
 - N9: proof is agent platform proof only. The renderer owns the proof library; the agent does not pick testimonials.
 - N12: the review layer is never part of the output.
 - N14: the agent's own copy stays under 250 words, so the page stays under 750.
+- One closing CTA: the close has only the one-click ask (Michiel, 2 November 2026). The agent writes no second CTA.
 - The swap test from gate 4: if another company's name could replace the account's and every line still held, rewrite the question, the job lines and the observed lines.
 
 **Write step.** Instead of `create_page` for `CompetitorComparisonPage`, the path writes the agent platform blueprint (see [storage](storage.md)), one record per account, keyed by `crm_account_id`. The existing takeout page at the account's route is not touched. The final output block stays the same.

@@ -27,7 +27,7 @@ import {
   type LifecycleState,
   type ThemeId,
 } from './library'
-import { readStack, stackTiles, themeEvidence, type StackTool, type ThemeEvidence } from './stack'
+import { readStack, stackTiles, themeEvidence, THEME_CATEGORIES, THEME_KEYWORDS, type StackTool, type ThemeEvidence } from './stack'
 
 /** Where a value came from. `agent` = waits for the agent drafts; the adapter cannot fill it. */
 export type Provenance = 'page' | 'derived' | 'template' | 'agent'
@@ -58,6 +58,12 @@ export interface AgentPlatformContent {
   themeEvidence: ThemeEvidence[]
   /** Observed lines per lead theme (agent only: a public fact plus source, else the line is deleted). */
   observed: Sourced<Partial<Record<ThemeId, { text: string; href: string }>>>
+  /**
+   * Per theme, what the page's own data shows (the tools they run in the theme's categories and
+   * the investments that name it): the homework line on a use-case card until the agent writes an
+   * observed line. Built from the N2-safe stack tiles and priorities, so no competitor is named.
+   */
+  why: Sourced<Partial<Record<ThemeId, ThemeWhy>>>
   /** Account-specific job lines per theme (agent); else the theme's generic job. */
   jobs: Sourced<Partial<Record<ThemeId, string>>>
   rep: Sourced<{ named: Array<{ name: string; role: string; email: string | null; initials: string }>; pod: string }>
@@ -142,6 +148,20 @@ export function toPeople(members: CompetitorComparisonPage['teamMembers']) {
     }))
 }
 
+/** What the page's own data shows for one theme: tools in its categories, investments that name it. */
+export interface ThemeWhy {
+  /** Stack tile labels (N2-safe: no competitor tile). */
+  stack: string[]
+  /** Stored investment names, verbatim (free text from the research; never re-cased or re-phrased). */
+  plans: string[]
+}
+
+function whyOf(theme: ThemeId, tiles: StackTool[], priorities: string[]): ThemeWhy | null {
+  const stack = tiles.filter((t) => !t.competitor && THEME_CATEGORIES[theme].includes(t.category)).map((t) => t.label).slice(0, 3)
+  const plans = priorities.filter((p) => THEME_KEYWORDS[theme].test(p)).slice(0, 2)
+  return stack.length || plans.length ? { stack, plans } : null
+}
+
 /* ---------------------------------------------------------------------- adapter */
 
 export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: LifecycleState | null } = {}): AgentPlatformContent {
@@ -172,6 +192,19 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
   const ae = toPeople(page.teamMembers).find((p) => AE_ROLE.test(p.role))
   const named = STATES[state.value].namedRep && ae ? [ae] : []
 
+  const tiles = stackTiles(tools)
+  // Primary investments first, at most four: a row of chips, not a list to read.
+  const priorities = [...(page.investments ?? [])]
+    .sort((a, b) => Number(!!b.IsPrimary) - Number(!!a.IsPrimary))
+    .map((i) => i.Name)
+    .filter((n) => n && !namesCompetitor(n))
+    .slice(0, 4)
+  const why: Partial<Record<ThemeId, ThemeWhy>> = {}
+  for (const e of ranked) {
+    const w = whyOf(e.theme, tiles, priorities)
+    if (w) why[e.theme] = w
+  }
+
   return {
     account,
     logo: page.customerLogo || null,
@@ -186,14 +219,9 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
       from: groups.length >= 3 ? 'derived' : 'template',
       note: groups.length >= 3 ? 'role groups from the page’s stakeholders (names never shown, N3)' : 'industry default: fewer than 3 role groups on the page',
     },
-    stack: { value: stackTiles(tools), from: 'derived', note: 'techStack; competitors by category only (N2)' },
+    stack: { value: tiles, from: 'derived', note: 'techStack; competitors by category only (N2)' },
     priorities: {
-      // Primary investments first, at most four: a row of chips, not a list to read.
-      value: [...(page.investments ?? [])]
-        .sort((a, b) => Number(!!b.IsPrimary) - Number(!!a.IsPrimary))
-        .map((i) => i.Name)
-        .filter((n) => n && !namesCompetitor(n))
-        .slice(0, 4),
+      value: priorities,
       from: 'page',
       note: 'investments (primary first, up to four), minus any that name the replaced platform (N2)',
     },
@@ -210,6 +238,7 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
     },
     themeEvidence: evidence,
     observed: { value: {}, from: 'agent', note: 'a public fact with a source, or the line is deleted' },
+    why: { value: why, from: 'derived', note: 'the stored tools and investments behind each theme; the agent’s observed line replaces it' },
     jobs: { value: {}, from: 'template', note: 'generic job lines; the agent writes them in the account’s language' },
     rep: {
       value: { named, pod: 'Your Optimizely account team' },

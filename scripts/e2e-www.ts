@@ -12,6 +12,10 @@
  * stream to Mark and the republish poll are all answered here; the test fails if any request
  * reaches webhook.opal.optimizely.com.
  *
+ * Layout (Michiel, 2 Nov): a full-screen hero at 75% of the window with the next scene peeking in,
+ * scenes at least 75%, the close the full window; one closing CTA; the intro on load settles; the
+ * hero landscape is never upscaled.
+ *
  * Covers, for both account templates (the agent platform one by default, ?template=takeout)
  * and the offer page: server render + hydration without errors, no sideways scroll on a phone,
  * every section present, sticky bar, the one-click connect panel (pings once per view, from the
@@ -129,7 +133,9 @@ async function revealsAll(page: Page) {
   expect(before < after.all, 'every scene was revealed before scrolling')
   expect(after.in === after.all, `${after.all - after.in} scene(s) never revealed`)
   await page.waitForTimeout(1200)
-  const hidden = await page.evaluate(() => [...document.querySelectorAll('[data-reveal]')].filter((e) => getComputedStyle(e).opacity === '0').length)
+  const hidden = await page.evaluate(
+    () => [...document.querySelectorAll('[data-reveal], .www-w, .www-tile')].filter((e) => getComputedStyle(e).opacity === '0').length,
+  )
   expect(hidden === 0, `${hidden} element(s) still invisible after scrolling through`)
   await page.evaluate(() => scrollTo(0, 0))
 }
@@ -145,6 +151,48 @@ async function shot(page: Page, name: string) {
   })
   await page.waitForTimeout(1600) // the last scene's reveal (0.8s + stagger) has finished
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true })
+}
+
+/** The hero is three quarters of the window (the next scene peeks in), the other scenes at least that, the close the full window. */
+async function sceneHeights(page: Page, vh: number) {
+  const r = await page.evaluate(() => ({
+    hero: document.getElementById('hero')!.getBoundingClientRect().height,
+    short: [...document.querySelectorAll('[data-scene]:not(.www-hero):not(.www-scene--compact)')]
+      .filter((s) => {
+        const h = s.getBoundingClientRect().height
+        return s.matches('.www-scene--fill') ? h < innerHeight - 25 : h < innerHeight * 0.75 - 1
+      })
+      .map((s) => s.id),
+    next: document.querySelector('#hero + [data-scene], #main-content > [data-scene]:nth-child(2)')?.getBoundingClientRect().top ?? 0,
+  }))
+  // 75% of the window; a hero with more copy than that grows, but the next scene still shows.
+  expect(r.hero >= vh * 0.75 - 2, `hero is ${r.hero}px in a ${vh}px window (want 75%)`)
+  expect(vh - r.next >= vh * 0.15, `the next scene starts at ${r.next}px: too little of it peeks into a ${vh}px window`)
+  expect(!r.short.length, `scenes shorter than 75% of the window: ${r.short.join(', ')}`)
+}
+
+/** The hero landscape is never upscaled: the file the browser picked is at least as wide as it is drawn. */
+async function heroImageSharp(page: Page) {
+  const r = await page.evaluate(() => {
+    const img = document.querySelector<HTMLImageElement>('.www-hero__img')!
+    return { src: img.currentSrc, drawn: img.getBoundingClientRect().width * devicePixelRatio }
+  })
+  const w = Number(r.src.match(/-(\d+)\.(avif|webp)/)?.[1])
+  expect(w >= r.drawn * 0.98, `${r.src} (${w}px) drawn ${Math.round(r.drawn)} device px wide`)
+}
+
+/** The intro plays once and settles: the landscape is fully open, the words and the panel are in. */
+async function introSettles(page: Page) {
+  await page.evaluate(() => scrollTo(0, 0))
+  await page.waitForTimeout(2600)
+  const r = await page.evaluate(() => ({
+    clip: getComputedStyle(document.querySelector('.www-hero__visual')!).clipPath,
+    words: [...document.querySelectorAll('#hero .www-w, #hero [data-reveal], #hero .www-agents, #hero .www-fact')].filter((e) => getComputedStyle(e).opacity !== '1').length,
+    running: document.getAnimations().filter((a) => a.playState === 'running' && (a.effect as KeyframeEffect)?.target?.closest?.('#hero') && !(a.effect as KeyframeEffect).target!.matches('.www-agents__live')).length,
+  }))
+  expect(/^(none|inset\(\s*(0(px|%)?\s*)+\))$/.test(r.clip), `hero landscape still clipped: ${r.clip}`)
+  expect(r.words === 0, `${r.words} hero element(s) not fully in after the intro`)
+  expect(r.running === 0, `${r.running} hero animation(s) still running after 2.6s`)
 }
 
 /* --------------------------------------------------------------------- tests */
@@ -178,25 +226,51 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await test('no sideways scroll', () => noSidewaysScroll(page))
     await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
     if (vp === 'desktop') {
-      await test('desktop: scenes fill the window, the hero exactly fits it', async () => {
+      await test('desktop: full screen hero at 75% of the window, the next scene peeking in; scenes at least 75%, the close the full window', () =>
+        sceneHeights(page, 900),
+      )
+      await test('desktop: the hero runs edge to edge, its copy lines up with the content column', async () => {
         const r = await page.evaluate(() => ({
-          hero: document.getElementById('hero')!.getBoundingClientRect().height,
-          short: [...document.querySelectorAll('[data-scene]:not(.www-scene--compact)')]
-            .filter((s) => s.getBoundingClientRect().height < innerHeight - (s.matches('.www-scene--fill.www-scene--dark') ? 25 : 1))
-            .map((s) => s.id),
+          card: document.querySelector('.www-hero__card')!.getBoundingClientRect(),
+          copy: document.querySelector('.www-hero__body h1')!.getBoundingClientRect().left,
+          col: document.querySelector('#who h2')!.getBoundingClientRect().left,
         }))
-        expect(Math.abs(r.hero - 900) <= 1, `hero is ${r.hero}px in a 900px window`)
-        expect(!r.short.length, `scenes shorter than the window: ${r.short.join(', ')}`)
+        expect(r.card.left === 0 && Math.abs(r.card.width - 1440) <= 1, `hero card ${r.card.left},${r.card.width}`)
+        expect(Math.abs(r.copy - r.col) <= 2, `hero copy at ${r.copy}px, content column at ${r.col}px`)
       })
     }
     if (vp === 'phone') {
-      await test('phone: the hero fills the first screen and its ask is in view', async () => {
-        const hero = await page.locator('#hero').boundingBox()
-        expect(hero && hero.height >= 844 - 1, `hero is ${hero?.height}px tall in an 844px window`)
+      await test('phone: the hero ask is in the first screen', async () => {
         const cta = await page.locator('#hero-connect-btn').boundingBox()
         expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
       })
     }
+    await test('the intro plays on load and settles (landscape open, words and panel in)', () => introSettles(page))
+    await test('the hero landscape is never upscaled', () => heroImageSharp(page))
+    await test('the page says whose it is once: the account logo above the H1, no "Made for"', async () => {
+      const r = await page.evaluate(() => ({
+        mark: document.querySelector('#hero .www-account')!.getBoundingClientRect().bottom,
+        h1: document.querySelector('#hero h1')!.getBoundingClientRect().top,
+        text: document.getElementById('hero')!.innerText,
+      }))
+      expect(r.mark <= r.h1, 'the logo is not above the H1')
+      // A logo that does not load (here the logo CDN is not reachable) shows the initials, never a broken image.
+      const logo = await page.evaluate(() => {
+        const tile = document.querySelector('#hero .www-account__logo')!
+        const img = tile.querySelector('img')
+        // No helper functions in here: tsx would wrap them in a __name() the page does not have.
+        const ini = tile.querySelector('.www-account__initials')
+        const imgShown = !!img && getComputedStyle(img).display !== 'none'
+        const iniShown = !!ini && getComputedStyle(ini).display !== 'none'
+        return { brokenShown: imgShown && img!.complete && img!.naturalWidth === 0, something: (imgShown && img!.naturalWidth > 0) || iniShown }
+      })
+      expect(!logo.brokenShown && logo.something, `logo tile: ${JSON.stringify(logo)}`)
+      expect((r.text.match(/Personalized for/g) ?? []).length === 1 && !/Made for|Built for/.test(r.text), r.text)
+    })
+    await test('the close has one call to action', async () => {
+      const n = await page.locator('#cta .www-close-band a, #cta .www-close-band button').count()
+      expect(n === 1, `${n} actions in the close band`)
+    })
     await test('the sticky bar appears past the hero and hides at the close', async () => {
       await page.evaluate(() => scrollTo(0, 0))
       await page.waitForTimeout(300)
@@ -213,6 +287,9 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       expect(beacons.length === 1, `beacons: ${beacons.length}`)
       const b = JSON.parse(beacons[0])
       expect(b.event === 'demo_button_clicked' && b.source === 'sticky-connect-btn', `beacon: ${beacons[0]}`)
+      // The stored "Schedule a call" link lives here now that the close has one CTA.
+      const stored = await page.evaluate(() => JSON.stringify((window as unknown as { __SSR_DATA__?: unknown }).__SSR_DATA__ ?? '').match(/"modalScheduleUrl":\{"default":"([^"]+)"/)?.[1] ?? null)
+      if (stored) expect((await panel.getByRole('link', { name: /Schedule a call/ }).getAttribute('href')) === stored, 'the panel does not link the stored schedule URL')
       await page.waitForTimeout(500) // the panel's open animation (0.35s) has finished
       await page.screenshot({ path: path.join(OUT, `connect-${vp}.png`) })
       await page.keyboard.press('Escape')
@@ -260,18 +337,21 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   await test('no sideways scroll', () => noSidewaysScroll(page))
   await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
   if (vp === 'desktop') {
-    await test('desktop: full scenes fill the window, the hero exactly fits it', async () => {
-      const r = await page.evaluate(() => ({
-        hero: document.getElementById('hero')!.getBoundingClientRect().height,
-        short: [...document.querySelectorAll('[data-scene]:not(.www-scene--compact)')]
-          // The dark bookends sit inset by 12px all round, like the hero card.
-          .filter((s) => s.getBoundingClientRect().height < innerHeight - (s.matches('.www-scene--fill.www-scene--dark') ? 25 : 1))
-          .map((s) => s.id),
-      }))
-      expect(Math.abs(r.hero - 900) <= 1, `hero is ${r.hero}px in a 900px window`)
-      expect(!r.short.length, `scenes shorter than the window: ${r.short.join(', ')}`)
-    })
+    await test('desktop: full screen hero at 75% of the window, the next scene peeking in; scenes at least 75%', () => sceneHeights(page, 900))
   }
+  await test('the intro plays on load and settles', () => introSettles(page))
+  await test('the hero landscape is never upscaled', () => heroImageSharp(page))
+  await test('their site screenshot is in the challenge scene, never drawn wider than it was taken', async () => {
+    const shotImg = page.locator('#challenge [data-xray="challenge-screenshot"] img')
+    if (!(await shotImg.count())) return
+    expect(!(await page.locator('#hero [data-xray="challenge-screenshot"]').count()), 'still on the hero')
+    const r = await shotImg.evaluate((img: HTMLImageElement) => ({ natural: img.naturalWidth, drawn: img.getBoundingClientRect().width }))
+    expect(r.drawn <= r.natural + 1, `drawn ${r.drawn}px wide from a ${r.natural}px capture`)
+  })
+  await test('the close has one call to action', async () => {
+    const n = await page.locator('#cta .www-btn').count()
+    expect(n === 1, `${n} buttons in the close`)
+  })
   await test('the sticky bar appears past the hero and hides at the contact card', async () => {
     expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
     await page.locator('#comparison').scrollIntoViewIfNeeded()
@@ -289,9 +369,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
   })
   if (vp === 'phone') {
-    await test('phone: the hero fills the first screen and its ask is in view', async () => {
-      const hero = await page.locator('#hero').boundingBox()
-      expect(hero && hero.height >= 844 - 1, `hero is ${hero?.height}px tall in an 844px window`)
+    await test('phone: the hero ask is in the first screen', async () => {
       const cta = await page.locator('#hero .www-btn').first().boundingBox()
       expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
     })
@@ -312,6 +390,8 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     for (const h of new Set(hrefs)) expect(await op.locator(h).count(), `link to ${h} goes nowhere`)
   })
   await test('no sideways scroll', () => noSidewaysScroll(op))
+  await test('the intro plays on load and settles', () => introSettles(op))
+  await test('the hero landscape is never upscaled', () => heroImageSharp(op))
   await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(op))
   if (await op.locator('#faq').count()) {
     await test('a FAQ answer opens on click', async () => {

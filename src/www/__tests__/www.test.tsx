@@ -24,7 +24,7 @@
 import assert from 'node:assert/strict'
 import { renderToString } from 'react-dom/server'
 import type { CompetitorComparisonPage } from '../../lib/graph-types'
-import AccountPage from '../AccountPage'
+import AccountPage, { connectProps } from '../AccountPage'
 import OfferPage from '../OfferPage'
 import { ACCOUNT_FIELDS } from '../account-fields'
 import { comparisonTableHtml, formatStatValue, PROOF_LOGOS, realContacts } from '../account-helpers'
@@ -460,7 +460,8 @@ const ATTR_EXPECT: Record<string, string[]> = {
   analystCTALink: ['href="https://example.test/F-analystCTALink"'],
   promoCTALink: ['href="https://example.test/F-promoCTALink"'],
   endCTALink: ['href="https://example.test/F-endCTALink"'],
-  modalScheduleUrl: ['href="https://example.test/F-modalScheduleUrl"'],
+  // In the connect panel the one closing CTA opens, not in the server HTML (see the test below).
+  modalScheduleUrl: [],
 }
 for (const f of ACCOUNT_FIELDS.filter((x) => x.use === 'attr')) {
   test(`attr  ${f.field} → ${f.section}`, () => {
@@ -469,6 +470,16 @@ for (const f of ACCOUNT_FIELDS.filter((x) => x.use === 'attr')) {
     for (const w of want) assert.ok(accountHtml.includes(w), `${w} is not in the markup`)
   })
 }
+
+test('the stored "Schedule a call" link is in the connect panel the one closing CTA opens', () => {
+  assert.equal(connectProps(account).scheduleUrl, 'https://example.test/F-modalScheduleUrl')
+  assert.equal(fromLegacyPage(account).scheduleUrl, 'https://example.test/F-modalScheduleUrl')
+  // ...and the close itself has one button, no second "Schedule a call".
+  const from = accountHtml.indexOf('<section id="cta"')
+  const close = accountHtml.slice(from, accountHtml.indexOf('</section>', from))
+  assert.ok(!close.includes('F-modalScheduleUrl'), 'a second CTA in the close')
+  assert.equal((close.match(/<button\b/g) ?? []).length, 1)
+})
 
 test('links inside arrays keep their targets (LinkedIn, person page, news, footer, analyst, citation, mail)', () => {
   for (const w of [
@@ -543,9 +554,12 @@ test('reveal animations can never hide content from a reader without JS', () => 
 })
 
 test('a scene with nothing to say is left out rather than rendered empty', () => {
-  const sparse = { ...fullAccountPage(), painPoints: null, challengeHeadline: null, analystCards: null, analystHeadline: null, analystQuote: null, promoHeading: null }
+  const sparse = { ...fullAccountPage(), painPoints: null, challengeHeadline: null, challengeScreenshotUrl: null, analystCards: null, analystHeadline: null, analystQuote: null, promoHeading: null }
   const html = renderToString(<AccountPage page={sparse as unknown as CompetitorComparisonPage} />)
   for (const id of ['challenge', 'analysts', 'promo']) assert.ok(!html.includes(`id="${id}"`), `#${id} rendered empty`)
+  // A stored screenshot alone still gets its scene: no stored content is dropped.
+  const shotOnly = renderToString(<AccountPage page={{ ...sparse, challengeScreenshotUrl: { default: 'https://example.test/shot.png' } } as unknown as CompetitorComparisonPage} />)
+  assert.match(shotOnly, /id="challenge"[\s\S]*https:\/\/example\.test\/shot\.png/)
 })
 
 test('metric units: a symbol stays with its number, a word unit is set smaller', () => {
@@ -779,6 +793,86 @@ test('hero: "Personalized for", the identity sentence first, no account name in 
   assert.ok(!/Northwind/.test(h1), h1)
 })
 
+test('hero: the page says whose it is once, with their logo above the H1 (Michiel, 2 Nov)', () => {
+  for (const [name, html] of [['agent platform', apHtml], ['takeout', accountHtml]] as const) {
+    const hero = html.slice(html.indexOf('<section id="hero"'), html.indexOf('</section>'))
+    const mark = hero.search(/class="www-account[ "]/)
+    assert.ok(mark > -1 && mark < hero.indexOf('<h1'), `${name}: no account logo above the H1`)
+    assert.match(hero, /class="www-account__logo"><img src="https:\/\/example\.test\/F-customerLogo\.png"/)
+    // One personalization line: no "Made for" in the corner, no account name on the landscape.
+    assert.ok(!/Made for|Built for/.test(textOf(hero)), `${name}: a second personalization line`)
+  }
+  const hero = apHtml.slice(0, apHtml.indexOf('</section>'))
+  assert.equal(textOf(hero).match(/Personalized for/g)?.length, 1)
+  assert.match(textOf(hero), /Agents at work Illustrative/)
+})
+
+test('hero: full screen, its landscape in every size up to 2880px wide', () => {
+  for (const html of [apHtml, accountHtml, renderToString(<OfferPage experience={fullOffer()} />)]) {
+    assert.match(html, /<section id="hero" data-scene(="true")? class="www-hero is-in"><div class="www-hero__card/)
+    assert.match(html, /mountain-wide-2880\.avif 2880w/)
+    assert.match(html, /fetchPriority="high"|fetchpriority="high"/)
+  }
+})
+
+test('takeout: the stored site screenshot is in the challenge scene at its own size, not stretched on the hero', () => {
+  const hero = accountHtml.slice(0, accountHtml.indexOf('</section>'))
+  assert.ok(!hero.includes('F-challengeScreenshotUrl'), 'the screenshot is still on the hero')
+  const from = accountHtml.indexOf('<section id="challenge"')
+  const challenge = accountHtml.slice(from, accountHtml.indexOf('</section>', from))
+  assert.match(challenge, /data-xray="challenge-screenshot"[\s\S]*src="https:\/\/example\.test\/F-challengeScreenshotUrl\.png"/)
+  assert.match(challenge, /F-challengeBrowserUrl/)
+})
+
+test('homework runs through the page: one fact per scene, not one homework section (Laura, Dan)', () => {
+  const facts = [
+    { Value: '12000', Label: 'employees' },
+    { Value: '40', Label: 'countries served' },
+    { Value: '1998', Label: 'founded' },
+    { Value: '310', Label: 'distribution centers' },
+    { Value: '9', Label: 'brands' },
+    { Value: '2.1B', Label: 'parcels a year' },
+    { Value: '64', Label: 'ports served' },
+  ]
+  const html = renderToString(<WwwAccountRoute page={stackPage({ intelStats: facts })} search="" />)
+  assert.ok(!/We did our homework/.test(html), 'a single homework section')
+  const sceneOf = (needle: string) => {
+    const at = html.indexOf(needle)
+    return [...html.slice(0, at).matchAll(/<section id="([^"]+)"/g)].pop()?.[1]
+  }
+  // The three hero pills, then one fact in each of four scenes, each said once.
+  assert.deepEqual(
+    ['distribution centers', 'brands', 'parcels a year', 'ports served'].map((l) => sceneOf(`<p class="www-note__label">${l}</p>`)),
+    ['intel', 'usecases', 'proof', 'migration'],
+  )
+  for (const l of ['employees', 'distribution centers', 'ports served']) assert.equal(textOf(html).split(l).length - 1, 1, `"${l}" said twice`)
+  // Every homework fact is an X-ray "intel-stats" hook, and carries the same tag.
+  assert.equal((html.match(/<aside[^>]*data-xray="intel-stats"/g) ?? []).length, 4)
+  assert.ok((textOf(html).match(/Our homework/g) ?? []).length >= 6)
+  // The use cases say what in the page's own data put them first (stack and investments, N2-safe).
+  assert.match(textOf(html), /In your stack Bynder On your agenda Global content localization/)
+  assert.match(textOf(html), /In your stack Tealium On your agenda Customer data unification/)
+  assert.equal(sceneOf('Where Northwind Freight is investing'), 'language')
+})
+
+test('a use-case homework line never names a competitor (N2)', () => {
+  const c = fromLegacyPage(stackPage({ investments: [{ Name: 'AEM upgrade', IsPrimary: true }, { Name: 'Global content localization', IsPrimary: false }] }))
+  for (const w of Object.values(c.why.value)) {
+    const line = [...w!.stack, ...w!.plans].join(' ')
+    assert.ok(!/AEM|Adobe|Sitecore|Your CMS/.test(line), line)
+  }
+  // Stored investment names are shown as written: never re-cased into a sentence ("tyler AI").
+  const t = fromLegacyPage(stackPage({ investments: [{ Name: 'Tyler AI across the product suite', IsPrimary: true }] }))
+  assert.deepEqual(t.why.value.geo?.plans, ['Tyler AI across the product suite'])
+})
+
+test('motion: every heading word, waypoint effect and the hero intro are presentation only', () => {
+  // Words are spans with the spaces left as text, so the heading reads and copies as one.
+  assert.match(apHtml, /<span class="www-w" style="--w:0">Who<\/span> <span class="www-w" style="--w:1">we<\/span>|<span class="www-w" style="--w:0">One<\/span> <span class="www-w" style="--w:1">platform<\/span>/)
+  assert.match(textOf(apHtml), /One platform to create, optimize and run digital experiences with AI agents\./)
+  for (const fx of ['left', 'right', 'drop', 'scale']) assert.match(apHtml, new RegExp(`data-reveal="${fx}"`), fx)
+})
+
 test('N2 and N3: no competitor name and no stakeholder name anywhere in the markup', () => {
   for (const name of ['Adobe Experience Manager', 'Sitecore', 'Pat Example', 'Sam Example', 'Kim Example', 'Lee Example']) {
     assert.ok(!apHtml.includes(name), `${name} is on the page`)
@@ -791,12 +885,12 @@ test('N1: no comparison table, no incumbent framing, no legacy challenge copy', 
   for (const f of ['F-challengeHeadline', 'F-pain-1', 'F-comparisonHeadline', 'F-row-1']) assert.ok(!apHtml.includes(f), f)
 })
 
-test('the close has exactly two calls to action', () => {
-  const band = apHtml.match(/<div[^>]*class="www-close-band"[\s\S]*?<\/div><\/div>/)![0]
+test('the close has one call to action (Michiel, 2 Nov: one CTA, not two)', () => {
+  const band = apHtml.match(/<div[^>]*class="www-close-band"[\s\S]*?<\/button><\/div>/)![0]
   const actions = band.match(/<(a|button)\b/g) ?? []
-  assert.equal(actions.length, 2, band)
+  assert.equal(actions.length, 1, band)
   assert.match(band, /id="cta-connect-btn"/)
-  assert.match(band, /Explore the agent platform/)
+  assert.ok(!/Explore the agent platform/.test(apHtml))
 })
 
 test('no account colours: the stored accent colour is nowhere on the page (gate 2)', () => {
@@ -845,7 +939,8 @@ test('the state sets the hero look, the proof track and whether the rep is named
 })
 
 test('the stored stack fills the 90-day Connect step by category, nothing replaced', () => {
-  assert.match(apText, /Link (cms|marketing automation|analytics|digital assets|customer data|crm)[a-z ,]* and [a-z ]+\. Nothing gets replaced\./)
+  assert.match(apText, /Link (CMS|marketing automation|analytics|digital assets|customer data|CRM)[A-Za-z ,]* and [A-Za-z ]+\. Nothing gets replaced\./)
+  assert.ok(!/\b(cms|crm|abm)\b/.test(apText), 'an acronym in lower case')
 })
 
 test('N1 and N2 in stored free text: the takeout sticky line is replaced, lines naming the platform are left off', () => {

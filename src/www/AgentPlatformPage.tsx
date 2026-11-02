@@ -10,7 +10,11 @@
  *   5 use cases         two priority cards and a strip of three, from the five themes
  *   6 proof             three verified results (track B) or three reads (track A)
  *   7 first 90 days     Connect · Teach · Launch · Scale, nothing replaced
- *   8 close             headline by state, three reasons, rep or team pod, exactly two CTAs
+ *   8 close             headline by state, three reasons, rep or team pod, one CTA
+ *
+ * The account research is not one "homework" section: one fact sits in each scene (Homework),
+ * the stack and teams carry the same tag, and each use case says what in the account's own data
+ * put it first.
  *
  * Look, headline, proof track, rep visibility and CTAs follow the lifecycle state. Content comes
  * from `AgentPlatformContent` (./agent-platform/content.ts); `?review=1` shows where each part
@@ -22,7 +26,8 @@ import { Button } from '../vendor/www/components/_ui/button'
 import { Badge } from '../vendor/www/components/_ui/badge'
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { cn } from '../vendor/www/lib/utils'
-import { Colophon, CountUp, Eyebrow, Heading, Reveal, Scene, StickyCta, TopStrip, WwwPage } from './ui'
+import type { CSSProperties, ReactNode } from 'react'
+import { AccountMark, Colophon, CountUp, Eyebrow, Heading, HeroFrame, Reveal, Scene, StickyCta, WwwPage } from './ui'
 import { ConnectProvider, useConnect } from './ConnectModal'
 import { SCENE } from './account-helpers'
 import {
@@ -78,6 +83,50 @@ function fill(s: string, c: AgentPlatformContent, lead?: ThemeId) {
   return s.replaceAll('{account}', c.account).replaceAll('{lead}', lead ? THEMES[lead].lead : '')
 }
 
+/* ================================================================== HOMEWORK */
+
+/**
+ * The account research, threaded through the page instead of parked in one section (Laura's and
+ * Dan's feedback): one fact per scene, always set the same way and marked with the same tag, so
+ * a reader sees the homework wherever they are. X-ray finds every one as `intel-stats`.
+ */
+function Homework({ stat, source, i = 2 }: { stat?: { value: string; label: string }; source?: { label: string; href: string } | null; i?: number }) {
+  if (!stat) return null
+  return (
+    <Reveal i={i} fx="right" as="aside" data-xray="intel-stats" className="www-note">
+      <HomeworkTag />
+      <p className="www-note__value">{/^(1[89]|20)\d{2}$/.test(stat.value) ? stat.value : <CountUp value={stat.value} />}</p>
+      <p className="www-note__label">{stat.label}</p>
+      {source && (
+        <p className="www-caption mt-2">
+          Source:{' '}
+          <a href={source.href} target="_blank" rel="noopener noreferrer" className="underline">
+            {source.label}
+          </a>
+        </p>
+      )}
+    </Reveal>
+  )
+}
+
+function HomeworkTag({ children = 'Our homework', compact = false }: { children?: string; compact?: boolean }) {
+  return (
+    <span className="www-note__tag" title={compact ? children : undefined}>
+      <MaterialIcon name="travel_explore" size="16" /> {compact ? <span className="sr-only">{children}</span> : children}
+    </span>
+  )
+}
+
+/** A scene's eyebrow and heading, with that scene's homework fact beside it on a wide screen. */
+function SceneHead({ children, note }: { children: ReactNode; note?: ReactNode }) {
+  return (
+    <div className="www-head">
+      <div className="www-head__main">{children}</div>
+      {note}
+    </div>
+  )
+}
+
 /* ======================================================================= HERO */
 
 function Hero({ c }: { c: AgentPlatformContent }) {
@@ -89,80 +138,77 @@ function Hero({ c }: { c: AgentPlatformContent }) {
   const chips = c.stack.value.filter((t) => !t.ours).slice(0, 4)
   const dark = st.look === 'darkfir'
   return (
-    <section id="hero" data-scene className="www-hero is-in">
-      <TopStrip account={{ name: c.account, logo: c.logo }} />
-      <div className="vb-container mx-auto w-full px-3 lg:px-6">
-        <div className={cn('www-hero__card', `www-hero__card--${st.look}`)} data-state={c.state.value}>
-          <div className="www-hero__copy">
-            <Reveal i={0}>
-              <p className={cn('www-eyebrow', dark && 'www-eyebrow--on-dark')}>Personalized for {c.account}</p>
-            </Reveal>
-            <Reveal i={1} data-xray="hero-title">
-              {/* Laura's state headlines are sentences, not slogans: one step down from display size. */}
-              <Heading text={st.h1} level="h1" size="h2" extrude />
-            </Reveal>
-            <Reveal i={2} as="p" data-xray="hero-subtitle" className={cn('www-lead', dark ? 'text-white/85' : '')}>
-              {IDENTITY_SENTENCE} {fill(st.sub, c, lead)}
-            </Reveal>
-            {c.pills.value.length > 0 && (
-              <Reveal i={3} as="div" data-xray="intel-stats" className="flex flex-wrap gap-2">
-                {c.pills.value.map((p) => (
-                  <span key={p} className={cn('www-pill', dark && 'www-pill--on-dark')}>
-                    {p}
-                  </span>
-                ))}
-              </Reveal>
-            )}
-            <Reveal i={4} className="flex flex-wrap gap-3">
-              <Button variant="primary" className="www-btn" id="hero-connect-btn" onClick={() => connect('hero-connect-btn')}>
-                {ctaLabel(st.primaryCta, c.rep.value.named)}
-              </Button>
-              <Button asChild variant={dark ? 'white' : 'dark'} className="www-btn">
-                <a href="#usecases">See where agents start</a>
-              </Button>
-            </Reveal>
-          </div>
-          <Reveal i={2} className="www-hero__visual">
-            <picture>
-              <source type="image/avif" srcSet={`${SCENE}-960.avif 960w, ${SCENE}-1600.avif 1600w`} sizes="(min-width: 992px) 50vw, 100vw" />
-              <img src={`${SCENE}-960.webp`} alt="" className="absolute inset-0 size-full object-cover" loading="eager" decoding="async" />
-            </picture>
-            <div className="www-agents" data-xray="agents-at-work">
-              <div className="flex items-center justify-between gap-3">
-                <p className="flex items-center gap-2 font-semibold">
-                  <MaterialIcon name="bolt" size="20" /> Agents at work for {c.account}
-                </p>
-                <span className="www-caption">Illustrative</span>
-              </div>
-              <ul className="mt-4 flex flex-col gap-2.5" role="list">
-                {tasks.map((t, i) => (
-                  <li key={t} className="www-agents__task">
-                    {i < 3 ? (
-                      <MaterialIcon name="check_circle" size="20" color="var(--www-good)" />
-                    ) : (
-                      <span className="www-agents__live" aria-hidden="true" />
-                    )}
-                    <span>
-                      {t}
-                      {i === 3 && <span className="sr-only"> (in progress)</span>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {chips.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {chips.map((t) => (
-                    <span key={t.label} className="www-agents__chip">
-                      {t.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+    <HeroFrame
+      look={st.look}
+      state={c.state.value}
+      scene={SCENE}
+      copy={
+        <>
+          {/* The page says whose it is once: their logo and one line, above the headline. */}
+          <Reveal i={0} fx="scale">
+            <AccountMark name={c.account} logo={c.logo} label={`Personalized for ${c.account}`} />
           </Reveal>
+          <Reveal i={1} data-xray="hero-title">
+            {/* Laura's state headlines are sentences, not slogans: one step down from display size. */}
+            <Heading text={st.h1} level="h1" size="h2" extrude />
+          </Reveal>
+          <Reveal i={2} as="p" data-xray="hero-subtitle" className={cn('www-lead', dark ? 'text-white/85' : '')}>
+            {IDENTITY_SENTENCE} {fill(st.sub, c, lead)}
+          </Reveal>
+          {c.pills.value.length > 0 && (
+            <Reveal i={3} as="div" data-xray="intel-stats" className="flex flex-wrap gap-2">
+              {c.pills.value.map((p) => (
+                <span key={p} className={cn('www-pill', dark && 'www-pill--on-dark')}>
+                  {p}
+                </span>
+              ))}
+            </Reveal>
+          )}
+          <Reveal i={4} className="flex flex-wrap gap-3">
+            <Button variant="primary" className="www-btn" id="hero-connect-btn" onClick={() => connect('hero-connect-btn')}>
+              {ctaLabel(st.primaryCta, c.rep.value.named)}
+            </Button>
+            <Button asChild variant={dark ? 'white' : 'dark'} className="www-btn">
+              <a href="#usecases">See where agents start</a>
+            </Button>
+          </Reveal>
+        </>
+      }
+      visual={
+        <div className="www-agents" data-xray="agents-at-work">
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 font-semibold">
+              <MaterialIcon name="bolt" size="20" /> Agents at work
+            </p>
+            <span className="www-caption">Illustrative</span>
+          </div>
+          <ul className="mt-4 flex flex-col gap-2.5" role="list">
+            {tasks.map((t, i) => (
+              <li key={t} className="www-agents__task" style={{ '--t': i } as CSSProperties}>
+                {i < 3 ? (
+                  <MaterialIcon name="check_circle" size="20" color="var(--www-good)" />
+                ) : (
+                  <span className="www-agents__live" aria-hidden="true" />
+                )}
+                <span>
+                  {t}
+                  {i === 3 && <span className="sr-only"> (in progress)</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {chips.length > 0 && (
+            <div className="www-agents__chips mt-4 flex flex-wrap gap-1.5">
+              {chips.map((t) => (
+                <span key={t.label} className="www-agents__chip">
+                  {t.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-    </section>
+      }
+    />
   )
 }
 
@@ -178,7 +224,7 @@ function WhoWeAre() {
         <Reveal i={1}>
           <Heading text={WHO_WE_ARE.heading} className="max-w-[20ch]" />
         </Reveal>
-        <div className="mt-[min(6vh,56px)] grid gap-3 md:grid-cols-3">
+        <div className="mt-[min(4vh,40px)] grid gap-3 md:grid-cols-3">
           {WHO_WE_ARE.tiles.map((t, i) => (
             <Reveal key={t.title} i={2 + i} className={cn('www-card', t.lead ? 'www-card--lime' : 'www-card--neutral')}>
               <span className="www-icon-tile www-icon-tile--white">
@@ -199,7 +245,7 @@ function WhoWeAre() {
             </a>
           ))}
         </Reveal>
-        <Reveal i={6} as="p" className="www-caption mt-5">
+        <Reveal i={6} as="p" className="www-caption mt-4">
           {WHO_WE_ARE.usage.text}{' '}
           <a href={WHO_WE_ARE.usage.href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
             {WHO_WE_ARE.usage.source}
@@ -213,42 +259,27 @@ function WhoWeAre() {
 /* ============================================================== WHERE IT FITS */
 
 function WhereItFits({ c }: { c: AgentPlatformContent }) {
-  const stats = c.stats.value
+  const teamsFromPage = c.teams.from === 'derived'
   return (
     <Scene id="intel" tone="neutral">
-      <div className="grid gap-[min(5vh,48px)] lg:grid-cols-12 lg:gap-12">
-        <div className="lg:col-span-5">
-          <Reveal i={0}>
-            <Eyebrow>We did our homework</Eyebrow>
-          </Reveal>
-          <Reveal i={1} data-xray="intel-headline">
-            <Heading text="Keep your stack. Add the layer that ##connects it##." />
-          </Reveal>
-          <Reveal i={2} as="p" className="www-lead mt-4">
-            Each tool does one job well. Agents read across all of them and act, with your team approving.
-          </Reveal>
-          {stats.length > 0 && (
-            <dl className="www-fit-stats mt-[min(5vh,40px)]">
-              {stats.map((s, i) => (
-                <Reveal key={s.label} i={3 + i} data-xray="intel-stats" className="www-fit-stat">
-                  <dt className="www-small order-2">{s.label}</dt>
-                  <dd className="www-number order-1">{/^(1[89]|20)\d{2}$/.test(s.value) ? s.value : <CountUp value={s.value} />}</dd>
-                </Reveal>
-              ))}
-            </dl>
-          )}
-          {c.statsSource.value && (
-            <p className="www-caption mt-3">
-              Source:{' '}
-              <a href={c.statsSource.value.href} target="_blank" rel="noopener noreferrer" className="underline">
-                {c.statsSource.value.label}
-              </a>
-            </p>
-          )}
+      <div className="grid gap-[min(4vh,40px)] lg:grid-cols-12 lg:items-center lg:gap-12">
+        <div className="flex flex-col gap-[min(4vh,32px)] lg:col-span-5">
+          <div>
+            <Reveal i={0}>
+              <Eyebrow>Where it fits</Eyebrow>
+            </Reveal>
+            <Reveal i={1} data-xray="intel-headline">
+              <Heading text="Keep your stack. Add the layer that ##connects it##." />
+            </Reveal>
+            <Reveal i={2} as="p" className="www-lead mt-4">
+              Each tool does one job well. Agents read across all of them and act.
+            </Reveal>
+          </div>
+          <Homework stat={c.stats.value[0]} source={c.statsSource.value} i={3} />
         </div>
         <div className="flex flex-col gap-2 lg:col-span-7">
-          <Reveal i={3} className="www-layer www-layer--teams">
-            <p className="www-layer__label">Your teams</p>
+          <Reveal i={2} fx="drop" className="www-layer www-layer--teams">
+            <p className="www-layer__label">{teamsFromPage ? <HomeworkTag>Your teams</HomeworkTag> : 'Your teams'}</p>
             <div className="flex flex-wrap gap-2">
               {c.teams.value.map((t) => (
                 <span key={t} className="www-chip">
@@ -257,10 +288,10 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
               ))}
             </div>
           </Reveal>
-          <Reveal i={4} className="www-layer__arrow" aria-hidden="true">
+          <Reveal i={3} className="www-layer__arrow" aria-hidden="true">
             <MaterialIcon name="swap_vert" size="24" />
           </Reveal>
-          <Reveal i={5} className="www-layer www-layer--platform">
+          <Reveal i={4} fx="scale" className="www-layer www-layer--platform">
             <p className="www-layer__label">
               <MaterialIcon name="bolt" size="18" /> Agent platform
             </p>
@@ -272,36 +303,26 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
               ))}
             </div>
           </Reveal>
-          <Reveal i={6} className="www-layer__arrow" aria-hidden="true">
+          <Reveal i={5} className="www-layer__arrow" aria-hidden="true">
             <MaterialIcon name="swap_vert" size="24" />
           </Reveal>
-          <Reveal i={7} className="www-layer www-layer--stack" data-xray="tech-stack">
-            <p className="www-layer__label">What {c.account} runs today</p>
+          <Reveal i={6} className="www-layer www-layer--stack" data-xray="tech-stack">
+            <p className="www-layer__label">
+              <HomeworkTag>{`What ${c.account} runs today`}</HomeworkTag>
+            </p>
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="list">
-              {c.stack.value.map((t) => (
-                <li key={t.label} className={cn('www-tile', t.ours && 'www-tile--ours')}>
-                  {/* A competitor tile already reads as its category ("Your CMS"). */}
-                  {!t.competitor && <span className="www-caption">{t.category}</span>}
+              {c.stack.value.map((t, k) => (
+                <li key={t.label} className={cn('www-tile', t.ours && 'www-tile--ours')} style={{ '--t': k } as CSSProperties}>
+                  {/* A competitor tile already reads as its category ("Your CMS"). An
+                      Optimizely tile says so once, in its category line. */}
+                  {!t.competitor && <span className="www-caption">{t.ours ? `${t.category} · yours already` : t.category}</span>}
                   <span className="font-semibold">{t.label}</span>
-                  {t.ours && <span className="www-tile__ours">Optimizely</span>}
                 </li>
               ))}
             </ul>
           </Reveal>
-          {c.priorities.value.length > 0 && (
-            <Reveal i={8} className="mt-3" data-xray="investments">
-              <p className="www-caption mb-2">Where {c.account} is investing</p>
-              <div className="flex flex-wrap gap-2">
-                {c.priorities.value.map((p) => (
-                  <span key={p} className="www-chip www-chip--white">
-                    {p}
-                  </span>
-                ))}
-              </div>
-            </Reveal>
-          )}
           {c.quote.value && (
-            <Reveal i={9} as="figure" className="www-card www-card--white mt-3">
+            <Reveal i={7} as="figure" className="www-card www-card--white mt-3">
               <blockquote className="www-quote-text">“{c.quote.value.text}”</blockquote>
               <figcaption className="www-caption mt-3">{c.quote.value.who}</figcaption>
               <p className="www-body mt-3">Optimizely applies the same idea to the marketing that tells that story.</p>
@@ -326,18 +347,18 @@ function SpeaksYourLanguage({ c }: { c: AgentPlatformContent }) {
         <Reveal i={1}>
           <Heading text={`Generic AI guesses. Ours starts from how ${c.account} works.`} className="max-w-[22ch]" />
         </Reveal>
-        <Reveal i={2} className="www-ask mt-[min(5vh,40px)]">
+        <Reveal i={2} fx="scale" className="www-ask mt-[min(4vh,32px)]">
           <span className="www-ask__who" aria-hidden="true">
             <MaterialIcon name="person" size="22" />
           </span>
           <p className="www-ask__q">“{c.question.value}”</p>
         </Reveal>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <Reveal i={3} className="www-card www-card--neutral">
+          <Reveal i={3} fx="left" className="www-card www-card--neutral">
             <p className="www-caption">A generic AI tool</p>
             <p className="www-lead mt-3 opacity-80">“Paste in your campaign data and I&apos;ll summarize it for you.”</p>
           </Reveal>
-          <Reveal i={4} className="www-card www-card--dark">
+          <Reveal i={4} fx="right" className="www-card www-card--dark">
             <p className="www-caption flex items-center gap-1 text-white">
               <MaterialIcon name="bolt" size="18" /> Optimizely agent platform
             </p>
@@ -350,6 +371,19 @@ function SpeaksYourLanguage({ c }: { c: AgentPlatformContent }) {
             </ul>
           </Reveal>
         </div>
+        {c.priorities.value.length > 0 && (
+          // What they are investing in is the language the agents start from.
+          <Reveal i={5} className="www-priorities mt-3" data-xray="investments">
+            <HomeworkTag>{`Where ${c.account} is investing`}</HomeworkTag>
+            <div className="flex flex-wrap gap-2">
+              {c.priorities.value.map((p) => (
+                <span key={p} className="www-chip">
+                  {p}
+                </span>
+              ))}
+            </div>
+          </Reveal>
+        )}
       </div>
     </Scene>
   )
@@ -363,48 +397,68 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
   return (
     <Scene id="usecases" tone="neutral">
       <div data-xray="use-cases">
-        <div className="mb-[min(5vh,40px)] max-w-[760px]">
+        <SceneHead note={<Homework stat={c.stats.value[1]} source={c.statsSource.value} />}>
           <Reveal i={0}>
             <Eyebrow>Where agents start</Eyebrow>
           </Reveal>
           <Reveal i={1}>
-            <Heading text={`Same platform. A starting point only ${c.account} would pick.`} />
+            <Heading text={`Same platform. A starting point only ${c.account} would pick.`} className="max-w-[24ch]" />
           </Reveal>
-          <Reveal i={2} as="p" className="www-lead mt-4">
-            For {c.account}, these two come first.
-          </Reveal>
-        </div>
+        </SceneHead>
         <div className="grid gap-3 md:grid-cols-2">
           {[a, b].map((id, i) => {
             const t = THEMES[id]
             const obs = c.observed.value[id]
+            const why = c.why.value[id]
             return (
-              <Reveal key={id} i={3 + i} className="www-card www-card--white www-usecase">
+              <Reveal key={id} i={3 + i} fx={i ? 'right' : 'left'} className="www-card www-card--white www-usecase">
                 <div className="flex items-center justify-between gap-3">
                   <span className="www-icon-tile">
                     <MaterialIcon name={t.icon} size="26" />
                   </span>
                   <Badge label={`Priority · ${t.name}`} color="lfgreen" filled size="sm" />
                 </div>
-                {obs && (
-                  <p className="www-small mt-5">
-                    <span className="www-caption block">Observed</span>
-                    {obs.text}{' '}
-                    <a href={obs.href} target="_blank" rel="noopener noreferrer" className="underline">
-                      Source
-                    </a>
-                  </p>
-                )}
                 <h3 className="www-h3 mt-5">{c.jobs.value[id] ?? t.job}</h3>
                 <p className="www-body mt-2">{t.body}</p>
+                {obs ? (
+                  <p className="www-why mt-4">
+                    <HomeworkTag>Observed</HomeworkTag>
+                    <span>
+                      {obs.text}{' '}
+                      <a href={obs.href} target="_blank" rel="noopener noreferrer" className="underline">
+                        Source
+                      </a>
+                    </span>
+                  </p>
+                ) : (
+                  why && (
+                    <div className="www-why mt-4">
+                      <HomeworkTag />
+                      <dl>
+                        {why.stack.length > 0 && (
+                          <div>
+                            <dt>In your stack</dt>
+                            <dd>{why.stack.join(' · ')}</dd>
+                          </div>
+                        )}
+                        {why.plans.length > 0 && (
+                          <div>
+                            <dt>On your agenda</dt>
+                            <dd>{why.plans.join(' · ')}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                  )
+                )}
                 <p className="www-caption mt-4">Measured on: {t.measuredOn}</p>
                 <p className="www-small mt-auto pt-4 font-medium">Enabled by {t.enabledBy}</p>
               </Reveal>
             )
           })}
         </div>
-        <Reveal i={5} className="mt-[min(4vh,32px)]">
-          <p className="www-caption mb-3">{customer ? 'Next on your roadmap' : 'Also on the same platform'}</p>
+        <Reveal i={5} className="mt-[min(3vh,24px)]">
+          <p className="www-caption mb-3">{customer ? 'Next on your roadmap' : 'Also on the platform'}</p>
           <div className="grid gap-3 md:grid-cols-3">
             {rest.slice(0, 3).map((id) => (
               <div key={id} className="www-card www-card--white flex items-start gap-3">
@@ -417,7 +471,7 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
             ))}
           </div>
         </Reveal>
-        <Reveal i={6} as="p" className="www-lead mt-[min(4vh,32px)] max-w-[52ch]">
+        <Reveal i={6} as="p" className="www-lead mt-[min(3vh,24px)] max-w-[52ch]">
           {USE_CASES_CLOSING_LINE}
         </Reveal>
       </div>
@@ -432,19 +486,21 @@ function Proof({ c }: { c: AgentPlatformContent }) {
   return (
     <Scene id="proof">
       <div data-xray="proof-stories">
-        <Reveal i={0}>
-          <Eyebrow>{trackB ? 'Proof it works' : 'Worth reading'}</Eyebrow>
-        </Reveal>
-        <Reveal i={1}>
-          <Heading
-            text={trackB ? 'Teams with many audiences are already ##running agents##.' : 'Where agent platforms are heading.'}
-            className="mb-[min(5vh,40px)] max-w-[22ch]"
-          />
-        </Reveal>
+        <SceneHead note={<Homework stat={c.stats.value[2]} source={c.statsSource.value} />}>
+          <Reveal i={0}>
+            <Eyebrow>{trackB ? 'Proof it works' : 'Worth reading'}</Eyebrow>
+          </Reveal>
+          <Reveal i={1}>
+            <Heading
+              text={trackB ? 'Teams with many audiences are already ##running agents##.' : 'Where agent platforms are heading.'}
+              className="max-w-[22ch]"
+            />
+          </Reveal>
+        </SceneHead>
         <div className="grid gap-3 md:grid-cols-3">
           {trackB
             ? PROOF_STORIES.map((p, i) => (
-                <Reveal key={p.customer} i={2 + i} className="www-card www-card--neutral www-proof">
+                <Reveal key={p.customer} i={2 + i} fx="scale" className="www-card www-card--neutral www-proof">
                   <p className="www-number">{p.metric}</p>
                   <p className="www-lead mt-1">{p.label}</p>
                   <p className="www-caption mt-4">
@@ -457,7 +513,7 @@ function Proof({ c }: { c: AgentPlatformContent }) {
                 </Reveal>
               ))
             : PROOF_ASSETS.map((p, i) => (
-                <Reveal key={p.title} i={2 + i} className="www-card www-card--neutral www-proof">
+                <Reveal key={p.title} i={2 + i} fx="scale" className="www-card www-card--neutral www-proof">
                   <p className="www-caption">{p.kind}</p>
                   <p className="www-h3 mt-2">{p.title}</p>
                   <a href={p.href} target="_blank" rel="noopener noreferrer" className="www-link mt-auto pt-6">
@@ -474,22 +530,31 @@ function Proof({ c }: { c: AgentPlatformContent }) {
 /* ============================================================= FIRST 90 DAYS */
 
 function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
-  const cats = [...new Set(c.stack.value.filter((t) => !t.ours && t.category !== 'Tool').map((t) => t.category.toLowerCase()))].slice(0, 3)
+  // "customer data", "marketing automation", but "CMS" and "ABM" stay capitals.
+  const word = (cat: string) => (cat === cat.toUpperCase() ? cat : cat.toLowerCase())
+  const cats = [...new Set(c.stack.value.filter((t) => !t.ours && t.category !== 'Tool').map((t) => word(t.category)))].slice(0, 3)
   const stackPhrase = cats.length ? cats.join(cats.length > 2 ? ', ' : ' and ').replace(/, ([^,]*)$/, ' and $1') : 'the tools you already run'
   const customer = c.state.value === 'customer'
   return (
     <Scene id="migration" tone="neutral">
       <div data-xray="first-90-days">
-        <Reveal i={0}>
-          <Eyebrow>The path forward</Eyebrow>
-        </Reveal>
-        <Reveal i={1}>
-          <Heading text={customer ? 'Your next 90 days' : 'Your first 90 days'} className="mb-[min(5vh,40px)]" />
-        </Reveal>
-        <ol className="grid gap-3 md:grid-cols-2 lg:grid-cols-4" role="list">
+        <SceneHead note={<Homework stat={c.stats.value[3]} source={c.statsSource.value} />}>
+          <Reveal i={0}>
+            <Eyebrow>The path forward</Eyebrow>
+          </Reveal>
+          <Reveal i={1}>
+            <Heading text={customer ? 'Your next 90 days' : 'Your first 90 days'} />
+          </Reveal>
+        </SceneHead>
+        {/* The path draws itself left to right as the scene arrives: each step's rule, then its number. */}
+        <ol className="www-path grid gap-3 md:grid-cols-2 lg:grid-cols-4" role="list">
           {FIRST_90_DAYS.map((s, i) => (
-            <Reveal key={s.step} as="li" i={2 + i} data-xray="timeline-phases" className="www-card www-card--white flex flex-col">
-              <span className="www-step-n">{i + 1}</span>
+            <Reveal key={s.step} as="li" i={2 + i} data-xray="timeline-phases" className="www-card www-card--white www-path__step flex flex-col">
+              <span className="flex items-center justify-between gap-2">
+                <span className="www-step-n">{i + 1}</span>
+                {/* The step that names their stack says where that came from. */}
+                {cats.length > 0 && s.body.includes('{stack}') && <HomeworkTag compact />}
+              </span>
               <h3 className="www-h3 mt-4">{s.step}</h3>
               <p className="www-body mt-2">{s.body.replace('{stack}', stackPhrase)}</p>
               <span className="www-role mt-auto">{s.role}</span>
@@ -519,7 +584,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
   return (
     <section id="cta" data-scene data-tone="dark" className="www-scene www-scene--dark www-scene--fill">
       <div id="form" className="www-scene__inner vb-container mx-auto w-full px-4 lg:px-8">
-        <div className="grid gap-[min(5vh,48px)] lg:grid-cols-12 lg:gap-12">
+        <div className="grid gap-[min(4vh,40px)] lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-7">
             <Reveal i={0}>
               <p className="www-eyebrow www-eyebrow--on-dark">Next steps</p>
@@ -529,7 +594,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
             </Reveal>
             <ol className="mt-[min(4vh,32px)] flex flex-col gap-3" role="list" data-xray="cta-description">
               {reasons.map((r, i) => (
-                <Reveal key={r} as="li" i={2 + i} className="www-reason">
+                <Reveal key={r} as="li" i={2 + i} fx="left" className="www-reason">
                   <span className="www-reason__n">{i + 1}</span>
                   <span className="www-lead">{r}</span>
                 </Reveal>
@@ -537,7 +602,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
             </ol>
           </div>
           <div className="flex flex-col gap-3 lg:col-span-5">
-            <Reveal i={3} className="www-card www-card--dark-2">
+            <Reveal i={3} fx="right" className="www-card www-card--dark-2">
               {people.length ? (
                 <ul className="flex flex-col gap-3" role="list">
                   {people.map((p) => (
@@ -560,7 +625,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
                 </div>
               )}
             </Reveal>
-            <Reveal i={4} className="www-card www-card--dark-2">
+            <Reveal i={4} fx="right" className="www-card www-card--dark-2">
               <p className="www-caption text-white/70">Built for</p>
               <ul className="mt-2 flex flex-col gap-1.5" role="list">
                 {c.teams.value.slice(0, 3).map((t) => (
@@ -569,22 +634,16 @@ function Close({ c }: { c: AgentPlatformContent }) {
                   </li>
                 ))}
               </ul>
-              <p className="www-small mt-3 text-white/70">Reviewing with colleagues? Forward this page. It stands on its own.</p>
+              <p className="www-small mt-3 text-white/70">Forward this page to colleagues. It stands on its own.</p>
             </Reveal>
           </div>
         </div>
+        {/* One call to action: the one-click ask. Scheduling and the contacts are in its panel. */}
         <Reveal i={5} className="www-close-band">
           <p className="www-h2 text-white">{st.closeLine}</p>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="primary" className="www-btn" id="cta-connect-btn" onClick={() => connect('cta-connect-btn')}>
-              <MaterialIcon name="bolt" size="20" /> {sent ? "You're all set" : ctaLabel(st.primaryCta, people)}
-            </Button>
-            <Button asChild variant="white" className="www-btn">
-              <a href={st.secondaryCta.href} target="_blank" rel="noopener noreferrer">
-                {st.secondaryCta.label}
-              </a>
-            </Button>
-          </div>
+          <Button variant="primary" className="www-btn" id="cta-connect-btn" onClick={() => connect('cta-connect-btn')}>
+            <MaterialIcon name="bolt" size="20" /> {sent ? "You're all set" : ctaLabel(st.primaryCta, people)}
+          </Button>
         </Reveal>
         <Colophon>
           {c.smallPrint.tagline && <span>{c.smallPrint.tagline}</span>}
@@ -634,6 +693,7 @@ function ReviewLayer({ c, search }: { c: AgentPlatformContent; search: string })
     ['Theme ranking', c.themes],
     ['Observed lines', c.observed],
     ['Job lines', c.jobs],
+    ['Why first', c.why],
     ['Rep', c.rep],
   ]
   return (

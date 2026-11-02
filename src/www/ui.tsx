@@ -12,7 +12,7 @@
  * StackedHeading, StatBlock, TableBlock, the logo carousel, the quote and arrow cards, the
  * accordion). The composition and the scale are ours.
  */
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { StackedHeading } from '../vendor/www/components/element/stacked-heading-element'
 import { Button } from '../vendor/www/components/_ui/button'
 import { cn } from '../vendor/www/lib/utils'
@@ -35,6 +35,7 @@ export function WwwPage({
   className?: string
 }) {
   useScenes()
+  useHeroDrift()
   return (
     <div
       className={cn('www-page bg-primary-1 text-secondary-darkfir font-body flex min-h-screen w-full flex-col', className)}
@@ -47,7 +48,11 @@ export function WwwPage({
   )
 }
 
-/** Adds `is-in` to each scene the first time a fifth of it is on screen. */
+/**
+ * Scroll waypoints. Each scene gets `is-in` the first time a fifth of it is on screen, which
+ * plays its entrance (the parts rise, slide or settle in, in order; see "motion" in www.css).
+ * The scene the reader is in gets `is-current`, for effects that follow the reader.
+ */
 function useScenes() {
   useEffect(() => {
     const scenes = Array.from(document.querySelectorAll<HTMLElement>('.www-page [data-scene]'))
@@ -65,8 +70,48 @@ function useScenes() {
       },
       { threshold: 0.18, rootMargin: '0px 0px -8% 0px' },
     )
-    scenes.forEach((s) => io.observe(s))
-    return () => io.disconnect()
+    // A thin band across the middle of the window: whichever scene crosses it is current.
+    const current = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) e.target.classList.toggle('is-current', e.isIntersecting)
+      },
+      { rootMargin: '-45% 0px -45% 0px' },
+    )
+    scenes.forEach((s) => {
+      io.observe(s)
+      current.observe(s)
+    })
+    return () => {
+      io.disconnect()
+      current.disconnect()
+    }
+  }, [])
+}
+
+/**
+ * As the reader scrolls out of the hero, its landscape drifts slower than the page and the copy
+ * lifts away: `--hero-p` runs 0 → 1 over the hero's height. Presentation only (a CSS variable);
+ * reduced motion turns the effect off in CSS.
+ */
+function useHeroDrift() {
+  useEffect(() => {
+    const hero = document.getElementById('hero')
+    if (!hero) return
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const h = hero.offsetHeight || 1
+      hero.style.setProperty('--hero-p', String(Math.min(1, Math.max(0, scrollY / h)).toFixed(3)))
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    update()
+    addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(raf)
+    }
   }, [])
 }
 
@@ -95,20 +140,132 @@ function ScrollProgress() {
   return <div ref={bar} aria-hidden="true" className="www-progress" />
 }
 
-/** The brand mark, anchored to the top-left corner (brand rule for a small logo), and whose page this is. */
-export function TopStrip({ account }: { account?: { name: string; logo?: string | null } | null }) {
+/**
+ * The brand mark, anchored to the top-left corner of the hero (brand rule for a small logo).
+ * Whose page this is is said once, by the AccountMark above the headline, not here as well.
+ */
+export function TopStrip() {
   return (
-    <div className="www-strip vb-container mx-auto flex items-center justify-between gap-4 px-4 lg:px-8">
+    <div className="www-strip">
       <a href="https://www.optimizely.com/" aria-label="Optimizely" className="shrink-0">
         <img src="/optimizely-logo-color.svg" alt="Optimizely" width={150} height={37} className="h-6 w-auto lg:h-7" />
       </a>
-      {account?.name && (
-        <span className="text-body-3xs flex min-w-0 items-center gap-2 font-medium">
-          {account.logo ? <img src={account.logo} alt="" className="size-6 shrink-0 rounded-md object-contain" /> : null}
-          <span className="truncate">Made for {account.name}</span>
-        </span>
-      )}
     </div>
+  )
+}
+
+/**
+ * The account's logo above the headline, with the page's one line of personalization beside it
+ * ("Personalized for CDW"). Any logo sits on a white tile with room around it, so a transparent
+ * mark, a square icon and a logo with its own white box all look deliberate.
+ */
+export function AccountMark({
+  name,
+  logo,
+  label,
+  xray,
+  accent = false,
+}: {
+  name: string
+  logo?: string | null
+  label: string
+  xray?: string
+  /** The takeout page's one use of the account's own colour (brandAccentColor): a stripe under the logo. */
+  accent?: boolean
+}) {
+  // A logo URL that no longer answers shows the initials instead of a broken-image icon. It may
+  // fail before hydration (no onError then), so the effect also checks the image once mounted.
+  // Presentation only: a data attribute the CSS reads, no state, so nothing can mismatch.
+  const img = useRef<HTMLImageElement>(null)
+  useEffect(() => {
+    const el = img.current
+    if (el && el.complete && el.naturalWidth === 0) el.parentElement?.setAttribute('data-broken', '')
+  }, [])
+  return (
+    <div className={cn('www-account', accent && 'www-account--accent')} data-xray={xray}>
+      <span className="www-account__logo">
+        {logo && (
+          <img
+            ref={img}
+            src={logo}
+            alt={`${name} logo`}
+            width={40}
+            height={40}
+            onError={(e) => e.currentTarget.parentElement?.setAttribute('data-broken', '')}
+          />
+        )}
+        <span className="www-account__initials" aria-hidden="true">
+          {initialsOf(name)}
+        </span>
+      </span>
+      <span className="www-account__label">{label}</span>
+    </div>
+  )
+}
+
+function initialsOf(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  return (words.length > 1 ? words[0][0] + words[1][0] : name.slice(0, 2)).toUpperCase()
+}
+
+/**
+ * The hero landscape, in every size the scene set ships (960 to 2880 wide), so it stays sharp
+ * on a large retina screen now that it runs to the window's edge.
+ */
+export function HeroImage({ scene, sizes = '(min-width: 992px) 48vw, 100vw' }: { scene: string; sizes?: string }) {
+  return (
+    <picture>
+      <source
+        type="image/avif"
+        srcSet={[960, 1280, 1600, 1920, 2400, 2880].map((w) => `${scene}-${w}.avif ${w}w`).join(', ')}
+        sizes={sizes}
+      />
+      <img
+        src={`${scene}-1600.webp`}
+        srcSet={[960, 1600, 2400].map((w) => `${scene}-${w}.webp ${w}w`).join(', ')}
+        sizes={sizes}
+        alt=""
+        className="www-hero__img"
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
+      />
+    </picture>
+  )
+}
+
+/**
+ * The hero, full screen: edge to edge, three quarters of the window's height so the next scene
+ * peeks in underneath. Copy on the left (aligned with the page's content column), the landscape
+ * running to the right edge. It plays an intro on first paint (www.css "hero intro"), from the
+ * server's HTML, before any script runs.
+ */
+export function HeroFrame({
+  look = 'darkfir',
+  state,
+  scene,
+  copy,
+  visual,
+}: {
+  look?: string
+  state?: string
+  scene: string
+  copy: ReactNode
+  visual?: ReactNode
+}) {
+  return (
+    <section id="hero" data-scene className="www-hero is-in">
+      <div className={cn('www-hero__card', `www-hero__card--${look}`)} data-state={state}>
+        <div className="www-hero__copy">
+          <TopStrip />
+          <div className="www-hero__body">{copy}</div>
+        </div>
+        <div className="www-hero__visual">
+          <HeroImage scene={scene} />
+          {visual}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -151,23 +308,28 @@ export function Scene({
   )
 }
 
-/** Staggered reveal: children of a scene fade and rise in, in order, as the scene enters. */
+/** How a part enters at its scene's waypoint: rise (default), slide in from a side, drop, or settle from a little larger. */
+export type RevealFx = 'up' | 'left' | 'right' | 'drop' | 'scale'
+
+/** Staggered reveal: children of a scene enter, in order, as the scene reaches its waypoint. */
 export function Reveal({
   i = 0,
+  fx,
   as: Tag = 'div',
   className,
   children,
   ...rest
 }: {
   i?: number
-  as?: 'div' | 'li' | 'p' | 'span' | 'figure'
+  fx?: RevealFx
+  as?: 'div' | 'li' | 'p' | 'span' | 'figure' | 'aside'
   className?: string
   children: ReactNode
   'aria-hidden'?: boolean | 'true'
   [key: `data-${string}`]: string | undefined
 }) {
   return (
-    <Tag data-reveal className={className} style={{ '--i': i } as CSSProperties} {...rest}>
+    <Tag data-reveal={fx && fx !== 'up' ? fx : ''} className={className} style={{ '--i': i } as CSSProperties} {...rest}>
       {children}
     </Tag>
   )
@@ -243,6 +405,19 @@ export function Heading({
   }
   const Tag = level
   const lines = text.split('\n')
+  // Each word is its own span so a heading can come in word by word at its scene's waypoint
+  // (www.css "motion"). The spaces stay plain text, so the heading reads, wraps and copies as one.
+  let w = 0
+  const words = (s: string) =>
+    s.split(/(\s+)/).map((part, k) =>
+      !part || /^\s+$/.test(part) ? (
+        part
+      ) : (
+        <span key={k} className="www-w" style={{ '--w': w++ } as CSSProperties}>
+          {part}
+        </span>
+      ),
+    )
   return (
     <Tag className={cn(`www-${sz}`, align === 'center' && 'text-center', 'text-balance', className)}>
       {lines.map((line, li) => (
@@ -250,10 +425,10 @@ export function Heading({
           {line.split(/##(.+?)##/g).map((p, i) =>
             i % 2 === 1 ? (
               <span key={i} className="www-emph">
-                {p}
+                {words(p)}
               </span>
             ) : (
-              p
+              <Fragment key={i}>{words(p)}</Fragment>
             ),
           )}
         </span>

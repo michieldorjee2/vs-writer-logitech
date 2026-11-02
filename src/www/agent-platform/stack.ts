@@ -143,7 +143,8 @@ export interface ThemeEvidence {
   why: string[]
 }
 
-const KEYWORDS: Record<ThemeId, RegExp> = {
+/** Words in a stated investment that point at a theme. */
+export const THEME_KEYWORDS: Record<ThemeId, RegExp> = {
   'content-ops': /content|brand|campaign|market|region|global|multi|launch|publish|localiz|translat|product line|catalog/i,
   personalization: /personaliz|segment|audience|customer data|loyalty|member|journey|1:1|one-to-one|buyer/i,
   geo: /\bai\b|search|seo|geo|answer|discover|chatgpt|llm/i,
@@ -156,26 +157,35 @@ const KEYWORDS: Record<ThemeId, RegExp> = {
  * Salesforce/6sense terms the page does not store (6QA, stage, intent, open opp, override):
  * stack evidence +10 each (max 20), a stated investment that names the theme +10 each (max 20).
  */
+/** The stack categories that count as evidence for each theme. */
+export const THEME_CATEGORIES: Record<ThemeId, Category[]> = {
+  'content-ops': ['CMS', 'Digital experience platform', 'Digital assets', 'Commerce'],
+  personalization: ['Customer data', 'Personalization'],
+  geo: ['Site search', 'AI content'],
+  optimization: ['Testing'],
+  analytics: ['Analytics', 'Customer data', 'Data warehouse'],
+}
+
 export function themeEvidence(
   tools: StackTool[],
   investments: Array<{ Name: string; IsPrimary: boolean | null }> | null | undefined,
 ): ThemeEvidence[] {
-  const has = (...cats: Category[]) => tools.filter((t) => cats.includes(t.category))
-  const analyticsTools = tools.filter((t) => t.category === 'Analytics' || t.category === 'Customer data' || t.category === 'Data warehouse')
+  const has = (theme: ThemeId) => tools.filter((t) => THEME_CATEGORIES[theme].includes(t.category))
+  const analyticsTools = has('analytics')
   const stackEvidence: Record<ThemeId, StackTool[]> = {
-    'content-ops': has('CMS', 'Digital experience platform', 'Digital assets', 'Commerce'),
-    personalization: has('Customer data', 'Personalization'),
-    geo: has('Site search', 'AI content'),
-    optimization: has('Testing'),
+    'content-ops': has('content-ops'),
+    personalization: has('personalization'),
+    geo: has('geo'),
+    optimization: has('optimization'),
     analytics: analyticsTools.length >= 3 ? analyticsTools : [],
   }
   const out: ThemeEvidence[] = []
-  for (const theme of Object.keys(KEYWORDS) as ThemeId[]) {
+  for (const theme of Object.keys(THEME_KEYWORDS) as ThemeId[]) {
     const why: string[] = []
     const st = stackEvidence[theme]
     const stackPts = Math.min(20, st.length * 10)
     if (st.length) why.push(`stack: ${st.map((t) => t.label).join(', ')}`)
-    const inv = (investments ?? []).filter((i) => KEYWORDS[theme].test(i.Name))
+    const inv = (investments ?? []).filter((i) => THEME_KEYWORDS[theme].test(i.Name))
     const invPts = Math.min(20, inv.reduce((n, i) => n + (i.IsPrimary ? 15 : 10), 0))
     if (inv.length) why.push(`investing in: ${inv.map((i) => i.Name).join(', ')}`)
     out.push({ theme, score: stackPts + invPts, why })

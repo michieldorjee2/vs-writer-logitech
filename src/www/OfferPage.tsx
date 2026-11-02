@@ -9,7 +9,7 @@
  * bookends (the invitation and the sign-up), white and Neutral 3 between, LFGreen for the
  * action. The one extruded moment is the run the writer marked in the hero headline.
  */
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Button } from '../vendor/www/components/_ui/button'
 import { Badge } from '../vendor/www/components/_ui/badge'
 import { CardCustomerQuoteCard } from '../vendor/www/components/block/card-customer-quote-block/card-customer-quote-card'
@@ -17,7 +17,7 @@ import { PortraitTextQuoteCard } from '../vendor/www/components/block/portrait-t
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../vendor/www/components/_ui/accordion'
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { cn } from '../vendor/www/lib/utils'
-import { Card, Colophon, Eyebrow, Heading, Initials, Paragraphs, Reveal, Scene, Steps, StickyCta, TopStrip, WwwPage, plain } from './ui'
+import { AccountMark, Card, Colophon, Eyebrow, Heading, HeroFrame, Initials, Paragraphs, Reveal, Scene, Steps, StickyCta, WwwPage, plain } from './ui'
 import { list, readOffer, str, type ElementData, type OfferSection } from './offer-content'
 import { SCENE } from './account-helpers'
 
@@ -311,58 +311,57 @@ function OfferHero({
   const intro = str(v.offerIntro, 'MainBody')
   return (
     <>
-      <section id="hero" data-scene className="www-hero is-in">
-        <TopStrip account={company ? { name: company, logo } : null} />
-        <div className="vb-container mx-auto w-full px-3 lg:px-6">
-          <div className="www-hero__card">
-            <div className="www-hero__copy">
-              {str(v.offerEyebrow, 'Text') && (
-                <Reveal i={0}>
-                  <Badge label={plain(str(v.offerEyebrow, 'Text'))} color="lfgreen" filled size="sm" iconName="event" />
-                </Reveal>
+      <HeroFrame
+        scene={SCENE}
+        copy={
+          <>
+            {company && (
+              <Reveal i={0} fx="scale">
+                <AccountMark name={company} logo={logo} label={`Made for ${company}`} />
+              </Reveal>
+            )}
+            {str(v.offerEyebrow, 'Text') && (
+              <Reveal i={0}>
+                <Badge label={plain(str(v.offerEyebrow, 'Text'))} color="lfgreen" filled size="sm" iconName="event" />
+              </Reveal>
+            )}
+            <Reveal i={1}>
+              {/* The writer's ##run## is the page's one extruded moment. */}
+              <Heading text={str(v.offerHeadline, 'Text')} level="h1" extrude className="text-white" />
+            </Reveal>
+            <Reveal i={3} className="flex flex-wrap gap-3">
+              {str(v.offerCta, 'ButtonText') && (
+                <Button asChild variant="primary" className="www-btn">
+                  <a href={str(v.offerCta, 'ButtonUrl') || '#signup'} {...external(str(v.offerCta, 'ButtonUrl'))}>
+                    {str(v.offerCta, 'ButtonText')}
+                  </a>
+                </Button>
               )}
-              <Reveal i={1}>
-                {/* The writer's ##run## is the page's one extruded moment. */}
-                <Heading text={str(v.offerHeadline, 'Text')} level="h1" extrude className="text-white" />
-              </Reveal>
-              <Reveal i={3} className="flex flex-wrap gap-3">
-                {str(v.offerCta, 'ButtonText') && (
-                  <Button asChild variant="primary" className="www-btn">
-                    <a href={str(v.offerCta, 'ButtonUrl') || '#signup'} {...external(str(v.offerCta, 'ButtonUrl'))}>
-                      {str(v.offerCta, 'ButtonText')}
-                    </a>
-                  </Button>
-                )}
-                {second && str(second, 'ButtonText') && (
-                  <Button asChild variant="white" className="www-btn">
-                    <a href={str(second, 'ButtonUrl') || '#about'} {...external(str(second, 'ButtonUrl'))}>
-                      {str(second, 'ButtonText')}
-                    </a>
-                  </Button>
-                )}
-              </Reveal>
-            </div>
-            <Reveal i={2} className="www-hero__visual">
-              <picture>
-                <source type="image/avif" srcSet={`${SCENE}-960.avif 960w, ${SCENE}-1600.avif 1600w`} sizes="(min-width: 992px) 50vw, 100vw" />
-                <img src={`${SCENE}-960.webp`} alt="" className="absolute inset-0 size-full object-cover" loading="eager" decoding="async" />
-              </picture>
-              {highlights.length > 0 && (
-                // The offer's facts as cards on the photo. Not StatBlock: these values are phrases
-                // ("For Scale AI", "A real agent"), which StatBlock would extrude like numbers.
-                <ul className="www-facts" role="list">
-                  {highlights.map((h, i) => (
-                    <li key={i} className="www-fact">
-                      <span className="font-nudge text-[clamp(20px,min(2.2vw,3.6vh),34px)] leading-[1.02] font-extrabold">{str(h, 'StatValue')}</span>
-                      <span className="www-small">{str(h, 'Description') || str(h, 'StatDescription')}</span>
-                    </li>
-                  ))}
-                </ul>
+              {second && str(second, 'ButtonText') && (
+                <Button asChild variant="white" className="www-btn">
+                  <a href={str(second, 'ButtonUrl') || '#about'} {...external(str(second, 'ButtonUrl'))}>
+                    {str(second, 'ButtonText')}
+                  </a>
+                </Button>
               )}
             </Reveal>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+        visual={
+          highlights.length > 0 && (
+            // The offer's facts as cards on the photo. Not StatBlock: these values are phrases
+            // ("For Scale AI", "A real agent"), which StatBlock would extrude like numbers.
+            <ul className="www-facts" role="list">
+              {highlights.map((h, i) => (
+                <li key={i} className="www-fact" style={{ '--t': i } as CSSProperties}>
+                  <span className="font-nudge text-[clamp(20px,min(2.2vw,3.6vh),34px)] leading-[1.02] font-extrabold">{str(h, 'StatValue')}</span>
+                  <span className="www-small">{str(h, 'Description') || str(h, 'StatDescription')}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      />
       {intro && (
         <Scene id="intro" compact>
           <Reveal i={0} className="www-intro mx-auto max-w-[1000px]">

@@ -161,7 +161,9 @@ body:has(.www-page) {
   transform: scaleX(0);
 }
 .www-page .www-strip {
-  height: 64px;
+  display: flex;
+  align-items: center;
+  height: 72px;
 }
 .www-page .www-sticky {
   position: fixed;
@@ -187,23 +189,44 @@ body:has(.www-page) {
   opacity: 1;
 }
 
-/* ---- hero (bookend 1) -------------------------------------------------------- */
-.www-page .www-hero {
-  display: flex;
-  flex-direction: column;
-  min-height: 100svh;
-  padding-bottom: 12px;
+/* ---- hero (bookend 1): full screen, three quarters of the window ---------------- */
+/* The page's content column, as an inset from the window's edge: the hero's copy lines up
+   with every scene below it (vb-container widths + its px-4 / lg:px-8 padding). */
+.www-page {
+  --www-edge: 16px;
 }
-.www-page .www-hero > .vb-container {
-  flex: 1;
-  display: flex;
+@media (min-width: 640px) {
+  .www-page {
+    --www-edge: calc((100vw - 640px) / 2 + 16px);
+  }
+}
+@media (min-width: 768px) {
+  .www-page {
+    --www-edge: calc((100vw - 768px) / 2 + 16px);
+  }
+}
+@media (min-width: 1024px) {
+  .www-page {
+    --www-edge: calc((100vw - 1024px) / 2 + 32px);
+  }
+}
+@media (min-width: 1280px) {
+  .www-page {
+    --www-edge: calc((100vw - 1280px) / 2 + 32px);
+  }
+}
+@media (min-width: 1376px) {
+  .www-page {
+    --www-edge: calc((100vw - 1376px) / 2 + 32px);
+  }
+}
+.www-page .www-hero {
+  position: relative;
 }
 .www-page .www-hero__card {
-  flex: 1;
+  position: relative;
   display: grid;
-  gap: 10px;
-  padding: 10px;
-  border-radius: var(--www-radius);
+  overflow: hidden;
   background: var(--www-fir);
   color: #fff;
   --prose-type-color: #fff;
@@ -211,43 +234,108 @@ body:has(.www-page) {
 .www-page .www-hero__copy {
   display: flex;
   flex-direction: column;
+  padding-inline: var(--www-edge);
+}
+.www-page .www-hero__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
-  gap: clamp(20px, 3.6vh, 36px);
-  padding: clamp(20px, 4vh, 56px) clamp(14px, 3vw, 48px);
+  align-items: flex-start;
+  gap: clamp(14px, 2.4vh, 28px);
+  padding-block: clamp(4px, 1.4vh, 20px) clamp(28px, 4.6vh, 56px);
 }
 .www-page .www-hero__visual {
   position: relative;
-  min-height: 46svh;
+  min-height: 44svh;
   overflow: hidden;
-  border-radius: calc(var(--www-radius) - 8px);
+}
+.www-page .www-hero__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 @media (min-width: 992px) {
   .www-page .www-hero__card {
-    grid-template-columns: 1.05fr 1fr;
-    min-height: calc(100svh - 76px);
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+    min-height: 75svh;
+  }
+  .www-page .www-hero__copy {
+    padding-right: clamp(32px, 4vw, 72px);
   }
   .www-page .www-hero__visual {
     min-height: 0;
   }
 }
-/* Their site today, in a browser frame floating on the landscape. */
+/* The extruded run's top layer sits 0.25em up and right of its base (StackedHeading: four steps
+   of 0.063em), so the words after it start after the top layer instead of under it. */
+.www-page h1 .origin-bottom-left {
+  margin-right: 0.26em;
+}
+/* The account's logo above the headline, and the page's one line of personalization. */
+.www-page .www-account {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.www-page .www-account__logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: clamp(48px, 6.4vh, 60px);
+  height: clamp(48px, 6.4vh, 60px);
+  padding: 8px;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--www-fir);
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+}
+.www-page .www-account__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.www-page .www-account__logo img + .www-account__initials,
+.www-page .www-account__logo[data-broken] img {
+  display: none;
+}
+.www-page .www-account__logo[data-broken] .www-account__initials {
+  display: inline;
+}
+.www-page .www-account__label {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.www-page .www-hero__card--darkfir .www-account__label {
+  color: rgb(255 255 255 / 0.85);
+}
+/* Their site today (takeout, the challenge scene), in a browser frame. The stored capture is a
+   full-page shot that is often only 374px wide, so the frame is never wider than that and the
+   page scrolls inside it when the scene arrives: sharp at its own size, never stretched. */
 .www-page .www-browser {
-  position: absolute;
-  top: 11%;
-  left: 7%;
-  width: 96%;
+  width: min(100%, 374px);
   margin: 0;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #fff;
-  box-shadow: 0 30px 60px -24px rgb(8 37 26 / 0.6);
+  box-shadow:
+    0 0 0 1.5px var(--www-fir),
+    0 24px 48px -28px rgb(8 37 26 / 0.5);
 }
-.www-page .www-browser img {
+.www-page .www-browser__view {
+  height: clamp(200px, 30vh, 300px);
+  overflow: hidden;
+}
+.www-page .www-browser__view img {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  object-position: top;
+  height: auto;
 }
 .www-page .www-browser__bar {
   display: flex;
@@ -270,31 +358,9 @@ body:has(.www-page) {
   color: var(--www-fir);
   font: 11px/1.4 var(--font-roboto), 'Roboto Mono', monospace;
 }
-.www-page .www-built-for {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  left: 14px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  max-width: 340px;
-  padding: 12px 18px 12px 12px;
-  border-radius: 18px;
-  background: #fff;
-  color: var(--www-fir);
-  box-shadow: 0 18px 40px -20px rgb(8 37 26 / 0.55);
-}
-@media (min-width: 992px) {
-  .www-page .www-built-for {
-    left: auto;
-    right: 24px;
-    bottom: 24px;
-  }
-}
-/* The account's brand colour (brandAccentColor): one stripe, theirs, on the card that names them. */
-.www-page .www-accent-bar {
-  border-left: 6px solid var(--www-accent, var(--www-lime));
+/* The account's brand colour (brandAccentColor, takeout only): one stripe, theirs, under their logo. */
+.www-page .www-account--accent .www-account__logo {
+  box-shadow: inset 0 -4px 0 var(--www-accent);
 }
 /* The offer's facts on the landscape. */
 .www-page .www-facts {
@@ -326,7 +392,9 @@ body:has(.www-page) {
   position: relative;
   display: flex;
   align-items: center;
-  padding-block: clamp(64px, 11vh, 140px);
+  /* Three quarters of the window (below), so the next scene is always in sight and the page
+     keeps moving; the padding is what is left of the old full-window spacing. */
+  padding-block: clamp(48px, 8vh, 104px);
   scroll-margin-top: 0;
 }
 .www-page .www-scene--neutral {
@@ -341,12 +409,12 @@ body:has(.www-page) {
   min-height: 100svh;
 }
 @media (min-width: 768px) {
-  .www-page .www-scene:not(.www-scene--compact) {
-    min-height: 100svh;
+  .www-page .www-scene:not(.www-scene--compact):not(.www-scene--fill) {
+    min-height: 75svh;
   }
 }
 .www-page .www-scene--compact {
-  padding-block: clamp(56px, 9vh, 112px);
+  padding-block: clamp(44px, 7vh, 88px);
 }
 /* A dark bookend sits inset like the hero card, so the page opens and closes the same way. */
 .www-page .www-scene--dark.www-scene--fill {
@@ -548,13 +616,16 @@ body:has(.www-page) {
 }
 
 /* ---- proof ---------------------------------------------------------------------- */
-/* The account's own tile in the logo strip keeps its colours and gets the one lime ring. */
+/* The account's own tile in the logo strip keeps its colours and is drawn in Dark Fir (the
+   brand's only stroke colour). The tile's 1px frame is its container's background showing through
+   its padding, so the highlight thickens that frame instead of adding a ring around it: same
+   radius, nothing for the strip's overflow to clip. */
 .www-page .www-you-tile img {
   filter: none !important;
 }
 .www-page .www-you-tile > div {
-  border-radius: 12px;
-  box-shadow: 0 0 0 2px var(--www-lime);
+  padding: 2px;
+  background: var(--www-fir);
 }
 /* Quote cards are portrait; cap their width by the window's height so two fit in one scene. */
 .www-page .www-quote > article {
@@ -726,7 +797,8 @@ body:has(.www-page) {
 }
 .www-page .www-hero__card--neutral2 {
   background: #eff6e9;
-  box-shadow: inset 0 0 0 1.5px var(--www-fir);
+  /* Full screen now: one Dark Fir rule where the hero meets the white page, not a frame. */
+  box-shadow: inset 0 -1.5px 0 var(--www-fir);
 }
 .www-page .www-hero__card--neutral3 {
   background: var(--www-n3);
@@ -756,8 +828,10 @@ body:has(.www-page) {
 /* "Agents at work": one white panel floating on the landscape. Illustrative, labelled so. */
 .www-page .www-agents {
   position: absolute;
-  inset: auto 6% 7% 6%;
-  padding: clamp(16px, 2.6vh, 24px);
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  padding: clamp(16px, 2.4vh, 24px);
   border-radius: 20px;
   background: #fff;
   color: var(--www-fir);
@@ -765,7 +839,10 @@ body:has(.www-page) {
 }
 @media (min-width: 992px) {
   .www-page .www-agents {
-    inset: auto 10% 10% 10%;
+    left: clamp(24px, 4vw, 64px);
+    right: auto;
+    bottom: clamp(24px, 6vh, 64px);
+    width: min(460px, calc(100% - 48px));
   }
 }
 .www-page .www-agents__task {
@@ -903,11 +980,6 @@ body:has(.www-page) {
 }
 .www-page .www-tile--ours {
   background: var(--www-lime);
-}
-.www-page .www-tile__ours {
-  align-self: flex-start;
-  margin-top: 2px;
-  font: 11px/1 var(--font-roboto), 'Roboto Mono', monospace;
 }
 
 /* ---- speaks your language ------------------------------------------------------ */
@@ -1244,27 +1316,143 @@ a.www-modal__tile:hover {
   }
 }
 
-/* ---- motion ---------------------------------------------------------------------- */
-/* Only once the boot script has marked <html>: without JS nothing is ever hidden. */
-.www-js .www-page [data-scene]:not(.www-hero) [data-reveal] {
-  opacity: 0;
-  transform: translateY(22px);
-  transition:
-    opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
-    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: calc(var(--i, 0) * 80ms);
+/* ---- homework, threaded through the page (agent platform) --------------------------- */
+.www-page .www-head {
+  display: grid;
+  gap: 20px;
+  margin-bottom: clamp(24px, 4vh, 40px);
 }
-.www-js .www-page [data-scene].is-in:not(.www-hero) [data-reveal] {
-  opacity: 1;
-  transform: none;
+@media (min-width: 992px) {
+  .www-page .www-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 48px;
+  }
 }
-.www-js .www-page [data-scene]:not(.is-in) .www-steps::before {
-  transform: scale(0);
+.www-page .www-note__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 12px/1.3 var(--font-roboto), 'Roboto Mono', monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-/* The hero plays on first paint, from the server's HTML, before any script has run. */
+.www-page .www-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 320px;
+  padding: 16px 20px 18px;
+  border-radius: 20px;
+  background: var(--www-n3);
+}
+.www-page .www-scene--neutral .www-note {
+  background: #fff;
+}
+.www-page .www-note__value {
+  margin-top: 10px;
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: clamp(32px, min(3.2vw, 5.4vh), 52px);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.www-page .www-note__label {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.www-page .www-why {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--www-n3);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.www-page .www-why dl {
+  display: grid;
+  gap: 4px;
+}
+.www-page .www-why dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+.www-page .www-why dt {
+  font-weight: 600;
+}
+.www-page .www-why dt::after {
+  content: ':';
+}
+.www-page .www-priorities {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  background: var(--www-n3);
+}
+.www-page .www-priorities .www-chip {
+  background: #fff;
+}
+.www-page .www-path__step {
+  position: relative;
+}
+
+/* ---- motion: the hero intro, then a waypoint per scene ------------------------------ */
+/* The hero plays on first paint, from the server's HTML, before any script has run: the
+   landscape opens from the right edge and settles, the logo and copy rise in order, then the
+   agents panel lands and its tasks tick off one by one. */
 .www-page .www-hero [data-reveal] {
   animation: www-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--i, 0) * 90ms + 60ms);
+  animation-delay: calc(var(--i, 0) * 90ms + 120ms);
+}
+.www-page .www-hero [data-reveal='scale'] {
+  animation-name: www-settle;
+}
+.www-page .www-hero .www-w {
+  display: inline-block;
+  animation: www-word 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 160ms + var(--w, 0) * 45ms);
+}
+.www-page .www-strip {
+  animation: www-fade 0.8s ease both;
+}
+.www-page .www-hero__visual {
+  animation: www-open 1.25s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+.www-page .www-hero__img {
+  animation: www-zoom 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.www-page .www-agents,
+.www-page .www-facts {
+  animation: www-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.9s both;
+}
+.www-page .www-agents__task,
+.www-page .www-fact {
+  animation: www-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(1.15s + var(--t, 0) * 0.2s);
+}
+.www-page .www-agents__chips {
+  animation: www-fade 0.6s ease 2s both;
+}
+/* Scrolling out of the hero: the landscape drifts slower than the page, the copy lifts away. */
+@media (prefers-reduced-motion: no-preference) {
+  .www-page .www-hero__visual picture {
+    position: absolute;
+    /* Taller than the frame by what it drifts, so the drift never shows an edge. */
+    inset: -12% 0 0 0;
+    transform: translate3d(0, calc(var(--hero-p, 0) * 10%), 0);
+  }
+  .www-page .www-hero__body {
+    transform: translate3d(0, calc(var(--hero-p, 0) * -48px), 0);
+    opacity: calc(1 - var(--hero-p, 0) * 0.7);
+  }
 }
 @keyframes www-rise {
   from {
@@ -1272,16 +1460,166 @@ a.www-modal__tile:hover {
     transform: translateY(18px);
   }
 }
+@keyframes www-settle {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+}
+@keyframes www-word {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+}
+@keyframes www-open {
+  from {
+    clip-path: inset(0 0 0 100%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes www-zoom {
+  from {
+    transform: scale(1.14);
+  }
+}
+@keyframes www-open-up {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (max-width: 991.98px) {
+  /* Stacked on a phone: the landscape opens from the bottom instead. */
+  .www-page .www-hero__visual {
+    animation-name: www-open-up;
+  }
+}
+
+/* Every other scene waits for its waypoint (useScenes adds .is-in when a fifth of it is on
+   screen), and only once the boot script has marked <html>: without JS nothing is ever hidden.
+   Parts enter in their --i order; each says how (Reveal's fx): rise, slide in from a side, drop,
+   or settle from a little larger. Headings come in word by word. */
+.www-js .www-page [data-scene]:not(.www-hero) [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 90ms);
+}
+.www-js .www-page [data-scene]:not(.www-hero) [data-reveal='left'] {
+  transform: translateX(-48px);
+}
+.www-js .www-page [data-scene]:not(.www-hero) [data-reveal='right'] {
+  transform: translateX(48px);
+}
+.www-js .www-page [data-scene]:not(.www-hero) [data-reveal='drop'] {
+  transform: translateY(-28px);
+}
+.www-js .www-page [data-scene]:not(.www-hero) [data-reveal='scale'] {
+  transform: scale(0.94);
+}
+.www-js .www-page [data-scene].is-in:not(.www-hero) [data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+.www-js .www-page [data-scene]:not(.www-hero) .www-w {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.45em);
+  transition:
+    opacity 0.6s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 90ms + var(--w, 0) * 38ms);
+}
+.www-js .www-page [data-scene].is-in:not(.www-hero) .www-w {
+  opacity: 1;
+  transform: none;
+}
+/* Where it fits: the stack tiles land one after another, after their layer. */
+.www-js .www-page [data-scene]:not(.www-hero) .www-tile {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 90ms + 250ms + var(--t, 0) * 70ms);
+}
+.www-js .www-page [data-scene].is-in:not(.www-hero) .www-tile {
+  opacity: 1;
+  transform: none;
+}
+/* The 90 days: each step's rule draws left to right, then its number pops. */
+.www-page .www-path__step::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 28px;
+  right: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--www-fir);
+  transform-origin: 0 50%;
+}
+.www-js .www-page [data-scene] .www-path__step::before {
+  transform: scaleX(0);
+  transition: transform 0.6s cubic-bezier(0.6, 0, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 160ms + 200ms);
+}
+.www-js .www-page [data-scene].is-in .www-path__step::before {
+  transform: scaleX(1);
+}
+.www-js .www-page [data-scene] .www-path__step .www-step-n {
+  transform: scale(0);
+  transition: transform 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+  transition-delay: calc(var(--i, 0) * 160ms + 500ms);
+}
+.www-js .www-page [data-scene].is-in .www-path__step .www-step-n {
+  transform: none;
+}
+/* Their site in the frame scrolls once, top to bottom and back, as the challenge arrives. */
+.www-js .www-page [data-scene].is-in .www-browser__view img {
+  animation: www-browse 9s ease-in-out 1.2s both;
+}
+@keyframes www-browse {
+  45%,
+  55% {
+    transform: translateY(calc(-100% + clamp(200px, 30vh, 300px)));
+  }
+}
+.www-js .www-page [data-scene]:not(.is-in) .www-steps::before {
+  transform: scale(0);
+}
 @media (prefers-reduced-motion: reduce) {
   .www-js .www-page [data-scene]:not(.www-hero) [data-reveal],
-  .www-page .www-hero [data-reveal] {
+  .www-js .www-page [data-scene]:not(.www-hero) .www-w,
+  .www-js .www-page [data-scene]:not(.www-hero) .www-tile,
+  .www-page .www-hero [data-reveal],
+  .www-page .www-hero .www-w,
+  .www-page .www-strip,
+  .www-page .www-hero__visual,
+  .www-page .www-hero__img,
+  .www-page .www-agents,
+  .www-page .www-facts,
+  .www-page .www-agents__task,
+  .www-page .www-fact,
+  .www-page .www-agents__chips,
+  .www-js .www-page [data-scene].is-in .www-browser__view img {
     opacity: 1;
     transform: none;
     transition: none;
     animation: none;
   }
+  .www-js .www-page [data-scene] .www-path__step::before,
+  .www-js .www-page [data-scene] .www-path__step .www-step-n,
   .www-js .www-page [data-scene]:not(.is-in) .www-steps::before {
     transform: none;
+    transition: none;
   }
   .www-page .www-sticky {
     transition: none;
