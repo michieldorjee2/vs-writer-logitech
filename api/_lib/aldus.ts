@@ -1,7 +1,8 @@
 /**
- * Aldus UI's two routes for the showcase (aldus-ui lib/offers/showcase-look.ts):
- * the running offers, and saving one offer's look. Its own token, which may
- * do nothing else.
+ * Aldus UI's routes for the showcase (aldus-ui lib/offers/showcase-look.ts):
+ * the running offers, saving or clearing one offer's look, and asking for one
+ * page of an offer that takes pages from search (askOfferPage). Its own
+ * token, which may do nothing else.
  *
  * Env: ALDUS_UI_URL, ALDUS_SHOWCASE_TOKEN. Unset: no offers, and the search
  * page is the usual one.
@@ -16,6 +17,8 @@ export type AldusOffer = {
   windowEnd: string;
   look: ShowcaseLook | null;
   pages: Array<{ accountName: string; pageUrl: string; liveSince: string | null }>;
+  /** Pages from search: 'off', 'on' or 'approval'. Absent from an Aldus UI before it, which reads as 'off'. */
+  fromSearch?: string;
 };
 
 export const aldusConfigured = () => Boolean(process.env.ALDUS_UI_URL && process.env.ALDUS_SHOWCASE_TOKEN);
@@ -62,4 +65,24 @@ export async function saveLook(offerId: string, look: Omit<ShowcaseLook, 'madeAt
   });
   held = null;
   return saved;
+}
+
+/**
+ * Asks Aldus UI for one page of a running offer, for the account a website
+ * names, as the rep who asked. Its answer comes back whatever its status, so
+ * the search page can say why it was refused. Up to 100 s: a cold account
+ * list is waited for once there.
+ */
+export async function askOfferPage(
+  offerId: string,
+  body: { website: string; requestedBy: { email: string; name?: string } },
+): Promise<{ status: number; body: unknown }> {
+  const base = (process.env.ALDUS_UI_URL || '').replace(/\/+$/, '');
+  const res = await fetch(`${base}/api/machine/showcase/offers/${encodeURIComponent(offerId)}/pages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.ALDUS_SHOWCASE_TOKEN}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(100_000),
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
 }

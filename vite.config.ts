@@ -211,6 +211,7 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/page-builds\/([^/]+)$/, '/api/page-builds/[id].ts'],
           [/^\/api\/offers$/, '/api/offers/index.ts'],
           [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
+          [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],
         ]
         let file: string | null = null
         let id: string | null = null
