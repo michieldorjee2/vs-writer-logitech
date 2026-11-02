@@ -1,0 +1,864 @@
+/* ==========================================================================
+   www-design pages (src/www): 1:1 landing pages built from optimizely.com's
+   components. Every rule is scoped to .www-page (or the <html> it sits in),
+   so no legacy template or Visual Builder page can match anything here.
+
+   The system, in brief:
+   - SCENES. Each section is one idea and at least the window's height on a
+     tablet or larger; its content is centred in it. Type is sized against the
+     window's HEIGHT as well as its width (min(vw, vh) inside clamp()), so a
+     scene fits a 13" laptop and a 27" monitor alike instead of overflowing
+     one and floating in the other.
+   - COLOUR (Optimizely brand rules). Backdrops are White and Neutral 3; Dark
+     Fir for the two bookends. LFGreen marks the action and nothing else but
+     a few small accents. No tertiary colour as a background, no gradients,
+     Dark Fir as the only stroke.
+   - ONE radius (32px, 24px on phones) for every module.
+   - MOTION. Scenes reveal their parts in order as they enter; the hero plays
+     on first paint without waiting for JS. Reduced motion: none of it.
+
+   Note the app's root font size is 10px, so lengths here are px (or
+   rem chosen for a 10px root), never rem copied from a 16px design.
+   ========================================================================== */
+
+/* Two headline sizes optimizely.com's components use (PortraitTextQuoteCard's phone quote,
+   one card title) that upstream's own token set never defines, so on the site they silently
+   fall back to body size. Named here, below the smallest defined step (xs = 28px). */
+@theme {
+  --text-headline-xxs: 24px;
+  --text-headline-3xs: 20px;
+}
+
+html:has(.www-page),
+body:has(.www-page) {
+  background: #fff;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.www-page) {
+    scroll-behavior: smooth;
+  }
+}
+
+.www-page {
+  --www-fir: #08251a;
+  --www-n3: #e4f0da;
+  --www-lime: #abff44;
+  --www-good: #3ab533;
+  --www-radius: 24px;
+  --www-gutter: clamp(12px, 1.6vw, 24px);
+  /* index.css clears this for the legacy templates; upstream buttons need prod's value. */
+  --color-lfgreen-100: hsl(92 82% 59%);
+  --prose-type-color: var(--www-fir);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+  color: var(--www-fir);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+@media (min-width: 768px) {
+  .www-page {
+    --www-radius: 32px;
+  }
+}
+
+/* ---- type ------------------------------------------------------------------ */
+.www-page .www-display,
+.www-page .www-h2,
+.www-page .www-h3,
+.www-page .www-number,
+.www-page .www-quote-text {
+  font-family: var(--font-headline), 'VC Nudge', Arial, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+}
+.www-page .www-display {
+  font-size: clamp(40px, min(6vw, 9.6vh), 112px);
+  line-height: 0.98;
+}
+.www-page .www-h2 {
+  font-size: clamp(32px, min(4.2vw, 6.6vh), 76px);
+  line-height: 1.02;
+}
+.www-page .www-h3 {
+  font-size: clamp(20px, min(1.8vw, 3vh), 30px);
+  line-height: 1.1;
+}
+.www-page .www-number {
+  font-size: clamp(40px, min(4.6vw, 7.6vh), 84px);
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.www-page .www-quote-text {
+  font-size: clamp(22px, min(2.4vw, 4vh), 40px);
+  line-height: 1.1;
+}
+.www-page .www-lead {
+  font-size: clamp(17px, min(1.4vw, 2.5vh), 24px);
+  line-height: 1.4;
+}
+.www-page .www-body {
+  font-size: clamp(15px, min(1.1vw, 1.95vh), 18px);
+  line-height: 1.45;
+}
+.www-page .www-small {
+  font-size: clamp(13px, min(0.95vw, 1.7vh), 15px);
+  line-height: 1.4;
+}
+.www-page .www-caption {
+  font-family: var(--font-roboto), 'Roboto Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+.www-page .www-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: clamp(12px, 2vh, 20px);
+  font-weight: 700;
+  font-size: clamp(14px, min(1vw, 1.8vh), 16px);
+  line-height: 1.2;
+}
+.www-page .www-eyebrow::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--www-lime);
+  box-shadow: 0 0 0 1.5px var(--www-fir);
+}
+.www-page .www-eyebrow--on-dark {
+  color: rgb(255 255 255 / 0.85);
+}
+.www-page .www-eyebrow--on-dark::before {
+  box-shadow: none;
+}
+/* The writer's emphasis, at the brand's "Clear" level: colour, not depth. */
+.www-page .www-emph {
+  color: #197050;
+}
+.www-page [data-tone='dark'] .www-emph,
+.www-page .www-hero .www-emph {
+  color: var(--www-lime);
+}
+.www-page .www-link {
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* ---- chrome: progress hairline, top strip, sticky ask ---------------------- */
+.www-page .www-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 3px;
+  background: var(--www-lime);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+.www-page .www-strip {
+  height: 64px;
+}
+.www-page .www-sticky {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 6px 6px 16px;
+  border-radius: 20px;
+  background: var(--www-fir);
+  box-shadow: 0 18px 40px -18px rgb(8 37 26 / 0.6);
+  transform: translate(-50%, 140%);
+  opacity: 0;
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s ease;
+}
+.www-page .www-sticky--visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+/* ---- hero (bookend 1) -------------------------------------------------------- */
+.www-page .www-hero {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding-bottom: 12px;
+}
+.www-page .www-hero > .vb-container {
+  flex: 1;
+  display: flex;
+}
+.www-page .www-hero__card {
+  flex: 1;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--www-radius);
+  background: var(--www-fir);
+  color: #fff;
+  --prose-type-color: #fff;
+}
+.www-page .www-hero__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(20px, 3.6vh, 36px);
+  padding: clamp(20px, 4vh, 56px) clamp(14px, 3vw, 48px);
+}
+.www-page .www-hero__visual {
+  position: relative;
+  min-height: 46svh;
+  overflow: hidden;
+  border-radius: calc(var(--www-radius) - 8px);
+}
+@media (min-width: 992px) {
+  .www-page .www-hero__card {
+    grid-template-columns: 1.05fr 1fr;
+    min-height: calc(100svh - 76px);
+  }
+  .www-page .www-hero__visual {
+    min-height: 0;
+  }
+}
+/* Their site today, in a browser frame floating on the landscape. */
+.www-page .www-browser {
+  position: absolute;
+  top: 11%;
+  left: 7%;
+  width: 96%;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 30px 60px -24px rgb(8 37 26 / 0.6);
+}
+.www-page .www-browser img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+}
+.www-page .www-browser__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--www-n3);
+}
+.www-page .www-browser__bar > span:not(.www-browser__url) {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgb(8 37 26 / 0.25);
+}
+.www-page .www-browser__url {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--www-fir);
+  font: 11px/1.4 var(--font-roboto), 'Roboto Mono', monospace;
+}
+.www-page .www-built-for {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 340px;
+  padding: 12px 18px 12px 12px;
+  border-radius: 18px;
+  background: #fff;
+  color: var(--www-fir);
+  box-shadow: 0 18px 40px -20px rgb(8 37 26 / 0.55);
+}
+@media (min-width: 992px) {
+  .www-page .www-built-for {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+  }
+}
+/* The account's brand colour (brandAccentColor): one stripe, theirs, on the card that names them. */
+.www-page .www-accent-bar {
+  border-left: 6px solid var(--www-accent, var(--www-lime));
+}
+/* The offer's facts on the landscape. */
+.www-page .www-facts {
+  position: relative;
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  height: 100%;
+  padding: 12px;
+}
+@media (min-width: 576px) {
+  .www-page .www-facts {
+    grid-template-columns: 1fr 1fr;
+    padding: clamp(12px, 2vh, 24px);
+  }
+}
+.www-page .www-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(12px, 2vh, 20px);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--www-fir);
+}
+
+/* ---- scenes -------------------------------------------------------------------- */
+.www-page .www-scene {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-block: clamp(64px, 11vh, 140px);
+  scroll-margin-top: 0;
+}
+.www-page .www-scene--neutral {
+  background: var(--www-n3);
+}
+.www-page .www-scene--dark {
+  background: var(--www-fir);
+  color: #fff;
+  --prose-type-color: #fff;
+}
+.www-page .www-scene--fill {
+  min-height: 100svh;
+}
+@media (min-width: 768px) {
+  .www-page .www-scene:not(.www-scene--compact) {
+    min-height: 100svh;
+  }
+}
+.www-page .www-scene--compact {
+  padding-block: clamp(56px, 9vh, 112px);
+}
+/* A dark bookend sits inset like the hero card, so the page opens and closes the same way. */
+.www-page .www-scene--dark.www-scene--fill {
+  margin: 12px;
+  border-radius: var(--www-radius);
+  min-height: calc(100svh - 24px);
+}
+
+/* ---- the one card --------------------------------------------------------------- */
+.www-page .www-card {
+  border-radius: var(--www-radius);
+  padding: clamp(20px, 3vh, 32px);
+}
+.www-page .www-card--neutral {
+  background: var(--www-n3);
+}
+.www-page .www-card--white {
+  background: #fff;
+}
+.www-page .www-card--dark {
+  background: var(--www-fir);
+  color: #fff;
+}
+.www-page .www-initials {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--www-fir);
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+}
+.www-page .www-card--white .www-initials,
+.www-page .www-scene--neutral .www-card--white .www-initials {
+  background: var(--www-n3);
+}
+.www-page .www-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--www-n3);
+}
+.www-page .www-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--www-lime);
+  box-shadow: 0 0 0 1.5px var(--www-fir);
+}
+
+/* ---- numbers ------------------------------------------------------------------- */
+.www-page .www-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(20px, 3vh, 32px) clamp(16px, 2vw, 32px);
+}
+@media (min-width: 992px) {
+  .www-page .www-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .www-page .www-stats--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.www-page .www-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: clamp(16px, 2.4vh, 24px);
+  border-top: 1.5px solid var(--www-fir);
+}
+.www-page .www-number__unit {
+  font-size: 0.42em;
+  letter-spacing: 0;
+}
+/* StatBlock is mint (Neutral 2, a tertiary colour) by design; here it is the one Neutral 3 module. */
+.www-page .www-roi-hero [class*='bg-(--color-neutral-2)'] {
+  background-color: var(--www-n3);
+}
+
+/* ---- signals: tool chips ----------------------------------------------------- */
+.www-page .www-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--www-n3);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.www-page .www-chip--ours {
+  background: var(--www-lime);
+}
+.www-page .www-stack-pill--flag {
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px var(--www-fir);
+}
+.www-page .www-chip__note {
+  font: 11px/1 var(--font-roboto), 'Roboto Mono', monospace;
+  opacity: 0.7;
+}
+
+/* ---- challenge: numbered points, two columns ---------------------------------- */
+.www-page .www-pains {
+  display: grid;
+  gap: clamp(20px, 3.4vh, 36px) clamp(20px, 2.4vw, 40px);
+}
+@media (min-width: 768px) {
+  .www-page .www-pains {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.www-page .www-pain {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.www-page .www-pain__n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--www-lime);
+  font: 500 13px/1 var(--font-roboto), 'Roboto Mono', monospace;
+}
+
+/* ---- comparison ----------------------------------------------------------------- */
+.www-page .www-table .prose {
+  --prose-table-bg: var(--www-n3);
+  --prose-table-text: var(--www-fir);
+  --prose-table-row-odd: #fff;
+  --prose-table-row-even: rgb(255 255 255 / 0.6);
+}
+.www-page .www-table .prose table {
+  margin: 0 !important;
+  border-radius: var(--www-radius) !important;
+}
+.www-page .www-table .prose table {
+  border-spacing: 0 clamp(4px, 0.7vh, 8px) !important;
+  padding: 0 clamp(12px, 1.6vw, 24px) clamp(12px, 1.6vh, 24px) !important;
+}
+.www-page .www-table .prose thead th {
+  padding: clamp(14px, 2.2vh, 24px) 24px clamp(8px, 1.2vh, 16px) !important;
+}
+.www-page .www-table .prose tbody td {
+  padding-block: clamp(6px, 1.1vh, 14px) !important;
+}
+.www-page .www-table .prose [data-table-icon] {
+  width: 28px;
+  height: 28px;
+  font-size: 26px;
+}
+.www-page .www-table .prose [data-table-icon='false']::before {
+  font-size: 22px;
+}
+.www-page .www-table .www-cell-label {
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+  font-weight: 500;
+}
+.www-page .www-table [data-table-icon] {
+  vertical-align: middle;
+}
+.www-page .www-table .table-with-icons td {
+  text-align: left;
+}
+.www-page .www-table thead th:last-child {
+  color: #197050 !important;
+}
+.www-page .www-table tbody td:first-child {
+  font-weight: 600;
+}
+.www-page .www-compare-card [data-icon='yes'] {
+  color: var(--www-good);
+}
+.www-page .www-compare-card [data-icon='no'] {
+  color: var(--color-error-darkred);
+}
+.www-page .www-compare-card [data-icon='limited'] {
+  color: var(--forms-color-error-light);
+}
+
+/* ---- proof ---------------------------------------------------------------------- */
+/* The account's own tile in the logo strip keeps its colours and gets the one lime ring. */
+.www-page .www-you-tile img {
+  filter: none !important;
+}
+.www-page .www-you-tile > div {
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--www-lime);
+}
+/* Quote cards are portrait; cap their width by the window's height so two fit in one scene. */
+.www-page .www-quote > article {
+  max-width: min(564px, calc((100svh - 300px) * 564 / 658));
+  margin-inline: auto;
+}
+
+/* ---- steps (the path, the agenda) ---------------------------------------------- */
+.www-page .www-steps {
+  position: relative;
+  display: grid;
+  gap: 28px;
+  padding-left: 32px;
+}
+.www-page .www-steps::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 8px;
+  width: 1.5px;
+  background: rgb(8 37 26 / 0.25);
+  transform-origin: top;
+  transition: transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) 0.2s;
+}
+.www-page .www-step {
+  position: relative;
+}
+.www-page .www-step__dot {
+  position: absolute;
+  top: 2px;
+  left: -32px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--www-lime);
+  box-shadow: 0 0 0 1.5px var(--www-fir);
+}
+@media (min-width: 992px) {
+  .www-page .www-steps {
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: clamp(20px, 2.4vw, 40px);
+    padding-left: 0;
+    padding-top: 40px;
+  }
+  .www-page .www-steps::before {
+    top: 8px;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 1.5px;
+    transform-origin: left;
+  }
+  .www-page .www-step__dot {
+    top: -40px;
+    left: 0;
+  }
+}
+
+/* ---- the ask (bookend 2) --------------------------------------------------------- */
+.www-page .www-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: var(--www-lime);
+  color: var(--www-fir);
+}
+.www-page .www-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px 10px 10px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.06);
+  color: #fff;
+  transition: background 0.2s ease;
+}
+.www-page .www-person:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+.www-page .www-avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--www-n3);
+  color: var(--www-fir);
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+}
+.www-page .www-signup-photo {
+  height: clamp(220px, 52vh, 560px);
+  overflow: hidden;
+  border-radius: calc(var(--www-radius) - 8px);
+}
+.www-page .www-colophon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: clamp(40px, 8vh, 96px);
+  padding-top: 20px;
+  border-top: 1px solid rgb(255 255 255 / 0.15);
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 0.6);
+}
+.www-page .www-colophon a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.www-page .www-colophon a:hover {
+  color: #fff;
+}
+
+/* ---- offer: the invitation's opening paragraph ---------------------------------- */
+.www-page .www-intro {
+  font-size: clamp(16px, min(1.25vw, 2.2vh), 20px);
+  line-height: 1.5;
+}
+.www-page .www-intro p:first-child {
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: clamp(26px, min(3.2vw, 5.4vh), 56px);
+  line-height: 1.06;
+  text-wrap: balance;
+}
+/* Paragraphs renders a flex column; multi-column layout needs a block container. */
+.www-page .www-intro > div {
+  display: block;
+}
+.www-page .www-intro p + p {
+  margin-top: 0.8em;
+}
+.www-page .www-intro p:first-child {
+  margin-bottom: clamp(20px, 3.4vh, 36px);
+}
+@media (min-width: 992px) {
+  .www-page .www-intro > div {
+    columns: 2;
+    column-gap: 56px;
+  }
+  .www-page .www-intro p:first-child {
+    column-span: all;
+  }
+  .www-page .www-intro p {
+    break-inside: avoid;
+  }
+}
+
+/* ---- motion ---------------------------------------------------------------------- */
+/* Only once the boot script has marked <html>: without JS nothing is ever hidden. */
+.www-js .www-page [data-scene]:not(.www-hero) [data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 80ms);
+}
+.www-js .www-page [data-scene].is-in:not(.www-hero) [data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+.www-js .www-page [data-scene]:not(.is-in) .www-steps::before {
+  transform: scale(0);
+}
+/* The hero plays on first paint, from the server's HTML, before any script has run. */
+.www-page .www-hero [data-reveal] {
+  animation: www-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 60ms);
+}
+@keyframes www-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .www-js .www-page [data-scene]:not(.www-hero) [data-reveal],
+  .www-page .www-hero [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    animation: none;
+  }
+  .www-js .www-page [data-scene]:not(.is-in) .www-steps::before {
+    transform: none;
+  }
+  .www-page .www-sticky {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   COPIED from optimizely.com app/globals.css (prose + TableBlock), scoped.
+   Upstream ships these unscoped; here they are prefixed and otherwise verbatim.
+   ========================================================================== */
+.www-page .prose {
+  --tw-prose-body: var(--prose-type-color);
+  --tw-prose-headings: var(--prose-type-color);
+  --tw-prose-bold: var(--prose-type-color);
+  --tw-prose-links: var(--prose-type-color);
+  font-size: var(--text-body-s);
+  line-height: 1.75;
+}
+@media (min-width: 1024px) {
+  .www-page .prose {
+    font-size: var(--text-body-base);
+    line-height: 1.5;
+  }
+}
+.www-page .prose table {
+  border-collapse: separate !important;
+  border-spacing: 0 8px !important;
+  background-color: var(--prose-table-bg) !important;
+  border-radius: 16px !important;
+  padding: 0 24px 24px !important;
+  width: 100% !important;
+  min-width: 700px !important;
+  color: var(--prose-table-text) !important;
+  overflow: hidden;
+  margin-top: 32px !important;
+  margin-bottom: 48px !important;
+}
+.www-page .prose thead th {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 24px 24px 16px !important;
+  font-family: var(--font-body), sans-serif;
+  font-weight: var(--font-weight-body-bold) !important;
+  font-size: var(--text-body-s) !important;
+  color: var(--prose-table-text) !important;
+  text-align: left;
+}
+.www-page .prose tbody td {
+  border: none !important;
+  padding: 16px 24px !important;
+  font-size: var(--text-body-xxs) !important;
+  line-height: 1.35 !important;
+  color: var(--prose-table-text) !important;
+}
+.www-page .prose tbody tr {
+  background-color: transparent !important;
+}
+.www-page .prose tbody tr:nth-child(odd) td {
+  background-color: var(--prose-table-row-odd) !important;
+}
+.www-page .prose tbody tr:nth-child(even) td {
+  background-color: var(--prose-table-row-even) !important;
+}
+.www-page .prose tbody tr td:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.www-page .prose tbody tr td:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.www-page .prose [data-table-icon] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-family: 'Material Symbols Rounded';
+  font-size: 36px;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 500,
+    'GRAD' 0,
+    'opsz' 40;
+}
+.www-page .prose [data-table-icon='true']::before {
+  content: '\e5ca';
+  color: var(--color-green-goodtogo);
+}
+.www-page .prose [data-table-icon='false']::before {
+  content: '\e5cd';
+  color: var(--color-error-darkred);
+  font-size: 30px;
+}
+.www-page .prose [data-table-icon='warning']::before {
+  content: '\e82a';
+  color: var(--forms-color-error-light);
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 500,
+    'GRAD' 0,
+    'opsz' 40;
+}
+.www-page .table-with-icons td {
+  text-align: center;
+  vertical-align: middle;
+}
+.www-page .table-with-icons td:first-child {
+  text-align: left;
+}

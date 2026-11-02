@@ -17,6 +17,9 @@ import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-
  * DynamicComparisonPage has quietly lost the hero's `id="hero"` anchor).
  */
 import UseCasePage from '../src/components/UseCasePage';
+import WwwAccountPage from '../src/www/AccountPage';
+import WwwOfferPage from '../src/www/OfferPage';
+import { isOfferExperience, wantsWwwDesign } from '../src/www/design';
 import { includes, resolveComponentPlan } from '../src/lib/limitless/component-plan';
 import { resolveUrl } from '../src/lib/graph-types';
 import { graphItems } from '../src/lib/graph-envelope';
@@ -1174,11 +1177,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      const appHtml = renderExperienceRoute(
-        <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
-          <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
-        </div>,
-      );
+      // ?design=www: the www-design concept (src/www). Mirrors VisualBuilderPage.tsx.
+      const appHtml = wantsWwwDesign(url.searchParams) && isOfferExperience(item)
+        ? renderExperienceRoute(<WwwOfferPage experience={item} />)
+        : renderExperienceRoute(
+            <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
+              <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
+            </div>,
+          );
 
       const headHtml = buildExperienceHeadHtml(item);
       const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`;
@@ -1257,6 +1263,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
       default: {
+        // ?design=www: the www-design concept (src/www). Mirrors App.tsx's renderPageBody.
+        if (wantsWwwDesign(url.searchParams)) {
+          appHtml = renderPageRoute(<WwwAccountPage page={page} />);
+          break;
+        }
         const componentPlan = resolveComponentPlan(page);
         appHtml = includes(componentPlan, 'use-case-matrix')
           ? renderPageRoute(<UseCasePage page={page} plan={componentPlan} />)

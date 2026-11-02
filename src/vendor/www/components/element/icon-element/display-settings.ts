@@ -1,0 +1,78 @@
+export default [
+  {
+    key: 'IconElementDisplayTemplate',
+    displayName: 'Icon Display Template',
+    contentType: 'IconElement',
+    settings: [
+      {
+        key: 'size',
+        displayName: 'Size',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'xs', displayName: 'Extra Small' },
+          { value: 'sm', displayName: 'Small' },
+          { value: 'med', displayName: 'Medium' },
+          { value: 'lrg', displayName: 'Large' },
+          { value: 'xl', displayName: 'Extra Large' },
+        ],
+        defaultValue: 'med',
+      },
+      {
+        key: 'fill',
+        displayName: 'Fill',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'filled', displayName: 'Filled' },
+          { value: 'outlined', displayName: 'Outlined' },
+        ],
+        defaultValue: 'filled',
+      },
+      {
+        key: 'color',
+        displayName: 'Color',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'inherit', displayName: 'Inherit' },
+          { value: 'darkfir', displayName: 'Dark Fir' },
+          { value: 'white', displayName: 'White' },
+          { value: 'green', displayName: 'Green (Good To Go)' },
+          { value: 'ltblue', displayName: 'Light Blue' },
+          { value: 'pink', displayName: 'Pink' },
+          { value: 'neutral', displayName: 'Neutral' },
+        ],
+        defaultValue: 'inherit',
+      },
+      {
+        key: 'background',
+        displayName: 'Background',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'none', displayName: 'None' },
+          { value: 'white', displayName: 'White' },
+          { value: 'mid_neutral', displayName: 'Mid neutral' },
+          { value: 'darkfir', displayName: 'Dark fir green' },
+          {
+            value: 'mid_dark_green',
+            displayName: 'Mid fir green',
+          },
+          {
+            value: 'light_dark_green',
+            displayName: 'Light fir green',
+          },
+          { value: 'lfgreen', displayName: 'Green' },
+          { value: 'mid_green', displayName: 'Mid green (Grass)' },
+          { value: 'ltblue', displayName: 'Light blue' },
+          { value: 'light_pink', displayName: 'Light pink' },
+          { value: 'pink', displayName: 'Dark pink' },
+          { value: 'opal', displayName: 'Opal' },
+        ],
+        defaultValue: 'none',
+      },
+    ],
+    isDefault: true,
+  },
+] as const

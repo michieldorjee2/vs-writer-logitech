@@ -33,8 +33,11 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* ABM / Aldus 1:1 landing page — granular per-component breakdown. */
-export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
+/* ABM / Aldus 1:1 landing page — granular per-component breakdown.
+   Each selector also matches `[data-xray="<id>"]`, the hook the www-design account page
+   (src/www/AccountPage.tsx, ?design=www) puts on the same component, so X-ray and Edit mode
+   work on both renderers without knowing which one is on screen. */
+const ABM_XRAY_LEGACY: XraySectionInfo[] = [
   {
     id: 'hero-3d',
     selector: '#hero-canvas',
@@ -245,6 +248,11 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     sources: ['Closing supporting line', 'Approved messaging'],
   },
 ];
+
+export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = ABM_XRAY_LEGACY.map((s) => ({
+  ...s,
+  selector: `${s.selector}, [data-xray="${s.id}"]`,
+}));
 
 /* Dynamic comparison page — non-ABM variant. Falls back to section IDs
  * since the dynamic layout is content-driven and less themed. */

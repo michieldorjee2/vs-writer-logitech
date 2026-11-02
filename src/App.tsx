@@ -5,6 +5,7 @@ import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 import { includes, resolveComponentPlan } from './lib/limitless/component-plan';
+import { wantsWwwDesign } from './www/design';
 import type {
     FinServPage as FinServPageData,
     PersonPage as PersonPageData,
@@ -50,6 +51,8 @@ const FloatingSidebar = lazy(() => import('./components/FloatingSidebar'));
  * and no legacy page should download a byte of it.
  */
 const VisualBuilderPage = lazy(() => import('./components/VisualBuilderPage'));
+/* The www-design concept (?design=www): optimizely.com's own components. See src/www. */
+const WwwAccountPage = lazy(() => import('./www/AccountPage'));
 
 function RouteSpinner() {
     return (
@@ -155,10 +158,12 @@ function HomePage() {
  * use-case page. Register the field, add it to the query, and every page the
  * decision engine writes takes this branch with no further code change.
  */
-function renderPageBody(data: CompetitorComparisonPage, editMode: boolean) {
+function renderPageBody(data: CompetitorComparisonPage, editMode: boolean, www = false) {
     if (isPersonPage(data)) return <PersonPage page={data} editMode={editMode} />;
     if (isRetailPage(data)) return <RetailCustomerPage page={data} />;
     if (isFinServPage(data)) return <FinServPage page={data} />;
+    // Mirrored in server/ssr-handler.tsx's default arm.
+    if (www) return <WwwAccountPage page={data} />;
     // Resolved once and reused, rather than once to test and once to pass down.
     const plan = resolveComponentPlan(data);
     if (includes(plan, 'use-case-matrix')) return <UseCasePage page={data} plan={plan} />;
@@ -209,11 +214,13 @@ function PageLoader() {
         // server/ssr-handler.tsx's renderPageRoute() reproduces this exact shape — including
         // the second slot — because useId() counts a children array. Change one, change both.
         <Suspense fallback={<RouteSpinner />}>
-            {renderPageBody(data, searchParams.get('ctx') === 'edit')}
+            {renderPageBody(data, searchParams.get('ctx') === 'edit', wantsWwwDesign(searchParams))}
             {fromSearch && !isRetailPage(data) && !isFinServPage(data) && (
                 <FloatingSidebar
                     page={data}
-                    variant={isPersonPage(data) ? 'person' : isABMPage(data) ? 'abm' : 'dynamic'}
+                    // The www design renders every account page with the ABM sections (and their
+                    // data-xray hooks), so X-ray and Edit use the ABM map there.
+                    variant={isPersonPage(data) ? 'person' : isABMPage(data) || wantsWwwDesign(searchParams) ? 'abm' : 'dynamic'}
                 />
             )}
         </Suspense>

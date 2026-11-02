@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-10-20
+updated: 2026-11-01
 ---
 
 # vs-writer-logitech
@@ -52,6 +52,17 @@ Three things it covers that the build does not:
 - **`server/` and `api/` are type-checked** (`typecheck:server`, `tsconfig.server.json`). The app config includes only `src/`, so the code that server-renders every page had never been checked; it now is, with `strictNullChecks` on, which is what the `api/` handlers' `if (!x.ok)` narrowing was written for. The app config is unchanged.
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
 - **`check:render`** server-renders the use-case template and asserts against the HTML.
+
+## www design (concept, `?design=www`)
+
+Any account page (`/<company>/`) or offer page (`/vb/<slug>`) renders in the new design when `?design=www` is on the URL; without it nothing changes. The pages are 1:1 landing pages built from optimizely.com's own React components (vendored in `src/vendor/www`, see its `UPSTREAM.md`): no navigation or footer, one window-height scene per idea, white and Neutral 3 between dark bookends, LFGreen for the action only. The content model is untouched; `src/www/account-fields.ts` maps all 67 `CompetitorComparisonPage` properties, and offer pages are read back from their Visual Builder composition (`src/www/offer-content.ts`). X-ray and Edit mode work on both designs (`data-xray` hooks).
+
+```bash
+npm run check:www                              # 95 offline tests: helpers, field coverage, x-ray hooks, brand rules
+WWW_UPSTREAM=~/Claude/OptimizelyHeadless npm run check:www   # + proves src/vendor/www still matches upstream
+npm run build && npx tsx scripts/serve-prod.ts &               # local production stand-in on :5199
+npm run e2e:www                                # Playwright, desktop + phone, X-ray/Edit with all network mocked
+```
 
 ## Sign-in
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import VisualBuilderExperience from '../cms/rendering/visual-builder';
+import WwwOfferPage from '../www/OfferPage';
+import { isOfferExperience, wantsWwwDesign } from '../www/design';
 import type { SafeVisualBuilderExperience } from '@/lib/optimizely/types/experience';
 
 /**
@@ -147,6 +149,11 @@ export default function VisualBuilderPage() {
         </p>
       </div>
     );
+  }
+
+  // The www-design concept, ?design=www on an offer page. Mirrored in server/ssr-handler.tsx.
+  if (wantsWwwDesign(searchParams) && isOfferExperience(data)) {
+    return <WwwOfferPage experience={data} />;
   }
 
   return (
