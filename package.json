@@ -15,7 +15,8 @@
     "cms:apply:dry": "tsx src/cms/apply.ts --dry-run",
     "tokens:build": "node scripts/build-tokens.js",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render"
+    "check:from-search": "tsx scripts/check-offer-from-search.ts",
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:from-search"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.20",
