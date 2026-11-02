@@ -29,7 +29,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     signal: init.signal ?? AbortSignal.timeout(8000),
   });
   const body = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(`Aldus UI ${init.method ?? 'GET'} ${path} → ${res.status} ${body.error ?? ''}`.trim());
+  if (!res.ok) throw Object.assign(new Error(`Aldus UI ${init.method ?? 'GET'} ${path} → ${res.status} ${body.error ?? ''}`.trim()), { status: res.status });
   return body;
 }
 
@@ -63,8 +63,10 @@ const VIEWER_HOLD_MS = 5 * 60_000;
  * Whether the signed-in person gets the search page's links back to Limitless
  * (Open Limitless, and Edit offer on the offer the page runs as), by Aldus
  * UI's rule. False when Aldus UI is unset, slow, older (404) or failing: no
- * links, never an error. Only a real answer is held, so a blip doesn't hide
- * the links for five minutes.
+ * links, never an error. A real answer is held, and so is a 404 (an Aldus UI
+ * without the route won't grow one in a moment, so each page load needn't
+ * ask again); a failure or a timeout isn't, so a blip doesn't hide the links
+ * for five minutes.
  */
 export async function isLimitlessAdmin(email: string, fresh = false): Promise<boolean> {
   if (!aldusConfigured()) return false;
@@ -81,7 +83,8 @@ export async function isLimitlessAdmin(email: string, fresh = false): Promise<bo
     if (typeof admin !== 'boolean') return false;
     viewers.set(who, { at: Date.now(), admin });
     return admin;
-  } catch {
+  } catch (err) {
+    if ((err as { status?: unknown } | null)?.status === 404) viewers.set(who, { at: Date.now(), admin: false });
     return false;
   }
 }

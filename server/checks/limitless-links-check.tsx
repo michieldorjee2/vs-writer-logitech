@@ -8,14 +8,17 @@
  *
  *   1. api/offers, with fetch stubbed (no network): Aldus UI says yes, and
  *      the answer carries its address, after exactly one POST that names the
- *      session's email (lower-cased) with the showcase token. It says no, or
+ *      session's email with the showcase token. isLimitlessAdmin itself asks
+ *      about an email in another case lower-cased and trimmed (the session's
+ *      already is, so only a direct call can show it). Aldus UI says no, or
  *      answers 404 (an older Aldus UI), fails, hangs past 3 s or answers
  *      something other than a boolean: no address, the offers still listed,
  *      200, and a hang doesn't hold the page for long.
- *   2. The answer is held five minutes per person; ?fresh=1 asks again; a
- *      failed answer isn't held. An email in the query, body or a header
- *      changes nothing: only the session's is asked about. Signed out: 401
- *      and no request. Aldus UI unset: no offers, no address, no request.
+ *   2. The answer is held five minutes per person, and so is a 404 as a no;
+ *      ?fresh=1 asks again; a failed request isn't held. An email in the
+ *      query, body or a header changes nothing: only the session's is asked
+ *      about. Signed out: 401 and no request. Aldus UI unset: no offers, no
+ *      address, no request.
  *   3. limitlessOrigin(): ALDUS_UI_URL's origin, https only, http only for
  *      localhost or 127.0.0.1; anything else (another http host, a look-alike,
  *      javascript:, unset) is null, and an admin then gets no address.
@@ -28,6 +31,9 @@
  *      links add exactly two visible words, "Open Limitless".
  *   5. SearchHome hands the menu the address /api/offers sent, through
  *      limitlessFrom (control: either half missing is caught).
+ *   6. search-home.css: the open menu sits above Mark's look card, which
+ *      shares its corner, so the pencil stays clickable while a look is made
+ *      or after one failed (control: no rule, or the card's level, is caught).
  *
  * scripts/check-limitless-links.mjs bundles and runs this, then runs it again
  * against mutants of the files it guards, each of which must fail it.
@@ -39,7 +45,7 @@ import { renderToString } from 'react-dom/server';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 import offersHandler from '../../api/offers/index.js';
-import { limitlessOrigin } from '../../api/_lib/aldus.js';
+import { isLimitlessAdmin, limitlessOrigin } from '../../api/_lib/aldus.js';
 import ProfileMenu from '../../src/components/ProfileMenu';
 import { limitlessFrom, type RunningOffer } from '../../src/lib/offer-looks';
 
@@ -150,7 +156,7 @@ async function main(): Promise<void> {
     check('…"private, no-store"', reply.headers['cache-control'] === 'private, no-store', reply.headers);
     const one = asked[0];
     check(
-      '…after exactly one POST to the viewer route, naming the session\'s email lower-cased, with the showcase token',
+      '…after exactly one POST to the viewer route, naming the session\'s email, with the showcase token',
       asked.length === 1 &&
         one.method === 'POST' &&
         one.body === '{"email":"laura@optimizely.com"}' &&
@@ -159,6 +165,23 @@ async function main(): Promise<void> {
         one.url === `${BASE}/api/machine/showcase/viewer`,
       asked,
     );
+  }
+
+  {
+    // The session's email is lower-cased already (api/_lib/auth.ts), so only a
+    // direct call shows isLimitlessAdmin's own lower-casing and trimming.
+    viewerReply = 'yes';
+    const before = calls.length;
+    const yes = await isLimitlessAdmin('  Mixed.Case@Optimizely.COM ', true);
+    const asked = viewerCalls().filter((c) => calls.indexOf(c) >= before);
+    check(
+      'isLimitlessAdmin asks about an email in another case lower-cased and trimmed',
+      yes === true && asked.length === 1 && asked[0].body === '{"email":"mixed.case@optimizely.com"}',
+      asked,
+    );
+    const again = calls.length;
+    const held = await isLimitlessAdmin('mixed.case@optimizely.com');
+    check('…and holds the answer under that form: the same person in lower case isn\'t asked again', held === true && calls.length === again, calls.length - again);
   }
 
   const noAddress: Array<[string, ViewerReply, string]> = [
@@ -192,12 +215,27 @@ async function main(): Promise<void> {
     check('?fresh=1 asks again', viewerCalls().length - before === 1 && fresh.body?.limitless === BASE, viewerCalls().length - before);
 
     as('blip@optimizely.com');
-    viewerReply = '404';
+    viewerReply = 'throw';
     await getOffers();
     viewerReply = 'yes';
     before = viewerCalls().length;
     const after = await getOffers();
-    check('a failed answer isn\'t held: the next read asks again and gets the address', viewerCalls().length - before === 1 && after.body?.limitless === BASE, after.body);
+    check('a failed request isn\'t held: the next read asks again and gets the address', viewerCalls().length - before === 1 && after.body?.limitless === BASE, after.body);
+
+    as('older@optimizely.com');
+    viewerReply = '404';
+    await getOffers();
+    viewerReply = 'yes';
+    before = viewerCalls().length;
+    const heldNo = await getOffers();
+    check(
+      'a 404 (an Aldus UI without the route) is held as a no: the next read doesn\'t ask again',
+      viewerCalls().length - before === 0 && listed(heldNo) && heldNo.body?.limitless === null,
+      { asked: viewerCalls().length - before, body: heldNo.body },
+    );
+    before = viewerCalls().length;
+    const freshYes = await getOffers({ fresh: '1' });
+    check('…and ?fresh=1 asks again and gets the address', viewerCalls().length - before === 1 && freshYes.body?.limitless === BASE, freshYes.body);
 
     as('spoof@optimizely.com');
     before = calls.length;
@@ -340,6 +378,27 @@ async function main(): Promise<void> {
     );
   }
 
+  // ─── 6. The open menu sits above Mark's look card ────────────────────────
+
+  {
+    const css = readFileSync('src/styles/search-home.css', 'utf-8');
+    const OPEN = '.sh-top:has(.search-page__profile-menu)';
+    /** The z-index of the top-level rule for exactly this selector, or null. */
+    const zOf = (src: string, selector: string): number | null => {
+      const at = src.search(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`));
+      if (at < 0) return null;
+      const z = src.slice(at, src.indexOf('}', at)).match(/z-index:\s*(\d+)/);
+      return z ? Number(z[1]) : null;
+    };
+    const above = (src: string) => {
+      const card = zOf(src, '.sh-look');
+      const open = zOf(src, OPEN);
+      return card !== null && open !== null && open > card;
+    };
+    check('the open menu sits above Mark\'s look card, so its pencil can be clicked while a look is made or after one failed', above(css), { card: zOf(css, '.sh-look'), open: zOf(css, OPEN) });
+    const atCardLevel = css.replace(/(\.sh-top:has\(\.search-page__profile-menu\)\s*\{[^}]*z-index:\s*)\d+/, (_, head: string) => `${head}${zOf(css, '.sh-look')}`);
+    check('control: no rule, or one at the card\'s level, is caught', atCardLevel !== css && !above(atCardLevel) && !above(css.split(OPEN).join('.sh-top-x')));
+  }
 }
 
 main().then(

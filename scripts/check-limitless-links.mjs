@@ -47,10 +47,28 @@ const MUTANTS = [
     to: 'return local || url.origin ? url.origin : null;',
   },
   {
-    name: 'a failed answer is held for five minutes',
+    name: 'a failed request is held for five minutes',
     file: 'api/_lib/aldus.ts',
-    from: '  } catch {\n    return false;\n  }',
-    to: '  } catch {\n    viewers.set(who, { at: Date.now(), admin: false });\n    return false;\n  }',
+    from: '    if ((err as { status?: unknown } | null)?.status === 404) viewers.set(',
+    to: '    viewers.set(',
+  },
+  {
+    name: 'a 404 is not held',
+    file: 'api/_lib/aldus.ts',
+    from: '    if ((err as { status?: unknown } | null)?.status === 404) viewers.set(who, { at: Date.now(), admin: false });\n',
+    to: '',
+  },
+  {
+    name: "call() drops the answer's status from its error",
+    file: 'api/_lib/aldus.ts',
+    from: ', { status: res.status })',
+    to: ', {})',
+  },
+  {
+    name: 'isLimitlessAdmin asks about the email as it was handed',
+    file: 'api/_lib/aldus.ts',
+    from: 'const who = email.trim().toLowerCase();',
+    to: 'const who = email;',
   },
   {
     name: 'any answer counts as yes',
