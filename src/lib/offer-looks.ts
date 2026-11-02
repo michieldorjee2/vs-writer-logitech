@@ -78,6 +78,14 @@ export type LookJob = {
 
 /** The cookie that holds the offer a rep runs /search as. */
 export const OFFER_COOKIE = 'sh_offer';
+
+/**
+ * GET /api/offers' `limitless`, as the profile menu may link to it: Limitless's
+ * address (an origin, http or https, nothing after it) when the server sent
+ * one, else null, and then the menu shows no links back to it.
+ */
+export const limitlessFrom = (value: unknown): string | null =>
+  typeof value === 'string' && /^https?:\/\/[^/?#\s@\\]+$/.test(value) ? value : null;
 export const isOfferId = (v: unknown): v is string => typeof v === 'string' && /^[\w.-]{1,200}$/.test(v) && !v.startsWith('.');
 
 /* ---------- The photograph's cuts ---------- */

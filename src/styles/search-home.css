@@ -163,6 +163,8 @@ html, body { margin: 0; background: #f9fcf8; }
   align-items: flex-start;
   justify-content: space-between;
 }
+/* The open menu over Mark's look card (.sh-look), which shares its corner: its pencil, refresh and ✕ stay clickable while a look is made or after one failed. */
+.sh-top:has(.search-page__profile-menu) { z-index: 5; }
 .sh-top__brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .sh-top__logo { display: block; flex: none; width: 166px; height: 40px; color: #fff; }
 /* The event's logo beside ours, drawn white whatever its colours (it sits on the photograph). */
@@ -513,6 +515,9 @@ html, body { margin: 0; background: #f9fcf8; }
 }
 .sh .search-page__profile-icon:hover { background: var(--sh-hover); color: var(--sh-fg); }
 .sh .search-page__profile-icon:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: 1px; }
+/* The links back to Limitless are anchors drawn as the menu's rows and icons. */
+.sh a.search-page__profile-item,
+.sh a.search-page__profile-icon { text-decoration: none; }
 
 /* The other running offers, one at a time. */
 .sh .search-page__profile-offers {

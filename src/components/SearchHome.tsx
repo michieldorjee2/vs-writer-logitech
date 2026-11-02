@@ -20,6 +20,7 @@ import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from
 import {
   headlineParts,
   isOfferId,
+  limitlessFrom,
   logoSrc,
   lookBackdrop,
   OFFER_COOKIE,
@@ -365,6 +366,8 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
      be a pick behind). Its look, once Mark has made one, is the scene and headline. */
   const [asOffer, setAsOffer] = useState<ShownOffer | null>(servedOffer);
   const [offers, setOffers] = useState<RunningOffer[] | null>(null);
+  /* Limitless's address when this person is one of its admins (the profile menu's links back), else null. */
+  const [limitless, setLimitless] = useState<string | null>(null);
   const [job, setJob] = useState<LookJob | null>(null);
   const look = asOffer?.look ?? null;
   const running = useMemo(() => (asOffer ? (offers?.find((o) => o.id === asOffer.id) ?? null) : null), [offers, asOffer]);
@@ -374,10 +377,11 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
     if (!signedInEmail) return;
     let cancelled = false;
     fetch('/api/offers', { cache: 'no-store' })
-      .then((r) => (r.ok ? (r.json() as Promise<{ offers: RunningOffer[] }>) : null))
+      .then((r) => (r.ok ? (r.json() as Promise<{ offers: RunningOffer[]; limitless?: unknown }>) : null))
       .then((body) => {
         if (cancelled || !body) return;
         setOffers(body.offers);
+        setLimitless(limitlessFrom(body.limitless));
         const wanted = readOfferCookie();
         const offer = wanted ? body.offers.find((o) => o.id === wanted) : undefined;
         if (wanted && !offer) writeOfferCookie(null); // it stopped running
@@ -1039,7 +1043,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
               </>
             )}
           </div>
-          {identity && <ProfileMenu identity={identity} offers={offers} chosen={asOffer?.id ?? null} onChoose={chooseOffer} onRemake={remakeLook} />}
+          {identity && <ProfileMenu identity={identity} offers={offers} chosen={asOffer?.id ?? null} onChoose={chooseOffer} onRemake={remakeLook} limitless={limitless} />}
         </header>
         {job && asOffer && job.offerId === asOffer.id && (
           <LookCard job={job} title={asOffer.title} onRetry={() => void makeLook(asOffer.id, 'retry')} />
