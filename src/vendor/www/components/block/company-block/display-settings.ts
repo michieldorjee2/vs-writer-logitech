@@ -1,0 +1,68 @@
+export default [
+  {
+    key: 'CompanyBlockDisplayTemplate',
+    displayName: 'Company Display Template',
+    contentType: 'CompanyBlock',
+    isDefault: true,
+    settings: [
+      {
+        key: 'variant',
+        displayName: 'Variant',
+        type: 'select',
+        required: false,
+        defaultValue: 'large',
+        options: [
+          { value: 'small', displayName: 'Small' },
+          { value: 'medium', displayName: 'Medium' },
+          { value: 'large', displayName: 'Large' },
+          { value: 'xlarge', displayName: 'XLarge' },
+        ],
+      },
+      {
+        key: 'colorScheme',
+        displayName: 'Color Scheme',
+        type: 'select',
+        required: false,
+        defaultValue: 'neutral',
+        options: [
+          { value: 'neutral', displayName: 'Neutral' },
+          { value: 'dark', displayName: 'Dark' },
+          { value: 'white', displayName: 'White' },
+        ],
+      },
+      {
+        key: 'background',
+        displayName: 'Background',
+        description: 'Background color (medium variant only)',
+        type: 'select',
+        required: false,
+        defaultValue: 'none',
+        options: [
+          { value: 'none', displayName: 'None' },
+          { value: 'neutral', displayName: 'Neutral' },
+          { value: 'opal', displayName: 'Opal' },
+          { value: 'green', displayName: 'Green' },
+          { value: 'pink', displayName: 'Light pink' },
+          { value: 'blue', displayName: 'Light blue' },
+        ],
+      },
+      {
+        key: 'sponsorTier',
+        displayName: 'Sponsor Tier',
+        description: 'Optional Opticon sponsor tier badge (xlarge variant)',
+        type: 'select',
+        required: false,
+        defaultValue: 'none',
+        options: [
+          { value: 'none', displayName: 'None' },
+          { value: 'bronze', displayName: 'Bronze' },
+          { value: 'silver', displayName: 'Silver' },
+          { value: 'gold', displayName: 'Gold' },
+          { value: 'platinum', displayName: 'Platinum' },
+          { value: 'diamond', displayName: 'Diamond' },
+          { value: 'supporter', displayName: 'Supporter' },
+        ],
+      },
+    ],
+  },
+] as const

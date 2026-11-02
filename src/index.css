@@ -119,6 +119,8 @@
       vendored checkbox/radio already reference. Full patch rationale in
       `src/vendor/opticom/UPSTREAM.md`, "The CSS entry point". */
 @import './vendor/opticom/app/globals.css';
+/* www-design concept pages (src/www): every rule is scoped to .www-page. */
+@import './www/www.css';
 
 /* The v3 theme, kept as-is. `@config` is v4's supported escape hatch for a
    legacy JS config, and it coexists with the `@theme` block above: the four

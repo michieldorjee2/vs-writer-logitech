@@ -17,6 +17,10 @@ import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-
  * DynamicComparisonPage has quietly lost the hero's `id="hero"` anchor).
  */
 import UseCasePage from '../src/components/UseCasePage';
+import WwwAccountPage from '../src/www/WwwAccountRoute';
+import WwwOfferPage from '../src/www/OfferPage';
+import { isOfferExperience, wantsTakeout, wantsWwwDesign } from '../src/www/design';
+import { agentPlatformHead } from '../src/www/agent-platform/content';
 import { includes, resolveComponentPlan } from '../src/lib/limitless/component-plan';
 import { resolveUrl } from '../src/lib/graph-types';
 import { graphItems } from '../src/lib/graph-envelope';
@@ -1175,11 +1179,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      const appHtml = renderExperienceRoute(
-        <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
-          <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
-        </div>,
-      );
+      // The www design (src/www), the default; ?design=classic for the previous one. Mirrors VisualBuilderPage.tsx.
+      const appHtml = wantsWwwDesign(url.searchParams) && isOfferExperience(item)
+        ? renderExperienceRoute(<WwwOfferPage experience={item} />)
+        : renderExperienceRoute(
+            <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
+              <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
+            </div>,
+          );
 
       const headHtml = buildExperienceHeadHtml(item);
       const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`;
@@ -1239,6 +1246,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
      * aldus-ui/docs/limitless-use-case-template.md.
      */
     let appHtml: string;
+    // What the <head> is built from: the page, except on the www agent platform template.
+    let headSource: typeof page = page;
     switch (page.__template) {
       case 'person':
         // Edit mode, exactly as App.tsx's renderPageBody passes it — to person pages only.
@@ -1258,6 +1267,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
       default: {
+        // The www design (src/www), the default; ?design=classic for the previous one. Mirrors App.tsx's renderPageBody.
+        if (wantsWwwDesign(url.searchParams)) {
+          appHtml = renderPageRoute(<WwwAccountPage page={page} search={url.search} />);
+          if (!wantsTakeout(url.searchParams)) headSource = agentPlatformHead(page);
+          break;
+        }
         const componentPlan = resolveComponentPlan(page);
         appHtml = includes(componentPlan, 'use-case-matrix')
           ? renderPageRoute(<UseCasePage page={page} plan={componentPlan} />)
@@ -1268,7 +1283,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- Build SEO head tags ----
-    const headHtml = buildHeadHtml(page);
+    const headHtml = buildHeadHtml(headSource);
 
     // ---- Embed page data for client hydration (avoids double-fetch) ----
     const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(page).replace(/</g, '\\u003c')}</script>`;

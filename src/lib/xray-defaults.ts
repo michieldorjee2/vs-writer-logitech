@@ -33,8 +33,11 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* ABM / Aldus 1:1 landing page — granular per-component breakdown. */
-export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
+/* ABM / Aldus 1:1 landing page — granular per-component breakdown.
+   Each selector also matches `[data-xray="<id>"]`, the hook the www-design account page
+   (src/www/AccountPage.tsx, ?design=www) puts on the same component, so X-ray and Edit mode
+   work on both renderers without knowing which one is on screen. */
+const ABM_XRAY_LEGACY: XraySectionInfo[] = [
   {
     id: 'hero-3d',
     selector: '#hero-canvas',
@@ -245,6 +248,70 @@ export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
     sources: ['Closing supporting line', 'Approved messaging'],
   },
 ];
+
+/* Sections only the agent platform template has (src/www/AgentPlatformPage.tsx, the default
+   www account page). Hook-only selectors: on the other renderers they match nothing, and X-ray and
+   Edit mode skip a section with no match. Tools name where the content comes from TODAY; the
+   notes say what the agent drafts (docs/agent-platform-template/) would add. */
+export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
+  {
+    id: 'agents-at-work',
+    selector: '[data-xray="agents-at-work"]',
+    title: 'Agents at work',
+    tools: ['BuiltWith', 'CMS'],
+    sources: ['Lead use cases, ranked from the stored stack and investments', 'Stack chips from the stored stack'],
+    notes: 'Illustrative, and labelled so. Agent 1 ranks the use cases from 6sense, stage and opportunities.',
+  },
+  {
+    id: 'who-we-are',
+    selector: '[data-xray="who-we-are"]',
+    title: 'Who we are',
+    tools: ['CMS'],
+    sources: ['Approved positioning', 'Analyst recognitions', 'Platform usage figure (May 2026 release)'],
+    notes: 'The same on every page.',
+  },
+  {
+    id: 'speaks-language',
+    selector: '[data-xray="speaks-language"]',
+    title: 'Speaks your language',
+    tools: ['CMS', 'BuiltWith'],
+    sources: ['Lead use case question', 'Tools named from the stored stack'],
+    notes: "Generic question until the page agent writes one in the account's own terms.",
+  },
+  {
+    id: 'use-cases',
+    selector: '[data-xray="use-cases"]',
+    title: 'Use cases',
+    tools: ['CMS', 'BuiltWith'],
+    sources: ['Five-theme library', 'Ranking from the stored stack and investments'],
+    notes: 'Observed lines appear once the agent supplies a sourced public fact.',
+  },
+  {
+    id: 'proof-stories',
+    selector: '[data-xray="proof-stories"]',
+    title: 'Proof',
+    tools: ['CMS'],
+    sources: ['Verified agent platform customer stories', 'Educational assets for prospects'],
+  },
+  {
+    id: 'first-90-days',
+    selector: '[data-xray="first-90-days"]',
+    title: 'First 90 days',
+    tools: ['CMS', 'BuiltWith'],
+    sources: ['Adoption plan', 'Stack categories from the stored stack', 'Trust Center'],
+  },
+];
+
+export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
+  ...ABM_XRAY_LEGACY.map((s) => ({
+    ...s,
+    selector: `${s.selector}, [data-xray="${s.id}"]`,
+  })),
+  ...AGENT_PLATFORM_XRAY,
+];
+
+/** The ids the legacy page and the takeout template share. */
+export const ABM_XRAY_LEGACY_IDS = ABM_XRAY_LEGACY.map((s) => s.id);
 
 /* Dynamic comparison page — non-ABM variant. Falls back to section IDs
  * since the dynamic layout is content-driven and less themed. */
