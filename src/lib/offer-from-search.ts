@@ -32,6 +32,9 @@ export const OFFER_ASK_WORDS = {
   },
 } as const;
 
+/** What a rep reads when the offer refuses for a reason of its own (Aldus UI's samples, cap, page setup or workflow). */
+export const OFFER_CANT_TAKE_MORE = 'This offer can’t take more pages right now.';
+
 const fill = (text: string, values: Record<string, string>) => text.replace(/\{(\w+)\}/g, (_, k: string) => values[k] ?? '');
 
 /** What the search bar says after an ask: a note once it's sent, or the error line. */
@@ -51,6 +54,8 @@ export function askNote(status: number, answer: OfferPageAsk, domain: string): {
       return { kind: 'error', text: `${account} has this offer’s page already.` };
     case 'writing':
       return { kind: 'error', text: `Mark is already writing ${account}’s page for this offer.` };
+    case 'waiting':
+      return { kind: 'error', text: `${account}’s page is already in the queue for this offer.` };
     case 'unsure':
       return { kind: 'error', text: 'Still reading the account list. Try again in a minute.' };
     case 'off':
@@ -60,8 +65,9 @@ export function askNote(status: number, answer: OfferPageAsk, domain: string): {
       return { kind: 'error', text: "Enter the company's domain, e.g. anaplan.com" };
   }
   if (status === 401) return { kind: 'error', text: 'Your Optimizely sign-in has ended. Reload the page to sign in again.' };
-  // The queue's own refusals (the offer can't write pages now, its samples, the cap) say why in Aldus UI's words.
-  if (answer.error && status >= 400 && status < 500) return { kind: 'error', text: answer.error };
+  // The offer can't take this page now (its page setup, its samples, the draft cap, this deployment's
+  // workflow): one plain line a rep can read. Aldus UI's own words are for its team and its logs.
+  if ((status >= 400 && status < 500) || answer.code === 'not-configured') return { kind: 'error', text: OFFER_CANT_TAKE_MORE };
   return { kind: 'error', text: "Couldn't reach Mark. Try again." };
 }
 

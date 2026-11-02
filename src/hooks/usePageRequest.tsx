@@ -184,7 +184,8 @@ export function usePageRequest({
       }
       if (!text) return setError('Enter the company they work at');
       const known = findCompany(text);
-      if (known) setCompanyRef(known);
+      // Its route and name only: the person page's request is as it was before findCompany also gave the domain.
+      if (known) setCompanyRef({ route: known.route, name: known.name });
       else if (looksLikeWebsite(text)) setCompanyRef({ website: text, ...(companyName ? { name: companyName } : {}) });
       else {
         setCompanyName(text);
