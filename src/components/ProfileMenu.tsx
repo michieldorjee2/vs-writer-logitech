@@ -53,11 +53,20 @@ function untilOf(offer: RunningOffer): string {
 /** "1 page · until 5 Nov" */
 const metaOf = (offer: RunningOffer) => [`${offer.pages.length} ${offer.pages.length === 1 ? 'page' : 'pages'}`, untilOf(offer)].filter(Boolean).join(' · ');
 
+/** Limitless's own pages, from its address: Home, and one offer's screen. */
+const limitlessHome = (base: string) => `${base}/`;
+const limitlessOffer = (base: string, offerId: string) => `${base}/offers/${encodeURIComponent(offerId)}`;
+
 /**
  * The search page's corner: "Hi, Michiel", which opens who is signed in, the
  * running offers the page can be run as (one at a time: the active one on
  * top, with "make the look again" and ✕ to go back to the usual page), and
  * the way out.
+ *
+ * Limitless admins (Aldus UI says who: GET /api/offers' `limitless`) also get
+ * two links back to it, each in a new tab: a pencil on the active offer that
+ * opens it there, and Open Limitless above Log out. Everyone else's menu is
+ * as it was.
  *
  * Log out is a form POST (a GET that signs you out is a link anyone can make
  * you follow), and it lands on /login — /search would sign the person straight
@@ -69,6 +78,8 @@ export default function ProfileMenu({
   chosen = null,
   onChoose,
   onRemake,
+  limitless = null,
+  defaultOpen = false,
 }: {
   identity: Identity;
   /** Aldus UI's running offers; null until they are read, and none to list when there are none. */
@@ -77,10 +88,14 @@ export default function ProfileMenu({
   onChoose?: (offerId: string | null) => void;
   /** Clear the active offer's look so Mark makes it again. */
   onRemake?: (offerId: string) => void;
+  /** Limitless's address when this person is one of its admins; null hides both links. */
+  limitless?: string | null;
+  /** Open on the first render (server/checks/limitless-links-check.tsx renders the open menu). */
+  defaultOpen?: boolean;
 }) {
   const active = (chosen && offers?.find((o) => o.id === chosen)) || null;
   const others = (offers ?? []).filter((o) => o.id !== chosen);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuId = useId();
@@ -141,6 +156,23 @@ export default function ProfileMenu({
                 <span className="search-page__profile-offer-name">{active.title}</span>
                 <span className="search-page__profile-offer-meta">{metaOf(active)}</span>
               </span>
+              {limitless && (
+                <a
+                  role="menuitem"
+                  className="search-page__profile-icon"
+                  href={limitlessOffer(limitless, active.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Edit ${active.title} in Limitless`}
+                  title="Edit offer"
+                  onClick={() => setOpen(false)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                  </svg>
+                </a>
+              )}
               {onRemake && (
                 <button
                   type="button"
@@ -198,6 +230,22 @@ export default function ProfileMenu({
                 </button>
               ))}
             </div>
+          )}
+          {limitless && (
+            <a
+              role="menuitem"
+              className="search-page__profile-item"
+              href={limitlessHome(limitless)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M7 17L17 7" />
+                <path d="M7 7h10v10" />
+              </svg>
+              Open Limitless
+            </a>
           )}
           <form
             method="post"

@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-10-20
+updated: 2026-11-02
 ---
 
 # vs-writer-logitech
@@ -41,17 +41,19 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:render
+npm run check          # everything that needs no network: both type-checks, lint, check:render, check:limitless, check:signup
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
 `npm run check` is what to run before pushing. It is deliberately not wired into `npm run build` yet — Vercel's build still runs only `tsc -b` — so a deploy is not blocked by anything new without a decision to do that.
 
-Three things it covers that the build does not:
+Five things it covers that the build does not:
 
 - **`server/` and `api/` are type-checked** (`typecheck:server`, `tsconfig.server.json`). The app config includes only `src/`, so the code that server-renders every page had never been checked; it now is, with `strictNullChecks` on, which is what the `api/` handlers' `if (!x.ok)` narrowing was written for. The app config is unchanged.
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
 - **`check:render`** server-renders the use-case template and asserts against the HTML.
+- **`check:limitless`** holds the search page's links back to Limitless to the people aldus-ui names, then reruns itself against mutants of the guarded files, each of which must fail it.
+- **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
 
 ## Sign-in
 
@@ -65,6 +67,7 @@ What each surface does:
 - **`/api/search-index` and `/api/edit-status`** answer 401 without a session. The index is now cached in function memory for five minutes instead of at the edge.
 - **Only `@optimizely.com` identities** get a session; anyone else lands on `/login?error=not_optimizely`.
 - **Log out** is a POST to `/api/auth/logout` from the search page's profile menu, which shows the person's Gravatar (initials when they have none). It lands on `/login`, not `/search`, which would sign the person straight back in while Okta still remembers them.
+- **Limitless admins** also get Open Limitless in that menu and a pencil on the offer the page runs as (each opens aldus-ui in a new tab). aldus-ui says who: `/api/offers` asks its `POST /api/machine/showcase/viewer` with `ALDUS_SHOWCASE_TOKEN` about the session's email, and with `ALDUS_UI_URL` or the token unset nobody gets the links (`npm run check:limitless`).
 
 ```bash
 OPTIID_RELAY_SECRET=   # required in production; the wiki's AUTH_RELAY_SECRET_SHOWCASE
@@ -128,6 +131,26 @@ Two things to know before touching it:
 - **Adding a field to `PAGE_QUERY` before it is registered in the CMS 404s every account page.** One unknown field fails the whole GraphQL query (commit `9091988`). Register in the CMS, run `npm run check:graph`, *then* add it to the query — in all three copies (`api/content.ts`, `server/ssr-handler.tsx`, `api/preview.ts`).
 - **`npm run check:render` guards this renderer.** It server-renders the fixture and asserts against the HTML: that `renderToString` survives (the renderer is SSR'd directly, with no `.server.tsx` twin), and that components the plan withheld genuinely do not reach the output. No network, no credentials — safe in CI.
 - **`_json` is not an escape hatch for unregistered fields.** Graph rejects it on a page root (`The \`_json\` field is only supported within the \`item\` field`), so a field the content type does not register cannot be read at all — register it first. A `mergeRetailJson()` built on the opposite assumption sat in `api/content.ts` and `server/ssr-handler.tsx` as a silent no-op until it was removed.
+
+## Offer pages: the email sign-up form
+
+Each offer in Limitless picks how people sign up on its pages: the close band's button links out (the default, every page today), or an email-only form on the page (aldus-ui `lib/offers/signup.ts`; Laura's ask, Notion "Add an optional email-only form block to the offer template"). Nothing is written to the CMS and no page is regenerated.
+
+It is off until `OFFER_SIGNUP_FORM=on`. Unset, no offer page asks Limitless anything, every page links out and `/api/offer-signup` answers 404: the site is exactly as before. On, when an offer page is served, `withOfferSignup` (`api/_lib/offer-signup.ts`) asks Limitless for the offer's choice (`GET /api/machine/showcase/offers/{id}/signup`, 1.5 s timeout, an answer held 30 s) and, for the form, `injectSignupForm` (`src/lib/offer-signup.ts`) gives the close band's `AbmClosingCtaElement` a `SignupOfferId` and points the hero's main button at `#signup`. All three experience paths do it (`api/content.ts`, `server/ssr-handler.tsx`, the dev proxy), so the HTML, `__SSR_DATA__` and a client fetch agree. With the page's edge cache, a switch shows within about six minutes. When Limitless can't answer, the page links out, the failure is held only 5 s and the page is edge-cached 10 s (`signupCacheControl`), so the next request asks again.
+
+The form (`src/components/offer-signup/OfferSignupForm.tsx`) posts through `postSignup` to `POST /api/offer-signup` (`api/offer-signup.ts`), which takes only a JSON post from the page's own site (415 or 403 otherwise, so another website can't post to it from a visitor's browser), checks the email's shape, rate-limits while `KV_REST_API_*` is set (30 a minute per address, since one company's people often share an office's address, and 3 a minute per email, kept as a hash), reads the page from Graph to confirm it is that offer's and to take its account (never the form's), and keeps the sign-up in Limitless, where the offer screen counts them and downloads a CSV. Limitless keeps a sign-up only for an offer whose pages show the form (or switched back to link out under 15 minutes ago, for a page still cached with it); for any other it answers 409, and the visitor is thanked and nothing is kept, as a bot is.
+
+Env (Production already has `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`, `GRAPH_AUTH_KEY` and the KV pair for the search page's offers):
+
+- `OFFER_SIGNUP_FORM`: **unset.** `on` turns the form on (above); any other value is off. Set aldus-ui's switch of the same name with it: that one shows the offer screen's Sign-ups panel and its "Use email form", so neither promises what the other won't do.
+- `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`: Limitless and the showcase's token. Unset: off, as above.
+- `GRAPH_AUTH_KEY`: the page read; unset, the endpoint answers 503.
+- `KV_REST_API_URL`, `KV_REST_API_TOKEN`: the rate limit; unset, no limit.
+- `OFFER_SIGNUP_WEBHOOKS`: **unset.** Comma-separated https URLs that each also get every sign-up, the way optimizely.com's forms post to their Webhooks (`email`, `PageName`, `pageURL`, `page_key`, `form_key`, `utm_source` … `utm_content`, `offer_id`, `campaign_id`): a Google Sheet's Apps Script web app for a live sheet, or later the ODP and Marketo form proxy. `campaign_id` is the offer's conversion campaign in Limitless, or empty, never the visitor's own `utm_campaign`. A webhook that fails is logged and never fails the sign-up.
+
+Until a webhook is set, nobody who signs up hears anything more: someone imports the offer's CSV from Limitless into the event's registration, which sends the details. Removing someone's sign-up (an erasure request) is done in Limitless's store; aldus-ui `docs/offers-section.md` §22 says how.
+
+Never submit the form on a preview whose `ALDUS_UI_URL` is production Limitless: the sign-up lands in production's list. Locally, set `ALDUS_UI_URL` to a local aldus-ui.
 
 ## Related
 
