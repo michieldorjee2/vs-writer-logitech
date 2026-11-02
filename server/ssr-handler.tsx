@@ -38,7 +38,7 @@ import type { BuildRecord } from '../src/lib/page-builds';
 import { randomScene } from '../src/lib/home-scenes';
 import { isOfferId, OFFER_COOKIE, type ShownOffer } from '../src/lib/offer-looks';
 import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
-import { withOfferSignup } from '../api/_lib/offer-signup';
+import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -1196,7 +1196,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const wantsFresh = url.searchParams.has('refresh');
       res.setHeader(
         'Cache-Control',
-        wantsFresh ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=300',
+        wantsFresh ? 'no-store' : signupCacheControl(item, 'public, s-maxage=60, stale-while-revalidate=300'),
       );
       if (!wantsFresh && item._metadata?.key) {
         res.setHeader('Cache-Tag', `page:${item._metadata.key}`);
