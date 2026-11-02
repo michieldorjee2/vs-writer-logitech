@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 
 # vs-writer-logitech
@@ -142,7 +142,7 @@ The form (`src/components/offer-signup/OfferSignupForm.tsx`) posts through `post
 
 Env (Production already has `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`, `GRAPH_AUTH_KEY` and the KV pair for the search page's offers):
 
-- `OFFER_SIGNUP_FORM`: **unset.** `on` turns the form on (above); any other value is off.
+- `OFFER_SIGNUP_FORM`: **unset.** `on` turns the form on (above); any other value is off. Set aldus-ui's switch of the same name with it: that one shows the offer screen's Sign-ups panel and its "Use email form", so neither promises what the other won't do.
 - `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`: Limitless and the showcase's token. Unset: off, as above.
 - `GRAPH_AUTH_KEY`: the page read; unset, the endpoint answers 503.
 - `KV_REST_API_URL`, `KV_REST_API_TOKEN`: the rate limit; unset, no limit.
@@ -151,6 +151,15 @@ Env (Production already has `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`, `GRAPH_AUTH_
 Until a webhook is set, nobody who signs up hears anything more: someone imports the offer's CSV from Limitless into the event's registration, which sends the details. Removing someone's sign-up (an erasure request) is done in Limitless's store; aldus-ui `docs/offers-section.md` §22 says how.
 
 Never submit the form on a preview whose `ALDUS_UI_URL` is production Limitless: the sign-up lands in production's list. Locally, set `ALDUS_UI_URL` to a local aldus-ui.
+
+## Search page: badge scanning (phones)
+
+Below 800 px wide, `/search` has a camera beside the go button. A rep photographs a badge, Mark reads it (`api/badge-read.ts`, signed in only), and the panel shows the person and the company ("From the badge"); any line can be fixed with a tap, and nothing is built until the rep presses Send to Mark, which goes through the existing person-page flow. It is off until `MARK_BADGE_AGENT_ID` names Mark's badge-reader agent and `OPAL_PAT` is set (`api/_lib/badge-mode.ts`); off, `/search` shows no camera and `/api/badge-read` answers 503. `BADGE_READ_STUB` is a local stand-in that always reads the same made-up badge, refused whenever `VERCEL_ENV` or `NODE_ENV` is production. The agent's spec and its one test run are in the Notion-sweep notes (`badge-agent-spec.md`).
+
+```bash
+MARK_BADGE_AGENT_ID=   # unset: no camera
+BADGE_READ_STUB=       # local preview only
+```
 
 ## Related
 
