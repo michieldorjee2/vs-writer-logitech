@@ -309,7 +309,7 @@ async function main(): Promise<void> {
 
   {
     const LAURA = { email: 'laura@optimizely.com', name: 'Laura Example' };
-    const offer = (id: string, title: string): RunningOffer => ({ id, title, windowStart: '2026-07-01', windowEnd: '2026-12-31', look: null, pages: [] });
+    const offer = (id: string, title: string): RunningOffer => ({ id, title, windowStart: '2026-07-01', windowEnd: '2026-12-31', look: null, pages: [], fromSearch: 'off' });
     const A = offer('a b', 'AI Fitness Workshop');
     const B = offer('platform-value', 'Platform Value Assessment');
     const noop = () => {};
