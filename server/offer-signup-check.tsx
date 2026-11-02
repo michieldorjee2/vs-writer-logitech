@@ -11,7 +11,8 @@
  *   b. AbmClosingCtaElement rendered on the server: with the offer, a form (id="signup", one
  *      email field, the band's button text on submit, method="post", the privacy line and its
  *      link) and no link to the sign-up URL; without it (control) today's link and no form;
- *      a stroke band's form still renders its ring.
+ *      a stroke band's form still renders its ring; the email field grows only side by side
+ *      (sm:flex-1), so stacked on a phone it keeps the button's h-10.
  *   c. withOfferSignup: OFFER_SIGNUP_FORM unset asks nothing and leaves every page as it was
  *      (production with nothing new set); on, "email" from Limitless puts the form in, "link"
  *      doesn't; an answer held 30 s (no second ask), a failure only 5 s; Limitless unset asks
@@ -44,7 +45,8 @@
  * taken out of api/content.ts and server/ssr-handler.tsx (e), the form posting to another
  * path (e, f), campaign_id falling back to utm_campaign (d), the Sec-Fetch-Site rule taken out
  * (d), the OFFER_SIGNUP_FORM gate taken out (c, d), the per-address limit back to 5 (d), a
- * failure held 30 s (c), any 400 read as "invalid" (f).
+ * failure held 30 s (c), any 400 read as "invalid" (f). The field's bare flex-1 (b) was red
+ * before the browser check's fix, which drew it 30 px tall under a 40 px button at 390 px.
  *
  * Run: `npm run check:signup` (scripts/check-offer-signup.mjs bundles it). Under server/ so
  * `npm run typecheck:server` type-checks it with the api/ files it imports; nothing deploys it.
@@ -144,6 +146,15 @@ const formPart = (html: string) => html.slice(Math.max(0, html.indexOf('<form'))
 check(
   "a stroke band's form keeps the band's ring around its button",
   formPart(strokeForm).includes('group/stroke') && !formPart(withForm).includes('group/stroke') && strokeLink.includes('group/stroke'),
+);
+// On a phone the field and the button stack (flex-col): a bare flex-1 there makes the field's
+// flex basis its height, and it drew at its content height (30 px) under the button's 40
+// (browser check, 390 px). It grows only where they sit side by side (sm:flex-row).
+const fieldClass = /<input[^>]*type="email"[^>]*class="([^"]*)"/.exec(withForm)?.[1] ?? /<input[^>]*class="([^"]*)"[^>]*type="email"/.exec(withForm)?.[1] ?? '';
+check(
+  '…the email field grows only side by side (sm:flex-1), so on a phone it is the h-10 the button is',
+  fieldClass.split(/\s+/).includes('h-10') && fieldClass.split(/\s+/).includes('sm:flex-1') && !fieldClass.split(/\s+/).includes('flex-1'),
+  fieldClass,
 );
 
 // ─── Stand-ins for the network ───────────────────────────────────────────

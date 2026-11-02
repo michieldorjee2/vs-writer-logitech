@@ -86,7 +86,8 @@ export default function OfferSignupForm({ offerId, buttonText, variant = 'primar
               aria-describedby={messageId}
               onChange={() => status === 'invalid' && setStatus('idle')}
               className={cn(
-                'h-10 w-full min-w-0 flex-1 rounded-(--radius-cta-sml) border-2 border-transparent bg-(--color-primary-1) px-4',
+                // sm:flex-1, not flex-1: stacked on a phone (flex-col), flex-1 would make the basis its height (30 px, not h-10).
+                'h-10 w-full min-w-0 sm:flex-1 rounded-(--radius-cta-sml) border-2 border-transparent bg-(--color-primary-1) px-4',
                 'font-body text-(length:--text-body-xs) text-(--color-secondary-darkfir) placeholder:text-(--color-tertiary-7)',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-secondary-ltblue)',
                 'aria-[invalid=true]:border-(--color-error-darkred)',
