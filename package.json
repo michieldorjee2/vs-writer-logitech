@@ -8,7 +8,6 @@
     "build": "npm run tokens:build && tsc -b && vite build && node scripts/build-ssr.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check:badge": "node scripts/check-badge-read.mjs",
     "check:graph": "node scripts/check-graph-queries.mjs",
     "check:render": "node scripts/check-use-case-render.mjs",
     "check:limitless": "node scripts/check-limitless-links.mjs",
@@ -19,7 +18,7 @@
     "tokens:build": "node scripts/build-tokens.js",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "check:from-search": "tsx scripts/check-offer-from-search.ts",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:limitless && npm run check:signup && npm run check:badge && npm run check:from-search"
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:limitless && npm run check:signup && npm run check:from-search"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.20",

@@ -152,15 +152,6 @@ Until a webhook is set, nobody who signs up hears anything more: someone imports
 
 Never submit the form on a preview whose `ALDUS_UI_URL` is production Limitless: the sign-up lands in production's list. Locally, set `ALDUS_UI_URL` to a local aldus-ui.
 
-## Search page: badge scanning (phones)
-
-Below 800 px wide, `/search` has a camera beside the go button. A rep photographs a badge, Mark reads it (`api/badge-read.ts`, signed in only), and the panel shows the person and the company ("From the badge"); any line can be fixed with a tap, and nothing is built until the rep presses Send to Mark, which goes through the existing person-page flow. It is off until `MARK_BADGE_AGENT_ID` names Mark's badge-reader agent and `OPAL_PAT` is set (`api/_lib/badge-mode.ts`); off, `/search` shows no camera and `/api/badge-read` answers 503. `BADGE_READ_STUB` is a local stand-in that always reads the same made-up badge, refused whenever `VERCEL_ENV` or `NODE_ENV` is production. The agent's spec and its one test run are in the Notion-sweep notes (`badge-agent-spec.md`).
-
-```bash
-MARK_BADGE_AGENT_ID=   # unset: no camera
-BADGE_READ_STUB=       # local preview only
-```
-
 ## Related
 
 - [[_MOCs/Web Apps]]

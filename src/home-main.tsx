@@ -4,7 +4,6 @@ import SearchHome from './components/SearchHome';
 import { randomScene, sceneById } from './lib/home-scenes';
 import { registerOfflineWorker } from './lib/home-offline';
 import type { ShownOffer } from './lib/offer-looks';
-import { servedBadgeReady } from './lib/badge-scan';
 
 /*
  * The search page's entry (home.html, served at /search). In production the
@@ -25,7 +24,7 @@ try {
 const asked = import.meta.env.DEV ? sceneById(new URLSearchParams(window.location.search).get('scene')) : undefined;
 const app = (
   <StrictMode>
-    <SearchHome scene={served ?? asked ?? randomScene()} offer={offer} badgeReady={servedBadgeReady(!!served, root.dataset.badge, import.meta.env.DEV)} />
+    <SearchHome scene={served ?? asked ?? randomScene()} offer={offer} />
   </StrictMode>
 );
 
