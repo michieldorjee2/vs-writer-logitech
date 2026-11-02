@@ -861,6 +861,15 @@ test('a use-case homework line never names a competitor (N2)', () => {
     const line = [...w!.stack, ...w!.plans].join(' ')
     assert.ok(!/AEM|Adobe|Sitecore|Your CMS/.test(line), line)
   }
+  // One piece of evidence backs one use case: two cards never repeat each other (Carhartt).
+  const both = fromLegacyPage(
+    stackPage({
+      techStack: [{ Name: 'Tealium', ColorTag: null }, { Name: 'Salesforce Interaction Studio', ColorTag: null }, { Name: 'Google Analytics 4', ColorTag: null }, { Name: 'Snowflake', ColorTag: null }],
+      investments: [{ Name: 'Customer data and personalization', IsPrimary: true }],
+    }),
+  )
+  const seen = Object.values(both.why.value).flatMap((w) => [...w!.stack, ...w!.plans])
+  assert.equal(new Set(seen).size, seen.length, `repeated: ${seen.join(', ')}`)
   // Stored investment names are shown as written: never re-cased into a sentence ("tyler AI").
   const t = fromLegacyPage(stackPage({ investments: [{ Name: 'Tyler AI across the product suite', IsPrimary: true }] }))
   assert.deepEqual(t.why.value.geo?.plans, ['Tyler AI across the product suite'])

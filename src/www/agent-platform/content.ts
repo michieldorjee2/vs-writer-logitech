@@ -199,10 +199,18 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
     .map((i) => i.Name)
     .filter((n) => n && !namesCompetitor(n))
     .slice(0, 4)
+  // Each stored tool or investment backs one use case only, the highest-ranked it fits: two cards
+  // side by side never show the same homework (Carhartt: Tealium counts for personalization and
+  // for analytics, and its one investment names both).
   const why: Partial<Record<ThemeId, ThemeWhy>> = {}
+  const used = new Set<string>()
   for (const e of ranked) {
     const w = whyOf(e.theme, tiles, priorities)
-    if (w) why[e.theme] = w
+    if (!w) continue
+    const fresh = { stack: w.stack.filter((x) => !used.has(x)), plans: w.plans.filter((x) => !used.has(x)) }
+    if (!fresh.stack.length && !fresh.plans.length) continue
+    for (const x of [...fresh.stack, ...fresh.plans]) used.add(x)
+    why[e.theme] = fresh
   }
 
   return {
