@@ -10,7 +10,8 @@
  * Nothing is written to the CMS and no page is regenerated: turning it off is one click in
  * Limitless, and the next render after the caches is the page as it was.
  *
- * Pure and dependency-free: the server, the browser bundle and the check import it.
+ * Dependency-free: the server, the browser bundle and the check import it. Only `postSignup`
+ * touches the network (the global fetch, the form's one request).
  */
 
 /** The form's anchor: the hero's main button points here when the form is on. */
@@ -70,6 +71,36 @@ export function utmOf(search: string): Utm {
     if (value && value.length <= 200) utm[key] = value;
   }
   return utm;
+}
+
+/** Where the form posts: api/offer-signup.ts (the dev server routes it in vite.config.ts). */
+export const SIGNUP_ENDPOINT = '/api/offer-signup';
+
+export type SignupOutcome = 'done' | 'invalid' | 'error';
+
+/**
+ * Sends one sign-up from the page at `location`: its path is the route, its utm_* values ride
+ * along. 'invalid' only when the endpoint says the email is (SIGNUP_WORDS.invalid); any other
+ * refusal, or no answer, is 'error', so a good email is never told it's wrong.
+ */
+export async function postSignup(
+  offerId: string,
+  email: string,
+  website: string,
+  location: { pathname: string; search: string },
+): Promise<SignupOutcome> {
+  try {
+    const res = await fetch(SIGNUP_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offerId, route: location.pathname, email, website, utm: utmOf(location.search) }),
+    });
+    if (res.ok) return 'done';
+    const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+    return res.status === 400 && body.error === SIGNUP_WORDS.invalid ? 'invalid' : 'error';
+  } catch {
+    return 'error';
+  }
 }
 
 type Obj = Record<string, unknown>;

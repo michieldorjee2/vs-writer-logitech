@@ -5,7 +5,7 @@
  * itself and keeps the sign-up in Limitless.
  *
  * Server-rendered as part of the page, so the first render is the same everywhere: nothing
- * here reads `window` until a submit (the page's path and its utm_* values are read then).
+ * here reads `window` until a submit (postSignup reads the page's path and its utm_* values then).
  * Colours follow the band, as the closing CTA's text does (`[[data-band=dark]_&]`): the field
  * is light on any band, the small print takes the band's quiet ink.
  */
@@ -15,7 +15,7 @@ import { Button } from '@/components/_ui/button'
 import { StrokeButtonWrapper } from '@/components/_ui/button/stroke-wrapper'
 import { cn } from '@/lib/utils'
 
-import { PRIVACY_URL, SIGNUP_ANCHOR, SIGNUP_WORDS, utmOf, workEmailOf } from '../../lib/offer-signup'
+import { postSignup, PRIVACY_URL, SIGNUP_ANCHOR, SIGNUP_WORDS, workEmailOf } from '../../lib/offer-signup'
 
 type Variant = 'primary' | 'dark' | 'white' | 'neutral' | 'whiteStroke' | 'opalStroke' | 'darkStroke'
 
@@ -47,22 +47,7 @@ export default function OfferSignupForm({ offerId, buttonText, variant = 'primar
       return
     }
     setStatus('sending')
-    try {
-      const res = await fetch('/api/offer-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          offerId,
-          route: window.location.pathname,
-          email,
-          website: String(data.get('website') ?? ''),
-          utm: utmOf(window.location.search),
-        }),
-      })
-      setStatus(res.ok ? 'done' : res.status === 400 ? 'invalid' : 'error')
-    } catch {
-      setStatus('error')
-    }
+    setStatus(await postSignup(offerId, email, String(data.get('website') ?? ''), window.location))
   }
 
   const message = status === 'invalid' ? w.invalid : status === 'error' ? w.error : ''
