@@ -280,7 +280,8 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="list">
               {c.stack.value.map((t) => (
                 <li key={t.label} className={cn('www-tile', t.ours && 'www-tile--ours')}>
-                  <span className="www-caption">{t.category === 'Tool' ? 'Tool' : t.category}</span>
+                  {/* A competitor tile already reads as its category ("Your CMS"). */}
+                  {!t.competitor && <span className="www-caption">{t.category}</span>}
                   <span className="font-semibold">{t.label}</span>
                   {t.ours && <span className="www-tile__ours">Optimizely</span>}
                 </li>

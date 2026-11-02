@@ -654,6 +654,11 @@ function stackPage(over: Record<string, unknown> = {}): CompetitorComparisonPage
       { Initials: 'KE', Name: 'Kim Example', Role: 'Head of Marketing Operations', LinkedInUrl: null },
       { Initials: 'LE', Name: 'Lee Example', Role: 'VP Content and Brand', LinkedInUrl: null },
     ],
+    teamMembers: [
+      { Initials: 'SD', Name: 'F-sdr-name', Role: 'Strategic Account Development Representative', Email: 'f-sdr@example.test' },
+      { Initials: 'FT', Name: 'F-team-name', Role: 'Enterprise Account Executive', Email: 'f-team@example.test' },
+      { Initials: 'SA', Name: 'Solutions Architect', Role: 'placeholder', Email: null },
+    ],
     ...over,
   } as unknown as CompetitorComparisonPage
 }
@@ -730,6 +735,9 @@ test('N4: a named rep only for an open opportunity or a customer, and never a pl
     assert.deepEqual(fromLegacyPage(page, { state }).rep.value.named.map((p) => p.name), ['F-team-name'])
   }
   for (const state of ['evaluated', 'ex-customer'] as const) assert.deepEqual(fromLegacyPage(page, { state }).rep.value.named, [])
+  // Only the account executive is named; with none stored, the team pod.
+  const noAe = stackPage({ intelStats: [], teamMembers: [{ Initials: 'SD', Name: 'F-sdr-name', Role: 'Sales Development Representative', Email: null }] })
+  assert.deepEqual(fromLegacyPage(noAe, { state: 'open-opp' }).rep.value.named, [])
 })
 
 test('every one of the 67 stored fields is either used (and where) or deliberately not shown (and why)', () => {
@@ -833,6 +841,7 @@ test('the state sets the hero look, the proof track and whether the rep is named
   assert.ok(!prospect.includes('F-team-name'))
   assert.match(textOf(opp), /F-team-name/)
   assert.match(textOf(opp), /Arrange a session with F-team-name/)
+  assert.ok(!opp.includes('F-sdr-name'), 'a non-AE team member is named')
 })
 
 test('the stored stack fills the 90-day Connect step by category, nothing replaced', () => {
@@ -852,6 +861,8 @@ test('N1 and N2 in stored free text: the takeout sticky line is replaced, lines 
   )
   for (const s of ['AEM', 'Sitecore', 'Adobe Experience Manager', 'exit plan']) assert.ok(!html.includes(s), `"${s}" is on the page`)
   assert.match(textOf(html), /Global content localization/)
+  const many = fromLegacyPage(stackPage({ investments: ['a', 'b', 'c', 'd', 'e', 'f'].map((n, i) => ({ Name: `I-${n}`, IsPrimary: i === 5 })) }))
+  assert.deepEqual(many.priorities.value, ['I-f', 'I-a', 'I-b', 'I-c'], 'primary first, at most four')
   assert.match(textOf(html), /12K employees/)
   const m = competitorMatcher(readStack(stackPage().techStack, 'Adobe Experience Manager'), 'Adobe Experience Manager')
   assert.ok(m('Our AEM rollout') && m('Sitecore XP') && !m('Teamwork across brands') && !m('Taem'))

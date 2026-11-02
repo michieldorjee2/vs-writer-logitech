@@ -1135,7 +1135,9 @@ body:has(.www-page) {
   .www-modal__grid {
     grid-template-columns: 1fr 1fr;
   }
-  .www-modal__tile--done {
+  .www-modal__tile--done,
+  /* An unpaired last tile (schedule only, or an odd number of people) takes the full row. */
+  .www-modal__grid > .www-modal__tile:last-child:nth-child(even) {
     grid-column: 1 / -1;
   }
 }

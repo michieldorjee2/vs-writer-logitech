@@ -94,6 +94,9 @@ export function competitorMatcher(tools: StackTool[], competitorName: string | n
   return (text) => !!text && re.test(text)
 }
 
+/** The roles that count as the account executive for rule N4. */
+const AE_ROLE = /account executive|\bAE\b|account director|client director/i
+
 /** A founding year is a date, not a count: never "2K". */
 function isYear(s: { Value: string; Label: string }) {
   return /^\s*(1[89]|20)\d{2}\s*$/.test(s.Value) && /found|establish|since|year|incorporat/i.test(s.Label)
@@ -164,7 +167,10 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
   const groups = [...new Set((page.stakeholders ?? []).map((p) => roleGroup(p.Role || '')).filter(Boolean) as string[])]
   const teams = groups.length >= 3 ? groups : [...new Set([...groups, ...DEFAULT_TEAMS])].slice(0, 5)
 
-  const named = STATES[state.value].namedRep ? toPeople(page.teamMembers) : []
+  // N4: one named rep, the account executive. The stored team often holds an SDR or a growth rep
+  // instead; then the page shows the team pod until Agent 1 resolves the AE (opp owner first).
+  const ae = toPeople(page.teamMembers).find((p) => AE_ROLE.test(p.role))
+  const named = STATES[state.value].namedRep && ae ? [ae] : []
 
   return {
     account,
@@ -182,9 +188,14 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
     },
     stack: { value: stackTiles(tools), from: 'derived', note: 'techStack; competitors by category only (N2)' },
     priorities: {
-      value: (page.investments ?? []).map((i) => i.Name).filter((n) => n && !namesCompetitor(n)),
+      // Primary investments first, at most four: a row of chips, not a list to read.
+      value: [...(page.investments ?? [])]
+        .sort((a, b) => Number(!!b.IsPrimary) - Number(!!a.IsPrimary))
+        .map((i) => i.Name)
+        .filter((n) => n && !namesCompetitor(n))
+        .slice(0, 4),
       from: 'page',
-      note: 'investments, minus any that name the replaced platform (N2)',
+      note: 'investments (primary first, up to four), minus any that name the replaced platform (N2)',
     },
     quote: { value: null, from: 'agent', note: 'optional exec quote with source' },
     question: {
@@ -203,7 +214,11 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
     rep: {
       value: { named, pod: 'Your Optimizely account team' },
       from: named.length ? 'page' : 'template',
-      note: STATES[state.value].namedRep ? 'teamMembers (N4: the opp owner once Agent 1 resolves it)' : 'no named rep in this state',
+      note: STATES[state.value].namedRep
+        ? named.length
+          ? 'the stored team member with an account executive role (N4); Agent 1 resolves the opp owner'
+          : 'no stored team member is an account executive, so the team pod (N4)'
+        : 'no named rep in this state',
     },
     scheduleUrl: page.modalScheduleUrl?.default || null,
     // The stored sticky line was written for the takeout pitch ("Your <competitor> exit plan is
@@ -244,7 +259,7 @@ export const USED_FIELDS: Array<{ field: string; where: string }> = [
   { field: 'techStack', where: 'stack layer of the fit diagram, hero chips, use-case ranking, the 90-day Connect step' },
   { field: 'investments', where: 'priority chips and use-case ranking' },
   { field: 'stakeholders', where: 'the teams layer and "Built for", as role groups only (N3)' },
-  { field: 'teamMembers', where: 'rep card and connect panel when the state may name them; the ping' },
+  { field: 'teamMembers', where: 'the account executive on the rep card and connect panel when the state allows (N4); the ping' },
   { field: 'modalScheduleUrl', where: 'connect panel: "Schedule a call"' },
   { field: 'footerTagline', where: 'small print (left off if it names the replaced platform, N2)' },
   { field: 'footerLegal', where: 'small print (left off if it names the replaced platform, N2)' },

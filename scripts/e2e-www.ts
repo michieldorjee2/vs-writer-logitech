@@ -213,6 +213,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       expect(beacons.length === 1, `beacons: ${beacons.length}`)
       const b = JSON.parse(beacons[0])
       expect(b.event === 'demo_button_clicked' && b.source === 'sticky-connect-btn', `beacon: ${beacons[0]}`)
+      await page.waitForTimeout(500) // the panel's open animation (0.35s) has finished
       await page.screenshot({ path: path.join(OUT, `connect-${vp}.png`) })
       await page.keyboard.press('Escape')
       await panel.waitFor({ state: 'detached', timeout: 3000 })
