@@ -29,7 +29,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     signal: init.signal ?? AbortSignal.timeout(8000),
   });
   const body = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(`Aldus UI ${init.method ?? 'GET'} ${path} → ${res.status} ${body.error ?? ''}`.trim());
+  if (!res.ok) throw Object.assign(new Error(`Aldus UI ${init.method ?? 'GET'} ${path} → ${res.status} ${body.error ?? ''}`.trim()), { status: res.status });
   return body;
 }
 
@@ -79,12 +79,20 @@ export type SignupEntry = {
   utm: Partial<Record<'source' | 'medium' | 'campaign' | 'term' | 'content', string>>;
 };
 
-/** Keeps one sign-up in Aldus UI. Answers the offer's conversion campaign id, or null. */
-export async function addSignup(offerId: string, entry: SignupEntry): Promise<{ campaignId: string | null }> {
-  const body = await call<{ campaignId?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry),
-  });
-  return { campaignId: typeof body.campaignId === 'string' ? body.campaignId : null };
+/**
+ * Keeps one sign-up in Aldus UI. Answers the offer's conversion campaign id, or null; `kept` is
+ * false when the offer takes no sign-ups (409: its pages link out, and have for a while).
+ */
+export async function addSignup(offerId: string, entry: SignupEntry): Promise<{ campaignId: string | null; kept: boolean }> {
+  try {
+    const body = await call<{ campaignId?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    });
+    return { campaignId: typeof body.campaignId === 'string' ? body.campaignId : null, kept: true };
+  } catch (err) {
+    if ((err as { status?: unknown }).status === 409) return { campaignId: null, kept: false };
+    throw err;
+  }
 }

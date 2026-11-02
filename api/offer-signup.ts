@@ -3,28 +3,43 @@
  * src/components/offer-signup/OfferSignupForm.tsx). Public, like api/track-miss.ts, so it trusts
  * nothing it is sent beyond the email:
  *
- *   1. at most 4 KB; a filled honeypot (`website`) answers 200 and keeps nothing
+ *   0. only while OFFER_SIGNUP_FORM=on (api/_lib/offer-signup.ts signupFormsOn), else 404: with
+ *      it unset no page shows the form, and the site is as it was
+ *   1. a JSON post (415 otherwise: another site's no-cors post can't send one without asking
+ *      first, and nothing here answers that), from the page's own site when the browser says
+ *      (Sec-Fetch-Site, 403 otherwise); at most 4 KB; a filled honeypot (`website`) answers 200
+ *      and keeps nothing
  *   2. the offer id, the page's /vb/ route and the email's shape, else 400
- *   3. at most 5 a minute per address while KV_REST_API_* is set (429); skipped when it isn't
+ *   3. while KV_REST_API_* is set, at most 30 a minute per address (one company's people often
+ *      share one office address) and 3 a minute per email (429); skipped when it isn't
  *   4. the page itself, read from Graph: it must exist and be that offer's page, else 404. The
  *      account and domain are the page's, never the form's
  *   5. kept in Limitless (aldus-ui POST /api/machine/showcase/offers/{id}/signup), else 502 and
- *      the form says try again
+ *      the form says try again. An offer whose pages link out (never chose the form, or
+ *      switched back over 15 minutes ago) takes none: Limitless answers 409, and the visitor is
+ *      thanked and nothing kept, as a bot is
  *   6. then, only when OFFER_SIGNUP_WEBHOOKS is set (comma-separated https URLs, unset today),
  *      each gets the sign-up the way optimizely.com's forms post to their Webhooks: `email`,
  *      `PageName`, `pageURL`, `page_key`, `form_key`, the utm_* fields, `offer_id` and
- *      `campaign_id`. A webhook that fails is logged and never fails the sign-up.
+ *      `campaign_id` (the offer's conversion campaign in Limitless, or empty: never the
+ *      visitor's own utm_campaign, which rides in its own field). A webhook that fails is
+ *      logged and never fails the sign-up.
  */
+import { createHash } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Redis } from '@upstash/redis';
 
 import { routeSegmentOf, SIGNUP_WORDS, UTM_KEYS, type Utm, workEmailOf } from '../src/lib/offer-signup.js';
-import { addSignup, aldusConfigured } from './_lib/aldus.js';
+import { addSignup } from './_lib/aldus.js';
+import { signupFormsOn } from './_lib/offer-signup.js';
 import { offerIdOf } from './_lib/offer-pages.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 const MAX_BODY = 4096;
-const PER_MINUTE = 5;
+/** Per address: an account's people often share one office's address. */
+const PER_MINUTE_IP = 30;
+/** Per email: one person's retries. */
+const PER_MINUTE_EMAIL = 3;
 const WEBHOOK_TIMEOUT_MS = 3000;
 const FORM_KEY = 'limitless-offer-signup';
 
@@ -64,18 +79,20 @@ function clientIp(req: VercelRequest): string {
   return forwarded || header(req, 'x-real-ip') || req.socket?.remoteAddress || 'unknown';
 }
 
-/** Over the limit? Never fails a sign-up: no KV, or KV down, is no limit. */
-async function overLimit(ip: string, now: Date): Promise<boolean> {
+/** Over the limit, per address or per email? Never fails a sign-up: no KV, or KV down, is no limit. */
+async function overLimit(ip: string, email: string, now: Date): Promise<boolean> {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!url || !token) return false;
   try {
     const redis = new Redis({ url, token });
     const minute = now.toISOString().slice(0, 16).replace(/\D/g, '');
-    const key = `signup:ip:${ip}:${minute}`;
-    const n = await redis.incr(key);
-    if (n === 1) await redis.expire(key, 120);
-    return n > PER_MINUTE;
+    // The email as a hash: the key outlives the request (two minutes), the address needn't be in it.
+    const ipKey = `signup:ip:${ip}:${minute}`;
+    const emailKey = `signup:email:${createHash('sha256').update(email).digest('hex').slice(0, 32)}:${minute}`;
+    const [byIp, byEmail] = await Promise.all([redis.incr(ipKey), redis.incr(emailKey)]);
+    await Promise.all([byIp === 1 && redis.expire(ipKey, 120), byEmail === 1 && redis.expire(emailKey, 120)]);
+    return byIp > PER_MINUTE_IP || byEmail > PER_MINUTE_EMAIL;
   } catch (err) {
     console.warn('[offer-signup] rate limit skipped:', err instanceof Error ? err.message : err);
     return false;
@@ -102,13 +119,24 @@ function pageUrlOf(req: VercelRequest, segment: string): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Off, there is no such endpoint: as before the form existed.
+  if (!signupFormsOn()) return res.status(404).json({ error: 'Not found' });
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
   res.setHeader('Cache-Control', 'no-store');
+  if (!/^application\/json(?:;|$)/i.test(header(req, 'content-type').trim())) return res.status(415).json({ error: SIGNUP_WORDS.error });
+  const site = header(req, 'sec-fetch-site');
+  if (site && site !== 'same-origin') return res.status(403).json({ error: SIGNUP_WORDS.error });
 
-  let body: unknown = req.body;
+  let body: unknown;
+  try {
+    body = req.body;
+  } catch {
+    // @vercel/node throws reading a JSON body that doesn't parse.
+    return res.status(400).json({ error: SIGNUP_WORDS.error });
+  }
   if (typeof body === 'string') {
     if (body.length > MAX_BODY) return res.status(413).json({ error: 'Too large' });
     try {
@@ -137,11 +165,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (value && value.length <= 200) utm[key] = value;
   }
 
-  if (await overLimit(clientIp(req), new Date())) return res.status(429).json({ error: SIGNUP_WORDS.error });
+  if (await overLimit(clientIp(req), email, new Date())) return res.status(429).json({ error: SIGNUP_WORDS.error });
 
   const authKey = process.env.GRAPH_AUTH_KEY;
-  if (!authKey || !aldusConfigured()) {
-    console.error('[offer-signup] GRAPH_AUTH_KEY or ALDUS_UI_URL/ALDUS_SHOWCASE_TOKEN unset: sign-up not kept');
+  if (!authKey) {
+    console.error('[offer-signup] GRAPH_AUTH_KEY unset: sign-up not kept');
     return res.status(503).json({ error: SIGNUP_WORDS.error });
   }
   let page: Page | null;
@@ -153,12 +181,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!page || offerIdOf(page.componentPlan) !== offerId) return res.status(404).json({ error: SIGNUP_WORDS.error });
 
-  let campaignId: string | null;
+  let kept: { campaignId: string | null; kept: boolean };
   try {
-    ({ campaignId } = await addSignup(offerId, { email, route: `/vb/${segment}`, account: page.companyName, domain: page.brandDomain, utm }));
+    kept = await addSignup(offerId, { email, route: `/vb/${segment}`, account: page.companyName, domain: page.brandDomain, utm });
   } catch (err) {
     console.error('[offer-signup] Limitless refused or unreachable:', err instanceof Error ? err.message : err);
     return res.status(502).json({ error: SIGNUP_WORDS.error });
+  }
+  if (!kept.kept) {
+    console.warn(`[offer-signup] ${offerId}: its pages link out, the sign-up was not kept`);
+    return res.status(200).json({ ok: true });
   }
 
   const hooks = webhookUrls();
@@ -170,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       page_key: `/vb/${segment}`,
       form_key: FORM_KEY,
       offer_id: offerId,
-      campaign_id: campaignId ?? utm.campaign ?? '',
+      campaign_id: kept.campaignId ?? '',
       ...Object.fromEntries(UTM_KEYS.map((key) => [`utm_${key}`, utm[key] ?? ''])),
     };
     const sent = await Promise.allSettled(
