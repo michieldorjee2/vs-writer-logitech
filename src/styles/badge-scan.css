@@ -22,3 +22,10 @@
   .sh-search__scan:hover { background: var(--sh-hover); color: var(--sh-fg); }
   .sh-search__scan:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: 2px; }
 }
+
+/* The card Mark read (SearchHome, "From the badge"). A touch screen keeps :hover on the
+   line last tapped, so a line already fixed stayed lit like the one being fixed
+   (.is-active). On touch, only the line being fixed is lit. */
+@media (hover: none) {
+  .sh-badge-card .sh-row:hover:not(.is-active) { background: none; }
+}

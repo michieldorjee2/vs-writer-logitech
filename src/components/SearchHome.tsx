@@ -1186,7 +1186,7 @@ export default function SearchHome({
           ) : view === 'request' && (req.card || req.phase === 'reading') ? (
             // A badge Mark read: who and which company. A tapped line is fixed in the bar.
             <div className="sh-cols sh-cols--single" data-anim={anim ?? undefined} key="request">
-              <div className="sh-col">
+              <div className="sh-col sh-badge-card">
                 <h2 style={slot(0, 0)}>From the badge</h2>
                 {badgeLines &&
                   (['person', 'company'] as const).map((field, r) => {

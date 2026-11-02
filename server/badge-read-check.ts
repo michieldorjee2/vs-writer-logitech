@@ -30,6 +30,7 @@
  *   - drop the "misread name keeps its domain" branch        → rule 7 fails
  *   - needs:'person' asks "Build a page for …?" again        → rule 7 fails
  *   - setKind('account') before the badge's send             → rule 7 fails
+ *   - drop the badge card's (hover: none) rule, or its class → rule 7 fails
  *   - servedBadgeReady asks the route in production          → rule 8 fails
  *   - `count >= READS_PER_WINDOW`, or the email as the key   → rule 8 fails
  *   - the route counts the read after the upload             → rule 8 fails
@@ -538,6 +539,11 @@ await check("a line the page needs opens instead of sending, and the bar asks fo
   assert.equal(ready.status, 'Build a page for Jane Doe?');
   assert.match(ready.hint ?? '', /^Mark builds the company's page first/);
   assert.equal(badgeWords(walk({ ...JANE, name: '' }).state!, findCompany).status, 'Build a page for Acme Corp?');
+});
+await check('on a touch screen only the line being fixed is lit, not the one fixed before (tapped lines keep :hover)', () => {
+  assert.match(source('src/components/SearchHome.tsx'), /<div className="sh-col sh-badge-card">\s*<h2 style=\{slot\(0, 0\)\}>From the badge<\/h2>/);
+  const touch = source('src/styles/badge-scan.css').match(/@media \(hover: none\) \{([^}]*\})\s*\}/)?.[1] ?? '';
+  assert.match(touch, /\.sh-badge-card \.sh-row:hover:not\(\.is-active\) \{ background: none; \}/);
 });
 await check("the panel's heading changes only once a request is sent (a badge's failed send leaves it as it was)", () => {
   const hook = source('src/hooks/usePageRequest.tsx');
