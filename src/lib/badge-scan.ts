@@ -1,28 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { BADGE_ERRORS, cardFromAgent, MAX_PHOTO_DATA_URL, type BadgeCard, type BadgeReadStatus } from './badge-card';
 
 /*
  * The search page's side of reading a badge (api/badge-read.ts the server's):
  * whether the camera shows, the photo made small on the phone, and Mark's read
- * followed until it is done. usePageRequest turns the card into a page request.
+ * followed until it is done. useBadgeCard turns the card into a page request.
  */
 
 const ENDPOINT = '/api/badge-read';
+/** The header a read is followed by: never the address, which lands in the request logs. */
+export const TICKET_HEADER = 'X-Badge-Ticket';
 /* Phones only, as the Notion item asks: the same width search-home.css and SearchHome switch layouts at. */
 const SCAN_MEDIA = '(max-width: 799.98px)';
 const POLL_MS = 1500;
 const READ_MS = 60_000;
 
-/** Whether this page shows the camera: signed in, on a phone, and Mark's badge reader is set up. */
-export function useBadgeReady(signedIn: boolean): boolean {
-  const [ready, setReady] = useState(false);
+/**
+ * Whether the badge reader is set up, as the server that drew /search said it
+ * (#root data-badge, server/ssr-handler.tsx): so production never asks. Only
+ * the dev server, which draws nothing, leaves it to the route (null).
+ */
+export function servedBadgeReady(drawnByServer: boolean, attr: string | undefined, dev: boolean): boolean | null {
+  if (drawnByServer) return attr === 'on';
+  return dev ? null : false;
+}
+
+const subscribePhone = (onChange: () => void) => {
+  const query = window.matchMedia(SCAN_MEDIA);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
+const onPhone = () => window.matchMedia(SCAN_MEDIA).matches;
+
+/** Whether this page shows the camera: signed in, on a phone, and Mark's badge reader is set up (`served`, or asked when null). */
+export function useBadgeReady(signedIn: boolean, served: boolean | null): boolean {
+  const phone = useSyncExternalStore(subscribePhone, onPhone, () => false);
+  const [asked, setAsked] = useState(false);
+  const ask = served === null && signedIn && phone;
   useEffect(() => {
-    if (!signedIn || !window.matchMedia(SCAN_MEDIA).matches) return;
+    if (!ask) return;
     let cancelled = false;
     fetch(ENDPOINT, { cache: 'no-store' })
       .then((r) => (r.ok ? (r.json() as Promise<{ ready?: unknown }>) : null))
       .then((body) => {
-        if (!cancelled) setReady(body?.ready === true);
+        if (!cancelled) setAsked(body?.ready === true);
       })
       .catch(() => {
         /* Offline: no camera. */
@@ -30,8 +51,8 @@ export function useBadgeReady(signedIn: boolean): boolean {
     return () => {
       cancelled = true;
     };
-  }, [signedIn]);
-  return ready;
+  }, [ask]);
+  return signedIn && phone && (served ?? asked);
 }
 
 /**
@@ -61,7 +82,7 @@ export async function shrinkPhoto(file: Blob, maxEdge = 1600): Promise<string> {
   }
 }
 
-export type ReadFailure = 'failed' | 'too-large' | 'timeout' | 'signed-out' | 'not-set-up' | 'unreachable';
+export type ReadFailure = 'failed' | 'too-large' | 'timeout' | 'signed-out' | 'not-set-up' | 'unreachable' | 'too-many';
 
 /** The first half of the line the bar shows when a read fails; the rep then types the company. */
 export const READ_FAILURE: Record<Exclude<ReadFailure, 'signed-out'>, string> = {
@@ -70,6 +91,7 @@ export const READ_FAILURE: Record<Exclude<ReadFailure, 'signed-out'>, string> = 
   timeout: 'Mark took too long.',
   'not-set-up': BADGE_ERRORS.notSetUp,
   unreachable: "Couldn't reach Mark.",
+  'too-many': BADGE_ERRORS.tooMany,
 };
 
 const wait = (ms: number, signal: AbortSignal) =>
@@ -101,6 +123,7 @@ export async function readBadge(file: Blob, signal: AbortSignal): Promise<{ ok: 
     });
     if (sent.status === 401) return fail('signed-out');
     if (sent.status === 503) return fail('not-set-up');
+    if (sent.status === 429) return fail('too-many');
     if (sent.status === 400) {
       const body = (await sent.json().catch(() => null)) as { error?: string } | null;
       return fail(body?.error === BADGE_ERRORS.tooLarge ? 'too-large' : 'failed');
@@ -111,7 +134,7 @@ export async function readBadge(file: Blob, signal: AbortSignal): Promise<{ ok: 
 
     while (Date.now() - started < READ_MS) {
       await wait(POLL_MS, signal);
-      const r = await fetch(`${ENDPOINT}?ticket=${encodeURIComponent(ticket)}`, { cache: 'no-store', signal });
+      const r = await fetch(ENDPOINT, { headers: { [TICKET_HEADER]: ticket }, cache: 'no-store', signal });
       if (r.status === 401) return fail('signed-out');
       if (r.status === 404) return fail('failed');
       if (!r.ok) return fail('unreachable');

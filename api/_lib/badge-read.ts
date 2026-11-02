@@ -9,10 +9,12 @@
  * The photo: the route strips it of EXIF (location, camera, time) and shrinks
  * it, uploads it to Mark's file server, and starts a private run of the reader
  * on it. The showcase keeps neither the photo nor what was read: no Blob, no
- * Redis, no log line. Mark keeps the photo in its file server under the PAT's
- * owner, referenced by that private run.
+ * Redis, no log line (badge-read-limit.ts keeps a count of reads per rep, and
+ * nothing else). Mark keeps the photo in its file server under the PAT's
+ * owner, referenced by that private run, also when the rep cancels the read.
  *
- * The run is followed through a ticket the browser holds: the run's id, the
+ * The run is followed through a ticket the browser holds and sends in a header
+ * (never the address, which lands in the request logs): the run's id, the
  * rep's email and ten minutes, signed. Nothing to store, and a rep can follow
  * only a read they started, never another Mark run by its id.
  *
@@ -23,22 +25,11 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { BADGE_ERRORS, cardFromAgent, MAX_PHOTO_BYTES, MAX_PHOTO_DATA_URL, type BadgeReadStatus } from '../../src/lib/badge-card.js';
 import { INSTANCE_ID, MarkError, markFileHeaders, type MarkAgentExecution } from './mark.js';
 
-type Env = Record<string, string | undefined>;
+import type { Env } from './badge-mode.js';
 
-/* ---------- Whether it is on ---------- */
+/* ---------- Whether it is on: badge-mode.ts ---------- */
 
-export type BadgeMode = 'off' | 'stub' | 'live';
-
-/** The stub never answers in production, whatever the env says. */
-export const stubRefused = (env: Env) => env.VERCEL_ENV === 'production' || env.NODE_ENV === 'production';
-
-export const badgeAgentId = (env: Env = process.env) => (env.MARK_BADGE_AGENT_ID || '').trim();
-
-export function badgeMode(env: Env = process.env): BadgeMode {
-  if ((env.BADGE_READ_STUB || '').trim() && !stubRefused(env)) return 'stub';
-  if (env.OPAL_PAT && badgeAgentId(env)) return 'live';
-  return 'off';
-}
+export { badgeAgentId, badgeMode, stubRefused, type BadgeMode } from './badge-mode.js';
 
 /* ---------- The ticket ---------- */
 

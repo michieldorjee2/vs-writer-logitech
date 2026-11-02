@@ -15,18 +15,22 @@ import {
   uploadBadgePhoto,
 } from './_lib/badge-read.js';
 import { getAgentExecution, MarkError, startAgent } from './_lib/mark.js';
+import { countStore, overReadLimit } from './_lib/badge-read-limit.js';
 import { BADGE_ERRORS } from '../src/lib/badge-card.js';
 
 /**
  * Mark reads a badge for the search page (api/_lib/badge-read.ts says how, and
  * what is kept where).
  *
- *   GET              → { ready }  whether the page shows its camera
- *   POST { image }   → 202 { ticket }  image: a JPEG/PNG/WebP data URL, at most 3 MB
- *   GET ?ticket=     → { status: 'reading' } | { status: 'done', card } | { status: 'failed' }
+ *   GET                       → { ready }  whether the reader is set up (the dev server's
+ *                               /search asks; in production the page render says)
+ *   POST { image }            → 202 { ticket }  image: a JPEG/PNG/WebP data URL, at most 3 MB;
+ *                               429 past ten reads in ten minutes
+ *   GET, X-Badge-Ticket: …    → { status: 'reading' } | { status: 'done', card } | { status: 'failed' }
  *
- * 503 until MARK_BADGE_AGENT_ID is set. Nothing is built here: the page shows
- * the card, and the rep sends it to /api/page-builds.
+ * POST and a GET with a ticket answer 503 until MARK_BADGE_AGENT_ID is set; a
+ * GET without one answers { ready: false }. Nothing is built here: the page
+ * shows the card, and the rep sends it to /api/page-builds.
  */
 export const config = { maxDuration: 60 };
 
@@ -38,7 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'private, no-store');
 
   const mode = badgeMode();
-  const ticket = typeof req.query?.ticket === 'string' ? req.query.ticket : null;
+  // A header, never the query: the address lands in the request logs, and the ticket names the rep and the run.
+  const sent = req.headers?.['x-badge-ticket'];
+  const ticket = typeof sent === 'string' && sent ? sent : null;
   if (req.method === 'GET' && !ticket) return res.status(200).json({ ready: mode !== 'off' });
   if (mode === 'off') return res.status(503).json({ error: BADGE_ERRORS.notSetUp });
 
@@ -54,6 +60,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch {
         return res.status(400).json({ error: BADGE_ERRORS.notAPhoto });
       }
+      // Counted before anything reaches Mark. A store that doesn't answer doesn't stop a read.
+      const tooMany = await overReadLimit(countStore(), email).catch((err: unknown) => {
+        console.error('[badge-read] count', err instanceof Error ? err.name : 'failed');
+        return false;
+      });
+      if (tooMany) return res.status(429).json({ error: BADGE_ERRORS.tooMany });
       const ex =
         mode === 'stub'
           ? `stub:${Date.now()}`

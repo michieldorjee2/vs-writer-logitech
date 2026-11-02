@@ -31,6 +31,7 @@ import type {
 } from '../src/lib/graph-types';
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries';
 import { authEnabled, currentIdentity, safeNext, signInPath } from '../api/_lib/auth';
+import { badgeRootAttr } from '../api/_lib/badge-mode';
 import { renderLoginPage } from './login-page';
 import SearchHome from '../src/components/SearchHome';
 import { buildForRoute, buildStore } from '../api/_lib/page-builds-store';
@@ -1118,7 +1119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const offer = await shownOfferFor(req.cookies?.[OFFER_COOKIE]);
     const body = renderToString(<SearchHome scene={scene} offer={offer} />);
     const offerAttr = offer ? ` data-offer="${escapeHtml(JSON.stringify(offer))}"` : '';
-    html = html.replace('<div id="root"></div>', `<div id="root" data-scene="${scene.id}"${offerAttr}>${body}</div>`);
+    // Whether Mark's badge reader is set up (phones show a camera): said here, so the page never asks.
+    html = html.replace('<div id="root"></div>', `<div id="root" data-scene="${scene.id}"${offerAttr}${badgeRootAttr()}>${body}</div>`);
 
     res.setHeader('Content-Type', 'text/html');
     if (!authEnabled()) res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');

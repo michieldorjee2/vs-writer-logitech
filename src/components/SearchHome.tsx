@@ -347,7 +347,16 @@ function LookCard({ job, title, onRetry }: { job: LookJob; title: string; onRetr
 /** Stagger slot for the rise and drop animations: rows down a column, columns slightly apart. */
 const slot = (row: number, col: number) => ({ '--i': row + col * 0.7 }) as CSSProperties;
 
-export default function SearchHome({ scene, offer: servedOffer = null }: { scene: Scene; offer?: ShownOffer | null }) {
+export default function SearchHome({
+  scene,
+  offer: servedOffer = null,
+  badgeReady = null,
+}: {
+  scene: Scene;
+  offer?: ShownOffer | null;
+  /** Whether Mark's badge reader is set up, as the server said (null: ask; the dev server). */
+  badgeReady?: boolean | null;
+}) {
   const heroRef = useRef<HTMLElement | null>(null);
   const liftRef = useRef<HTMLDivElement | null>(null);
   const listsRef = useRef<HTMLDivElement | null>(null);
@@ -640,7 +649,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
   );
   const req = usePageRequest({ findCompany, onStarted: addBuilds });
   /* Phones: a camera in the bar when Mark's badge reader is set up (MARK_BADGE_AGENT_ID). */
-  const scanReady = useBadgeReady(!!identity);
+  const scanReady = useBadgeReady(!!identity, badgeReady);
   /* A badge line tapped to fix: the bar's field comes back in its place, ready to type. */
   const fixingLine = !!req.card && (req.phase === 'person' || req.phase === 'company' || req.phase === 'title');
   useEffect(() => {
@@ -992,7 +1001,6 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
   const badgeLines = req.card ? cardLines(req.card, req.cardCompany) : null;
   const requestHint =
     req.error ??
-    req.badgeHint ??
     (req.phase === 'sent'
       ? 'It shows up in your list while Mark works; open it to watch.'
       : req.phase === 'person'
@@ -1010,7 +1018,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
   /* The go button turns into a + when what it would do is ask Mark for a page. */
   const activeRow = view === 'search' && !leaving ? navRows[activeIdx] : undefined;
   const addRow = activeRow?.kind === 'add' ? activeRow : null;
-  const adding = (!!req.phase && req.phase !== 'sent') || !!addRow;
+  const adding = req.phase === 'company' || req.phase === 'person' || !!addRow;
   const goLabel = req.phase ? 'Send to Mark' : addRow ? (addRow.add === 'account' ? 'Add company' : 'Add person') : 'Open';
 
   /* What a screen reader hears as the results change, rather than the whole panel again. */
@@ -1134,7 +1142,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
               <button
                 type="submit"
                 className="sh-search__go"
-                data-icon={adding ? 'add' : 'go'}
+                data-icon={adding || req.card ? 'add' : 'go'}
                 aria-label={goLabel}
                 disabled={req.submitting || req.phase === 'reading'}
               >
@@ -1208,9 +1216,12 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
                       </button>
                     );
                   })}
-                <p className={'sh-note' + (req.error ? ' sh-note--error' : '')} style={slot(badgeLines ? 3 : 1, 0)}>
-                  {requestHint}
-                </p>
+                {/* No note when a row already says what to tap. */}
+                {(req.error ?? req.badgeHint) && (
+                  <p className={'sh-note' + (req.error ? ' sh-note--error' : '')} style={slot(badgeLines ? 3 : 1, 0)}>
+                    {req.error ?? req.badgeHint}
+                  </p>
+                )}
               </div>
             </div>
           ) : view === 'request' ? (
