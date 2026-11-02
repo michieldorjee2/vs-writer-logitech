@@ -8,7 +8,7 @@
 import type { MarkChunk, MarkExecution } from '../../src/lib/page-builds.js';
 
 const BASE_URL = (process.env.OPAL_BASE_URL || 'https://opal.optimizely.com').replace(/\/+$/, '');
-const INSTANCE_ID = process.env.OPAL_INSTANCE_ID || '4f42a24e93f945bcb262bff01a9a1562';
+export const INSTANCE_ID = process.env.OPAL_INSTANCE_ID || '4f42a24e93f945bcb262bff01a9a1562';
 
 /** Limitless one-off account page (showcase search). */
 export const ACCOUNT_WORKFLOW_ID = process.env.MARK_ACCOUNT_WORKFLOW_ID || 'ef6efcd5-a814-4ad5-befe-66e730fcdf59';
@@ -91,12 +91,15 @@ export type MarkAgentExecution = {
   error_message?: string | null;
 };
 
-/** Starts an agent run in the background (it can outlive any one request). Returns its id. */
-export async function startAgent(agentId: string, parameters: Record<string, unknown>): Promise<string> {
+/**
+ * Starts an agent run in the background (it can outlive any one request). Returns its id.
+ * `private`: only the PAT's owner sees the run in Mark (the badge reader's photos).
+ */
+export async function startAgent(agentId: string, parameters: Record<string, unknown>, opts: { private?: boolean } = {}): Promise<string> {
   const body = await call<unknown>(`/agents/specialized/${agentId}/execute?run_in_background=true`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parameters }),
+    body: JSON.stringify({ parameters, ...(opts.private ? { private: true } : {}) }),
   });
   const id = unwrap<{ id?: string }>(body)?.id;
   if (!id) throw new MarkError('Mark started no run', 502);
