@@ -12,16 +12,18 @@
  * stream to Mark and the republish poll are all answered here; the test fails if any request
  * reaches webhook.opal.optimizely.com.
  *
- * Covers: server render + hydration without errors, no sideways scroll on a phone, every
- * section present, sticky bar, the one-click contact, the offer FAQ, X-ray mode outlining every
- * section, Edit mode rewriting the hero headline in place from a (mocked) Mark stream, and the
- * legacy renderers unchanged without ?design=www.
+ * Covers, for both account templates (the agent platform one by default, ?template=takeout)
+ * and the offer page: server render + hydration without errors, no sideways scroll on a phone,
+ * every section present, sticky bar, the one-click connect panel (pings once per view, from the
+ * sticky bar or the close), the review layer and state switch, the offer FAQ, X-ray mode
+ * outlining every section, Edit mode rewriting the hero headline in place from a (mocked) Mark
+ * stream, and the legacy renderers unchanged without ?design=www.
  */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { ABM_XRAY_DEFAULTS } from '../src/lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_XRAY } from '../src/lib/xray-defaults'
 
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
 const ACCOUNT = process.env.E2E_ACCOUNT || '/cdw/'
@@ -150,14 +152,104 @@ async function shot(page: Page, name: string) {
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-features=AsyncDns'] })
 console.log(`www-design e2e against ${BASE}  (screenshots: ${OUT})`)
 
+const beaconsOf = (page: Page) => page.evaluate(() => (window as unknown as { __beacons: string[] }).__beacons)
+
 for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
-  console.log(`\naccount page, ${vp}`)
+  console.log(`\naccount page, agent platform template (the default), ${vp}`)
+  {
+    const { ctx, watch } = await newContext(browser, vp)
+    const page = await open(ctx, watch, url(ACCOUNT, 'design=www'))
+    await test('server-rendered and hydrated without errors', async () => {
+      const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the server did not render the agent platform page')
+      expect(!watch.errors.length, watch.errors.join('\n'))
+    })
+    await test('the tab title is the template\'s, before and after hydration (no takeout pitch)', async () => {
+      const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      const server = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? ''
+      const client = await page.title()
+      expect(/^Optimizely agent platform · Personalized for /.test(server), `server title: ${server}`)
+      expect(client === server.replace(/&amp;/g, '&'), `client title "${client}" differs from the server's "${server}"`)
+    })
+    await test("Laura's eight sections, in her order", async () => {
+      const ids = await page.$$eval('[data-scene]', (els) => els.map((e) => e.id))
+      expect(JSON.stringify(ids) === JSON.stringify(['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta']), ids.join(', '))
+    })
+    await test('no sideways scroll', () => noSidewaysScroll(page))
+    await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
+    if (vp === 'desktop') {
+      await test('desktop: scenes fill the window, the hero exactly fits it', async () => {
+        const r = await page.evaluate(() => ({
+          hero: document.getElementById('hero')!.getBoundingClientRect().height,
+          short: [...document.querySelectorAll('[data-scene]:not(.www-scene--compact)')]
+            .filter((s) => s.getBoundingClientRect().height < innerHeight - (s.matches('.www-scene--fill.www-scene--dark') ? 25 : 1))
+            .map((s) => s.id),
+        }))
+        expect(Math.abs(r.hero - 900) <= 1, `hero is ${r.hero}px in a 900px window`)
+        expect(!r.short.length, `scenes shorter than the window: ${r.short.join(', ')}`)
+      })
+    }
+    if (vp === 'phone') {
+      await test('phone: the hero fills the first screen and its ask is in view', async () => {
+        const hero = await page.locator('#hero').boundingBox()
+        expect(hero && hero.height >= 844 - 1, `hero is ${hero?.height}px tall in an 844px window`)
+        const cta = await page.locator('#hero-connect-btn').boundingBox()
+        expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
+      })
+    }
+    await test('the sticky bar appears past the hero and hides at the close', async () => {
+      await page.evaluate(() => scrollTo(0, 0))
+      await page.waitForTimeout(300)
+      expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
+      await page.locator('#usecases').scrollIntoViewIfNeeded()
+      await page.waitForSelector('.www-sticky--visible', { timeout: 3000 })
+    })
+    await test('the sticky button pings the team once and opens the connect panel (no form)', async () => {
+      await page.locator('.www-sticky--visible #sticky-connect-btn').click()
+      const panel = page.getByRole('dialog')
+      await panel.getByText("You're all set").waitFor({ timeout: 3000 })
+      expect(!(await panel.locator('form, input, textarea').count()), 'the panel has a form field')
+      const beacons = await beaconsOf(page)
+      expect(beacons.length === 1, `beacons: ${beacons.length}`)
+      const b = JSON.parse(beacons[0])
+      expect(b.event === 'demo_button_clicked' && b.source === 'sticky-connect-btn', `beacon: ${beacons[0]}`)
+      await page.screenshot({ path: path.join(OUT, `connect-${vp}.png`) })
+      await page.keyboard.press('Escape')
+      await panel.waitFor({ state: 'detached', timeout: 3000 })
+    })
+    await test('the close reopens the panel without pinging the team a second time', async () => {
+      await page.locator('#cta').scrollIntoViewIfNeeded()
+      await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
+      await page.locator('#cta-connect-btn').click()
+      await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+      expect((await beaconsOf(page)).length === 1, 'pinged twice')
+      expect(/You're all set/.test(await page.locator('#cta-connect-btn').innerText()), 'the close button does not say it is done')
+      await page.getByRole('button', { name: 'Close' }).click()
+      expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
+    })
+    if (vp === 'desktop') {
+      await test('?review=1 shows where each part came from, and switches the lifecycle state', async () => {
+        expect(!(await page.locator('.www-review').count()), 'review layer on the production page')
+        const rp = await open(ctx, watch, url(ACCOUNT, 'design=www&review=1'))
+        await rp.locator('.www-review').waitFor()
+        await rp.locator('.www-review__state', { hasText: 'Ex-customer' }).click()
+        await rp.waitForURL(/state=ex-customer/)
+        await rp.waitForSelector('[data-state="ex-customer"].www-hero__card--ltblue')
+        await rp.screenshot({ path: path.join(OUT, 'review-ex-customer.png') })
+        await rp.close()
+      })
+    }
+    await shot(page, `agent-platform-${vp}`)
+    await ctx.close()
+  }
+
+  console.log(`\naccount page, takeout template (?template=takeout), ${vp}`)
   const { ctx, watch } = await newContext(browser, vp)
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www'))
+  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&template=takeout'))
 
   await test('server-rendered and hydrated without errors', async () => {
-    const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
-    expect(html.includes('class="www-page'), 'the server did not render the www page')
+    const html = await (await fetch(url(ACCOUNT, 'design=www&template=takeout'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+    expect(html.includes('class="www-page') && html.includes('id="comparison"'), 'the server did not render the takeout page')
     expect(!watch.errors.length, watch.errors.join('\n'))
   })
   await test('every section the ODP tracking observes is on the page', async () => {
@@ -186,10 +278,12 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await page.locator('#cta').scrollIntoViewIfNeeded()
     await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
   })
-  await test('one click on the contact button tells the team, and says so', async () => {
+  await test('one click on the contact button tells the team, says so, and opens the connect panel', async () => {
     await page.locator('#cta-connect-btn').click()
-    await page.getByRole('status').getByText("You're all set").waitFor({ timeout: 3000 })
-    const beacons = await page.evaluate(() => (window as unknown as { __beacons: string[] }).__beacons)
+    await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+    await page.keyboard.press('Escape')
+    await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
+    const beacons = await beaconsOf(page)
     expect(beacons.length === 1 && JSON.parse(beacons[0]).event === 'demo_button_clicked', `beacons: ${JSON.stringify(beacons)}`)
     expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
   })
@@ -201,7 +295,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
     })
   }
-  await shot(page, `account-${vp}`)
+  await shot(page, `takeout-${vp}`)
   await ctx.close()
 
   console.log(`\noffer page, ${vp}`)
@@ -229,7 +323,35 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   await o.ctx.close()
 }
 
-console.log('\nbooth tools on the www account page (signed in, ?search=1)')
+console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const onPage = await page.evaluate(
+    (ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)),
+    ABM_XRAY_DEFAULTS.map((s) => s.id),
+  )
+  await test(`X-ray outlines every section on the page (${onPage.length}), the new ones included`, async () => {
+    for (const id of AGENT_PLATFORM_XRAY.map((s) => s.id)) expect(onPage.includes(id), `no hook for ${id}`)
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('.xray-card').length >= n, onPage.length, { timeout: 8000 })
+    const titles = await page.$$eval('.xray-card__title', (els) => els.map((e) => e.textContent))
+    for (const t of ABM_XRAY_DEFAULTS.filter((s) => onPage.includes(s.id)).map((s) => s.title)) expect(titles.includes(t), `no X-ray card for "${t}"`)
+    await page.screenshot({ path: path.join(OUT, 'booth-xray-agent-platform.png') })
+    await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
+  })
+  await test('Edit mode offers feedback on every section', async () => {
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, onPage.length, { timeout: 8000 })
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
+console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
 {
   const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
   // Mark's edit stream, answered here: one edit to the hero headline.
@@ -245,7 +367,7 @@ console.log('\nbooth tools on the www account page (signed in, ?search=1)')
     const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
     await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
   })
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&template=takeout&search=1'))
   heroText = (await page.locator('[data-xray="hero-title"] h1').innerText()).replace(/\s+/g, ' ').trim()
 
   const onPage = await page.evaluate(

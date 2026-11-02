@@ -1,11 +1,12 @@
-import { lazy, Suspense, useEffect, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import { usePageContent } from './hooks/usePageContent';
 import { usePreviewContent } from './hooks/usePreviewContent';
 import { useHeadMeta } from './hooks/useHeadMeta';
 import type { CompetitorComparisonPage, PreviewBlock } from './lib/graph-types';
 import { includes, resolveComponentPlan } from './lib/limitless/component-plan';
-import { wantsWwwDesign } from './www/design';
+import { wantsTakeout, wantsWwwDesign } from './www/design';
+import { agentPlatformHead } from './www/agent-platform/content';
 import type {
     FinServPage as FinServPageData,
     PersonPage as PersonPageData,
@@ -52,7 +53,7 @@ const FloatingSidebar = lazy(() => import('./components/FloatingSidebar'));
  */
 const VisualBuilderPage = lazy(() => import('./components/VisualBuilderPage'));
 /* The www-design concept (?design=www): optimizely.com's own components. See src/www. */
-const WwwAccountPage = lazy(() => import('./www/AccountPage'));
+const WwwAccountPage = lazy(() => import('./www/WwwAccountRoute'));
 
 function RouteSpinner() {
     return (
@@ -158,12 +159,12 @@ function HomePage() {
  * use-case page. Register the field, add it to the query, and every page the
  * decision engine writes takes this branch with no further code change.
  */
-function renderPageBody(data: CompetitorComparisonPage, editMode: boolean, www = false) {
+function renderPageBody(data: CompetitorComparisonPage, editMode: boolean, www = false, search = '') {
     if (isPersonPage(data)) return <PersonPage page={data} editMode={editMode} />;
     if (isRetailPage(data)) return <RetailCustomerPage page={data} />;
     if (isFinServPage(data)) return <FinServPage page={data} />;
     // Mirrored in server/ssr-handler.tsx's default arm.
-    if (www) return <WwwAccountPage page={data} />;
+    if (www) return <WwwAccountPage page={data} search={search} />;
     // Resolved once and reused, rather than once to test and once to pass down.
     const plan = resolveComponentPlan(data);
     if (includes(plan, 'use-case-matrix')) return <UseCasePage page={data} plan={plan} />;
@@ -189,8 +190,12 @@ function PageLoader() {
     const { data, isLoading, error } = usePageContent(slug || '');
     const hydrated = useHydrated();
 
-    // Inject title, meta description, canonical, and JSON-LD
-    useHeadMeta(data);
+    // Inject title, meta description, canonical, and JSON-LD. The www agent platform template
+    // replaces the stored takeout title and description (they name the competitor), exactly as
+    // the server does, so the head does not change on hydration.
+    const apHead = wantsWwwDesign(searchParams) && !wantsTakeout(searchParams);
+    const headPage = useMemo(() => (data && apHead && !isPersonPage(data) && !isRetailPage(data) && !isFinServPage(data) ? agentPlatformHead(data) : data), [data, apHead]);
+    useHeadMeta(headPage);
 
     if (isLoading) {
         return (
@@ -214,7 +219,7 @@ function PageLoader() {
         // server/ssr-handler.tsx's renderPageRoute() reproduces this exact shape — including
         // the second slot — because useId() counts a children array. Change one, change both.
         <Suspense fallback={<RouteSpinner />}>
-            {renderPageBody(data, searchParams.get('ctx') === 'edit', wantsWwwDesign(searchParams))}
+            {renderPageBody(data, searchParams.get('ctx') === 'edit', wantsWwwDesign(searchParams), searchParams.toString())}
             {fromSearch && !isRetailPage(data) && !isFinServPage(data) && (
                 <FloatingSidebar
                     page={data}

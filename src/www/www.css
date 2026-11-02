@@ -713,6 +713,535 @@ body:has(.www-page) {
   }
 }
 
+/* ==========================================================================
+   Agent platform template (AgentPlatformPage.tsx)
+   ========================================================================== */
+
+/* ---- hero: the look follows the lifecycle state (Laura's state table) ---------- */
+.www-page .www-hero__card--neutral2,
+.www-page .www-hero__card--neutral3,
+.www-page .www-hero__card--ltblue {
+  color: var(--www-fir);
+  --prose-type-color: var(--www-fir);
+}
+.www-page .www-hero__card--neutral2 {
+  background: #eff6e9;
+  box-shadow: inset 0 0 0 1.5px var(--www-fir);
+}
+.www-page .www-hero__card--neutral3 {
+  background: var(--www-n3);
+}
+.www-page .www-hero__card--ltblue {
+  background: #91dbda;
+}
+.www-page .www-hero__card:not(.www-hero__card--darkfir) .www-emph {
+  color: #197050;
+}
+.www-page .www-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--www-fir);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.www-page .www-pill--on-dark {
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+
+/* "Agents at work": one white panel floating on the landscape. Illustrative, labelled so. */
+.www-page .www-agents {
+  position: absolute;
+  inset: auto 6% 7% 6%;
+  padding: clamp(16px, 2.6vh, 24px);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--www-fir);
+  box-shadow: 0 24px 48px -24px rgb(8 37 26 / 0.55);
+}
+@media (min-width: 992px) {
+  .www-page .www-agents {
+    inset: auto 10% 10% 10%;
+  }
+}
+.www-page .www-agents__task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: clamp(14px, min(1vw, 1.8vh), 16px);
+  line-height: 1.35;
+}
+.www-page .www-agents__live {
+  position: relative;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+.www-page .www-agents__live::before,
+.www-page .www-agents__live::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  background: var(--www-good);
+}
+.www-page .www-agents__live::after {
+  animation: www-pulse 1.8s ease-out infinite;
+}
+@keyframes www-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.www-page .www-agents__chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--www-n3);
+  font: 12px/1.2 var(--font-roboto), 'Roboto Mono', monospace;
+  letter-spacing: 0.02em;
+}
+.www-page .www-agents__chip--dark {
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+
+/* ---- who we are -------------------------------------------------------------- */
+.www-page .www-card--lime {
+  background: var(--www-lime);
+}
+.www-page .www-icon-tile--white {
+  background: #fff;
+}
+.www-page .www-analyst {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1.5px var(--www-fir);
+  transition: background 0.2s ease;
+}
+.www-page .www-analyst:hover {
+  background: var(--www-n3);
+}
+.www-page .www-analyst .www-body {
+  flex: 1;
+}
+
+/* ---- where it fits: their numbers, then teams / platform / their stack ---------- */
+.www-page .www-fit-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(16px, 2.6vh, 28px) clamp(16px, 2vw, 28px);
+}
+.www-page .www-fit-stat {
+  display: flex;
+  flex-direction: column;
+  /* dt (label) then dd (number) in the markup; the number reads first. */
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1.5px solid var(--www-fir);
+}
+.www-page .www-fit-stat .www-number {
+  font-size: clamp(32px, min(3.4vw, 5.6vh), 60px);
+}
+.www-page .www-layer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(16px, 2.4vh, 24px);
+  border-radius: 24px;
+}
+.www-page .www-layer--teams,
+.www-page .www-layer--stack {
+  background: #fff;
+}
+.www-page .www-layer--platform {
+  background: var(--www-fir);
+  color: #fff;
+}
+.www-page .www-layer__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 12px/1.3 var(--font-roboto), 'Roboto Mono', monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.www-page .www-layer__arrow {
+  display: flex;
+  justify-content: center;
+  opacity: 0.55;
+}
+.www-page .www-chip--on-dark {
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+.www-page .www-chip--white {
+  background: #fff;
+}
+.www-page .www-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--www-n3);
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.www-page .www-tile--ours {
+  background: var(--www-lime);
+}
+.www-page .www-tile__ours {
+  align-self: flex-start;
+  margin-top: 2px;
+  font: 11px/1 var(--font-roboto), 'Roboto Mono', monospace;
+}
+
+/* ---- speaks your language ------------------------------------------------------ */
+.www-page .www-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: clamp(18px, 3vh, 28px);
+  border-radius: var(--www-radius);
+  box-shadow: inset 0 0 0 1.5px var(--www-fir);
+}
+.www-page .www-ask__who {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--www-n3);
+}
+.www-page .www-ask__q {
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: clamp(20px, min(2vw, 3.4vh), 32px);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+/* ---- use cases, proof, 90 days -------------------------------------------------- */
+.www-page .www-usecase,
+.www-page .www-proof {
+  display: flex;
+  flex-direction: column;
+}
+.www-page .www-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--www-lime);
+  box-shadow: 0 0 0 1.5px var(--www-fir);
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+}
+.www-page .www-role {
+  align-self: flex-start;
+  margin-top: 20px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--www-n3);
+  font: 12px/1.2 var(--font-roboto), 'Roboto Mono', monospace;
+}
+.www-page .www-governance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 18px 22px;
+  border-radius: 20px;
+  background: #fff;
+}
+
+/* ---- close ---------------------------------------------------------------------- */
+.www-page .www-card--dark-2 {
+  background: rgb(255 255 255 / 0.06);
+  color: #fff;
+}
+.www-page .www-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.www-page .www-reason__n {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--www-lime);
+  color: var(--www-fir);
+  font-weight: 700;
+  font-size: 15px;
+}
+.www-page .www-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--www-lime);
+}
+.www-page .www-close-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  margin-top: clamp(32px, 6vh, 72px);
+  padding-top: clamp(24px, 4vh, 40px);
+  border-top: 1px solid rgb(255 255 255 / 0.15);
+}
+.www-page .www-close-band .www-h2 {
+  font-size: clamp(26px, min(3vw, 5vh), 52px);
+}
+
+/* ---- review layer (?review=1 only; never in production output, N12) --------------- */
+.www-page .www-review {
+  position: fixed;
+  top: 76px;
+  right: 12px;
+  z-index: 70;
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100svh - 160px);
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1.5px var(--www-fir),
+    0 20px 40px -20px rgb(8 37 26 / 0.5);
+  font: 12px/1.4 var(--font-roboto), 'Roboto Mono', monospace;
+}
+.www-page .www-review table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.www-page .www-review th,
+.www-page .www-review td {
+  padding: 4px 0;
+  vertical-align: top;
+  text-align: left;
+  border-top: 1px solid var(--www-n3);
+}
+.www-page .www-review th {
+  width: 34%;
+  padding-right: 8px;
+  font-weight: 500;
+}
+.www-page .www-review__state {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--www-n3);
+}
+.www-page .www-review__state.is-on {
+  background: var(--www-fir);
+  color: #fff;
+}
+.www-page .www-review__from {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--www-n3);
+}
+.www-page .www-review__from--page {
+  background: var(--www-lime);
+}
+.www-page .www-review__from--agent {
+  background: var(--www-fir);
+  color: #fff;
+}
+
+/* ==========================================================================
+   The connect panel (ConnectModal.tsx). Radix portals it to <body>, outside
+   .www-page, so it is scoped by its own root class instead.
+   ========================================================================== */
+.www-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgb(8 37 26 / 0.55);
+  backdrop-filter: blur(4px);
+  animation: www-fade 0.25s ease both;
+}
+.www-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 81;
+  width: min(880px, calc(100vw - 24px));
+  max-height: calc(100svh - 24px);
+  overflow: auto;
+  padding: 12px;
+  border-radius: 32px;
+  background: #fff;
+  color: #08251a;
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+  transform: translate(-50%, -50%);
+  animation: www-pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.www-modal:focus {
+  outline: none;
+}
+.www-modal__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+.www-modal__close:hover {
+  background: rgb(255 255 255 / 0.22);
+}
+.www-modal__close:focus-visible,
+.www-modal__tile:focus-visible {
+  outline: 2px solid #abff44;
+  outline-offset: 2px;
+}
+.www-modal__grid {
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .www-modal__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .www-modal__tile--done {
+    grid-column: 1 / -1;
+  }
+}
+.www-modal__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 24px;
+  border-radius: 24px;
+  background: #e4f0da;
+  color: #08251a;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+a.www-modal__tile:hover {
+  transform: translateY(-2px);
+}
+.www-modal__tile--done {
+  padding: clamp(28px, 5vh, 48px) 28px;
+  background: #08251a;
+  color: #fff;
+}
+.www-modal__tile--fast {
+  background: #abff44;
+}
+.www-modal__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: #abff44;
+  color: #08251a;
+}
+.www-modal__title {
+  font-family: var(--font-headline), 'VC Nudge', Arial, sans-serif;
+  font-weight: 800;
+  font-size: clamp(32px, 5vh, 52px);
+  line-height: 1;
+}
+.www-modal__body {
+  max-width: 46ch;
+  font-size: 17px;
+  line-height: 1.45;
+  color: rgb(255 255 255 / 0.85);
+}
+.www-modal__label,
+.www-modal__hint {
+  font: 12px/1.3 var(--font-roboto), 'Roboto Mono', monospace;
+  letter-spacing: 0.03em;
+  opacity: 0.8;
+}
+.www-modal__cta {
+  font-family: var(--font-headline), 'VC Nudge', Arial, sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.www-modal__tile--person strong {
+  margin-top: 6px;
+  font-size: 18px;
+}
+.www-modal__mail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.www-modal .www-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff;
+  font-family: var(--font-headline), 'VC Nudge', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+}
+@keyframes www-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes www-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .www-modal,
+  .www-modal__overlay,
+  .www-page .www-agents__live::after {
+    animation: none;
+  }
+}
+
 /* ---- motion ---------------------------------------------------------------------- */
 /* Only once the boot script has marked <html>: without JS nothing is ever hidden. */
 .www-js .www-page [data-scene]:not(.www-hero) [data-reveal] {

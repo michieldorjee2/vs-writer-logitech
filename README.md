@@ -57,8 +57,10 @@ Three things it covers that the build does not:
 
 Any account page (`/<company>/`) or offer page (`/vb/<slug>`) renders in the new design when `?design=www` is on the URL; without it nothing changes. The pages are 1:1 landing pages built from optimizely.com's own React components (vendored in `src/vendor/www`, see its `UPSTREAM.md`): no navigation or footer, one window-height scene per idea, white and Neutral 3 between dark bookends, LFGreen for the action only. The content model is untouched; `src/www/account-fields.ts` maps all 67 `CompetitorComparisonPage` properties, and offer pages are read back from their Visual Builder composition (`src/www/offer-content.ts`). X-ray and Edit mode work on both designs (`data-xray` hooks).
 
+An account page in the www design renders one of two templates. The default is the agent platform template (`src/www/AgentPlatformPage.tsx`): Laura Perez Riau's eight-section page from Dan Tranter's pitch, where the lifecycle state sets the hero, headline, proof and CTAs. It reads `AgentPlatformContent`, which `src/www/agent-platform/content.ts` fills from the stored page until the agents write it directly; `?review=1` shows where each part came from and `?state=` switches the state. `?template=takeout` renders the competitive takeout page with every stored field. On both, the one-click ask (hero, sticky bar, close) pings the account team once per page view and opens a connect panel instead of a form (`src/www/ConnectModal.tsx`). The agent changes this template needs are drafted, not deployed, in [docs/agent-platform-template](docs/agent-platform-template/README.md).
+
 ```bash
-npm run check:www                              # 95 offline tests: helpers, field coverage, x-ray hooks, brand rules
+npm run check:www                              # 121 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules
 WWW_UPSTREAM=~/Claude/OptimizelyHeadless npm run check:www   # + proves src/vendor/www still matches upstream
 npm run build && npx tsx scripts/serve-prod.ts &               # local production stand-in on :5199
 npm run e2e:www                                # Playwright, desktop + phone, X-ray/Edit with all network mocked

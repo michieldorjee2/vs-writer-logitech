@@ -20,10 +20,10 @@
  * Section ids are the ones the ODP tracking hook observes; `data-xray` hooks are what X-ray and
  * Edit mode find (ABM_XRAY_DEFAULTS).
  */
-import { useState } from 'react'
 import type { CompetitorComparisonPage } from '../lib/graph-types'
 import { useOdpTracking } from '../hooks/useOdpTracking'
-import { fireDemoWebhook } from '../lib/abm-demo-webhook'
+import { ConnectProvider, useConnect } from './ConnectModal'
+import { toPeople } from './agent-platform/content'
 import { deriveCustomerName } from '../lib/page-identity'
 import GravatarAvatar from '../components/GravatarAvatar'
 import { Button } from '../vendor/www/components/_ui/button'
@@ -67,6 +67,7 @@ export default function AccountPage({ page }: Props) {
       .replace(/^\/+|\/+$/g, '') || null
 
   return (
+    <ConnectProvider page={page} people={toPeople(page.teamMembers)} scheduleUrl={page.modalScheduleUrl?.default || null}>
     <WwwPage accent={page.brandAccentColor}>
       <div id="main-content">
         <Hero page={page} company={company} />
@@ -81,8 +82,9 @@ export default function AccountPage({ page }: Props) {
         <Path page={page} />
         <Ask page={page} team={realContacts(page.teamMembers)} />
       </div>
-      <StickyCta text={page.stickyCTAText || 'Explore what Optimizely can do'} />
+      <StickyAsk text={page.stickyCTAText || 'Explore what Optimizely can do'} />
     </WwwPage>
+    </ConnectProvider>
   )
 }
 
@@ -662,8 +664,14 @@ function Path({ page }: { page: CompetitorComparisonPage }) {
 
 /* ======================================================================== 11 ASK */
 
+/** The sticky bar's button is the same one-click ask as the closing scene's. */
+function StickyAsk({ text }: { text: string }) {
+  const { connect } = useConnect()
+  return <StickyCta text={text} onAction={() => connect('sticky-connect-btn')} />
+}
+
 function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<typeof realContacts> }) {
-  const [sent, setSent] = useState(false)
+  const { connect, sent } = useConnect()
   const schedule = page.modalScheduleUrl?.default
   return (
     <section id="cta" data-scene data-tone="dark" className="www-scene www-scene--dark www-scene--fill">
@@ -693,10 +701,7 @@ function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<
                     variant="primary"
                     className="www-btn"
                     id="cta-connect-btn"
-                    onClick={() => {
-                      fireDemoWebhook(page, 'cta-connect-btn')
-                      setSent(true)
-                    }}
+                    onClick={() => connect('cta-connect-btn')}
                   >
                     {page.ctaButtonText || 'Get in touch with your Optimizely team'}
                   </Button>

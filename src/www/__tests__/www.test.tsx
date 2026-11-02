@@ -17,6 +17,9 @@
  *      value, and an offer page renders every string of every element in its composition
  *   5. X-ray and Edit mode can find every section: each ABM_XRAY_DEFAULTS id has a
  *      `data-xray` hook on the new page and every selector matches it
+ *   6. the agent platform template (the default www account page): the adapter that re-reads
+ *      existing pages into it, Laura's rules (N1 to N14, gate 2), the lifecycle states, and that
+ *      every stored field is either used or deliberately not shown
  */
 import assert from 'node:assert/strict'
 import { renderToString } from 'react-dom/server'
@@ -28,8 +31,12 @@ import { comparisonTableHtml, formatStatValue, PROOF_LOGOS, realContacts } from 
 import { isOfferExperience, wantsWwwDesign } from '../design'
 import { OFFER_SLOTS, readOffer, type ElementData } from '../offer-content'
 import { plain, richToStacked } from '../ui'
-import { ABM_XRAY_DEFAULTS } from '../../lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import offerBlueprint from '../../cms/blueprints/offer'
+import WwwAccountRoute from '../WwwAccountRoute'
+import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, USED_FIELDS } from '../agent-platform/content'
+import { readStack, stackTiles } from '../agent-platform/stack'
+import { DEFAULT_TEAMS, IDENTITY_SENTENCE, THEME_ORDER } from '../agent-platform/library'
 
 /* ------------------------------------------------------------------ harness */
 
@@ -601,9 +608,284 @@ test('every ABM x-ray selector also matches its data-xray hook', () => {
   for (const s of ABM_XRAY_DEFAULTS) assert.ok(s.selector.includes(`[data-xray="${s.id}"]`), s.id)
 })
 
-test('the new account page carries a data-xray hook for every x-ray section', () => {
-  const missing = ABM_XRAY_DEFAULTS.filter((s) => !accountHtml.includes(`data-xray="${s.id}"`)).map((s) => s.id)
+test('the takeout account page carries a data-xray hook for every legacy x-ray section', () => {
+  const missing = ABM_XRAY_LEGACY_IDS.filter((id) => !accountHtml.includes(`data-xray="${id}"`))
   assert.deepEqual(missing, [])
+})
+
+/* ------------------------------------------------------ agent platform template */
+
+console.log('\nagent platform template: the adapter (existing pages into the new structure)')
+
+/**
+ * A realistic synthetic account (no real company or person): a replaced CMS plus a second CMS,
+ * marketing automation, analytics, a CDP, a traffic figure and a stat about Optimizely.
+ */
+function stackPage(over: Record<string, unknown> = {}): CompetitorComparisonPage {
+  return {
+    ...fullAccountPage(),
+    competitorName: 'Adobe Experience Manager',
+    intelHeadline: 'We know <em>Northwind Freight</em>',
+    intelStats: [
+      { Value: '12000', Label: 'employees' },
+      { Value: '3.2M', Label: 'monthly visitors' },
+      { Value: '40', Label: 'countries served' },
+      { Value: '3', Label: 'Optimizely products in use' },
+      { Value: '1998', Label: 'founded' },
+    ],
+    techStack: [
+      { Name: 'Adobe Experience Manager', ColorTag: 'var(--orange)' },
+      { Name: 'Sitecore', ColorTag: null },
+      { Name: 'Marketo', ColorTag: null },
+      { Name: 'Google Analytics 4', ColorTag: null },
+      { Name: 'Tealium', ColorTag: null },
+      { Name: 'Salesforce', ColorTag: null },
+      { Name: 'OneTrust', ColorTag: null },
+      { Name: 'Bynder', ColorTag: null },
+      { Name: 'Marketo', ColorTag: null },
+    ],
+    investments: [
+      { Name: 'Global content localization', IsPrimary: true },
+      { Name: 'Customer data unification', IsPrimary: false },
+    ],
+    stakeholders: [
+      { Initials: 'PE', Name: 'Pat Example', Role: 'Chief Marketing Officer', LinkedInUrl: null },
+      { Initials: 'SE', Name: 'Sam Example', Role: 'Director of Digital Experience', LinkedInUrl: null },
+      { Initials: 'KE', Name: 'Kim Example', Role: 'Head of Marketing Operations', LinkedInUrl: null },
+      { Initials: 'LE', Name: 'Lee Example', Role: 'VP Content and Brand', LinkedInUrl: null },
+    ],
+    ...over,
+  } as unknown as CompetitorComparisonPage
+}
+
+test('state: a stored Optimizely tool or stat reads as customer, anything else as prospect', () => {
+  assert.equal(deriveState(stackPage({ intelStats: [] })).value, 'prospect')
+  assert.equal(deriveState(stackPage()).value, 'customer') // "3 Optimizely products in use"
+  assert.equal(deriveState(stackPage({ intelStats: [], techStack: [{ Name: 'Optimizely Web Experimentation', ColorTag: null }] })).value, 'customer')
+})
+
+test('state: ?state= overrides for review, an unknown value is ignored', () => {
+  const page = stackPage({ intelStats: [] })
+  assert.equal(fromLegacyPage(page, { state: 'open-opp' }).state.value, 'open-opp')
+  assert.equal(fromLegacyPage(page, { state: 'nonsense' as never }).state.value, 'prospect')
+})
+
+test('N8: traffic figures and stats about Optimizely never become account facts', () => {
+  const c = fromLegacyPage(stackPage())
+  assert.deepEqual(c.pills.value, ['12K employees', '40 countries served', 'Founded 1998'])
+  assert.deepEqual(c.stats.value, [], 'the homework tiles repeat no hero fact')
+  const more = fromLegacyPage(stackPage({ intelStats: [...(stackPage().intelStats ?? []), { Value: '86', Label: 'NPS' }, { Value: '5', Label: 'business units' }] }))
+  assert.deepEqual(more.stats.value.map((s) => s.label), ['NPS', 'business units'])
+})
+
+test('N2: the replaced platform, and any tool in its category, show as the category only', () => {
+  const tools = readStack(stackPage().techStack, 'Adobe Experience Manager')
+  const aem = tools.find((t) => t.name === 'Adobe Experience Manager')!
+  const sitecore = tools.find((t) => t.name === 'Sitecore')!
+  assert.ok(aem.competitor && sitecore.competitor, 'both CMSs are competitors')
+  assert.equal(aem.label, 'Your CMS')
+  assert.equal(sitecore.label, 'Your CMS')
+  assert.ok(!tools.find((t) => t.name === 'Marketo')!.competitor)
+  assert.equal(tools.filter((t) => t.name === 'Marketo').length, 1, 'duplicates are dropped')
+})
+
+test('N2: an orange-tagged tool is a competitor even without a competitor name', () => {
+  const tools = readStack([{ Name: 'Contentful', ColorTag: 'var(--orange)' }, { Name: 'Marketo', ColorTag: null }], null)
+  assert.equal(tools[0].label, 'Your CMS')
+  assert.equal(tools[1].label, 'Marketo')
+})
+
+test('stack tiles: at most six, Optimizely first, one tile per competitor category', () => {
+  const tools = readStack([{ Name: 'Optimizely CMS', ColorTag: null }, ...(stackPage().techStack ?? [])], 'Adobe Experience Manager')
+  const tiles = stackTiles(tools)
+  assert.ok(tiles.length <= 6)
+  assert.ok(tiles[0].ours)
+  assert.equal(tiles.filter((t) => t.label === 'Your CMS').length, 1)
+  assert.ok(!tiles.some((t) => t.category === 'Consent'), 'consent tools are not a layer worth a tile')
+})
+
+test('use cases rank from stored evidence; a tie goes to content operations', () => {
+  const c = fromLegacyPage(stackPage())
+  assert.equal(c.themes.value[0], 'content-ops') // CMS + DAM in the stack, "content localization" primary
+  assert.equal(c.themes.value.length, 5)
+  const tie = fromLegacyPage(stackPage({ techStack: [], investments: [] }))
+  assert.deepEqual(tie.themes.value, THEME_ORDER)
+  const testing = fromLegacyPage(stackPage({ techStack: [{ Name: 'VWO', ColorTag: null }, { Name: 'AB Tasty', ColorTag: null }], investments: [{ Name: 'Experimentation program', IsPrimary: true }] }))
+  assert.equal(testing.themes.value[0], 'optimization')
+})
+
+test('N3: teams come from stakeholder roles (three or more groups), else the default', () => {
+  const c = fromLegacyPage(stackPage())
+  assert.equal(c.teams.from, 'derived')
+  assert.ok(c.teams.value.includes('Marketing leadership') && c.teams.value.includes('Content and brand'))
+  const few = fromLegacyPage(stackPage({ stakeholders: [] }))
+  assert.equal(few.teams.from, 'template')
+  assert.deepEqual(few.teams.value, DEFAULT_TEAMS)
+})
+
+test('N4: a named rep only for an open opportunity or a customer, and never a placeholder', () => {
+  const page = stackPage({ intelStats: [] })
+  assert.deepEqual(fromLegacyPage(page).rep.value.named, [])
+  for (const state of ['open-opp', 'customer'] as const) {
+    assert.deepEqual(fromLegacyPage(page, { state }).rep.value.named.map((p) => p.name), ['F-team-name'])
+  }
+  for (const state of ['evaluated', 'ex-customer'] as const) assert.deepEqual(fromLegacyPage(page, { state }).rep.value.named, [])
+})
+
+test('every one of the 67 stored fields is either used (and where) or deliberately not shown (and why)', () => {
+  const used = USED_FIELDS.map((f) => f.field)
+  const off = NOT_SHOWN.map((f) => f.field)
+  assert.deepEqual(used.filter((f) => off.includes(f)), [], 'a field is in both lists')
+  assert.deepEqual([...used, ...off].sort(), ACCOUNT_FIELDS.map((f) => f.field).sort())
+  assert.ok(NOT_SHOWN.every((f) => f.rule.length > 8), 'every hidden field names its rule')
+})
+
+console.log('\nagent platform template: the page')
+
+const apSearch = (s: string) => renderToString(<WwwAccountRoute page={stackPage({ intelStats: stackPage().intelStats?.filter((x) => !/Optimizely/.test(x.Label)) })} search={s} />)
+const apHtml = apSearch('')
+const apText = textOf(apHtml)
+
+/** The visible copy a reader gets, excluding the review layer. */
+function readerText(html: string) {
+  return textOf(
+    html
+      .replace(/<aside class="www-review"[\s\S]*?<\/aside>/, '')
+      // Not reading load: screen-reader-only text ("opens in new tab"), and anything hidden from
+      // assistive tech (icon ligatures, the stacked layers of the extruded run).
+      .replace(/<(span|dt|p)[^>]*class="sr-only"[^>]*>[^<]*(<!-- -->[^<]*)*<\/\1>/g, '')
+      .replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, ''),
+  )
+}
+
+test('the agent platform template is the default; ?template=takeout is the takeout page', () => {
+  const ids = (html: string) => [...html.matchAll(/<section id="([^"]+)" data-scene/g)].map((m) => m[1])
+  assert.deepEqual(ids(apHtml), ['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta'])
+  assert.deepEqual(ids(apSearch('?template=takeout')), ['hero', 'intel', 'signals', 'challenge', 'comparison', 'proof', 'analysts', 'promo', 'roi', 'migration', 'cta'])
+})
+
+test('hero: "Personalized for", the identity sentence first, no account name in the H1', () => {
+  assert.match(apText, /Personalized for Northwind Freight/)
+  assert.match(apText, new RegExp(IDENTITY_SENTENCE.replace(/\./g, '\\.') + ' Our agent platform sits on top of the tools Northwind Freight'))
+  const h1 = textOf(apHtml.match(/<h1[\s\S]*?<\/h1>/)![0])
+  assert.ok(!/Northwind/.test(h1), h1)
+})
+
+test('N2 and N3: no competitor name and no stakeholder name anywhere in the markup', () => {
+  for (const name of ['Adobe Experience Manager', 'Sitecore', 'Pat Example', 'Sam Example', 'Kim Example', 'Lee Example']) {
+    assert.ok(!apHtml.includes(name), `${name} is on the page`)
+  }
+  assert.match(apText, /Your CMS/)
+})
+
+test('N1: no comparison table, no incumbent framing, no legacy challenge copy', () => {
+  assert.ok(!/<table/.test(apHtml.replace(/<aside class="www-review"[\s\S]*?<\/aside>/, '')))
+  for (const f of ['F-challengeHeadline', 'F-pain-1', 'F-comparisonHeadline', 'F-row-1']) assert.ok(!apHtml.includes(f), f)
+})
+
+test('the close has exactly two calls to action', () => {
+  const band = apHtml.match(/<div[^>]*class="www-close-band"[\s\S]*?<\/div><\/div>/)![0]
+  const actions = band.match(/<(a|button)\b/g) ?? []
+  assert.equal(actions.length, 2, band)
+  assert.match(band, /id="cta-connect-btn"/)
+  assert.match(band, /Explore the agent platform/)
+})
+
+test('no account colours: the stored accent colour is nowhere on the page (gate 2)', () => {
+  assert.ok(!apHtml.toLowerCase().includes('#0a1b2c'))
+  assert.ok(!/--www-accent/.test(apHtml))
+})
+
+test('N12: build logic stays out of the production page; ?review=1 shows it', () => {
+  for (const word of ['6QA', 'MUV', 'Track B', 'Build logic', 'withheld', 'provenance', 'Prospect', 'takeout', 'derived']) {
+    assert.ok(!readerText(apHtml).includes(word), `"${word}" on the production page`)
+  }
+  assert.ok(!apHtml.includes('www-review'))
+  const review = apSearch('?review=1')
+  assert.match(review, /class="www-review"/)
+  assert.match(textOf(review), /Review · Customer|Review · Prospect/)
+})
+
+test('N14: the reader gets 750 words or fewer', () => {
+  const words = readerText(apHtml).split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length
+  console.log(`       (${words} words)`)
+  if (process.env.WWW_DUMP) console.log(readerText(apHtml))
+  assert.ok(words <= 750, `${words} words`)
+})
+
+test('one extruded moment per page: the run in the state headline', () => {
+  assert.deepEqual([...extrudedRuns(apHtml)], ['put them to work'])
+})
+
+test('the state sets the hero look, the proof track and whether the rep is named', () => {
+  const look = (html: string) => html.match(/www-hero__card--(\w+)/)![1]
+  const prospect = apHtml
+  const opp = apSearch('?state=open-opp')
+  assert.equal(look(prospect), 'darkfir')
+  assert.equal(look(opp), 'darkfir')
+  assert.equal(look(apSearch('?state=evaluated')), 'neutral2')
+  assert.equal(look(apSearch('?state=customer')), 'neutral3')
+  assert.equal(look(apSearch('?state=ex-customer')), 'ltblue')
+  // Track A for a prospect: reads, no customer logos or names. Track B otherwise.
+  assert.ok(!/Diligent|Corinthia|Robinson/.test(prospect))
+  assert.match(opp, /Diligent/)
+  // Rep named only where the state allows it (the hero button names them too).
+  assert.ok(!prospect.includes('F-team-name'))
+  assert.match(textOf(opp), /F-team-name/)
+  assert.match(textOf(opp), /Arrange a session with F-team-name/)
+})
+
+test('the stored stack fills the 90-day Connect step by category, nothing replaced', () => {
+  assert.match(apText, /Link (cms|marketing automation|analytics|digital assets|customer data|crm)[a-z ,]* and [a-z ]+\. Nothing gets replaced\./)
+})
+
+test('N1 and N2 in stored free text: the takeout sticky line is replaced, lines naming the platform are left off', () => {
+  const html = renderToString(
+    <WwwAccountRoute
+      page={stackPage({
+        stickyCTAText: 'Your AEM exit plan is ready',
+        investments: [{ Name: 'AEM upgrade', IsPrimary: true }, { Name: 'Sitecore sunset', IsPrimary: false }, { Name: 'Global content localization', IsPrimary: false }],
+        footerTagline: 'Built to replace Adobe Experience Manager',
+        intelStats: [{ Value: '4000', Label: 'AEM pages' }, { Value: '12000', Label: 'employees' }],
+      })}
+    />,
+  )
+  for (const s of ['AEM', 'Sitecore', 'Adobe Experience Manager', 'exit plan']) assert.ok(!html.includes(s), `"${s}" is on the page`)
+  assert.match(textOf(html), /Global content localization/)
+  assert.match(textOf(html), /12K employees/)
+  const m = competitorMatcher(readStack(stackPage().techStack, 'Adobe Experience Manager'), 'Adobe Experience Manager')
+  assert.ok(m('Our AEM rollout') && m('Sitecore XP') && !m('Teamwork across brands') && !m('Taem'))
+})
+
+test('N2 in the head: the tab title, description and link preview do not carry the takeout pitch', () => {
+  const head = agentPlatformHead(stackPage({ PageTitle: 'Northwind - Why Optimizely over Adobe Experience Manager', MetaDescription: 'Move from AEM to Optimizely' }))
+  assert.equal(head.PageTitle, 'Optimizely agent platform · Personalized for Northwind Freight')
+  assert.ok(head.MetaDescription.startsWith(IDENTITY_SENTENCE))
+  assert.ok(!/Adobe|AEM/.test(head.PageTitle + head.MetaDescription))
+  assert.equal(head.testimonial1, null)
+  assert.equal(head.analystCards, null)
+})
+
+test('stored small print is kept', () => {
+  assert.ok(!apText.includes('F-stickyCTAText'))
+  assert.match(apText, /F-footerTagline/)
+  assert.match(apText, /F-footerLegal/)
+  assert.match(apHtml, /F-customerLogo\.png/)
+})
+
+test('the agent platform page carries a hook for each of its X-ray sections, the takeout page for the legacy ones', () => {
+  const reused = ['hero-title', 'hero-subtitle', 'intel-headline', 'intel-stats', 'tech-stack', 'investments', 'timeline-phases', 'team-members', 'cta-title', 'cta-description']
+  const want = [...AGENT_PLATFORM_XRAY.map((s) => s.id), ...reused]
+  assert.deepEqual(want.filter((id) => !apHtml.includes(`data-xray="${id}"`)), [])
+  const takeout = apSearch('?template=takeout')
+  assert.deepEqual(ABM_XRAY_LEGACY_IDS.filter((id) => !takeout.includes(`data-xray="${id}"`)), [])
+})
+
+test('the one-click ask: buttons, no form anywhere on the page', () => {
+  assert.ok(!/<form[\s>]/.test(apHtml))
+  assert.match(apHtml, /id="hero-connect-btn"/)
+  assert.match(apHtml, /id="sticky-connect-btn"/)
+  assert.match(apHtml, /id="cta-connect-btn"/)
 })
 
 /* -------------------------------------------------------------------- result */

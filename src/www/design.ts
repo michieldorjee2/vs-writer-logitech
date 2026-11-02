@@ -18,3 +18,10 @@ export function isOfferExperience(value: unknown): boolean {
   if (typeof plan === 'string') return /"blueprint"\s*:\s*"offer"|"kind"\s*:\s*"offer-page"/.test(plan)
   return false
 }
+
+/** `?template=takeout`: the competitive takeout template instead of the agent platform one. */
+export function wantsTakeout(search: string | URLSearchParams | null | undefined): boolean {
+  if (!search) return false
+  const p = typeof search === 'string' ? new URLSearchParams(search) : search
+  return p.get('template') === 'takeout'
+}

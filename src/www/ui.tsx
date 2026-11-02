@@ -163,6 +163,7 @@ export function Reveal({
   as?: 'div' | 'li' | 'p' | 'span' | 'figure'
   className?: string
   children: ReactNode
+  'aria-hidden'?: boolean | 'true'
   [key: `data-${string}`]: string | undefined
 }) {
   return (
@@ -395,7 +396,24 @@ export function Steps({
 
 /* ------------------------------------------------------------ sticky ask */
 
-export function StickyCta({ text, href = '#cta', label = 'Talk to your team', endId = 'cta' }: { text: string; href?: string; label?: string; endId?: string }) {
+/**
+ * The floating ask, shown between the hero and the closing scene. With `onAction` it is the
+ * Limitless one-click button (it pings the team itself, see ConnectModal); with only `href` it is
+ * a link (the offer page's sign-up).
+ */
+export function StickyCta({
+  text,
+  href = '#cta',
+  label = 'Talk to your team',
+  endId = 'cta',
+  onAction,
+}: {
+  text: string
+  href?: string
+  label?: string
+  endId?: string
+  onAction?: () => void
+}) {
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     const hero = document.getElementById('hero')
@@ -417,11 +435,17 @@ export function StickyCta({ text, href = '#cta', label = 'Talk to your team', en
   return (
     <div className={cn('www-sticky', visible && 'www-sticky--visible')} aria-hidden={!visible}>
       <span className="www-small min-w-0 truncate pl-2 font-medium text-white">{text}</span>
-      <Button asChild variant="primary" size="sm" className="www-btn shrink-0" tabIndex={visible ? 0 : -1}>
-        <a href={href} id="sticky-connect-btn">
+      {onAction ? (
+        <Button variant="primary" size="sm" className="www-btn shrink-0" tabIndex={visible ? 0 : -1} id="sticky-connect-btn" onClick={onAction}>
           {label}
-        </a>
-      </Button>
+        </Button>
+      ) : (
+        <Button asChild variant="primary" size="sm" className="www-btn shrink-0" tabIndex={visible ? 0 : -1}>
+          <a href={href} id="sticky-connect-btn">
+            {label}
+          </a>
+        </Button>
+      )}
     </div>
   )
 }
