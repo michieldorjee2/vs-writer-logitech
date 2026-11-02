@@ -32,7 +32,7 @@ try {
 
   const env = { ...process.env };
   // The check sets its own; nothing from the shell or .env.local reaches it.
-  for (const key of ['ALDUS_UI_URL', 'ALDUS_SHOWCASE_TOKEN', 'GRAPH_AUTH_KEY', 'KV_REST_API_URL', 'KV_REST_API_TOKEN', 'OFFER_SIGNUP_WEBHOOKS']) delete env[key];
+  for (const key of ['ALDUS_UI_URL', 'ALDUS_SHOWCASE_TOKEN', 'GRAPH_AUTH_KEY', 'KV_REST_API_URL', 'KV_REST_API_TOKEN', 'OFFER_SIGNUP_FORM', 'OFFER_SIGNUP_WEBHOOKS']) delete env[key];
   const run = spawnSync(process.execPath, [out], { stdio: 'inherit', env });
   process.exit(run.status ?? 1);
 } finally {
