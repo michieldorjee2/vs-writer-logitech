@@ -513,6 +513,9 @@ html, body { margin: 0; background: #f9fcf8; }
 }
 .sh .search-page__profile-icon:hover { background: var(--sh-hover); color: var(--sh-fg); }
 .sh .search-page__profile-icon:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: 1px; }
+/* The links back to Limitless are anchors drawn as the menu's rows and icons. */
+.sh a.search-page__profile-item,
+.sh a.search-page__profile-icon { text-decoration: none; }
 
 /* The other running offers, one at a time. */
 .sh .search-page__profile-offers {
