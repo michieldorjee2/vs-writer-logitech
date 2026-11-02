@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-10-20
+updated: 2026-11-01
 ---
 
 # vs-writer-logitech
@@ -41,7 +41,7 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:render
+npm run check          # everything that needs no network: both type-checks, lint, check:render, check:signup
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
@@ -52,6 +52,7 @@ Three things it covers that the build does not:
 - **`server/` and `api/` are type-checked** (`typecheck:server`, `tsconfig.server.json`). The app config includes only `src/`, so the code that server-renders every page had never been checked; it now is, with `strictNullChecks` on, which is what the `api/` handlers' `if (!x.ok)` narrowing was written for. The app config is unchanged.
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
 - **`check:render`** server-renders the use-case template and asserts against the HTML.
+- **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
 
 ## Sign-in
 
@@ -128,6 +129,21 @@ Two things to know before touching it:
 - **Adding a field to `PAGE_QUERY` before it is registered in the CMS 404s every account page.** One unknown field fails the whole GraphQL query (commit `9091988`). Register in the CMS, run `npm run check:graph`, *then* add it to the query — in all three copies (`api/content.ts`, `server/ssr-handler.tsx`, `api/preview.ts`).
 - **`npm run check:render` guards this renderer.** It server-renders the fixture and asserts against the HTML: that `renderToString` survives (the renderer is SSR'd directly, with no `.server.tsx` twin), and that components the plan withheld genuinely do not reach the output. No network, no credentials — safe in CI.
 - **`_json` is not an escape hatch for unregistered fields.** Graph rejects it on a page root (`The \`_json\` field is only supported within the \`item\` field`), so a field the content type does not register cannot be read at all — register it first. A `mergeRetailJson()` built on the opposite assumption sat in `api/content.ts` and `server/ssr-handler.tsx` as a silent no-op until it was removed.
+
+## Offer pages: the email sign-up form
+
+Each offer in Limitless picks how people sign up on its pages: the close band's button links out (the default, every page today), or an email-only form on the page (aldus-ui `lib/offers/signup.ts`; Laura's ask, Notion "Add an optional email-only form block to the offer template"). Nothing is written to the CMS and no page is regenerated: when an offer page is served, `withOfferSignup` (`api/_lib/offer-signup.ts`) asks Limitless for the offer's choice (`GET /api/machine/showcase/offers/{id}/signup`, held 30 s, 1.5 s timeout, the link on any failure) and, for the form, `injectSignupForm` (`src/lib/offer-signup.ts`) gives the close band's `AbmClosingCtaElement` a `SignupOfferId` and points the hero's main button at `#signup`. All three experience paths do it (`api/content.ts`, `server/ssr-handler.tsx`, the dev proxy), so the HTML, `__SSR_DATA__` and a client fetch agree. With the page's edge cache, a switch shows within about six minutes.
+
+The form (`src/components/offer-signup/OfferSignupForm.tsx`) posts to `POST /api/offer-signup` (`api/offer-signup.ts`), which checks the email's shape, rate-limits to 5 a minute per address while `KV_REST_API_*` is set, reads the page from Graph to confirm it is that offer's and to take its account (never the form's), and keeps the sign-up in Limitless, where the offer screen counts them and downloads a CSV.
+
+Env (Production already has the first four for the search page's offers):
+
+- `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`: Limitless and the showcase's token. Unset: every page links out, and the endpoint answers 503.
+- `GRAPH_AUTH_KEY`: the page read.
+- `KV_REST_API_URL`, `KV_REST_API_TOKEN`: the rate limit; unset, no limit.
+- `OFFER_SIGNUP_WEBHOOKS`: **unset.** Comma-separated https URLs that each also get every sign-up, the way optimizely.com's forms post to their Webhooks (`email`, `PageName`, `pageURL`, `page_key`, `form_key`, `utm_source` … `utm_content`, `offer_id`, `campaign_id`): a Google Sheet's Apps Script web app for a live sheet, or later the ODP and Marketo form proxy. A webhook that fails is logged and never fails the sign-up.
+
+Never submit the form on a preview whose `ALDUS_UI_URL` is production Limitless: the sign-up lands in production's list. Locally, set `ALDUS_UI_URL` to a local aldus-ui.
 
 ## Related
 

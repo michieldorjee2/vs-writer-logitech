@@ -3,6 +3,7 @@ import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
 import { graphItems } from '../src/lib/graph-envelope.js';
 import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
+import { withOfferSignup } from './_lib/offer-signup.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -278,7 +279,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.setHeader('X-Robots-Tag', 'noindex, nofollow');
             return res
               .status(200)
-              .json(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template }));
+              .json(await withOfferSignup(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template })));
           }
         }
       }

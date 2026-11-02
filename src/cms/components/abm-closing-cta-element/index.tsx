@@ -28,6 +28,7 @@ import { EditableField } from '@/lib/optimizely/features/draft'
 import type { DisplaySettings } from '@/lib/optimizely/types/display-settings'
 import { cn } from '@/lib/utils'
 
+import OfferSignupForm from '../../../components/offer-signup/OfferSignupForm'
 import { linkTarget } from '../../link-target'
 import type { AbmClosingCtaElementProps } from './types'
 
@@ -83,6 +84,7 @@ export default function AbmClosingCtaElement({
   Description,
   ButtonText,
   ScheduleUrl,
+  SignupOfferId,
   displaySettings,
 }: Props) {
   const { colorScheme, buttonVariant, buttonSize } =
@@ -98,7 +100,7 @@ export default function AbmClosingCtaElement({
 
   // Upstream's rule for a CTA: no destination, no button — and its placeholder label when
   // the destination is set but the label has not been written yet.
-  const button = ScheduleUrl ? (
+  const button = ScheduleUrl && !SignupOfferId ? (
     <Button variant={variant} size={size} asChild>
       <a href={ScheduleUrl} {...linkTarget(ScheduleUrl)} data-epi-edit="ButtonText">
         {ButtonText ?? 'Update Link Text'}
@@ -141,6 +143,9 @@ export default function AbmClosingCtaElement({
         ) : (
           button
         ))}
+
+      {/* The offer chose the email form (src/lib/offer-signup.ts): it takes the button's place. */}
+      {SignupOfferId && <OfferSignupForm offerId={SignupOfferId} buttonText={ButtonText} variant={variant} size={size} stroke={stroke} />}
     </div>
   )
 }

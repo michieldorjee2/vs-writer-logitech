@@ -1,7 +1,8 @@
 /**
- * Aldus UI's two routes for the showcase (aldus-ui lib/offers/showcase-look.ts):
- * the running offers, and saving one offer's look. Its own token, which may
- * do nothing else.
+ * Aldus UI's routes for the showcase (aldus-ui lib/offers/showcase-look.ts):
+ * the running offers, saving one offer's look, and (lib/offers/signup.ts) an
+ * offer's sign-up choice and adding one sign-up. Its own token, which may do
+ * nothing else.
  *
  * Env: ALDUS_UI_URL, ALDUS_SHOWCASE_TOKEN. Unset: no offers, and the search
  * page is the usual one.
@@ -62,4 +63,28 @@ export async function saveLook(offerId: string, look: Omit<ShowcaseLook, 'madeAt
   });
   held = null;
   return saved;
+}
+
+/** How people sign up on an offer's pages (aldus-ui lib/offers/signup.ts). Throws when Aldus UI can't say. */
+export async function signupFormFor(offerId: string, signal: AbortSignal): Promise<'link' | 'email'> {
+  const { form } = await call<{ form?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, { signal });
+  return form === 'email' ? 'email' : 'link';
+}
+
+export type SignupEntry = {
+  email: string;
+  route: string;
+  account: string | null;
+  domain: string | null;
+  utm: Partial<Record<'source' | 'medium' | 'campaign' | 'term' | 'content', string>>;
+};
+
+/** Keeps one sign-up in Aldus UI. Answers the offer's conversion campaign id, or null. */
+export async function addSignup(offerId: string, entry: SignupEntry): Promise<{ campaignId: string | null }> {
+  const body = await call<{ campaignId?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
+  return { campaignId: typeof body.campaignId === 'string' ? body.campaignId : null };
 }
