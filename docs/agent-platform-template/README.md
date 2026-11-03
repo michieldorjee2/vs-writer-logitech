@@ -32,20 +32,31 @@ Ten of the 67 stored fields feed the template (`USED_FIELDS` in `content.ts`); t
 
 ## Edit mode on this template (live since 2 November 2026)
 
-Most of this page is template copy, the same on every page, which no page field can change. Edit mode (the booth's `?search=1` sidebar) therefore offers only the parts a stored field drives, and says in each comment popup what the part is made of (`AGENT_PLATFORM_EDIT` in `src/lib/xray-defaults.ts`):
+Edit mode (the booth's `?search=1` sidebar) offers the parts a stored field drives and, since 3 November, the page's own text: the headline and most content (Michiel: "labels are fine as not editable, but things like H1 also weren't. Most content should be"). Each comment popup says what the part is made of (`AGENT_PLATFORM_EDIT` in `src/lib/xray-defaults.ts`):
 
 | Part | Fields |
 |---|---|
+| Headline, Subtitle | `copy.hero.h1`, `copy.hero.sub` |
 | Account logo | `customerLogo` |
 | Account facts (hero pills, and one per section further down) | `intelStats` |
+| Who we are | `copy.who.*` (heading, three tiles) |
+| Where it fits | `copy.fit.*` (heading, lead line) |
+| Speaks your language | `copy.language.*` (heading, question, generic answer, checklist) |
 | Agents at work, What they run today | `techStack` |
 | Their teams | `stakeholders` (roles only) |
 | Where they're investing | `investments` |
-| Use cases | `techStack`, `investments` (the ranking and the "Our homework" lines) |
+| Use cases | `techStack`, `investments` (the ranking and the "Our homework" lines), `copy.usecases.*` (heading, card titles and text, closing line) |
+| Proof headline | `copy.proof.heading` |
+| First 90 days | `copy.ninety.*` (heading, four steps, governance line) |
+| Close | `copy.close.*` (heading, three reasons, the line above the button) |
 | Account team | `teamMembers` |
 | Small print | `footerTagline`, `footerLegal` |
 
-The request to Mark opens with "Page template: agent platform" and lists each commented part's fields (`src/lib/edit-payload.ts`). Mark's live-edit agent (`account_page_live_edit`, v1.4.3) knows this template, skips template copy with a reason, and sends each edit's `field` with its full new `value`. The page re-renders from that value while Mark works (`src/www/live-edit.ts`), so every place the field shows changes together; the rest of the page dims around the part in focus, and each changed element glows once. Mark's single `update_page` is still the save. Once Graph has it (Edit mode watches `lastModified`: Graph keeps `published` at the first publish date), Edit mode reads the saved page and replays, part by part, any change Mark saved without narrating it, then reloads. Mark often narrates only after saving, and once (v1.4.2, an instruction to narrate first) not at all, so the replay is what guarantees the spotlight and the live change.
+Labels (eyebrows, captions, buttons) and the proof stories (verified customer results) are not offered.
+
+**The page's own text** (`src/lib/page-copy.ts`) has no CMS property, and the account page content type stays as it is. The `copy.<key>` fields default to the template's text for that page (`src/www/agent-platform/copy.ts`). A page's own versions are kept in the site's Redis (`pc:<route>`, `api/_lib/page-copy.ts`, the `KV_REST_API_*` store the page builds use), with who changed each key and when. Every path that serves an account page adds them as `pageCopy`. Mark sends a copy change like any other edit, with `field` set to the copy key and `value` set to the full new text. `api/opal-edit-stream.ts` reads the same events the browser animates and, at the end of the run, saves the applied ones as the signed-in editor. It then purges the page's cache and tells Edit mode (`{k:"copy"}`), which reloads without waiting for a CMS republish when only copy changed.
+
+The request to Mark opens with "Page template: agent platform" and lists each commented part's fields, with the text each copy field shows now under "Now" (`src/lib/edit-payload.ts`). Mark's live-edit agent (`account_page_live_edit`, v1.5.0 since 3 November) knows this template. It sends each edit's `field` with its full new `value`, never puts a `copy.` field in `update_page`, and goes straight to `done` when only copy changed. The page re-renders from that value while Mark works (`src/www/live-edit.ts`), so every place the field shows changes together; the rest of the page dims around the part in focus, and each changed element glows once. For stored fields, Mark's single `update_page` is still the save. Once Graph has it (Edit mode watches `lastModified`: Graph keeps `published` at the first publish date), Edit mode reads the saved page and replays, part by part, any change Mark saved without narrating it, then reloads. Mark often narrates only after saving, and once (v1.4.2, an instruction to narrate first) not at all, so the replay is what guarantees the spotlight and the live change.
 
 ## The three drafts
 

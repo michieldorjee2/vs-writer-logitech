@@ -303,15 +303,34 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
 ];
 
 /**
- * Edit mode on the www agent platform page (src/www/AgentPlatformPage.tsx). Most of that page is
- * template copy, the same on every page (Laura's state headlines, who we are, the proof library,
- * the 90-day plan), which no page field can change, so Edit mode offers only the parts a page
- * field drives, and tells Mark which fields those are. `fields` are CompetitorComparisonPage
- * property keys; `hint` is what the comment popup says the area is made of.
+ * Edit mode on the www agent platform page (src/www/AgentPlatformPage.tsx): the parts a page field
+ * drives, and the headlines and body text, which are the page's own copy (src/lib/page-copy.ts:
+ * "copy.<key>" fields, kept beside the page). Labels (eyebrows, captions, buttons) and the proof
+ * stories (verified customer results) are not offered. `fields` are CompetitorComparisonPage
+ * property keys or copy fields; a field ending ".*" is every copy key under it that the page
+ * shows (Edit mode expands it). `hint` is what the comment popup says the area is made of.
  */
 export type EditSectionInfo = XraySectionInfo & { fields: string[]; hint: string };
 
 export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
+  {
+    id: 'hero-title',
+    selector: '#hero [data-xray="hero-title"]',
+    title: 'Headline',
+    tools: ['Mark'],
+    sources: ['copy.hero.h1'],
+    fields: ['copy.hero.h1'],
+    hint: 'The headline. The words between ## marks are the extruded ones; keep one run.',
+  },
+  {
+    id: 'hero-subtitle',
+    selector: '#hero [data-xray="hero-subtitle"]',
+    title: 'Subtitle',
+    tools: ['Mark'],
+    sources: ['copy.hero.sub'],
+    fields: ['copy.hero.sub'],
+    hint: 'The line under the headline.',
+  },
   {
     id: 'account-logo',
     selector: '#hero [data-xray="account-logo"]',
@@ -329,6 +348,33 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
     sources: ['intelStats'],
     fields: ['intelStats'],
     hint: 'The first three facts show here; the next four appear one per section further down. No traffic figures.',
+  },
+  {
+    id: 'who-we-are',
+    selector: '#who [data-field^="copy.who"]',
+    title: 'Who we are',
+    tools: ['Mark'],
+    sources: ['copy.who.*'],
+    fields: ['copy.who.*'],
+    hint: 'The heading and the three tiles. The analyst badges and the usage line stay as they are.',
+  },
+  {
+    id: 'where-it-fits',
+    selector: '#intel [data-field^="copy.fit"]',
+    title: 'Where it fits',
+    tools: ['Mark'],
+    sources: ['copy.fit.*'],
+    fields: ['copy.fit.*'],
+    hint: 'The heading and the line under it.',
+  },
+  {
+    id: 'speaks-language',
+    selector: '#language [data-field^="copy.language"]',
+    title: 'Speaks your language',
+    tools: ['Mark'],
+    sources: ['copy.language.*'],
+    fields: ['copy.language.*'],
+    hint: 'The heading, the leadership question, the generic AI answer and the checklist.',
   },
   {
     id: 'agents-at-work',
@@ -371,9 +417,36 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
     selector: '[data-xray="use-cases"]',
     title: 'Use cases',
     tools: ['BuiltWith', 'Mark', 'CMS'],
-    sources: ['techStack', 'investments'],
-    fields: ['techStack', 'investments'],
-    hint: 'Ranked from their stack and investments; "Our homework" on each card shows which. The card copy is the same on every page.',
+    sources: ['techStack', 'investments', 'copy.usecases.*'],
+    fields: ['techStack', 'investments', 'copy.usecases.*'],
+    hint: 'Ranked from their stack and investments; "Our homework" on each card shows which. The heading, each card\'s title and text, and the closing line can be reworded for this page.',
+  },
+  {
+    id: 'proof-heading',
+    selector: '#proof [data-field="copy.proof.heading"]',
+    title: 'Proof headline',
+    tools: ['Mark'],
+    sources: ['copy.proof.heading'],
+    fields: ['copy.proof.heading'],
+    hint: 'The heading. The stories under it are verified customer results and stay as they are.',
+  },
+  {
+    id: 'first-90-days',
+    selector: '[data-xray="first-90-days"]',
+    title: 'First 90 days',
+    tools: ['Mark'],
+    sources: ['copy.ninety.*'],
+    fields: ['copy.ninety.*'],
+    hint: 'The heading, the four steps and the governance line. Connect names their stack by category.',
+  },
+  {
+    id: 'close',
+    selector: '#cta [data-field^="copy.close"]',
+    title: 'Close',
+    tools: ['Mark'],
+    sources: ['copy.close.*'],
+    fields: ['copy.close.*'],
+    hint: 'The closing headline, the three reasons and the line above the button.',
   },
   {
     id: 'team-members',
