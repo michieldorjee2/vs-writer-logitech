@@ -28,7 +28,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_XRAY } from '../src/lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../src/lib/xray-defaults'
 
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
 const ACCOUNT = process.env.E2E_ACCOUNT || '/cdw/'
@@ -125,7 +125,13 @@ async function revealsAll(page: Page) {
       scrollTo(0, y)
       await new Promise((r) => setTimeout(r, 150))
     }
+    // End on the very bottom: the loop's last step can stop short of the close.
+    scrollTo(0, document.body.scrollHeight)
   })
+  // The waypoint observer answers asynchronously; give the last scene a moment, not a race.
+  await page
+    .waitForFunction(() => document.querySelectorAll('[data-scene].is-in').length === document.querySelectorAll('[data-scene]').length, null, { timeout: 3000 })
+    .catch(() => {})
   const after = await page.evaluate(() => ({
     in: document.querySelectorAll('[data-scene].is-in').length,
     all: document.querySelectorAll('[data-scene]').length,
@@ -408,7 +414,30 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
 console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
 {
   const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  // Mark's edit stream (agent v1.4), answered here: add a tool to their stack, with the field's
+  // full new value, the way the agent now sends it. The request it was sent is kept to check.
+  let stack: Array<{ Name: string; ColorTag: string | null }> = []
+  let sent: { suggested_edit?: string } | null = null
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    sent = route.request().postDataJSON()
+    const value = [{ Name: 'Shopify Plus', ColorTag: null }, ...stack]
+    const events = [
+      { type: 'plan', sections: ['What they run today'], summary: 'e2e' },
+      { type: 'section_focus', section: 'What they run today' },
+      { type: 'edit', index: 1, section: 'What they run today', target: 'stack tool', kind: 'item-add', status: 'applied', old: '', new: 'Shopify Plus', field: 'techStack', value },
+      { type: 'commit', status: 'saving', edits: 1 },
+      { type: 'done', saved: true },
+    ]
+    const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
   const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  // The stored stack, from the server HTML's hydration data (the page drops it once hydrated).
+  {
+    const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+    const data = JSON.parse(html.match(/window\.__SSR_DATA__=(\{[\s\S]*?\})<\/script>/)![1]) as { techStack?: typeof stack }
+    stack = data.techStack ?? []
+  }
   const onPage = await page.evaluate(
     (ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)),
     ABM_XRAY_DEFAULTS.map((s) => s.id),
@@ -422,9 +451,34 @@ console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
     await page.screenshot({ path: path.join(OUT, 'booth-xray-agent-platform.png') })
     await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
   })
-  await test('Edit mode offers feedback on every section', async () => {
+  const editable = await page.evaluate((secs) => secs.filter((s) => document.querySelector(s.selector)).map((s) => s.title), AGENT_PLATFORM_EDIT.map((s) => ({ selector: s.selector, title: s.title })))
+  await test(`Edit mode offers the ${editable.length} parts a page field drives, not the template copy`, async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
-    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, onPage.length, { timeout: 8000 })
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length === n, editable.length, { timeout: 8000 })
+    const labels = await page.$$eval('[aria-label^="Leave feedback on "]', (els) => els.map((e) => e.getAttribute('aria-label')!.replace('Leave feedback on ', '')))
+    expect(JSON.stringify(labels.sort()) === JSON.stringify([...editable].sort()), `offered: ${labels.join(', ')}`)
+    for (const t of ['Who we are', 'Proof', 'First 90 days', 'Hero headline']) expect(!labels.includes(t), `template copy offered: ${t}`)
+  })
+  await test('Mark\'s edit shows live: the section in focus is spotlit and the real page re-renders from the new value', async () => {
+    await page.locator('[aria-label="Leave feedback on What they run today"]').click()
+    await page.locator('.edit-popup__hint').waitFor({ timeout: 3000 })
+    await page.locator('.edit-popup__textarea').fill('They run Shopify Plus now')
+    await page.locator('.edit-popup__btn--primary').click()
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForSelector('.edit-spot--on', { timeout: 8000 })
+    await page.waitForFunction(() => /Shopify Plus/.test(document.querySelector('[data-xray="tech-stack"]')?.textContent || ''), null, { timeout: 15000 })
+    // The rest of their stack is still there: the page re-rendered from the whole new value.
+    const tiles = await page.locator('[data-xray="tech-stack"] .www-tile').count()
+    expect(stack.length > 0 && tiles > 1, `only ${tiles} tile(s) after the edit (stored stack: ${stack.length})`)
+    // The changed parts glow once the re-render has landed (two frames after the new value).
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.live-changed')].some((e) => ((e as HTMLElement).dataset.field || '').split(' ').includes('techStack')),
+      null,
+      { timeout: 3000 },
+    )
+    await page.screenshot({ path: path.join(OUT, 'booth-edit-agent-platform.png') })
+    const ask = sent?.suggested_edit ?? ''
+    expect(/^Page template: agent platform\./.test(ask) && /Section: What they run today\nFields: techStack\nFeedback: They run Shopify Plus now/.test(ask), `sent: ${ask}`)
   })
   await test('no errors, and nothing reached the real webhooks', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))

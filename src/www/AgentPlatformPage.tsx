@@ -45,12 +45,15 @@ import {
   type ThemeId,
 } from './agent-platform/library'
 import { fromLegacyPage, STATE_IDS, type AgentPlatformContent } from './agent-platform/content'
+import { useLivePage } from './live-edit'
 import type { LifecycleState } from './agent-platform/library'
 
 export default function AgentPlatformPage({ page, search = '' }: { page: CompetitorComparisonPage; search?: string }) {
   useOdpTracking('abm')
   const params = new URLSearchParams(search)
-  const c = fromLegacyPage(page, { state: params.get('state') as LifecycleState | null })
+  // Edit mode's live edits (booth only) re-render the page from Mark's streamed values.
+  const live = useLivePage(page)
+  const c = fromLegacyPage(live, { state: params.get('state') as LifecycleState | null })
   const review = params.get('review') === '1'
   const st = STATES[c.state.value]
   const people = c.rep.value.named
@@ -93,7 +96,7 @@ function fill(s: string, c: AgentPlatformContent, lead?: ThemeId) {
 function Homework({ stat, source, i = 2 }: { stat?: { value: string; label: string }; source?: { label: string; href: string } | null; i?: number }) {
   if (!stat) return null
   return (
-    <Reveal i={i} fx="right" as="aside" data-xray="intel-stats" className="www-note">
+    <Reveal i={i} fx="right" as="aside" data-xray="intel-stats" data-field="intelStats" className="www-note">
       <HomeworkTag />
       <p className="www-note__value">{/^(1[89]|20)\d{2}$/.test(stat.value) ? stat.value : <CountUp value={stat.value} />}</p>
       <p className="www-note__label">{stat.label}</p>
@@ -145,8 +148,8 @@ function Hero({ c }: { c: AgentPlatformContent }) {
       copy={
         <>
           {/* The page says whose it is once: their logo and one line, above the headline. */}
-          <Reveal i={0} fx="scale">
-            <AccountMark name={c.account} logo={c.logo} label={`Personalized for ${c.account}`} />
+          <Reveal i={0} fx="scale" data-field="customerLogo">
+            <AccountMark name={c.account} logo={c.logo} label={`Personalized for ${c.account}`} xray="account-logo" />
           </Reveal>
           <Reveal i={1} data-xray="hero-title">
             {/* Laura's state headlines are sentences, not slogans: one step down from display size. */}
@@ -156,7 +159,7 @@ function Hero({ c }: { c: AgentPlatformContent }) {
             {IDENTITY_SENTENCE} {fill(st.sub, c, lead)}
           </Reveal>
           {c.pills.value.length > 0 && (
-            <Reveal i={3} as="div" data-xray="intel-stats" className="flex flex-wrap gap-2">
+            <Reveal i={3} as="div" data-xray="intel-stats" data-field="intelStats" className="flex flex-wrap gap-2">
               {c.pills.value.map((p) => (
                 <span key={p} className={cn('www-pill', dark && 'www-pill--on-dark')}>
                   {p}
@@ -198,7 +201,7 @@ function Hero({ c }: { c: AgentPlatformContent }) {
             ))}
           </ul>
           {chips.length > 0 && (
-            <div className="www-agents__chips mt-4 flex flex-wrap gap-1.5">
+            <div className="www-agents__chips mt-4 flex flex-wrap gap-1.5" data-field="techStack">
               {chips.map((t) => (
                 <span key={t.label} className="www-agents__chip">
                   {t.label}
@@ -278,7 +281,7 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
           <Homework stat={c.stats.value[0]} source={c.statsSource.value} i={3} />
         </div>
         <div className="flex flex-col gap-2 lg:col-span-7">
-          <Reveal i={2} fx="drop" className="www-layer www-layer--teams">
+          <Reveal i={2} fx="drop" className="www-layer www-layer--teams" data-xray="teams" data-field="stakeholders">
             <p className="www-layer__label">{teamsFromPage ? <HomeworkTag>Your teams</HomeworkTag> : 'Your teams'}</p>
             <div className="flex flex-wrap gap-2">
               {c.teams.value.map((t) => (
@@ -306,7 +309,7 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
           <Reveal i={5} className="www-layer__arrow" aria-hidden="true">
             <MaterialIcon name="swap_vert" size="24" />
           </Reveal>
-          <Reveal i={6} className="www-layer www-layer--stack" data-xray="tech-stack">
+          <Reveal i={6} className="www-layer www-layer--stack" data-xray="tech-stack" data-field="techStack">
             <p className="www-layer__label">
               <HomeworkTag>{`What ${c.account} runs today`}</HomeworkTag>
             </p>
@@ -373,7 +376,7 @@ function SpeaksYourLanguage({ c }: { c: AgentPlatformContent }) {
         </div>
         {c.priorities.value.length > 0 && (
           // What they are investing in is the language the agents start from.
-          <Reveal i={5} className="www-priorities mt-3" data-xray="investments">
+          <Reveal i={5} className="www-priorities mt-3" data-xray="investments" data-field="investments">
             <HomeworkTag>{`Where ${c.account} is investing`}</HomeworkTag>
             <div className="flex flex-wrap gap-2">
               {c.priorities.value.map((p) => (
@@ -432,7 +435,7 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
                   </p>
                 ) : (
                   why && (
-                    <div className="www-why mt-4">
+                    <div className="www-why mt-4" data-field="techStack investments">
                       <HomeworkTag />
                       <dl>
                         {why.stack.length > 0 && (
@@ -549,7 +552,14 @@ function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
         {/* The path draws itself left to right as the scene arrives: each step's rule, then its number. */}
         <ol className="www-path grid gap-3 md:grid-cols-2 lg:grid-cols-4" role="list">
           {FIRST_90_DAYS.map((s, i) => (
-            <Reveal key={s.step} as="li" i={2 + i} data-xray="timeline-phases" className="www-card www-card--white www-path__step flex flex-col">
+            <Reveal
+              key={s.step}
+              as="li"
+              i={2 + i}
+              data-xray="timeline-phases"
+              data-field={s.body.includes('{stack}') ? 'techStack' : undefined}
+              className="www-card www-card--white www-path__step flex flex-col"
+            >
               <span className="flex items-center justify-between gap-2">
                 <span className="www-step-n">{i + 1}</span>
                 {/* The step that names their stack says where that came from. */}
@@ -602,7 +612,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
             </ol>
           </div>
           <div className="flex flex-col gap-3 lg:col-span-5">
-            <Reveal i={3} fx="right" className="www-card www-card--dark-2">
+            <Reveal i={3} fx="right" className="www-card www-card--dark-2" data-field="teamMembers">
               {people.length ? (
                 <ul className="flex flex-col gap-3" role="list">
                   {people.map((p) => (
@@ -625,7 +635,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
                 </div>
               )}
             </Reveal>
-            <Reveal i={4} fx="right" className="www-card www-card--dark-2">
+            <Reveal i={4} fx="right" className="www-card www-card--dark-2" data-field="stakeholders">
               <p className="www-caption text-white/70">Built for</p>
               <ul className="mt-2 flex flex-col gap-1.5" role="list">
                 {c.teams.value.slice(0, 3).map((t) => (
@@ -645,7 +655,7 @@ function Close({ c }: { c: AgentPlatformContent }) {
             <MaterialIcon name="bolt" size="20" /> {sent ? "You're all set" : ctaLabel(st.primaryCta, people)}
           </Button>
         </Reveal>
-        <Colophon>
+        <Colophon xray="small-print" field="footerTagline footerLegal">
           {c.smallPrint.tagline && <span>{c.smallPrint.tagline}</span>}
           {c.smallPrint.legal && <span>{c.smallPrint.legal}</span>}
           <a href="https://www.optimizely.com/ai/" target="_blank" rel="noopener noreferrer">

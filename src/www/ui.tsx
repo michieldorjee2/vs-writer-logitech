@@ -539,8 +539,12 @@ export function CountUp({ value, className }: { value: string; className?: strin
 }
 
 /** The page's own small print, at the end of the last scene (there is no footer). */
-export function Colophon({ children }: { children: ReactNode }) {
-  return <div className="www-colophon">{children}</div>
+export function Colophon({ children, xray, field }: { children: ReactNode; xray?: string; field?: string }) {
+  return (
+    <div className="www-colophon" data-xray={xray} data-field={field}>
+      {children}
+    </div>
+  )
 }
 
 /* ---------------------------------------------------------------- steps */

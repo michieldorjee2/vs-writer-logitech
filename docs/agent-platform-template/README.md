@@ -30,6 +30,23 @@ Ten of the 67 stored fields feed the template (`USED_FIELDS` in `content.ts`); t
 - **Homework through the page.** The facts after the hero's three are no longer a block in one section: one sits in each of where it fits, use cases, proof and the first 90 days. The stack, the investments and each use case carry the same "Our homework" tag. Agent 2's `stats` field feeds these, so the output contract is unchanged.
 - **Hero.** Full screen at 75% of the window, the account logo above the headline, "Personalized for" said once.
 
+## Edit mode on this template (live since 2 November 2026)
+
+Most of this page is template copy, the same on every page, which no page field can change. Edit mode (the booth's `?search=1` sidebar) therefore offers only the parts a stored field drives, and says in each comment popup what the part is made of (`AGENT_PLATFORM_EDIT` in `src/lib/xray-defaults.ts`):
+
+| Part | Fields |
+|---|---|
+| Account logo | `customerLogo` |
+| Account facts (hero pills, and one per section further down) | `intelStats` |
+| Agents at work, What they run today | `techStack` |
+| Their teams | `stakeholders` (roles only) |
+| Where they're investing | `investments` |
+| Use cases | `techStack`, `investments` (the ranking and the "Our homework" lines) |
+| Account team | `teamMembers` |
+| Small print | `footerTagline`, `footerLegal` |
+
+The request to Mark opens with "Page template: agent platform" and lists each commented part's fields (`src/lib/edit-payload.ts`). Mark's live-edit agent (`account_page_live_edit`, v1.4.1) knows this template, skips template copy with a reason, and sends each edit's `field` with its full new `value`. The page re-renders from that value while Mark works (`src/www/live-edit.ts`), so every place the field shows changes together; the rest of the page dims around the part in focus, and each changed element glows once. Mark's single `update_page` is still the save, and the page reloads from the CMS once it is published.
+
 ## The three drafts
 
 - [Agent 1: signal resolver](agent-1-signal-resolver.md). What the Gather step adds to the dossier's Account state, and the deterministic code-step logic for routing, state, scoring and the stack.
