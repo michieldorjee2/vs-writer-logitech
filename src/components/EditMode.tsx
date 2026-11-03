@@ -78,7 +78,7 @@ type ActiveCard = {
  * false on timeout/abort. */
 async function waitForRepublish(
   key: string,
-  since: string,
+  since: { published: string; lastModified?: string | null },
   signal: AbortSignal,
   deadlineMs = 120_000,
 ): Promise<boolean> {
@@ -86,7 +86,10 @@ async function waitForRepublish(
   await sleep(1500);
   while (Date.now() < end && !signal.aborted) {
     try {
-      const qs = `key=${encodeURIComponent(key)}&since=${encodeURIComponent(since)}`;
+      // lastModified moves on every save; published only on the first publish.
+      const qs = since.lastModified
+        ? `key=${encodeURIComponent(key)}&modifiedSince=${encodeURIComponent(since.lastModified)}`
+        : `key=${encodeURIComponent(key)}&since=${encodeURIComponent(since.published)}`;
       const res = await fetch(`/api/edit-status?${qs}`, { cache: 'no-store', signal });
       if (res.ok) {
         const data = (await res.json()) as { changed?: boolean };
@@ -490,6 +493,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     };
 
     const baselinePublished = page._metadata?.published ?? null;
+    const baselineModified = page._metadata?.lastModified ?? null;
     const pageKey = page._metadata?.key ?? null;
 
     const ac = new AbortController();
@@ -642,7 +646,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       setWillReload(true);
       setLiveStatus('Publishing… waiting for it to go live');
       if (pageKey && baselinePublished) {
-        await waitForRepublish(pageKey, baselinePublished, ac.signal);
+        await waitForRepublish(pageKey, { published: baselinePublished, lastModified: baselineModified }, ac.signal);
       } else {
         await sleep(2500);
       }
