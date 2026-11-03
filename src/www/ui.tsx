@@ -366,10 +366,24 @@ export function plain(text: string | null | undefined): string {
 type Size = 'display' | 'h2' | 'h3'
 
 /**
+ * How big a headline sized to its own length (`fit`) is drawn: the font size that fills about the
+ * same area whatever the length, so a short headline is set large and a long one steps down
+ * instead of running to five or six lines. The size goes as 1/√(characters), against the width
+ * of the copy column and the window's height (www.css `.www-display--fit`). 33 characters
+ * ("Optimizely at 6sense Breakthrough") is set as large as the display size allows, 74 about
+ * two thirds of that.
+ */
+export function fitVars(text: string): CSSProperties {
+  const n = Math.max(12, plain(text).length)
+  const r = 1 / Math.sqrt(n)
+  return { '--fit-w': (0.9 * r).toFixed(4), '--fit-h': (0.62 * r).toFixed(4) } as CSSProperties
+}
+
+/**
  * Headings. A `##run##` is the writer's emphasis: on most headings it becomes the accent
  * colour (the brand's "Clear" level). `extrude` turns it into the extruded run instead, via
  * optimizely.com's StackedHeading. The brand allows one extruded moment per design, so only the
- * offer's hero headline uses it.
+ * offer's hero headline uses it. `fit` sizes a display headline to its length (fitVars).
  */
 export function Heading({
   text,
@@ -377,6 +391,7 @@ export function Heading({
   size,
   align = 'left',
   extrude = false,
+  fit = false,
   className,
 }: {
   text: string
@@ -384,23 +399,26 @@ export function Heading({
   size?: Size
   align?: 'left' | 'center'
   extrude?: boolean
+  fit?: boolean
   className?: string
 }) {
   if (!text) return null
   const sz = size ?? (level === 'h1' ? 'display' : level)
+  const sizeClass = cn(`www-${sz}`, fit && 'www-display--fit')
+  const fitted = (heading: ReactNode) => (fit ? <div style={fitVars(text)}>{heading}</div> : heading)
   if (extrude && text.includes('##')) {
-    return (
+    return fitted(
       <StackedHeading
         text={text}
         as={level}
-        fontSizeOverrides={`www-${sz}`}
+        fontSizeOverrides={sizeClass}
         leadingOverrides="leading-[0.98]"
         alignment={align}
         animationMode="none"
         extrusionCount={5}
         colorScheme="inherit"
         className={cn('text-balance', className)}
-      />
+      />,
     )
   }
   const Tag = level
@@ -418,8 +436,8 @@ export function Heading({
         </span>
       ),
     )
-  return (
-    <Tag className={cn(`www-${sz}`, align === 'center' && 'text-center', 'text-balance', className)}>
+  return fitted(
+    <Tag className={cn(sizeClass, align === 'center' && 'text-center', 'text-balance', className)}>
       {lines.map((line, li) => (
         <span key={li} className={lines.length > 1 ? 'block' : undefined}>
           {line.split(/##(.+?)##/g).map((p, i) =>
@@ -433,7 +451,7 @@ export function Heading({
           )}
         </span>
       ))}
-    </Tag>
+    </Tag>,
   )
 }
 

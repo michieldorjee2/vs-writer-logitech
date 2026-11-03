@@ -270,9 +270,28 @@ body:has(.www-page) {
   }
 }
 /* The extruded run's top layer sits 0.25em up and right of its base (StackedHeading: four steps
-   of 0.063em), so the words after it start after the top layer instead of under it. */
+   of 0.063em), so the words after it start after the top layer instead of under it. The run
+   also takes more room above it and between its own lines, so its top layer clears the line
+   above (it ran into the descenders of "join" on the North Face page) and, when a long run
+   wraps, its second line clears the first. */
 .www-page h1 .origin-bottom-left {
   margin-right: 0.26em;
+  margin-top: 0.2em;
+  line-height: 1.14;
+}
+/* A headline sized to its own length (ui.tsx fitVars), against the copy column's width and the
+   window's height, and never larger than the display size: a short headline is set as before,
+   a long one steps down instead of running to seven lines and pushing the hero past the window
+   (Laura, 3 Nov). */
+.www-page .www-hero__copy {
+  container-type: inline-size;
+}
+.www-page .www-display--fit {
+  font-size: clamp(
+    32px,
+    min(calc(var(--fit-w) * 100cqi), calc(var(--fit-h) * 100svh), clamp(40px, min(6vw, 9.6vh), 112px)),
+    112px
+  );
 }
 /* The account's logo above the headline, and the page's one line of personalization. */
 .www-page .www-account {
@@ -750,9 +769,12 @@ body:has(.www-page) {
 }
 
 /* ---- offer: the invitation's opening paragraph ---------------------------------- */
+/* One column on the page's content width (Laura, 3 Nov: the two columns left one paragraph
+   alone in the left half on most pages). The opening line runs the full width; the paragraphs
+   under it are set a size up so a long line still reads, and stop at about 80 characters. */
 .www-page .www-intro {
-  font-size: clamp(16px, min(1.25vw, 2.2vh), 20px);
-  line-height: 1.5;
+  font-size: clamp(17px, min(1.5vw, 2.6vh), 25px);
+  line-height: 1.45;
 }
 .www-page .www-intro p:first-child {
   font-family: var(--font-headline), 'VC Nudge', sans-serif;
@@ -760,28 +782,10 @@ body:has(.www-page) {
   font-size: clamp(26px, min(3.2vw, 5.4vh), 56px);
   line-height: 1.06;
   text-wrap: balance;
-}
-/* Paragraphs renders a flex column; multi-column layout needs a block container. */
-.www-page .www-intro > div {
-  display: block;
+  margin-bottom: clamp(8px, 1.6vh, 16px);
 }
 .www-page .www-intro p + p {
-  margin-top: 0.8em;
-}
-.www-page .www-intro p:first-child {
-  margin-bottom: clamp(20px, 3.4vh, 36px);
-}
-@media (min-width: 992px) {
-  .www-page .www-intro > div {
-    columns: 2;
-    column-gap: 56px;
-  }
-  .www-page .www-intro p:first-child {
-    column-span: all;
-  }
-  .www-page .www-intro p {
-    break-inside: avoid;
-  }
+  max-width: 80ch;
 }
 
 /* ==========================================================================
