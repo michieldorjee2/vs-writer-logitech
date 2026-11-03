@@ -16,6 +16,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { showsWhoWeAre } from '../src/www/agent-platform/library'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 for (const line of fs.existsSync(path.join(ROOT, '.env.local')) ? fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8').split('\n') : []) {
@@ -40,7 +41,7 @@ query Pages($limit: Int!, $skip: Int!) {
   CompetitorComparisonPage(locale: en, limit: $limit, skip: $skip, orderBy: { _metadata: { published: DESC } }) {
     total
     items {
-      _metadata { url { default hierarchical } }
+      _metadata { key url { default hierarchical } }
       competitorName
       stakeholders { Name }
       teamMembers { Name }
@@ -49,13 +50,13 @@ query Pages($limit: Int!, $skip: Int!) {
 }`
 
 interface Item {
-  _metadata?: { url?: { default?: string | null; hierarchical?: string | null } | null } | null
+  _metadata?: { key?: string | null; url?: { default?: string | null; hierarchical?: string | null } | null } | null
   competitorName?: string | null
   stakeholders?: Array<{ Name?: string | null }> | null
   teamMembers?: Array<{ Name?: string | null }> | null
 }
 
-async function listPages(): Promise<Array<{ path: string; competitor: string | null; people: string[] }>> {
+async function listPages(): Promise<Array<{ path: string; key: string | null; competitor: string | null; people: string[] }>> {
   const out: Item[] = []
   for (let skip = 0; skip < 6000; skip += 100) {
     const r = await fetch(`https://cg.optimizely.com/content/v2?auth=${KEY}`, {
@@ -78,6 +79,7 @@ async function listPages(): Promise<Array<{ path: string; competitor: string | n
     seen.add(p)
     pages.push({
       path: p,
+      key: it._metadata?.key ?? null,
       competitor: it.competitorName && !/your current platform/i.test(it.competitorName) ? it.competitorName.trim() : null,
       // Person-shaped names only (some pages store a role group as a name), never an Optimizely
       // team member listed among the stakeholders (the AE may be named, N4).
@@ -106,7 +108,7 @@ function visible(html: string) {
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const SECTIONS = ['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta']
 
-async function check(p: { path: string; competitor: string | null; people: string[] }): Promise<string[]> {
+async function check(p: { path: string; key: string | null; competitor: string | null; people: string[] }): Promise<string[]> {
   const problems: string[] = []
   let res: Response
   try {
@@ -117,7 +119,10 @@ async function check(p: { path: string; competitor: string | null; people: strin
   if (res.status !== 200) return [`HTTP ${res.status}`]
   const html = await res.text()
   if (!/class="www-page[^"]*\bwww-ap\b/.test(html)) return ['not the agent platform page']
-  const missing = SECTIONS.filter((id) => !new RegExp(`<section id="${id}"`).test(html))
+  // Pages in WITHOUT_WHO_WE_ARE (Google) leave "Who we are" out, and must not show it.
+  const expected = showsWhoWeAre(p.key) ? SECTIONS : SECTIONS.filter((id) => id !== 'who')
+  const missing = expected.filter((id) => !new RegExp(`<section id="${id}"`).test(html))
+  if (!expected.includes('who') && /<section id="who"/.test(html)) problems.push('shows Who we are, which this page leaves out')
   if (missing.length) problems.push(`missing sections: ${missing.join(', ')}`)
   const title = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? ''
   if (!title.startsWith('Optimizely agent platform · Personalized for ')) problems.push(`title: ${title}`)
