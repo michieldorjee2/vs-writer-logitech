@@ -12,7 +12,11 @@
  *    without its legal suffix, and with a run-together name split ("OpenTable" -> "/open-table/").
  *    Only the URL can be filtered in Graph (the eyebrow and display name can't), and an account
  *    page whose URL is the company's name is that company's page. This finds 104.
- * The ID wins when both find a page (on 3 Nov they never disagree). Together: 110 of the 424
+ * 3. A regional office or division of an account with a page: the account's name followed only
+ *    by words like a country, a region or "Technologies", "Services", "Group" ("Microsoft
+ *    Australia" -> "/microsoft/", "Cisco Systems, Inc." -> "/cisco/"). Only those words: a name
+ *    that merely starts the same ("BILL" and the Bill & Melinda Gates Foundation) is not a parent.
+ * The ID wins, then the exact name, then the division. Together, on 3 Nov: about 125 of the 424
  * offer pages; the rest were written for companies with no account page (Dynatrace, Xero,
  * Splunk), and keep their initials.
  */
@@ -42,13 +46,29 @@ export function slugify(s: string): string {
     .toLowerCase()
 }
 
+/** Words that, after an account's name, make a regional office or a division of it. */
+const QUALIFIERS = new Set(
+  (
+    'inc incorporated corp corporation co company ltd limited llc plc ag ab asa sa nv bv gmbh se spa srl oy oyj pty ' +
+    'australia uk us usa america americas north south latin emea apac europe european asia pacific canada germany ' +
+    'deutschland france nl netherlands japan india nordics nordic benelux uae united kingdom states ireland spain italy ' +
+    'brazil mexico singapore hq global international worldwide technologies technology tech services systems group ' +
+    'holdings enterprise io digital'
+  ).split(' '),
+)
+
 /** The account page URLs a company could have, best first. */
 export function parentAccountUrls(companyName: string | null | undefined): string[] {
   const name = (companyName ?? '').trim()
   if (!name) return []
   const bare = withoutSuffix(name)
   const split = bare.replace(/([a-z])([A-Z])/g, '$1 $2')
-  return [...new Set([name, bare, split].map(slugify).filter(Boolean))].map((s) => `/${s}/`)
+  const exact = [name, bare, split].map(slugify).filter(Boolean)
+  // Then the account a regional office or division belongs to, the longest name first.
+  const words = slugify(name).split('-')
+  const division: string[] = []
+  for (let i = words.length - 1; i >= 1; i--) if (words.slice(i).every((w) => QUALIFIERS.has(w))) division.push(words.slice(0, i).join('-'))
+  return [...new Set([...exact, ...division])].map((s) => `/${s}/`)
 }
 
 /** A Salesforce account ID to look the account page up by, in both its forms (18 and 15 characters); none for a placeholder. */
