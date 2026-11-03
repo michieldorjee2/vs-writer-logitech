@@ -32,6 +32,8 @@ import { comparisonTableHtml, formatStatValue, PROOF_LOGOS, realContacts } from 
 import { isOfferExperience, wantsWwwDesign } from '../design'
 import { OFFER_SLOTS, readOffer, type ElementData } from '../offer-content'
 import { fitVars, plain, richToStacked } from '../ui'
+import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from '../../lib/parent-account'
+import { forgetParentAccounts, withParentAccount } from '../../../api/_lib/parent-account'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
 import { applyLiveField, changedLiveFields, LIVE_FIELDS, liveValue, mergeLive, resetLive } from '../live-edit'
@@ -55,6 +57,12 @@ function test(name: string, fn: () => void) {
     failures.push(name)
     console.log(`  FAIL ${name}\n       ${(err as Error).message.split('\n').join('\n       ')}`)
   }
+}
+
+/** An async test: queued, and run in order after the synchronous ones (the bundle is CommonJS, no top-level await). */
+const later: Array<[string, () => Promise<void>]> = []
+function testAsync(name: string, fn: () => Promise<void>) {
+  later.push([name, fn])
 }
 
 /** Visible text of server-rendered HTML: tags dropped, entities decoded, whitespace collapsed. */
@@ -646,6 +654,23 @@ test('the offer intro is one column on the content width, not two', () => {
   assert.ok(introRules.every((body) => !/\bcolumns\s*:/.test(body)), 'an intro rule still sets columns')
 })
 
+test('offer page: scenes on the same background share it instead of each padding out to 75% (offer pages only)', () => {
+  // Laura, 3 Nov. The account pages keep every scene at 75% (Michiel, 2 Nov).
+  assert.match(offerHtml, /class="www-page [^"]*www-offer/)
+  assert.ok(!accountHtml.includes('www-offer'))
+  const css = readFileSync('src/www/www.css', 'utf8')
+  assert.match(css, /\.www-offer \.www-scene\.www-scene--light \+ \.www-scene\.www-scene--light[\s\S]*?min-height: 0/)
+})
+
+test('booth chrome on a www page is solid, with no backdrop blur (it flickered while scrolling)', () => {
+  // Michiel, 3 Nov: "flickering for the admin sidebar when scrolling".
+  const css = readFileSync('src/styles/floating-sidebar.css', 'utf8')
+  const rule = css.match(/body:has\(\.www-page\) \.xray-sidebar,[\s\S]*?\{([^}]*)\}/)?.[1] ?? ''
+  assert.match(rule, /backdrop-filter: none/)
+  assert.match(rule, /background: #08251a/)
+  for (const sel of ['.xray-hud', '.edit-hud']) assert.ok(css.includes(`body:has(.www-page) ${sel}`), sel)
+})
+
 test('every FAQ question and answer is in the server HTML as FAQPage data (answers open on click)', () => {
   assert.equal(faqLd?.['@type'], 'FAQPage')
   assert.deepEqual(
@@ -659,6 +684,121 @@ test('an answer cannot break out of the FAQ script', () => {
   ;(page.composition.nodes[8].rows[1].columns[0].elements[0].component as Record<string, unknown>).Answer = '</script><b>x</b>'
   const html = renderToString(<OfferPage experience={page} />)
   assert.ok(!html.includes('</script><b>x</b>'))
+})
+
+console.log('\noffer page: the parent account (its logo)')
+
+test('the parent account page is looked up at the company name as a slug, best first', () => {
+  assert.deepEqual(parentAccountUrls('Ralph Lauren Corp.'), ['/ralph-lauren-corp/', '/ralph-lauren/'])
+  assert.deepEqual(parentAccountUrls('OpenTable'), ['/opentable/', '/open-table/'])
+  assert.deepEqual(parentAccountUrls('Wiz, Inc.'), ['/wiz-inc/', '/wiz/'])
+  assert.deepEqual(parentAccountUrls('Ziff Davis, LLC.'), ['/ziff-davis-llc/', '/ziff-davis/'])
+  assert.deepEqual(parentAccountUrls('Alvarez & Marsal'), ['/alvarez-and-marsal/'])
+  assert.deepEqual(parentAccountUrls('Volvo Cars'), ['/volvo-cars/'])
+  assert.deepEqual(parentAccountUrls('  '), [])
+  assert.deepEqual(parentAccountUrls(null), [])
+})
+
+test('of several account pages, the one at the best URL is the parent; none, no parent', () => {
+  const urls = parentAccountUrls('SAP SE')
+  const found = [
+    { url: '/sap/', logo: 'https://cdn.example.test/sap-short.svg', domain: 'sap.com' },
+    { url: '/sap-se/', logo: 'https://cdn.example.test/sap.svg', domain: 'sap.com' },
+  ]
+  assert.equal(pickParentAccount(urls, found)?.url, '/sap-se/')
+  assert.equal(pickParentAccount(urls, []), null)
+  assert.equal(pickParentAccount(urls, [{ url: '/sapient/', logo: null, domain: null }]), null)
+})
+
+test('the Salesforce account is the first link to the parent; a placeholder ID of zeros is none', () => {
+  assert.deepEqual(salesforceIds('0014J00000MyXyTQAV'), ['0014J00000MyXyTQAV', '0014J00000MyXyT'])
+  assert.deepEqual(salesforceIds('000000000000000AAA'), [])
+  assert.deepEqual(salesforceIds('000000000000000'), [])
+  assert.deepEqual(salesforceIds(''), [])
+  assert.deepEqual(salesforceIds(null), [])
+  assert.deepEqual(salesforceIds('not an id'), [])
+  // The page with the offer's account wins over the page at the company's name...
+  const urls = parentAccountUrls('Acme Inc.')
+  const byName = { url: '/acme/', logo: 'https://example.test/name.svg', domain: 'acme.com', salesforceAccountID: '0014J00000AAAAAQAA' }
+  const byId = { url: '/acme-group/', logo: 'https://example.test/id.svg', domain: 'acme.com', salesforceAccountID: '0014J00000BBBBBQAB' }
+  assert.equal(pickParentAccount(urls, [byName, byId], salesforceIds('0014J00000BBBBB'))?.url, '/acme-group/')
+  // ...and with no ID match, the name decides.
+  assert.equal(pickParentAccount(urls, [byName, byId], salesforceIds('0014J00000CCCCCQAC'))?.url, '/acme/')
+})
+
+test('a placeholder image is not a logo of the page\'s own', () => {
+  assert.equal(hasOwnLogo('https://placehold.co/96x96?text=AC'), false)
+  assert.equal(hasOwnLogo(null), false)
+  assert.equal(hasOwnLogo(''), false)
+  assert.equal(hasOwnLogo('https://cdn.brandfetch.io/domain/acme.com/type/icon'), true)
+})
+
+/** withParentAccount against a stand-in for Graph: nothing leaves the process. */
+async function withGraph<T>(answer: (urls: string[]) => Response | Promise<Response>, run: (asked: string[][]) => Promise<T>): Promise<T> {
+  const realFetch = globalThis.fetch
+  const realKey = process.env.GRAPH_AUTH_KEY
+  const asked: string[][] = []
+  process.env.GRAPH_AUTH_KEY = 'test-key'
+  globalThis.fetch = (async (_url: unknown, init?: { body?: string }) => {
+    const urls = JSON.parse(init?.body ?? '{}').variables?.urls ?? []
+    asked.push(urls)
+    return answer(urls)
+  }) as typeof fetch
+  forgetParentAccounts()
+  try {
+    return await run(asked)
+  } finally {
+    globalThis.fetch = realFetch
+    if (realKey === undefined) delete process.env.GRAPH_AUTH_KEY
+    else process.env.GRAPH_AUTH_KEY = realKey
+    forgetParentAccounts()
+  }
+}
+const graphAnswer = (items: unknown[]) => new Response(JSON.stringify({ data: { CompetitorComparisonPage: { items } } }), { status: 200 })
+const RL_LOGO = 'https://cdn.brandfetch.io/domain/ralphlauren.com/type/icon'
+
+testAsync('an offer page without a logo shows its parent account\'s, and its domain', async () => {
+  await withGraph(
+    () => graphAnswer([{ _metadata: { url: { hierarchical: '/ralph-lauren/' } }, customerLogo: RL_LOGO, brandDomain: 'ralphlauren.com' }]),
+    async (asked) => {
+      const page = { __typename: 'ABMExperience', companyName: 'Ralph Lauren Corp.', customerLogo: { default: null }, brandDomain: null }
+      const shown = (await withParentAccount(page)) as typeof page & { parentAccountUrl?: string }
+      assert.deepEqual(asked, [['/ralph-lauren-corp/', '/ralph-lauren/']])
+      assert.equal(shown.customerLogo.default, RL_LOGO)
+      assert.equal(shown.brandDomain, 'ralphlauren.com')
+      assert.equal(shown.parentAccountUrl, '/ralph-lauren/')
+      // ...and the hero draws it, above the headline, in place of the initials.
+      const html = renderToString(<OfferPage experience={{ ...fullOffer(), companyName: shown.companyName, customerLogo: shown.customerLogo }} />)
+      assert.ok(html.includes(`src="${RL_LOGO}"`), 'the hero does not draw the inherited logo')
+      // Asked once per company: the next page for the same company is answered from what was held.
+      await withParentAccount(page)
+      assert.equal(asked.length, 1)
+    },
+  )
+})
+
+testAsync('a page with its own logo keeps it; other experiences, no parent, or Graph failing: the page as it was', async () => {
+  const own = { __typename: 'ABMExperience', companyName: 'Ralph Lauren Corp.', customerLogo: { default: 'https://example.test/own.svg' }, brandDomain: 'ralphlauren.com' }
+  const person = { __typename: 'PersonExperience', companyName: 'Ralph Lauren Corp.', customerLogo: { default: null } }
+  const bare = { __typename: 'ABMExperience', companyName: 'Dynatrace', customerLogo: { default: null }, brandDomain: null }
+  await withGraph(
+    () => graphAnswer([]),
+    async (asked) => {
+      assert.equal(await withParentAccount(own), own)
+      assert.equal(await withParentAccount(person), person)
+      assert.equal(asked.length, 0, 'asked Graph for a page that needs nothing')
+      assert.equal(await withParentAccount(bare), bare)
+      assert.equal(asked.length, 1)
+    },
+  )
+  await withGraph(
+    () => new Response('nope', { status: 502 }),
+    async () => assert.equal(await withParentAccount(bare), bare),
+  )
+  await withGraph(
+    () => Promise.reject(new Error('network down')),
+    async () => assert.equal(await withParentAccount(bare), bare),
+  )
 })
 
 console.log('\nX-ray and Edit mode hooks')
@@ -1167,8 +1307,20 @@ test('the live store checks each value\'s shape and starts empty for the server'
 
 /* -------------------------------------------------------------------- result */
 
-console.log(`\n${passed} passed, ${failures.length} failed`)
-if (failures.length) {
-  console.log(failures.map((f) => `  - ${f}`).join('\n'))
-  process.exit(1)
-}
+void (async () => {
+  for (const [name, fn] of later) {
+    try {
+      await fn()
+      passed++
+      console.log(`  ok  ${name}`)
+    } catch (err) {
+      failures.push(name)
+      console.log(`  FAIL ${name}\n       ${(err as Error).message.split('\n').join('\n       ')}`)
+    }
+  }
+  console.log(`\n${passed} passed, ${failures.length} failed`)
+  if (failures.length) {
+    console.log(failures.map((f) => `  - ${f}`).join('\n'))
+    process.exit(1)
+  }
+})()

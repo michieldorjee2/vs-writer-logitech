@@ -4,6 +4,7 @@ import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experien
 import { graphItems } from '../src/lib/graph-envelope.js';
 import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
 import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
+import { withParentAccount } from './_lib/parent-account.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -275,7 +276,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const json = await queryGraph(authKey, query, { slug: s });
           const items = json?.data?.[typeName]?.items;
           if (items && items.length > 0) {
-            const shown = await withOfferSignup(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template }));
+            const shown = await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template })));
             res.setHeader('Cache-Control', signupCacheControl(shown, 's-maxage=60, stale-while-revalidate=300'));
             res.setHeader('X-Robots-Tag', 'noindex, nofollow');
             return res.status(200).json(shown);

@@ -411,6 +411,41 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   // Laura, 3 Nov: a long headline ran to seven lines and pushed the hero past the window, and
   // the extruded run sat on the descenders of the line above. The longest live headline (74
   // characters) and the North Face one she reported, on the page as served.
+  // Laura, 3 Nov: tighten the space after "What you'll leave with". Scenes on the same
+  // background follow each other at one scene's padding, not two scenes each padded to 75%.
+  await test('offer scenes on the same background are one gap apart, not two padded scenes', async () => {
+    const lp = await open(o.ctx, o.watch, url('/vb/sitecore-switch-volvo-cars', 'design=www'))
+    await lp.evaluate(async () => {
+      for (let y = 0; y < document.body.scrollHeight; y += 400) {
+        scrollTo(0, y)
+        await new Promise((r) => setTimeout(r, 40))
+      }
+    })
+    await lp.waitForTimeout(1200)
+    // No named helpers inside evaluate: tsx wraps them in a __name() the page doesn't have.
+    const gaps = await lp.evaluate(() => {
+      const scenes = [...document.querySelectorAll<HTMLElement>('section[data-scene][data-tone]')].map((s) => {
+        const kids = [...(s.firstElementChild as HTMLElement).children].filter((k) => (k as HTMLElement).offsetHeight)
+        return {
+          id: s.id,
+          tone: s.dataset.tone,
+          top: Math.min(...kids.map((k) => k.getBoundingClientRect().top)),
+          bottom: Math.max(...kids.map((k) => k.getBoundingClientRect().bottom)),
+        }
+      })
+      const out: Array<{ between: string; gap: number }> = []
+      for (let i = 1; i < scenes.length; i++) {
+        if (scenes[i].tone !== scenes[i - 1].tone) continue
+        out.push({ between: `${scenes[i - 1].id} → ${scenes[i].id}`, gap: Math.round(scenes[i].top - scenes[i - 1].bottom) })
+      }
+      return out
+    })
+    expect(gaps.length > 0, 'no two scenes on the same background on this page')
+    const limit = vp === 'desktop' ? 130 : 110
+    const wide = gaps.filter((g) => g.gap > limit)
+    expect(!wide.length, `gaps over ${limit}px: ${wide.map((g) => `${g.between} ${g.gap}px`).join(', ')}`)
+    await lp.close()
+  })
   for (const long of ['/vb/sitecore-switch-volvo-cars', '/vb/the-north-face-retail-cx-personalization-lab-ralph-lauren-corp']) {
     await test(`a long headline steps down instead of pushing the hero past the window (${long})`, async () => {
       const lp = await open(o.ctx, o.watch, url(long, 'design=www'))

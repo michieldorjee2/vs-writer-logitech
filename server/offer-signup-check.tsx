@@ -469,7 +469,9 @@ const ssr = source('server/ssr-handler.tsx');
 const ssrFetch = ssr.slice(ssr.indexOf('async function fetchExperienceContent('), ssr.indexOf('\n}\n', ssr.indexOf('async function fetchExperienceContent(')));
 const vite = source('vite.config.ts');
 const form = source('src/components/offer-signup/OfferSignupForm.tsx');
-const WRAP = /withOfferSignup\(normalizeExperienceItem\(/;
+// The sign-up form is the outer wrap; the parent account's logo (api/_lib/parent-account.ts) goes
+// on first, so the experience withOfferSignup marks "unsure" is the one served.
+const WRAP = /withOfferSignup\(await withParentAccount\(normalizeExperienceItem\(/;
 check('api/content.ts passes the experience through withOfferSignup and serves it with signupCacheControl', WRAP.test(content) && /signupCacheControl\(shown,/.test(content));
 check(
   'server/ssr-handler.tsx: fetchExperienceContent wraps, the /vb page is served with signupCacheControl',

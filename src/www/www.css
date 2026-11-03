@@ -431,6 +431,23 @@ body:has(.www-page) {
   .www-page .www-scene:not(.www-scene--compact):not(.www-scene--fill) {
     min-height: 75svh;
   }
+  /* On an offer page, scenes on the same background read as one band, so they don't each pad
+     out to three quarters of the window: a short scene centred in 75% left up to 280px of white
+     between "What you'll leave with" and the session (Laura, 3 Nov: tighten the space). Each
+     scene in a run of the same tone takes its own height. The account pages keep every scene
+     at 75% (Michiel, 2 Nov). */
+  .www-offer .www-scene.www-scene--light:has(+ .www-scene--light),
+  .www-offer .www-scene.www-scene--light + .www-scene.www-scene--light,
+  .www-offer .www-scene.www-scene--neutral:has(+ .www-scene--neutral),
+  .www-offer .www-scene.www-scene--neutral + .www-scene.www-scene--neutral {
+    min-height: 0;
+  }
+}
+/* ...and the second of two such scenes needs only a short top padding: the first's bottom
+   padding already separates them. */
+.www-offer .www-scene.www-scene--light + .www-scene.www-scene--light,
+.www-offer .www-scene.www-scene--neutral + .www-scene.www-scene--neutral {
+  padding-top: clamp(8px, 2.6vh, 32px);
 }
 .www-page .www-scene--compact {
   padding-block: clamp(44px, 7vh, 88px);
