@@ -44,6 +44,7 @@ import { isOfferId, OFFER_COOKIE, type ShownOffer } from '../src/lib/offer-looks
 import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
 import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 import { withParentAccount } from '../api/_lib/parent-account';
+import { withPageCopy } from '../api/_lib/page-copy';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -581,7 +582,8 @@ async function fetchPageContent(authKey: string, slug: string): Promise<FetchedP
   }
 
   if (!items || items.length === 0) return null;
-  return items[0];
+  // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
+  return withPageCopy(items[0]);
 }
 
 // ---------------------------------------------------------------------------

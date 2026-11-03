@@ -7,21 +7,25 @@
  * edits those fields only and knows the rest of the page is template copy (agent v1.4).
  */
 export const AGENT_PLATFORM_TEMPLATE_LINE =
-  'Page template: agent platform. Only the fields listed under each section can change; the rest of the page is template copy, the same on every page. Send each changed field as "field" with its full new value as "value".'
+  'Page template: agent platform. Only the fields listed under each section can change; labels and the proof stories stay as they are. Send each changed field as "field" with its full new value as "value". Fields starting "copy." are this page\'s own text, with no CMS property: their text now is under "Now"; send the new text as the value and it is saved with the edit, so don\'t put them in update_page.'
 
 export interface SectionComment {
   title: string
   feedback: string
-  /** CompetitorComparisonPage property keys behind the section (agent platform page only). */
+  /** CompetitorComparisonPage property keys or copy fields behind the section (agent platform page only). */
   fields?: string[]
+  /** The text each copy field shows now, by field ("copy.hero.h1" -> the headline). */
+  copy?: Record<string, string | string[]>
 }
 
 export function buildSuggestedEdit(comments: SectionComment[], template?: 'agent-platform'): string {
-  const blocks = comments.map((c) =>
-    template === 'agent-platform' && c.fields?.length
-      ? `Section: ${c.title}\nFields: ${c.fields.join(', ')}\nFeedback: ${c.feedback}`
-      : `Section: ${c.title}\nFeedback: ${c.feedback}`,
-  )
+  const blocks = comments.map((c) => {
+    if (template !== 'agent-platform' || !c.fields?.length) return `Section: ${c.title}\nFeedback: ${c.feedback}`
+    const now = Object.entries(c.copy ?? {})
+      .filter(([f]) => c.fields!.includes(f))
+      .map(([f, v]) => `  ${f} = ${JSON.stringify(v)}`)
+    return [`Section: ${c.title}`, `Fields: ${c.fields.join(', ')}`, ...(now.length ? ['Now:', ...now] : []), `Feedback: ${c.feedback}`].join('\n')
+  })
   const body = blocks.join('\n\n---\n\n')
   return template === 'agent-platform' ? `${AGENT_PLATFORM_TEMPLATE_LINE}\n\n${body}` : body
 }

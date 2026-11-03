@@ -30,22 +30,11 @@ import type { CSSProperties, ReactNode } from 'react'
 import { AccountMark, Colophon, CountUp, Eyebrow, Heading, HeroFrame, Reveal, Scene, StickyCta, WwwPage } from './ui'
 import { ConnectProvider, useConnect } from './ConnectModal'
 import { SCENE } from './account-helpers'
-import {
-  FIRST_90_DAYS,
-  GOVERNANCE_LINE,
-  IDENTITY_SENTENCE,
-  PLATFORM_LAYER,
-  PROOF_ASSETS,
-  PROOF_STORIES,
-  STATES,
-  THEMES,
-  TRUST_CENTER,
-  USE_CASES_CLOSING_LINE,
-  WHO_WE_ARE,
-  type ThemeId,
-} from './agent-platform/library'
+import { FIRST_90_DAYS, PLATFORM_LAYER, PROOF_ASSETS, PROOF_STORIES, STATES, THEMES, TRUST_CENTER, WHO_WE_ARE } from './agent-platform/library'
 import { fromLegacyPage, STATE_IDS, type AgentPlatformContent } from './agent-platform/content'
-import { useLivePage } from './live-edit'
+import { resolveCopy, stackPhrase } from './agent-platform/copy'
+import { setShownCopy, useLivePage } from './live-edit'
+import { useEffect } from 'react'
 import type { LifecycleState } from './agent-platform/library'
 
 export default function AgentPlatformPage({ page, search = '' }: { page: CompetitorComparisonPage; search?: string }) {
@@ -57,18 +46,28 @@ export default function AgentPlatformPage({ page, search = '' }: { page: Competi
   const review = params.get('review') === '1'
   const st = STATES[c.state.value]
   const people = c.rep.value.named
+  // The headlines and body text: the page's own copy where it has some (src/lib/page-copy.ts),
+  // the template's everywhere else. Edit mode reads what each part shows now from setShownCopy.
+  const copy = resolveCopy(c, live.pageCopy)
+  useEffect(() => {
+    setShownCopy(copy)
+  })
+  const t = (key: string) => {
+    const v = copy[key]
+    return typeof v === 'string' ? v : ''
+  }
   return (
     <ConnectProvider page={page} people={people} scheduleUrl={c.scheduleUrl} teamLabel="your Optimizely account team">
       <WwwPage className="www-ap">
         <div id="main-content">
-          <Hero c={c} />
-          <WhoWeAre />
-          <WhereItFits c={c} />
-          <SpeaksYourLanguage c={c} />
-          <UseCases c={c} />
-          <Proof c={c} />
-          <FirstNinetyDays c={c} />
-          <Close c={c} />
+          <Hero c={c} t={t} />
+          <WhoWeAre t={t} />
+          <WhereItFits c={c} t={t} />
+          <SpeaksYourLanguage c={c} t={t} checks={Array.isArray(copy['language.checks']) ? copy['language.checks'] : []} />
+          <UseCases c={c} t={t} />
+          <Proof c={c} t={t} />
+          <FirstNinetyDays c={c} t={t} />
+          <Close c={c} t={t} />
         </div>
         <StickyAsk text={c.stickyText} label={ctaLabel(st.primaryCta, people)} />
         {review && <ReviewLayer c={c} search={search} />}
@@ -82,9 +81,8 @@ function ctaLabel(base: string, people: Array<{ name: string }>) {
   return base === 'Arrange a session' && people.length ? `${base} with ${people[0].name.split(/\s+/)[0]}` : base
 }
 
-function fill(s: string, c: AgentPlatformContent, lead?: ThemeId) {
-  return s.replaceAll('{account}', c.account).replaceAll('{lead}', lead ? THEMES[lead].lead : '')
-}
+/** A part's text by its page-copy key (resolveCopy). */
+type T = (key: string) => string
 
 /* ================================================================== HOMEWORK */
 
@@ -132,7 +130,7 @@ function SceneHead({ children, note }: { children: ReactNode; note?: ReactNode }
 
 /* ======================================================================= HERO */
 
-function Hero({ c }: { c: AgentPlatformContent }) {
+function Hero({ c, t }: { c: AgentPlatformContent; t: T }) {
   const st = STATES[c.state.value]
   const { connect } = useConnect()
   const lead = c.themes.value[0]
@@ -151,12 +149,12 @@ function Hero({ c }: { c: AgentPlatformContent }) {
           <Reveal i={0} fx="scale" data-field="customerLogo">
             <AccountMark name={c.account} logo={c.logo} label={`Personalized for ${c.account}`} xray="account-logo" />
           </Reveal>
-          <Reveal i={1} data-xray="hero-title">
+          <Reveal i={1} data-xray="hero-title" data-field="copy.hero.h1">
             {/* Laura's state headlines are sentences, not slogans: one step down from display size. */}
-            <Heading text={st.h1} level="h1" size="h2" extrude />
+            <Heading text={t('hero.h1')} level="h1" size="h2" extrude />
           </Reveal>
-          <Reveal i={2} as="p" data-xray="hero-subtitle" className={cn('www-lead', dark ? 'text-white/85' : '')}>
-            {IDENTITY_SENTENCE} {fill(st.sub, c, lead)}
+          <Reveal i={2} as="p" data-xray="hero-subtitle" data-field="copy.hero.sub" className={cn('www-lead', dark ? 'text-white/85' : '')}>
+            {t('hero.sub')}
           </Reveal>
           {c.pills.value.length > 0 && (
             <Reveal i={3} as="div" data-xray="intel-stats" data-field="intelStats" className="flex flex-wrap gap-2">
@@ -217,24 +215,29 @@ function Hero({ c }: { c: AgentPlatformContent }) {
 
 /* ================================================================= WHO WE ARE */
 
-function WhoWeAre() {
+function WhoWeAre({ t }: { t: T }) {
   return (
     <Scene id="who">
       <div data-xray="who-we-are">
         <Reveal i={0}>
           <Eyebrow>Who we are</Eyebrow>
         </Reveal>
-        <Reveal i={1}>
-          <Heading text={WHO_WE_ARE.heading} className="max-w-[20ch]" />
+        <Reveal i={1} data-field="copy.who.heading">
+          <Heading text={t('who.heading')} className="max-w-[20ch]" />
         </Reveal>
         <div className="mt-[min(4vh,40px)] grid gap-3 md:grid-cols-3">
-          {WHO_WE_ARE.tiles.map((t, i) => (
-            <Reveal key={t.title} i={2 + i} className={cn('www-card', t.lead ? 'www-card--lime' : 'www-card--neutral')}>
+          {WHO_WE_ARE.tiles.map((tile, i) => (
+            <Reveal
+              key={tile.icon}
+              i={2 + i}
+              data-field={`copy.who.tile${i + 1}.title copy.who.tile${i + 1}.body`}
+              className={cn('www-card', tile.lead ? 'www-card--lime' : 'www-card--neutral')}
+            >
               <span className="www-icon-tile www-icon-tile--white">
-                <MaterialIcon name={t.icon} size="24" />
+                <MaterialIcon name={tile.icon} size="24" />
               </span>
-              <h3 className="www-h3 mt-5">{t.title}</h3>
-              <p className="www-body mt-2">{t.body}</p>
+              <h3 className="www-h3 mt-5">{t(`who.tile${i + 1}.title`)}</h3>
+              <p className="www-body mt-2">{t(`who.tile${i + 1}.body`)}</p>
             </Reveal>
           ))}
         </div>
@@ -261,7 +264,7 @@ function WhoWeAre() {
 
 /* ============================================================== WHERE IT FITS */
 
-function WhereItFits({ c }: { c: AgentPlatformContent }) {
+function WhereItFits({ c, t }: { c: AgentPlatformContent; t: T }) {
   const teamsFromPage = c.teams.from === 'derived'
   return (
     <Scene id="intel" tone="neutral">
@@ -271,11 +274,11 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
             <Reveal i={0}>
               <Eyebrow>Where it fits</Eyebrow>
             </Reveal>
-            <Reveal i={1} data-xray="intel-headline">
-              <Heading text="Keep your stack. Add the layer that ##connects it##." />
+            <Reveal i={1} data-xray="intel-headline" data-field="copy.fit.heading">
+              <Heading text={t('fit.heading')} />
             </Reveal>
-            <Reveal i={2} as="p" className="www-lead mt-4">
-              Each tool does one job well. Agents read across all of them and act.
+            <Reveal i={2} as="p" data-field="copy.fit.lead" className="www-lead mt-4">
+              {t('fit.lead')}
             </Reveal>
           </div>
           <Homework stat={c.stats.value[0]} source={c.statsSource.value} i={3} />
@@ -339,34 +342,33 @@ function WhereItFits({ c }: { c: AgentPlatformContent }) {
 
 /* ======================================================= SPEAKS YOUR LANGUAGE */
 
-function SpeaksYourLanguage({ c }: { c: AgentPlatformContent }) {
-  const lead = THEMES[c.themes.value[0]]
+function SpeaksYourLanguage({ c, t, checks }: { c: AgentPlatformContent; t: T; checks: string[] }) {
   return (
     <Scene id="language">
       <div data-xray="speaks-language" className="mx-auto max-w-[1000px]">
         <Reveal i={0}>
           <Eyebrow>Speaks your language</Eyebrow>
         </Reveal>
-        <Reveal i={1}>
-          <Heading text={`Generic AI guesses. Ours starts from how ${c.account} works.`} className="max-w-[22ch]" />
+        <Reveal i={1} data-field="copy.language.heading">
+          <Heading text={t('language.heading')} className="max-w-[22ch]" />
         </Reveal>
-        <Reveal i={2} fx="scale" className="www-ask mt-[min(4vh,32px)]">
+        <Reveal i={2} fx="scale" data-field="copy.language.question" className="www-ask mt-[min(4vh,32px)]">
           <span className="www-ask__who" aria-hidden="true">
             <MaterialIcon name="person" size="22" />
           </span>
-          <p className="www-ask__q">“{c.question.value}”</p>
+          <p className="www-ask__q">“{t('language.question')}”</p>
         </Reveal>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <Reveal i={3} fx="left" className="www-card www-card--neutral">
+          <Reveal i={3} fx="left" data-field="copy.language.generic" className="www-card www-card--neutral">
             <p className="www-caption">A generic AI tool</p>
-            <p className="www-lead mt-3 opacity-80">“Paste in your campaign data and I&apos;ll summarize it for you.”</p>
+            <p className="www-lead mt-3 opacity-80">“{t('language.generic')}”</p>
           </Reveal>
-          <Reveal i={4} fx="right" className="www-card www-card--dark">
+          <Reveal i={4} fx="right" data-field="copy.language.checks" className="www-card www-card--dark">
             <p className="www-caption flex items-center gap-1 text-white">
               <MaterialIcon name="bolt" size="18" /> Optimizely agent platform
             </p>
             <ul className="mt-3 flex flex-col gap-2" role="list">
-              {lead.checks.map((k) => (
+              {checks.map((k) => (
                 <li key={k} className="www-body flex items-start gap-2">
                   <MaterialIcon name="check" size="20" color="var(--color-primary-lfgreen)" /> {k}
                 </li>
@@ -394,7 +396,7 @@ function SpeaksYourLanguage({ c }: { c: AgentPlatformContent }) {
 
 /* ================================================================== USE CASES */
 
-function UseCases({ c }: { c: AgentPlatformContent }) {
+function UseCases({ c, t }: { c: AgentPlatformContent; t: T }) {
   const [a, b, ...rest] = c.themes.value
   const customer = c.state.value === 'customer'
   return (
@@ -404,25 +406,31 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
           <Reveal i={0}>
             <Eyebrow>Where agents start</Eyebrow>
           </Reveal>
-          <Reveal i={1}>
-            <Heading text={`Same platform. A starting point only ${c.account} would pick.`} className="max-w-[24ch]" />
+          <Reveal i={1} data-field="copy.usecases.heading">
+            <Heading text={t('usecases.heading')} className="max-w-[24ch]" />
           </Reveal>
         </SceneHead>
         <div className="grid gap-3 md:grid-cols-2">
           {[a, b].map((id, i) => {
-            const t = THEMES[id]
+            const theme = THEMES[id]
             const obs = c.observed.value[id]
             const why = c.why.value[id]
             return (
-              <Reveal key={id} i={3 + i} fx={i ? 'right' : 'left'} className="www-card www-card--white www-usecase">
+              <Reveal
+                key={id}
+                i={3 + i}
+                fx={i ? 'right' : 'left'}
+                data-field={`copy.usecases.${id}.title copy.usecases.${id}.body`}
+                className="www-card www-card--white www-usecase"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <span className="www-icon-tile">
-                    <MaterialIcon name={t.icon} size="26" />
+                    <MaterialIcon name={theme.icon} size="26" />
                   </span>
-                  <Badge label={`Priority · ${t.name}`} color="lfgreen" filled size="sm" />
+                  <Badge label={`Priority · ${theme.name}`} color="lfgreen" filled size="sm" />
                 </div>
-                <h3 className="www-h3 mt-5">{c.jobs.value[id] ?? t.job}</h3>
-                <p className="www-body mt-2">{t.body}</p>
+                <h3 className="www-h3 mt-5">{t(`usecases.${id}.title`)}</h3>
+                <p className="www-body mt-2">{t(`usecases.${id}.body`)}</p>
                 {obs ? (
                   <p className="www-why mt-4">
                     <HomeworkTag>Observed</HomeworkTag>
@@ -454,8 +462,8 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
                     </div>
                   )
                 )}
-                <p className="www-caption mt-4">Measured on: {t.measuredOn}</p>
-                <p className="www-small mt-auto pt-4 font-medium">Enabled by {t.enabledBy}</p>
+                <p className="www-caption mt-4">Measured on: {theme.measuredOn}</p>
+                <p className="www-small mt-auto pt-4 font-medium">Enabled by {theme.enabledBy}</p>
               </Reveal>
             )
           })}
@@ -464,18 +472,18 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
           <p className="www-caption mb-3">{customer ? 'Next on your roadmap' : 'Also on the platform'}</p>
           <div className="grid gap-3 md:grid-cols-3">
             {rest.slice(0, 3).map((id) => (
-              <div key={id} className="www-card www-card--white flex items-start gap-3">
+              <div key={id} data-field={`copy.usecases.${id}.strip.title copy.usecases.${id}.strip.body`} className="www-card www-card--white flex items-start gap-3">
                 <MaterialIcon name={THEMES[id].icon} size="24" />
                 <div>
-                  <p className="font-semibold">{THEMES[id].strip.title}</p>
-                  <p className="www-small mt-1">{THEMES[id].strip.body}</p>
+                  <p className="font-semibold">{t(`usecases.${id}.strip.title`)}</p>
+                  <p className="www-small mt-1">{t(`usecases.${id}.strip.body`)}</p>
                 </div>
               </div>
             ))}
           </div>
         </Reveal>
-        <Reveal i={6} as="p" className="www-lead mt-[min(3vh,24px)] max-w-[52ch]">
-          {USE_CASES_CLOSING_LINE}
+        <Reveal i={6} as="p" data-field="copy.usecases.closing" className="www-lead mt-[min(3vh,24px)] max-w-[52ch]">
+          {t('usecases.closing')}
         </Reveal>
       </div>
     </Scene>
@@ -484,7 +492,7 @@ function UseCases({ c }: { c: AgentPlatformContent }) {
 
 /* ====================================================================== PROOF */
 
-function Proof({ c }: { c: AgentPlatformContent }) {
+function Proof({ c, t }: { c: AgentPlatformContent; t: T }) {
   const trackB = STATES[c.state.value].proofTrack === 'B'
   return (
     <Scene id="proof">
@@ -493,11 +501,8 @@ function Proof({ c }: { c: AgentPlatformContent }) {
           <Reveal i={0}>
             <Eyebrow>{trackB ? 'Proof it works' : 'Worth reading'}</Eyebrow>
           </Reveal>
-          <Reveal i={1}>
-            <Heading
-              text={trackB ? 'Teams with many audiences are already ##running agents##.' : 'Where agent platforms are heading.'}
-              className="max-w-[22ch]"
-            />
+          <Reveal i={1} data-field="copy.proof.heading">
+            <Heading text={t('proof.heading')} className="max-w-[22ch]" />
           </Reveal>
         </SceneHead>
         <div className="grid gap-3 md:grid-cols-3">
@@ -532,12 +537,9 @@ function Proof({ c }: { c: AgentPlatformContent }) {
 
 /* ============================================================= FIRST 90 DAYS */
 
-function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
-  // "customer data", "marketing automation", but "CMS" and "ABM" stay capitals.
-  const word = (cat: string) => (cat === cat.toUpperCase() ? cat : cat.toLowerCase())
-  const cats = [...new Set(c.stack.value.filter((t) => !t.ours && t.category !== 'Tool').map((t) => word(t.category)))].slice(0, 3)
-  const stackPhrase = cats.length ? cats.join(cats.length > 2 ? ', ' : ' and ').replace(/, ([^,]*)$/, ' and $1') : 'the tools you already run'
-  const customer = c.state.value === 'customer'
+function FirstNinetyDays({ c, t }: { c: AgentPlatformContent; t: T }) {
+  // The Connect step names their stack by category when the page knows it (agent-platform/copy.ts).
+  const namesStack = stackPhrase(c) !== 'the tools you already run'
   return (
     <Scene id="migration" tone="neutral">
       <div data-xray="first-90-days">
@@ -545,8 +547,8 @@ function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
           <Reveal i={0}>
             <Eyebrow>The path forward</Eyebrow>
           </Reveal>
-          <Reveal i={1}>
-            <Heading text={customer ? 'Your next 90 days' : 'Your first 90 days'} />
+          <Reveal i={1} data-field="copy.ninety.heading">
+            <Heading text={t('ninety.heading')} />
           </Reveal>
         </SceneHead>
         {/* The path draws itself left to right as the scene arrives: each step's number, then a
@@ -558,24 +560,26 @@ function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
               as="li"
               i={2 + i}
               data-xray="timeline-phases"
-              data-field={s.body.includes('{stack}') ? 'techStack' : undefined}
+              data-field={`${s.body.includes('{stack}') ? 'techStack ' : ''}copy.ninety.step${i + 1}.title copy.ninety.step${i + 1}.body`}
               className="www-card www-card--white www-path__step flex flex-col"
             >
               <span className="flex items-center gap-3">
                 <span className="www-step-n">{i + 1}</span>
                 <span className="www-path__rule" aria-hidden="true" />
                 {/* The step that names their stack says where that came from. */}
-                {cats.length > 0 && s.body.includes('{stack}') && <HomeworkTag compact />}
+                {namesStack && s.body.includes('{stack}') && <HomeworkTag compact />}
               </span>
-              <h3 className="www-h3 mt-4">{s.step}</h3>
-              <p className="www-body mt-2">{s.body.replace('{stack}', stackPhrase)}</p>
+              <h3 className="www-h3 mt-4">{t(`ninety.step${i + 1}.title`)}</h3>
+              <p className="www-body mt-2">{t(`ninety.step${i + 1}.body`)}</p>
               <span className="www-role mt-auto">{s.role}</span>
             </Reveal>
           ))}
         </ol>
         <Reveal i={6} className="www-governance mt-3">
           <MaterialIcon name="verified_user" size="24" />
-          <p className="www-body flex-1">{GOVERNANCE_LINE}</p>
+          <p className="www-body flex-1" data-field="copy.ninety.governance">
+            {t('ninety.governance')}
+          </p>
           <a href={TRUST_CENTER} target="_blank" rel="noopener noreferrer" className="www-link">
             Trust Center →<span className="sr-only"> (opens in new tab)</span>
           </a>
@@ -587,11 +591,10 @@ function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
 
 /* ====================================================================== CLOSE */
 
-function Close({ c }: { c: AgentPlatformContent }) {
+function Close({ c, t }: { c: AgentPlatformContent; t: T }) {
   const st = STATES[c.state.value]
   const { connect, sent } = useConnect()
-  const [a, b] = c.themes.value
-  const reasons = [THEMES[a].reason, THEMES[b].reason, `It runs on the stack ${c.account} already has. Nothing gets replaced.`]
+  const reasons = [t('close.reason1'), t('close.reason2'), t('close.reason3')]
   const people = c.rep.value.named
   return (
     <section id="cta" data-scene data-tone="dark" className="www-scene www-scene--dark www-scene--fill">
@@ -601,12 +604,12 @@ function Close({ c }: { c: AgentPlatformContent }) {
             <Reveal i={0}>
               <p className="www-eyebrow www-eyebrow--on-dark">Next steps</p>
             </Reveal>
-            <Reveal i={1} data-xray="cta-title">
-              <Heading text={fill(st.closeHeading, c)} className="text-white" />
+            <Reveal i={1} data-xray="cta-title" data-field="copy.close.heading">
+              <Heading text={t('close.heading')} className="text-white" />
             </Reveal>
             <ol className="mt-[min(4vh,32px)] flex flex-col gap-3" role="list" data-xray="cta-description">
               {reasons.map((r, i) => (
-                <Reveal key={r} as="li" i={2 + i} fx="left" className="www-reason">
+                <Reveal key={i} as="li" i={2 + i} fx="left" data-field={`copy.close.reason${i + 1}`} className="www-reason">
                   <span className="www-reason__n">{i + 1}</span>
                   <span className="www-lead">{r}</span>
                 </Reveal>
@@ -652,7 +655,9 @@ function Close({ c }: { c: AgentPlatformContent }) {
         </div>
         {/* One call to action: the one-click ask. Scheduling and the contacts are in its panel. */}
         <Reveal i={5} className="www-close-band">
-          <p className="www-h2 text-white">{st.closeLine}</p>
+          <p className="www-h2 text-white" data-field="copy.close.line">
+            {t('close.line')}
+          </p>
           <Button variant="primary" className="www-btn" id="cta-connect-btn" onClick={() => connect('cta-connect-btn')}>
             <MaterialIcon name="bolt" size="20" /> {sent ? "You're all set" : ctaLabel(st.primaryCta, people)}
           </Button>

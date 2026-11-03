@@ -49,6 +49,8 @@ export function editKind(e: EditEvent): EditKind {
 export type LiveEvent =
   | { kind: 'agent'; ev: AgentEvent }
   | { kind: 'tool'; name: string; phase: 'call' | 'result'; ok?: boolean }
+  /** The page's own copy the route saved from Mark's edits (src/lib/page-copy.ts), by key. */
+  | { kind: 'copy'; saved: string[]; error?: string }
   | { kind: 'error'; message: string };
 
 /** Who is editing is not part of it: the route takes that from the session. */
@@ -56,10 +58,12 @@ export interface EditStreamPayload {
   company_name: string;
   company_slug: string;
   suggested_edit: string;
+  /** The page's CMS key, so the route can purge its cached copy after saving the page's own copy. */
+  page_key?: string | null;
 }
 
-/** Pull every complete top-level {…} object out of `buf`; return the rest. */
-function drainObjects(buf: string): { objects: AgentEvent[]; rest: string } {
+/** Pull every complete top-level {…} object out of `buf`; return the rest. (Also read by api/opal-edit-stream.ts, to save the page's own copy.) */
+export function drainObjects(buf: string): { objects: AgentEvent[]; rest: string } {
   const objects: AgentEvent[] = [];
   let depth = 0, inStr = false, esc = false, start = -1, consumed = 0;
   for (let i = 0; i < buf.length; i++) {
@@ -124,6 +128,7 @@ export async function* streamEdit(
         | { k: 'text'; t: string }
         | { k: 'tool'; name: string; phase: 'call' | 'result'; ok?: boolean }
         | { k: 'error'; message: string }
+        | { k: 'copy'; saved: string[]; error?: string }
         | { k: 'done' };
       try { msg = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
       if (msg.k === 'text') {
@@ -135,6 +140,8 @@ export async function* streamEdit(
         yield { kind: 'tool', name: msg.name, phase: msg.phase, ok: msg.ok };
       } else if (msg.k === 'error') {
         yield { kind: 'error', message: msg.message };
+      } else if (msg.k === 'copy') {
+        yield { kind: 'copy', saved: Array.isArray(msg.saved) ? msg.saved : [], error: msg.error };
       }
       // k:done — stream simply ends after
     }

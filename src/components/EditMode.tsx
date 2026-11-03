@@ -11,7 +11,8 @@ import {
   type XraySectionInfo,
 } from '../lib/xray-defaults';
 import { buildSuggestedEdit } from '../lib/edit-payload';
-import { applyLiveField, changedLiveFields, getLivePatch, mergeLive, resetLive } from '../www/live-edit';
+import { expandFields } from '../lib/page-copy';
+import { applyLiveField, changedLiveFields, getLivePatch, getShownCopy, liveFieldValue, mergeLive, resetLive } from '../www/live-edit';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { streamEdit, editKind, type EditKind } from '../lib/opal-edit-stream';
 import { animateSectionEdit } from '../lib/inplace-edit';
@@ -200,6 +201,13 @@ function flashField(field: string): HTMLElement[] {
 }
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+/** The text each copy field among `fields` shows now, for Mark (the page's own copy isn't in the CMS). */
+function copyNow(fields: string[], shown: Record<string, string | string[]>): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const f of fields) if (f.startsWith('copy.') && shown[f.slice(5)] !== undefined) out[f] = shown[f.slice(5)];
+  return out;
+}
 
 function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props) {
   // The agent platform template is mostly template copy: Edit mode offers only the parts a page
@@ -477,12 +485,21 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     // Map sectionId → display title (and, on the agent platform page, the fields behind it)
     const byId = new Map(sections.map((s) => [s.id, s]));
 
+    // On the agent platform page: each part's fields with its copy keys spread out, and the text
+    // they show now (what Mark edits from).
+    const shownCopy = agentPlatform ? getShownCopy() : {};
+    const fieldsOf = (sectionId: string) => (agentPlatform ? expandFields(byId.get(sectionId)?.fields, shownCopy) : byId.get(sectionId)?.fields);
+
     const suggestedEdit = buildSuggestedEdit(
-      entries.map(([sectionId, feedback]) => ({
-        title: byId.get(sectionId)?.title || sectionId,
-        feedback,
-        fields: byId.get(sectionId)?.fields,
-      })),
+      entries.map(([sectionId, feedback]) => {
+        const fields = fieldsOf(sectionId);
+        return {
+          title: byId.get(sectionId)?.title || sectionId,
+          feedback,
+          fields,
+          copy: agentPlatform && fields ? copyNow(fields, shownCopy) : undefined,
+        };
+      }),
       agentPlatform ? 'agent-platform' : undefined,
     );
 
@@ -490,6 +507,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       company_name: companyName,
       company_slug: slug,
       suggested_edit: suggestedEdit,
+      page_key: page._metadata?.key ?? null,
     };
 
     const baselinePublished = page._metadata?.published ?? null;
@@ -499,7 +517,9 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     const ac = new AbortController();
     liveAbort.current = ac;
     let editSeq = 0;
-    let committed = false; // update_page succeeded (tool result or done.saved)
+    let committed = false; // update_page succeeded (tool result or done.saved), or the page's own copy was saved
+    let cmsSaved = false; // update_page ran: the CMS republishes, so wait for it
+    let copySaved: string[] = []; // the page's own copy the route saved (no CMS republish to wait for)
     let sawDone = false;
     let sawError = false;
     let curFocus: string | null = null;
@@ -512,6 +532,16 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           setLiveStatus('Something went wrong');
           continue;
         }
+        if (e.kind === 'copy') {
+          if (e.error) {
+            setLiveError(`The new text couldn't be saved: ${e.error}`);
+          } else if (e.saved.length) {
+            copySaved = e.saved;
+            committed = true;
+            setLiveStatus('Changes saved');
+          }
+          continue;
+        }
         if (e.kind === 'tool') {
           if (e.name === 'get_page') {
             setLiveStatus(e.phase === 'call' ? 'Reading the page…' : 'Page loaded');
@@ -519,7 +549,10 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
             if (e.phase === 'call') setLiveStatus('Saving changes…');
             else {
               setLiveStatus('Changes saved');
-              if (e.ok !== false) committed = true;
+              if (e.ok !== false) {
+                committed = true;
+                cmsSaved = true;
+              }
             }
           } else if (e.name === 'take_webpage_screenshot') {
             setLiveStatus(e.phase === 'call' ? 'Taking a fresh screenshot…' : 'Screenshot captured');
@@ -645,7 +678,10 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     if (committed) {
       setWillReload(true);
       setLiveStatus('Publishing… waiting for it to go live');
-      if (pageKey && baselinePublished) {
+      if (!cmsSaved && copySaved.length) {
+        // Only the page's own copy changed: saved already, nothing to republish.
+        await sleep(600);
+      } else if (pageKey && baselinePublished) {
         await waitForRepublish(pageKey, { published: baselinePublished, lastModified: baselineModified }, ac.signal);
       } else {
         await sleep(2500);
@@ -661,13 +697,13 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
             for (const [sectionId] of entries) {
               const sec = byId.get(sectionId);
               const shown = mergeLive(page as unknown as Record<string, unknown>, getLivePatch());
-              const changed = changedLiveFields(sec?.fields ?? [], shown, saved);
+              const changed = changedLiveFields(expandFields(sec?.fields, shownCopy), shown, saved);
               if (!changed.length) continue;
               setFocusSectionId(sectionId);
               setLiveStatus(`Showing what changed: ${sec?.title ?? sectionId}`);
               scrollToSection(sectionId);
               await sleep(600);
-              for (const f of changed) applyLiveField(f, saved[f]);
+              for (const f of changed) applyLiveField(f, liveFieldValue(saved, f));
               await nextFrame();
               for (const f of changed) flashField(f);
               await sleep(1800);

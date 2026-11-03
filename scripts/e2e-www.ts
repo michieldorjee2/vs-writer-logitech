@@ -515,12 +515,13 @@ console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
     await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
   })
   const editable = await page.evaluate((secs) => secs.filter((s) => document.querySelector(s.selector)).map((s) => s.title), AGENT_PLATFORM_EDIT.map((s) => ({ selector: s.selector, title: s.title })))
-  await test(`Edit mode offers the ${editable.length} parts a page field drives, not the template copy`, async () => {
+  await test(`Edit mode offers ${editable.length} parts: the page fields and the page's own text, the headline included`, async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
     await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length === n, editable.length, { timeout: 8000 })
     const labels = await page.$$eval('[aria-label^="Leave feedback on "]', (els) => els.map((e) => e.getAttribute('aria-label')!.replace('Leave feedback on ', '')))
     expect(JSON.stringify(labels.sort()) === JSON.stringify([...editable].sort()), `offered: ${labels.join(', ')}`)
-    for (const t of ['Who we are', 'Proof', 'First 90 days', 'Hero headline']) expect(!labels.includes(t), `template copy offered: ${t}`)
+    // Michiel, 3 Nov: "things like H1 also weren't [editable]. Most content should be."
+    for (const t of ['Headline', 'Subtitle', 'Who we are', 'First 90 days', 'Close']) expect(labels.includes(t), `not offered: ${t}`)
   })
   await test('Mark\'s edit shows live: the section in focus is spotlit and the real page re-renders from the new value', async () => {
     await page.locator('[aria-label="Leave feedback on What they run today"]').click()
@@ -544,6 +545,57 @@ console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
     expect(/^Page template: agent platform\./.test(ask) && /Section: What they run today\nFields: techStack\nFeedback: They run Shopify Plus now/.test(ask), `sent: ${ask}`)
   })
   await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
+console.log('\nEdit mode on the agent platform page: the page\'s own text (the headline)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  // Mark rewrites the headline: a copy field, so no update_page. The route answers with the
+  // copy it saved (api/opal-edit-stream.ts), and Edit mode reloads without waiting for the CMS.
+  let sent: { suggested_edit?: string; page_key?: string } | null = null
+  let statusPolls = 0
+  const NEW_H1 = 'Your stack already knows. ##Agents act on it##.'
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    sent = route.request().postDataJSON()
+    const events = [
+      { type: 'section_focus', section: 'Headline' },
+      { type: 'edit', index: 1, section: 'Headline', target: 'headline', kind: 'text', status: 'applied', old: '', new: NEW_H1, field: 'copy.hero.h1', value: NEW_H1 },
+      { type: 'done', saved: true },
+    ]
+    const body =
+      events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') +
+      `data: ${JSON.stringify({ k: 'copy', saved: ['hero.h1'] })}\n\ndata: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
+  await ctx.route('**/api/edit-status**', (route) => {
+    statusPolls++
+    return route.fulfill({ json: { changed: false } })
+  })
+  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const before = await page.locator('#hero h1').innerText()
+  await test('Mark\'s new headline shows live, and Edit mode reloads without waiting for a CMS republish', async () => {
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.locator('[aria-label="Leave feedback on Headline"]').click()
+    await page.locator('.edit-popup__textarea').fill('Make it about what their stack already knows')
+    await page.locator('.edit-popup__btn--primary').click()
+    const started = Date.now()
+    const reloaded = page.waitForURL(/[?&]refresh=\d+/, { timeout: 20000 })
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForFunction(() => /Agents act on it/.test(document.querySelector('#hero h1')?.textContent || ''), null, { timeout: 15000 })
+    expect(!/Agents act on it/.test(before), 'the headline already said it')
+    await page.screenshot({ path: path.join(OUT, 'booth-edit-headline.png') })
+    await reloaded
+    expect(Date.now() - started < 15000, `the reload took ${Date.now() - started}ms`)
+    expect(statusPolls === 0, `polled the CMS republish ${statusPolls} times for a copy-only edit`)
+    const ask = sent?.suggested_edit ?? ''
+    expect(/Section: Headline\nFields: copy\.hero\.h1\nNow:\n {2}copy\.hero\.h1 = "[^"]+"\nFeedback: Make it about/.test(ask), `sent: ${ask}`)
+    expect(/^[a-f0-9]{32}$/i.test(sent?.page_key ?? ''), `no page key sent (${sent?.page_key})`)
+  })
+  await test('no errors, and nothing reached the real webhooks (headline edit)', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))
     expect(!watch.escaped.length, watch.escaped.join(', '))
   })

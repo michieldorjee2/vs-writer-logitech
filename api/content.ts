@@ -5,6 +5,7 @@ import { graphItems } from '../src/lib/graph-envelope.js';
 import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
 import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
 import { withParentAccount } from './_lib/parent-account.js';
+import { withPageCopy } from './_lib/page-copy.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -362,7 +363,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Page not found' });
     }
 
-    const page = items[0];
+    // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
+    const page = await withPageCopy(items[0]);
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');

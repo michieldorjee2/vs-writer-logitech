@@ -1,5 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireIdentity } from './_lib/auth.js';
+import { routeOf, savePageCopy } from './_lib/page-copy.js';
+import { purgePageCache } from './_lib/purge-page.js';
+import { copyEdits } from '../src/lib/page-copy.js';
+import { drainObjects } from '../src/lib/opal-edit-stream.js';
 
 /**
  * Live edit-mode streaming endpoint. Replaces the fire-and-forget
@@ -12,7 +16,13 @@ import { requireIdentity } from './_lib/auth.js';
  * Browser-bound SSE messages (one JSON object per `data:` line):
  *   { k: "text",  t }                      — raw agent text chunk (JSONL)
  *   { k: "tool",  name, phase, ok? }       — get_page / update_page activity
+ *   { k: "copy",  saved, error? }          — the page's own copy saved from Mark's edits
  *   { k: "done" }                          — execution complete
+ *
+ * The page's own copy (src/lib/page-copy.ts: the agent platform template's headlines and body
+ * text, which have no CMS property) is saved here: the route reads the same edits the browser
+ * animates, and at the end of the run keeps the applied edits on a "copy.<key>" field for this
+ * page (api/_lib/page-copy.ts), as the signed-in editor, then purges the page's cached copy.
  *   { k: "error", message }
  *
  * Signed-in Optimizely people only (api/_lib/auth.ts). The agent's
@@ -117,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const identity = requireIdentity(req, res);
   if (!identity) return;
-  const { company_name, company_slug, suggested_edit } = (req.body ?? {}) as Record<string, unknown>;
+  const { company_name, company_slug, suggested_edit, page_key } = (req.body ?? {}) as Record<string, unknown>;
   if (
     typeof company_name !== 'string' || !company_name.trim() ||
     typeof company_slug !== 'string' || !company_slug.trim() ||
@@ -143,6 +153,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   req.on('close', () => ac.abort());
 
   const toolNames = new Map<string, string>();
+  // Mark's events, read as the browser reads them, for the page's own copy.
+  let agentText = '';
+  const events: Array<Record<string, unknown>> = [];
+  const take = (t: string) => {
+    agentText += t;
+    const { objects, rest } = drainObjects(agentText);
+    agentText = rest;
+    events.push(...(objects as unknown as Array<Record<string, unknown>>));
+  };
+  const saveCopy = async () => {
+    const edits = copyEdits(events);
+    const keys = Object.keys(edits);
+    if (!keys.length) return;
+    try {
+      await savePageCopy(routeOf(company_slug), edits, identity.email);
+      if (typeof page_key === 'string' && /^[a-f0-9]{32}$/i.test(page_key)) await purgePageCache(page_key);
+      send({ k: 'copy', saved: keys });
+    } catch (err) {
+      console.error('[opal-edit-stream] page copy not saved:', err);
+      send({ k: 'copy', saved: [], error: err instanceof Error ? err.message : String(err) });
+    }
+  };
   try {
     for await (const ev of streamAgent(
       pat,
@@ -154,7 +186,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       switch (ev.eventType) {
         case 'response_chunk': {
           const t = str(p['content']) ?? str(p['chunk']);
-          if (t) send({ k: 'text', t });
+          if (t) {
+            send({ k: 'text', t });
+            take(t);
+          }
           break;
         }
         case 'tool_call': {
@@ -176,8 +211,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           break;
       }
     }
+    take('');
+    await saveCopy();
     send({ k: 'done' });
   } catch (err) {
+    // What Mark had applied before the failure is still the page's: keep it.
+    await saveCopy();
     send({ k: 'error', message: err instanceof Error ? err.message : String(err) });
   }
   res.end();

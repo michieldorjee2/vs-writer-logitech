@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { GraphResponse } from '../src/lib/graph-envelope.js';
 import { requireIdentity } from './_lib/auth.js';
+import { purgePageCache } from './_lib/purge-page.js';
 
 /**
  * Edit-mode polling endpoint. The FloatingSidebar hits this every 15s
@@ -21,14 +22,6 @@ import { requireIdentity } from './_lib/auth.js';
  */
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
-const VERCEL_API = 'https://api.vercel.com';
-/** Canonical Vercel IDs for this project. NOT the URL slugs — the
- *  invalidate-by-tags endpoint accepts the slug forms with a 200 OK
- *  but silently no-ops, which is exactly the kind of mistake that
- *  hides cache bugs in production. Pulled from
- *  `vercel api /v9/projects/aldus`. */
-const VERCEL_TEAM_ID = 'team_36vwk4IJMOpRMCwSOu1biPWG';
-const VERCEL_PROJECT_ID = 'prj_BXIHuf6RBP5le8pfrxPGhLnb6Uqf';
 
 const STATUS_QUERY = `
 query EditStatusByKey($key: String!) {
@@ -50,44 +43,6 @@ async function queryGraph(authKey: string, key: string) {
     body: JSON.stringify({ query: STATUS_QUERY, variables: { key } }),
   });
   return res.json() as Promise<GraphResponse<{ _metadata?: Record<string, unknown> }>>;
-}
-
-/** Best-effort Cache-Tag purge. Vercel's tag-based eviction is
- *  eventually consistent — the API returns 200 immediately but the
- *  edge nodes can take anywhere from a few seconds to a minute to
- *  drop the cached entry, which is too slow for the moment the
- *  visitor clicks Refresh right after the toast. The client also
- *  appends a `?refresh=…` cache-buster on that immediate click for
- *  a deterministic first-click experience; this purge then catches
- *  the slower paths (manual Cmd-R later, second-tab visitor, etc.). */
-async function purgePageCache(key: string): Promise<void> {
-  const token = process.env.VERCEL_TOKEN;
-  if (!token) {
-    console.warn('[api/edit-status] VERCEL_TOKEN not set — skipping cache purge');
-    return;
-  }
-
-  const url =
-    `${VERCEL_API}/v1/edge-cache/invalidate-by-tags` +
-    `?teamId=${encodeURIComponent(VERCEL_TEAM_ID)}` +
-    `&projectIdOrName=${encodeURIComponent(VERCEL_PROJECT_ID)}`;
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ tags: [`page:${key}`] }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.warn('[api/edit-status] purge failed', res.status, body.slice(0, 200));
-    }
-  } catch (err) {
-    console.warn('[api/edit-status] purge fetch error', err);
-  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

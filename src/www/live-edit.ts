@@ -12,6 +12,7 @@
  */
 import { useMemo, useSyncExternalStore } from 'react'
 import type { CompetitorComparisonPage } from '../lib/graph-types'
+import { copyKey, copyValue, type PageCopy } from '../lib/page-copy'
 
 type Patch = Record<string, unknown>
 
@@ -54,8 +55,19 @@ export function liveValue(field: LiveField, value: unknown): unknown | null {
   }
 }
 
-/** Applies one streamed field value. Returns false when the field or its value is not accepted. */
+/**
+ * Applies one streamed field value. Returns false when the field or its value is not accepted.
+ * A page-copy field ("copy.hero.h1", src/lib/page-copy.ts) goes into the page's `pageCopy`.
+ */
 export function applyLiveField(field: unknown, value: unknown): boolean {
+  const ck = copyKey(field)
+  if (ck) {
+    const v = copyValue(ck, value)
+    if (v === null) return false
+    patch = { ...patch, pageCopy: { ...((patch.pageCopy as PageCopy | undefined) ?? {}), [ck]: v } }
+    for (const l of listeners) l()
+    return true
+  }
   if (!isLiveField(field)) return false
   const v = liveValue(field, value)
   if (v === null && value !== null) return false
@@ -80,14 +92,24 @@ export function getLivePatch(): Patch {
  * mode replays these after the save, so a change Mark saved without narrating it still gets its
  * spotlight and its glow before the reload.
  */
-export function changedLiveFields(fields: readonly string[], shown: Record<string, unknown>, saved: Record<string, unknown>): LiveField[] {
+export function changedLiveFields(fields: readonly string[], shown: Record<string, unknown>, saved: Record<string, unknown>): string[] {
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
-  return fields.filter((f): f is LiveField => isLiveField(f) && !same(shown[f], saved[f]))
+  return fields.filter((f) => (isLiveField(f) || copyKey(f) !== null) && !same(liveFieldValue(shown, f), liveFieldValue(saved, f)))
 }
 
-/** The page with the live values on top. Pure, for the renderer and the tests. */
+/** A field's value on a page: a page property, or one entry of its `pageCopy`. */
+export function liveFieldValue(page: Record<string, unknown> | null | undefined, field: string): unknown {
+  const ck = copyKey(field)
+  if (ck) return (page?.pageCopy as PageCopy | undefined)?.[ck]
+  return page?.[field]
+}
+
+/** The page with the live values on top (its own copy merged key by key). Pure, for the renderer and the tests. */
 export function mergeLive<T extends object>(page: T, p: Patch): T {
-  return p === EMPTY || !Object.keys(p).length ? page : ({ ...page, ...p } as T)
+  if (p === EMPTY || !Object.keys(p).length) return page
+  const merged = { ...page, ...p } as Record<string, unknown>
+  if (p.pageCopy) merged.pageCopy = { ...((page as { pageCopy?: PageCopy }).pageCopy ?? {}), ...(p.pageCopy as PageCopy) }
+  return merged as T
 }
 
 const subscribe = (l: () => void) => {
@@ -103,4 +125,17 @@ export function useLivePage(page: CompetitorComparisonPage): CompetitorCompariso
     () => EMPTY,
   )
   return useMemo(() => mergeLive(page, p), [page, p])
+}
+
+/**
+ * The text each editable part of the agent platform page shows right now (agent-platform/copy.ts
+ * resolveCopy), set by the page after each render on the client. Edit mode sends it to Mark with
+ * a comment, since the page's own copy isn't in the CMS for Mark to read.
+ */
+let shownCopy: Record<string, string | string[]> = {}
+export function setShownCopy(copy: Record<string, string | string[]>): void {
+  shownCopy = copy
+}
+export function getShownCopy(): Record<string, string | string[]> {
+  return shownCopy
 }
