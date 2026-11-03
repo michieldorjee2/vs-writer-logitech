@@ -19,7 +19,7 @@ query GetFinServPage($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
+      _metadata { key url { default hierarchical } published lastModified }
       template
       PageTitle MetaDescription
       brand tagline audience targetSlug targetName
@@ -47,7 +47,7 @@ query GetPersonPage($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
+      _metadata { key url { default hierarchical } published lastModified }
       template
       PageTitle MetaDescription noIndex
       companySlug companyName personSlug crmContactId
@@ -90,7 +90,7 @@ query GetRetailPage($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
+      _metadata { key url { default hierarchical } published lastModified }
       template
       PageTitle MetaDescription CanonicalUrl { default }
       customerSlug customerDisplayName register monthStamp
@@ -135,7 +135,7 @@ query GetPage($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
+      _metadata { key url { default hierarchical } published lastModified }
       PageTitle MetaDescription
       eyebrow headline subheadline cta link { default }
       comparisonHeadline

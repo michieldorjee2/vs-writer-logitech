@@ -37,7 +37,7 @@ query EditStatusByKey($key: String!) {
     locale: en
   ) {
     items {
-      _metadata { key published }
+      _metadata { key published lastModified }
     }
   }
 }
@@ -99,6 +99,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const key = req.query.key;
   const since = req.query.since;
+  // Preferred baseline: the page's lastModified at submit. Graph keeps `published` at the first
+  // publish date when a page is saved again, so a `since` (published) baseline never changes.
+  const modifiedSince = req.query.modifiedSince;
   if (!key || typeof key !== 'string') {
     return res.status(400).json({ error: 'Missing key parameter' });
   }
@@ -116,7 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const sinceStr = typeof since === 'string' && since ? since : null;
-    const changed = !!sinceStr && meta.published !== sinceStr;
+    const modifiedStr = typeof modifiedSince === 'string' && modifiedSince ? modifiedSince : null;
+    const changed = modifiedStr ? !!meta.lastModified && meta.lastModified !== modifiedStr : !!sinceStr && meta.published !== sinceStr;
 
     if (changed) {
       // Awaited so the function isn't killed mid-flight by the
@@ -130,6 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       key: meta.key,
       published: meta.published,
+      lastModified: meta.lastModified ?? null,
       changed,
     });
   } catch (err) {

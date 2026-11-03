@@ -46,7 +46,7 @@ function baselineKey(): string {
  *  *this* exact piece of content regardless of slug shape) and the
  *  baseline `published` timestamp to compare against. We persist
  *  them together as JSON. */
-type Baseline = { key: string; published: string };
+type Baseline = { key: string; published: string; lastModified?: string | null };
 
 function readBaseline(): Baseline | null {
   try {
@@ -54,7 +54,7 @@ function readBaseline(): Baseline | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Baseline>;
     if (!parsed?.key || !parsed?.published) return null;
-    return { key: parsed.key, published: parsed.published };
+    return { key: parsed.key, published: parsed.published, lastModified: parsed.lastModified ?? null };
   } catch {
     return null;
   }
@@ -256,7 +256,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
     setNow(Date.now());
     const meta = page._metadata;
     if (meta?.key && meta?.published) {
-      writeBaseline({ key: meta.key, published: meta.published });
+      writeBaseline({ key: meta.key, published: meta.published, lastModified: meta.lastModified ?? null });
     }
     setEditsLanded(false);
   }, [page]);
@@ -276,9 +276,12 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
 
     const poll = async () => {
       try {
+        // lastModified moves on every save; published only on the first publish.
         const qs =
           'key=' + encodeURIComponent(baseline.key) +
-          '&since=' + encodeURIComponent(baseline.published);
+          (baseline.lastModified
+            ? '&modifiedSince=' + encodeURIComponent(baseline.lastModified)
+            : '&since=' + encodeURIComponent(baseline.published));
         const res = await fetch('/api/edit-status?' + qs, { cache: 'no-store' });
         if (!res.ok) return;
         const data = (await res.json()) as { changed?: boolean };

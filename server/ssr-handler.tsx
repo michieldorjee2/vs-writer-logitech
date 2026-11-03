@@ -190,7 +190,7 @@ const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 // lets us deploy before Graph finishes propagating the schema changes
 // and lights up the new fields automatically the moment they appear.
 const BASE_RETAIL_FIELDS = `
-  _metadata { key url { default hierarchical } published }
+  _metadata { key url { default hierarchical } published lastModified }
   template
   PageTitle MetaDescription CanonicalUrl { default }
   customerSlug customerDisplayName register monthStamp
@@ -275,7 +275,7 @@ query GetRetailPage($slug: String!) {
 // ---------------------------------------------------------------------------
 
 const FINSERV_FIELDS = `
-  _metadata { key url { default hierarchical } published }
+  _metadata { key url { default hierarchical } published lastModified }
   template
   PageTitle MetaDescription
   brand tagline audience targetSlug targetName
@@ -343,7 +343,7 @@ query GetPage($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
+      _metadata { key url { default hierarchical } published lastModified }
       PageTitle MetaDescription
       eyebrow headline subheadline cta link { default }
       comparisonHeadline
@@ -476,7 +476,7 @@ query GetPersonPage($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
+      _metadata { key url { default hierarchical } published lastModified }
       template
       PageTitle MetaDescription noIndex
       companySlug companyName personSlug crmContactId

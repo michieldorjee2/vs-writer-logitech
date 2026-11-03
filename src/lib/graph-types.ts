@@ -128,6 +128,8 @@ export interface CompetitorComparisonPage {
         key: string;
         url: { default: string; hierarchical: string };
         published: string;
+        /** Changes on every save; `published` stays the first publish date (Graph, Nov 2026). */
+        lastModified?: string | null;
     };
     PageTitle: string;
     MetaDescription: string;
