@@ -4,7 +4,7 @@
  * replacement for it. Eight sections, in her order:
  *
  *   1 hero              who we are → what agents do for them → their situation as the reason
- *   2 who we are        the same on every page
+ *   2 who we are        the same on every page, except those in WITHOUT_WHO_WE_ARE (Google)
  *   3 where it fits     their numbers, then teams / agent platform / their stack
  *   4 speaks your language  one leadership question; generic AI vs the agent platform
  *   5 use cases         two priority cards and a strip of three, from the five themes
@@ -42,6 +42,7 @@ import {
   TRUST_CENTER,
   USE_CASES_CLOSING_LINE,
   WHO_WE_ARE,
+  showsWhoWeAre,
   type ThemeId,
 } from './agent-platform/library'
 import { fromLegacyPage, STATE_IDS, type AgentPlatformContent } from './agent-platform/content'
@@ -62,7 +63,7 @@ export default function AgentPlatformPage({ page, search = '' }: { page: Competi
       <WwwPage className="www-ap">
         <div id="main-content">
           <Hero c={c} />
-          <WhoWeAre />
+          {showsWhoWeAre(page._metadata?.key) && <WhoWeAre />}
           <WhereItFits c={c} />
           <SpeaksYourLanguage c={c} />
           <UseCases c={c} />
