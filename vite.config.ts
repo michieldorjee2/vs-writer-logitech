@@ -452,7 +452,10 @@ function graphDevProxy(authKey: string, singleKey: string, devEmail: string | nu
           try {
             const item = await queryGraph(authKey, PAGE_QUERY, { slug: `/${slug}/` }, 'CompetitorComparisonPage')
             if (!item) return jsonResponse(res, 404, { error: 'Page not found' })
-            jsonResponse(res, 200, item)
+            // The page's own copy, as api/content.ts adds it (api/_lib/page-copy.ts).
+            for (const [k, v] of Object.entries(env)) if (!(k in process.env)) process.env[k] = v
+            const { withPageCopy } = await server.ssrLoadModule('/api/_lib/page-copy.ts')
+            jsonResponse(res, 200, await withPageCopy(item))
           } catch (err) {
             console.error('[graph-dev-proxy]', err)
             jsonResponse(res, 500, { error: 'Graph fetch failed' })

@@ -260,6 +260,10 @@ export interface CompetitorComparisonPage {
     }> | null;
 
 
+    // Not from Graph: the page's own copy on the agent platform template, kept beside the page
+    // (src/lib/page-copy.ts) and added to it by every path that serves it (api/_lib/page-copy.ts).
+    pageCopy?: Record<string, string | string[]> | null;
+
     // X-ray sales overlay — per-section data-source annotations.
     // When the CMS doesn't return entries, the component falls back to a
     // built-in default list keyed by the section id (see xray-defaults.ts).

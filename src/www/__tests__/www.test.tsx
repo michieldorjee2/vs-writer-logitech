@@ -36,7 +36,11 @@ import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from 
 import { forgetParentAccounts, withParentAccount } from '../../../api/_lib/parent-account'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
-import { applyLiveField, changedLiveFields, LIVE_FIELDS, liveValue, mergeLive, resetLive } from '../live-edit'
+import { applyLiveField, changedLiveFields, getLivePatch, LIVE_FIELDS, liveFieldValue, liveValue, mergeLive, resetLive } from '../live-edit'
+import { COPY_KEYS, COPY_THEMES, copyEdits, copyKey, copyValue, expandFields, readCopy } from '../../lib/page-copy'
+import { resolveCopy, templateCopy } from '../agent-platform/copy'
+import { readPageCopy, savePageCopy, useCopyStore, withPageCopy, type CopyStore } from '../../../api/_lib/page-copy'
+import opalEditStream from '../../../api/opal-edit-stream'
 import AgentPlatformPage from '../AgentPlatformPage'
 import offerBlueprint from '../../cms/blueprints/offer'
 import WwwAccountRoute from '../WwwAccountRoute'
@@ -686,6 +690,102 @@ test('an answer cannot break out of the FAQ script', () => {
   assert.ok(!html.includes('</script><b>x</b>'))
 })
 
+test('the request to Mark carries the text a copy field shows now', () => {
+  const ap = buildSuggestedEdit(
+    [{ title: 'Headline', feedback: 'Mention their beer brands', fields: ['copy.hero.h1'], copy: { 'copy.hero.h1': 'You already run Optimizely. Now put ##agents to work## on it.' } }],
+    'agent-platform',
+  )
+  assert.ok(ap.includes('Fields: copy.hero.h1'))
+  assert.ok(ap.includes('Now:\n  copy.hero.h1 = "You already run Optimizely. Now put ##agents to work## on it."'))
+  assert.ok(AGENT_PLATFORM_TEMPLATE_LINE.includes('copy.') && /update_page/.test(AGENT_PLATFORM_TEMPLATE_LINE))
+})
+
+/** A page-copy store in memory, for withPageCopy and the stream route. */
+function memoryStore(): CopyStore & { data: Map<string, unknown> } {
+  const data = new Map<string, unknown>()
+  return {
+    data,
+    get: (async (k: string) => (data.has(k) ? JSON.parse(JSON.stringify(data.get(k))) : null)) as CopyStore['get'],
+    set: (async (k: string, v: unknown) => {
+      data.set(k, JSON.parse(JSON.stringify(v)))
+      return 'OK'
+    }) as CopyStore['set'],
+  }
+}
+
+testAsync('page copy is kept per page and added to the account page wherever it is served', async () => {
+  const store = memoryStore()
+  useCopyStore(store)
+  try {
+    assert.deepEqual(await savePageCopy('/heineken/', { 'hero.h1': 'One', 'hero.eyebrow': 'no' } as never, 'pat@optimizely.com'), { 'hero.h1': 'One' })
+    await savePageCopy('heineken', { 'close.line': 'Two' }, 'sam@optimizely.com')
+    assert.deepEqual(await readPageCopy('/en/heineken/'), { 'hero.h1': 'One', 'close.line': 'Two' })
+    const saved = store.data.get('pc:heineken') as { edits: Array<{ key: string; by: string }> }
+    assert.deepEqual(saved.edits.map((e) => `${e.key} ${e.by}`), ['close.line sam@optimizely.com', 'hero.h1 pat@optimizely.com'])
+    const page = { __typename: 'CompetitorComparisonPage', _metadata: { url: { hierarchical: '/heineken/' } } }
+    assert.deepEqual(((await withPageCopy(page)) as { pageCopy?: unknown }).pageCopy, { 'hero.h1': 'One', 'close.line': 'Two' })
+    const other = { _metadata: { url: { hierarchical: '/cdw/' } } }
+    assert.equal(await withPageCopy(other), other, 'a page with no copy of its own is not the same object')
+    // A store that fails or hangs never fails the page.
+    useCopyStore({ get: (async () => { throw new Error('down') }) as CopyStore['get'], set: store.set })
+    assert.equal(await withPageCopy(page), page)
+    useCopyStore({ get: (() => new Promise(() => {})) as CopyStore['get'], set: store.set })
+    assert.equal(await withPageCopy(page), page)
+  } finally {
+    useCopyStore(undefined)
+  }
+})
+
+testAsync('the edit stream saves the copy edits Mark applied, as the signed-in editor, and says so', async () => {
+  const store = memoryStore()
+  useCopyStore(store)
+  const env = { ...process.env }
+  delete process.env.OPTIID_RELAY_SECRET
+  process.env.DEV_AUTH_EMAIL = 'editor@optimizely.com'
+  process.env.OPAL_PAT = 'test-pat'
+  delete process.env.VERCEL_TOKEN
+  const realFetch = globalThis.fetch
+  const asked: string[] = []
+  // Mark's stream: the headline edit split across two chunks, a skipped edit, a CMS field, done.
+  const chunks = [
+    '{"type":"section_focus","section":"Headline"}{"type":"edit","section":"Headline","field":"copy.hero.h1","value":"Heineken, meet ',
+    '##your agents##.","status":"applied"}{"type":"edit","section":"Close","field":"copy.close.line","value":"No","status":"skipped"}',
+    '{"type":"edit","section":"Account facts","field":"intelStats","value":[]}{"type":"done","saved":true}',
+  ]
+  globalThis.fetch = (async (url: unknown) => {
+    asked.push(String(url))
+    const body = chunks.map((c) => `data: ${JSON.stringify({ event_type: 'response_chunk', payload: { content: c } })}\n\n`).join('')
+    return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+  }) as typeof fetch
+  const written: string[] = []
+  const req = { method: 'POST', cookies: {}, headers: {}, on: () => {}, body: { company_name: 'Heineken', company_slug: '/heineken', suggested_edit: 'Section: Headline', page_key: 'a'.repeat(32) } }
+  const res = {
+    statusCode: 200,
+    setHeader: () => {},
+    status(c: number) { this.statusCode = c; return this },
+    json(b: unknown) { written.push(JSON.stringify(b)); return this },
+    write(chunk: string) { written.push(chunk); return true },
+    end() {},
+  }
+  try {
+    await opalEditStream(req as never, res as never)
+    assert.equal(asked.length, 1, 'the route called something besides the agent')
+    assert.ok(asked[0].includes('/stream-execute'))
+    const saved = store.data.get('pc:heineken') as { values: Record<string, unknown>; edits: Array<{ by: string }> }
+    assert.deepEqual(saved?.values, { 'hero.h1': 'Heineken, meet ##your agents##.' })
+    assert.equal(saved.edits[0].by, 'editor@optimizely.com')
+    const msgs = written.filter((w) => w.startsWith('data:')).map((w) => JSON.parse(w.slice(5)))
+    const copy = msgs.find((m) => m.k === 'copy')
+    assert.deepEqual(copy, { k: 'copy', saved: ['hero.h1'] })
+    assert.equal(msgs.at(-1).k, 'done')
+    assert.ok(msgs.findIndex((m) => m.k === 'copy') < msgs.length - 1, 'copy comes before done')
+  } finally {
+    globalThis.fetch = realFetch
+    process.env = env
+    useCopyStore(undefined)
+  }
+})
+
 console.log('\noffer page: the parent account (its logo)')
 
 test('the parent account page is looked up at the company name as a slug, best first', () => {
@@ -693,6 +793,14 @@ test('the parent account page is looked up at the company name as a slug, best f
   assert.deepEqual(parentAccountUrls('OpenTable'), ['/opentable/', '/open-table/'])
   assert.deepEqual(parentAccountUrls('Wiz, Inc.'), ['/wiz-inc/', '/wiz/'])
   assert.deepEqual(parentAccountUrls('Ziff Davis, LLC.'), ['/ziff-davis-llc/', '/ziff-davis/'])
+  // A regional office or a division: the account's name, then only qualifier words.
+  assert.deepEqual(parentAccountUrls('Microsoft Australia'), ['/microsoft-australia/', '/microsoft/'])
+  assert.deepEqual(parentAccountUrls('Tata Consultancy Services UK Limited').slice(-2), ['/tata-consultancy-services/', '/tata-consultancy/'])
+  assert.ok(parentAccountUrls('Cisco Systems, Inc.').includes('/cisco/'))
+  // ...but not a name that only starts the same.
+  assert.deepEqual(parentAccountUrls('BILL'), ['/bill/'])
+  assert.ok(!parentAccountUrls('Bill Payments Platform').includes('/bill/'))
+  assert.ok(!parentAccountUrls('Microsoft Game Stack').includes('/microsoft/'))
   assert.deepEqual(parentAccountUrls('Alvarez & Marsal'), ['/alvarez-and-marsal/'])
   assert.deepEqual(parentAccountUrls('Volvo Cars'), ['/volvo-cars/'])
   assert.deepEqual(parentAccountUrls('  '), [])
@@ -1244,22 +1352,104 @@ test('the one-click ask: buttons, no form anywhere on the page', () => {
 
 console.log('\nEdit mode on the agent platform page')
 
-test('Edit mode offers the parts a page field drives, each with its fields, all on the page', () => {
+test('Edit mode offers the parts a page field drives and the page\'s own text, each on the page', () => {
   const hero = apHtml.slice(0, apHtml.indexOf('</section>'))
+  const shown = templateCopy(fromLegacyPage(stackPage({ intelStats: stackPage().intelStats?.filter((x) => !/Optimizely/.test(x.Label)) })))
+  const marked = new Set([...apHtml.matchAll(/data-field="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)))
   for (const sec of AGENT_PLATFORM_EDIT) {
-    const id = sec.selector.match(/data-xray="([^"]+)"/)![1]
-    assert.ok((sec.selector.startsWith('#hero') ? hero : apHtml).includes(`data-xray="${id}"`), `no hook for ${sec.title} (${id})`)
-    assert.ok(sec.fields.length && sec.fields.every((f) => USED_FIELDS.some((u) => u.field === f)), `${sec.title}: a field this template does not use`)
-    assert.ok(sec.fields.every((f) => (LIVE_FIELDS as readonly string[]).includes(f)), `${sec.title}: a field the live preview cannot show`)
+    const hook = sec.selector.match(/data-xray="([^"]+)"/)?.[1]
+    const prefix = sec.selector.match(/data-field\^?="([^"]+)"/)?.[1]
+    if (hook) assert.ok((sec.selector.startsWith('#hero') ? hero : apHtml).includes(`data-xray="${hook}"`), `no hook for ${sec.title} (${hook})`)
+    else assert.ok(prefix && apHtml.includes(`data-field="${prefix}`), `${sec.title}: nothing on the page matches ${sec.selector}`)
+    const fields = expandFields(sec.fields, shown)
+    assert.ok(fields.length, `${sec.title}: no fields`)
+    for (const f of fields) {
+      if (copyKey(f)) assert.ok(marked.has(f), `${sec.title}: ${f} is not marked on the page`)
+      else {
+        assert.ok(USED_FIELDS.some((u) => u.field === f), `${sec.title}: ${f} is a field this template does not use`)
+        assert.ok((LIVE_FIELDS as readonly string[]).includes(f), `${sec.title}: ${f} is a field the live preview cannot show`)
+      }
+    }
     assert.ok(sec.hint.length > 10, `${sec.title} has no hint`)
   }
-  // Template copy is not offered: no field could change it.
-  for (const t of ['Who we are', 'Proof', 'First 90 days', 'Hero headline']) assert.ok(!AGENT_PLATFORM_EDIT.some((s) => s.title === t), t)
+  // Michiel, 3 Nov: the H1 and most content are editable; labels are not, nor the proof stories.
+  for (const t of ['Headline', 'Subtitle', 'Who we are', 'Where it fits', 'Speaks your language', 'Proof headline', 'First 90 days', 'Close'])
+    assert.ok(AGENT_PLATFORM_EDIT.some((s) => s.title === t), `${t} is not offered`)
+  const offered = AGENT_PLATFORM_EDIT.flatMap((s) => expandFields(s.fields, shown))
+  assert.ok(!offered.some((f) => /eyebrow|caption|button|story|stories/i.test(f)), 'a label or a proof story is offered')
 })
 
 test('every field a live edit can change has the page elements that render it marked', () => {
   const marked = new Set([...apSearch('?state=customer').matchAll(/data-field="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)))
   for (const f of LIVE_FIELDS) assert.ok(marked.has(f), `no data-field="${f}" on the page`)
+})
+
+test('page copy: only the template\'s keys, plain text within limits, lists for the checklist', () => {
+  assert.deepEqual([...COPY_THEMES], THEME_ORDER, 'COPY_THEMES is THEME_ORDER')
+  assert.equal(copyKey('copy.hero.h1'), 'hero.h1')
+  assert.equal(copyKey('copy.usecases.geo.title'), 'usecases.geo.title')
+  assert.equal(copyKey('copy.usecases.nonsense.title'), null)
+  assert.equal(copyKey('copy.hero.eyebrow'), null)
+  assert.equal(copyKey('headline'), null)
+  assert.equal(copyValue('hero.h1', '  Heineken, meet <b>your</b> ##agents##.  '), 'Heineken, meet your ##agents##.')
+  assert.equal(copyValue('hero.h1', ''), null)
+  assert.equal(copyValue('hero.h1', 'x'.repeat(701)), null)
+  assert.equal(copyValue('hero.h1', ['a']), null)
+  assert.deepEqual(copyValue('language.checks', ['One', ' Two ', '']), ['One', 'Two'])
+  assert.equal(copyValue('language.checks', 'One'), null)
+  assert.deepEqual(readCopy({ 'hero.h1': 'Ok', 'hero.eyebrow': 'no', 'fit.lead': 3, __proto__x: 'no' }), { 'hero.h1': 'Ok' })
+  assert.deepEqual(readCopy(null), {})
+  // What the stream route keeps from Mark's events: applied copy edits, the last per key.
+  assert.deepEqual(
+    copyEdits([
+      { type: 'edit', field: 'copy.hero.h1', value: 'First', status: 'applied' },
+      { type: 'edit', field: 'copy.hero.h1', value: 'Second' },
+      { type: 'edit', field: 'copy.close.line', value: 'Skipped', status: 'skipped' },
+      { type: 'edit', field: 'intelStats', value: [] },
+      { type: 'edit', field: 'copy.hero.badkey', value: 'No' },
+      { type: 'done', saved: true },
+    ]),
+    { 'hero.h1': 'Second' },
+  )
+  assert.deepEqual(expandFields(['techStack', 'copy.close.*'], { 'close.heading': 'x', 'close.line': 'y', 'hero.h1': 'z' }), ['techStack', 'copy.close.heading', 'copy.close.line'])
+  assert.ok(COPY_KEYS.length > 20)
+})
+
+test('the agent platform page draws its own copy where it has some, the template\'s everywhere else', () => {
+  const page = { ...stackPage(), pageCopy: { 'hero.h1': 'Heineken, meet ##your agents##.', 'ninety.step1.title': 'Plug in', 'language.checks': ['Knows the brand book'] } }
+  const html = renderToString(<AgentPlatformPage page={page as CompetitorComparisonPage} />)
+  const text = textOf(html)
+  assert.ok(html.includes('Heineken, meet '), 'the own headline is not drawn')
+  assert.deepEqual([...extrudedRuns(html)], ['your agents'], 'the own headline\'s run is not the extruded one')
+  assert.ok(text.includes('Plug in') && !text.includes('Connect Link'), 'the own step title is not drawn')
+  assert.ok(text.includes('Knows the brand book'))
+  // Everything else is the template's.
+  const c = fromLegacyPage(page as CompetitorComparisonPage)
+  const base = templateCopy(c)
+  assert.ok(text.includes(String(base['who.heading']).replace(/##/g, '')))
+  // Every part of the template's copy the page shows is marked, so Edit mode can spotlight and glow it.
+  const marked = new Set([...html.matchAll(/data-field="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)))
+  for (const k of Object.keys(base)) assert.ok(marked.has(`copy.${k}`), `copy.${k} is not marked on the page`)
+  // An own value for a key the template doesn't have is ignored.
+  assert.equal(resolveCopy(c, { 'nope.key': 'x' } as never)['nope.key'], undefined)
+})
+
+test('a live copy edit re-renders the page from the new text; the replay compares saved copy', () => {
+  resetLive()
+  assert.ok(applyLiveField('copy.hero.h1', 'Live ##headline## now.'))
+  assert.ok(!applyLiveField('copy.hero.h1', ''), 'an empty headline is accepted')
+  assert.ok(!applyLiveField('copy.hero.eyebrow', 'x'), 'a label is accepted')
+  const shown = mergeLive(stackPage() as unknown as Record<string, unknown>, getLivePatch())
+  assert.equal(liveFieldValue(shown, 'copy.hero.h1'), 'Live ##headline## now.')
+  const html = renderToString(<AgentPlatformPage page={shown as unknown as CompetitorComparisonPage} />)
+  assert.deepEqual([...extrudedRuns(html)], ['headline'])
+  assert.ok(html.includes('Live ') && html.includes(' now.'))
+  // The page's other own copy stays when one key is edited live.
+  const withOwn = mergeLive({ pageCopy: { 'close.line': 'Kept' } } as Record<string, unknown>, getLivePatch())
+  assert.deepEqual(withOwn.pageCopy, { 'close.line': 'Kept', 'hero.h1': 'Live ##headline## now.' })
+  const saved = { pageCopy: { 'hero.h1': 'Saved headline.', 'close.line': 'Kept' } }
+  assert.deepEqual(changedLiveFields(['copy.hero.h1', 'copy.close.line', 'techStack'], withOwn, saved), ['copy.hero.h1'])
+  resetLive()
 })
 
 test('the request to Mark names the template and the fields behind each commented section', () => {
