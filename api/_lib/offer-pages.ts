@@ -4,6 +4,8 @@
  * of them are read (a few dozen today) and sorted here.
  */
 import type { OfferPage } from '../../src/lib/offer-looks.js';
+import { hasOwnLogo } from '../../src/lib/parent-account.js';
+import { parentAccountsOf, parentKey } from './parent-account.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 const PAGE_SIZE = 100;
@@ -16,6 +18,7 @@ query OfferPages($limit: Int!, $skip: Int!) {
     items {
       _metadata { url { hierarchical } published }
       companyName
+      salesforceAccountID
       brandDomain
       customerLogo { default }
       componentPlan
@@ -27,6 +30,7 @@ query OfferPages($limit: Int!, $skip: Int!) {
 type Item = {
   _metadata: { url: { hierarchical: string | null }; published: string | null };
   companyName: string | null;
+  salesforceAccountID?: string | null;
   brandDomain: string | null;
   customerLogo: { default: string | null } | null;
   componentPlan: string | null;
@@ -43,6 +47,10 @@ export const offerIdOf = (plan: string | null): string | null => {
 };
 
 let held: { at: number; byOffer: Map<string, OfferPage[]> } | null = null;
+/** For the checks: forget what was held. */
+export function forgetOfferPages(): void {
+  held = null;
+}
 const HOLD_MS = 60_000;
 
 export async function offerPagesByOffer(): Promise<Map<string, OfferPage[]>> {
@@ -50,6 +58,8 @@ export async function offerPagesByOffer(): Promise<Map<string, OfferPage[]>> {
   const authKey = process.env.GRAPH_AUTH_KEY;
   const byOffer = new Map<string, OfferPage[]>();
   if (!authKey) return byOffer;
+  // The pages with no logo of their own, and their Salesforce accounts, for the parent lookup below.
+  const orphans: Array<{ page: OfferPage; salesforceAccountID: string | null }> = [];
   for (let skip = 0; skip < MAX_ITEMS; skip += PAGE_SIZE) {
     const r = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
       method: 'POST',
@@ -64,16 +74,28 @@ export async function offerPagesByOffer(): Promise<Map<string, OfferPage[]>> {
       const route = (item._metadata.url.hierarchical || '').replace(/^\/+|\/+$/g, '');
       if (!offerId || !route || !item.companyName) continue;
       const list = byOffer.get(offerId) ?? [];
-      list.push({
+      const own = item.customerLogo?.default ?? null;
+      const page: OfferPage = {
         route,
         companyName: item.companyName,
         domain: item.brandDomain,
-        logoUrl: item.customerLogo?.default ?? null,
+        logoUrl: hasOwnLogo(own) ? own : null,
         published: item._metadata.published,
-      });
+      };
+      list.push(page);
+      if (!page.logoUrl) orphans.push({ page, salesforceAccountID: item.salesforceAccountID ?? null });
       byOffer.set(offerId, list);
     }
     if (items.length < PAGE_SIZE || skip + PAGE_SIZE >= (body.data?.ABMExperience?.total ?? 0)) break;
+  }
+  // As on the page itself (api/_lib/parent-account.ts): a page without a logo of its own shows its
+  // parent account page's, so the search page's list matches what the page shows.
+  const parents = await parentAccountsOf(orphans.map((o) => ({ companyName: o.page.companyName, salesforceAccountID: o.salesforceAccountID })));
+  for (const o of orphans) {
+    const parent = parents.get(parentKey(o.page.companyName, o.salesforceAccountID));
+    if (!parent) continue;
+    o.page.logoUrl = parent.logo;
+    o.page.domain ??= parent.domain;
   }
   held = { at: Date.now(), byOffer };
   return byOffer;
