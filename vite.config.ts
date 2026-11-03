@@ -433,10 +433,11 @@ function graphDevProxy(authKey: string, singleKey: string, devEmail: string | nu
                     // The offer's email form, as api/content.ts adds it (api/_lib/offer-signup.ts reads .env.local like the dev routes).
                     for (const [k, v] of Object.entries(env)) if (!(k in process.env)) process.env[k] = v
                     const { withOfferSignup } = await server.ssrLoadModule('/api/_lib/offer-signup.ts')
+                    const { withParentAccount } = await server.ssrLoadModule('/api/_lib/parent-account.ts')
                     return jsonResponse(
                       res,
                       200,
-                      await withOfferSignup(normalizeExperienceItem({ ...item, __typename: typeName, __template: template })),
+                      await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...item, __typename: typeName, __template: template }))),
                     )
                   }
                 }
