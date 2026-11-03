@@ -1558,25 +1558,25 @@ a.www-modal__tile:hover {
   opacity: 1;
   transform: none;
 }
-/* The 90 days: each step's rule draws left to right, then its number pops. */
-.www-page .www-path__step::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 28px;
-  right: 28px;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
+/* The 90 days: each step's number pops once its card is in, then a line runs out of it toward
+   the next step, card after card, so the four read as one path. (Michiel, 3 Nov: the old rule,
+   a bar on each card's top edge inside its rounded corners, drawn before the card had faded
+   in, "looks a little weird".) The line is revealed with a clip, not stretched, so its round
+   ends keep their shape. */
+.www-page .www-path__rule {
+  flex: 1;
+  min-width: 24px;
+  height: 2px;
+  border-radius: 2px;
   background: var(--www-fir);
-  transform-origin: 0 50%;
 }
-.www-js .www-page [data-scene] .www-path__step::before {
-  transform: scaleX(0);
-  transition: transform 0.6s cubic-bezier(0.6, 0, 0.2, 1);
-  transition-delay: calc(var(--i, 0) * 160ms + 200ms);
+.www-js .www-page [data-scene] .www-path__rule {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.55s cubic-bezier(0.6, 0, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 160ms + 720ms);
 }
-.www-js .www-page [data-scene].is-in .www-path__step::before {
-  transform: scaleX(1);
+.www-js .www-page [data-scene].is-in .www-path__rule {
+  clip-path: inset(0 0 0 0);
 }
 .www-js .www-page [data-scene] .www-path__step .www-step-n {
   transform: scale(0);
@@ -1619,10 +1619,11 @@ a.www-modal__tile:hover {
     transition: none;
     animation: none;
   }
-  .www-js .www-page [data-scene] .www-path__step::before,
+  .www-js .www-page [data-scene] .www-path__rule,
   .www-js .www-page [data-scene] .www-path__step .www-step-n,
   .www-js .www-page [data-scene]:not(.is-in) .www-steps::before {
     transform: none;
+    clip-path: none;
     transition: none;
   }
   .www-page .www-sticky {

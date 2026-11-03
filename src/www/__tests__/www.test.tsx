@@ -1004,6 +1004,17 @@ test('one extruded moment per page: the run in the state headline', () => {
   assert.deepEqual([...extrudedRuns(apHtml)], ['put them to work'])
 })
 
+test('the 90 days: each step draws a line out of its number, not a bar on the card edge', () => {
+  // Michiel, 3 Nov: the bar along each card's top edge "looks a little weird".
+  const path = apHtml.match(/<ol class="www-path[\s\S]*?<\/ol>/)?.[0] ?? ''
+  const steps = path.match(/www-path__step/g) ?? []
+  assert.equal(steps.length, 4, 'four steps')
+  assert.equal((path.match(/class="www-path__rule"/g) ?? []).length, 4, 'every step has its line')
+  assert.match(path, /class="www-step-n">1<\/span><span class="www-path__rule"/, 'the line runs out of the number')
+  const css = readFileSync('src/www/www.css', 'utf8')
+  assert.ok(!css.includes('.www-path__step::before'), 'the edge bar is still drawn')
+})
+
 test('the state sets the hero look, the proof track and whether the rep is named', () => {
   const look = (html: string) => html.match(/www-hero__card--(\w+)/)![1]
   const prospect = apHtml

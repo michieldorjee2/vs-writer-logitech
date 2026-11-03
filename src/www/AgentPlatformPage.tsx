@@ -549,7 +549,8 @@ function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
             <Heading text={customer ? 'Your next 90 days' : 'Your first 90 days'} />
           </Reveal>
         </SceneHead>
-        {/* The path draws itself left to right as the scene arrives: each step's rule, then its number. */}
+        {/* The path draws itself left to right as the scene arrives: each step's number, then a
+            line out of it toward the next step. */}
         <ol className="www-path grid gap-3 md:grid-cols-2 lg:grid-cols-4" role="list">
           {FIRST_90_DAYS.map((s, i) => (
             <Reveal
@@ -560,8 +561,9 @@ function FirstNinetyDays({ c }: { c: AgentPlatformContent }) {
               data-field={s.body.includes('{stack}') ? 'techStack' : undefined}
               className="www-card www-card--white www-path__step flex flex-col"
             >
-              <span className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-3">
                 <span className="www-step-n">{i + 1}</span>
+                <span className="www-path__rule" aria-hidden="true" />
                 {/* The step that names their stack says where that came from. */}
                 {cats.length > 0 && s.body.includes('{stack}') && <HomeworkTag compact />}
               </span>
