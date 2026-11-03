@@ -408,6 +408,34 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     })
   }
   await shot(op, `offer-${vp}`)
+  // Laura, 3 Nov: a long headline ran to seven lines and pushed the hero past the window, and
+  // the extruded run sat on the descenders of the line above. The longest live headline (74
+  // characters) and the North Face one she reported, on the page as served.
+  for (const long of ['/vb/sitecore-switch-volvo-cars', '/vb/the-north-face-retail-cx-personalization-lab-ralph-lauren-corp']) {
+    await test(`a long headline steps down instead of pushing the hero past the window (${long})`, async () => {
+      const lp = await open(o.ctx, o.watch, url(long, 'design=www'))
+      const r = await lp.evaluate(() => {
+        const h1 = document.querySelector('#hero h1') as HTMLElement
+        const run = h1.querySelector('.origin-bottom-left') as HTMLElement | null
+        const before = run?.previousElementSibling ?? run?.parentElement?.previousElementSibling ?? null
+        // The last line of the words before the run, when the run starts on a line below it.
+        const last = before ? [...before.getClientRects()].at(-1) : undefined
+        const top = run?.getBoundingClientRect().top ?? 0
+        return {
+          hero: document.getElementById('hero')!.getBoundingClientRect().height,
+          h1: h1.getBoundingClientRect().height,
+          gap: last && top > last.top + 1 ? top - last.bottom : null,
+        }
+      })
+      const vh = vp === 'desktop' ? 900 : 844
+      // 75% is the hero's height; a page with two stacked buttons runs a little over, and the
+      // next scene must still show (the live page's long headline took it past the window).
+      if (vp === 'desktop') expect(r.hero <= vh * 0.8, `hero is ${r.hero}px in a ${vh}px window (want at most 80%)`)
+      expect(r.h1 <= vh * 0.45, `the headline is ${r.h1}px tall in a ${vh}px window`)
+      expect(r.gap === null || r.gap >= 0, `the extruded run's line starts ${r.gap}px into the line above`)
+      await lp.close()
+    })
+  }
   await o.ctx.close()
 }
 

@@ -327,8 +327,9 @@ function OfferHero({
               </Reveal>
             )}
             <Reveal i={1}>
-              {/* The writer's ##run## is the page's one extruded moment. */}
-              <Heading text={str(v.offerHeadline, 'Text')} level="h1" extrude className="text-white" />
+              {/* The writer's ##run## is the page's one extruded moment. Offer headlines run from
+                  about 30 to 75 characters, so the size follows the length (ui.tsx fitVars). */}
+              <Heading text={str(v.offerHeadline, 'Text')} level="h1" extrude fit className="text-white" />
             </Reveal>
             <Reveal i={3} className="flex flex-wrap gap-3">
               {str(v.offerCta, 'ButtonText') && (
@@ -365,7 +366,8 @@ function OfferHero({
       />
       {intro && (
         <Scene id="intro" compact>
-          <Reveal i={0} className="www-intro mx-auto max-w-[1000px]">
+          {/* One column on the page's content width: the opening line, then the paragraphs under it. */}
+          <Reveal i={0} className="www-intro">
             <Paragraphs text={intro} />
           </Reveal>
           {leftovers}

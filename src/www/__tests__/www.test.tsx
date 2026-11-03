@@ -22,6 +22,7 @@
  *      every stored field is either used or deliberately not shown
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { renderToString } from 'react-dom/server'
 import type { CompetitorComparisonPage } from '../../lib/graph-types'
 import AccountPage, { connectProps } from '../AccountPage'
@@ -30,7 +31,7 @@ import { ACCOUNT_FIELDS } from '../account-fields'
 import { comparisonTableHtml, formatStatValue, PROOF_LOGOS, realContacts } from '../account-helpers'
 import { isOfferExperience, wantsWwwDesign } from '../design'
 import { OFFER_SLOTS, readOffer, type ElementData } from '../offer-content'
-import { plain, richToStacked } from '../ui'
+import { fitVars, plain, richToStacked } from '../ui'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
 import { applyLiveField, changedLiveFields, LIVE_FIELDS, liveValue, mergeLive, resetLive } from '../live-edit'
@@ -615,6 +616,34 @@ test('offer sign-up: when the offer chose the email form, the www close shows it
 test('the about section keeps its anchor and the hero run is extruded', () => {
   assert.match(offerHtml, /id="about"/)
   assert.ok((offerHtml.match(/O-run/g) ?? []).length > 1, 'an extruded run renders once per layer')
+})
+
+test('the offer headline is sized to its length: a long one steps down, a short one keeps the display size', () => {
+  // Laura, 3 Nov: a long headline ran to seven lines and pushed the hero past the window.
+  const short = 'Optimizely at ##6sense Breakthrough##' // 33 characters, the shortest live offer headline
+  const long = 'Sitecore is slowing down sites for more than 100 markets. ##Take a day back.##' // 74, the longest
+  const w = (t: string) => Number((fitVars(t) as Record<string, string>)['--fit-w'])
+  const h = (t: string) => Number((fitVars(t) as Record<string, string>)['--fit-h'])
+  assert.ok(w(long) < w(short) && h(long) < h(short), 'a longer headline must get a smaller size')
+  assert.ok(Math.abs(w(long) / w(short) - Math.sqrt(33 / 74)) < 0.01, 'the size goes as 1/√length')
+  assert.equal(w(plain(short)), w(short), 'the ## marks do not count as characters')
+  // The offer hero opts in; the size class and the length's variables reach the h1.
+  const hero = offerHtml.match(/<section id="hero"[\s\S]*?<\/section>/)?.[0] ?? ''
+  assert.match(hero, /<h1[^>]*class="[^"]*www-display--fit/)
+  assert.ok(hero.includes(`--fit-w:${(fitVars('O-headline ##O-run##') as Record<string, string>)['--fit-w']}`), 'the fit variables are not on the headline')
+  // The account page's headline is template copy and keeps its fixed size.
+  assert.ok(!renderToString(<AgentPlatformPage page={account} />).includes('www-display--fit'))
+})
+
+test('the offer intro is one column on the content width, not two', () => {
+  // Laura, 3 Nov: the two columns left a single paragraph alone in the left half.
+  const intro = offerHtml.match(/<section id="intro"[\s\S]*?<\/section>/)?.[0] ?? ''
+  assert.match(intro, /class="www-intro"/)
+  assert.ok(!/max-w-\[1000px\]/.test(intro), 'the intro is still a narrow centred block')
+  const css = readFileSync('src/www/www.css', 'utf8')
+  const introRules = [...css.matchAll(/([^{}]*\.www-intro[^{}]*)\{([^}]*)\}/g)].map((m) => m[2])
+  assert.ok(introRules.length > 0, 'no .www-intro rules found')
+  assert.ok(introRules.every((body) => !/\bcolumns\s*:/.test(body)), 'an intro rule still sets columns')
 })
 
 test('every FAQ question and answer is in the server HTML as FAQPage data (answers open on click)', () => {
