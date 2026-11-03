@@ -70,6 +70,21 @@ export function resetLive() {
   for (const l of listeners) l()
 }
 
+/** The live values so far (Edit mode compares the saved page against the page as shown). */
+export function getLivePatch(): Patch {
+  return patch
+}
+
+/**
+ * The live fields among `fields` whose saved value differs from what the page shows now. Edit
+ * mode replays these after the save, so a change Mark saved without narrating it still gets its
+ * spotlight and its glow before the reload.
+ */
+export function changedLiveFields(fields: readonly string[], shown: Record<string, unknown>, saved: Record<string, unknown>): LiveField[] {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  return fields.filter((f): f is LiveField => isLiveField(f) && !same(shown[f], saved[f]))
+}
+
 /** The page with the live values on top. Pure, for the renderer and the tests. */
 export function mergeLive<T extends object>(page: T, p: Patch): T {
   return p === EMPTY || !Object.keys(p).length ? page : ({ ...page, ...p } as T)

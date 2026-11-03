@@ -45,7 +45,7 @@ Most of this page is template copy, the same on every page, which no page field 
 | Account team | `teamMembers` |
 | Small print | `footerTagline`, `footerLegal` |
 
-The request to Mark opens with "Page template: agent platform" and lists each commented part's fields (`src/lib/edit-payload.ts`). Mark's live-edit agent (`account_page_live_edit`, v1.4.1) knows this template, skips template copy with a reason, and sends each edit's `field` with its full new `value`. The page re-renders from that value while Mark works (`src/www/live-edit.ts`), so every place the field shows changes together; the rest of the page dims around the part in focus, and each changed element glows once. Mark's single `update_page` is still the save, and the page reloads from the CMS once it is published.
+The request to Mark opens with "Page template: agent platform" and lists each commented part's fields (`src/lib/edit-payload.ts`). Mark's live-edit agent (`account_page_live_edit`, v1.4.3) knows this template, skips template copy with a reason, and sends each edit's `field` with its full new `value`. The page re-renders from that value while Mark works (`src/www/live-edit.ts`), so every place the field shows changes together; the rest of the page dims around the part in focus, and each changed element glows once. Mark's single `update_page` is still the save. Once Graph has it (Edit mode watches `lastModified`: Graph keeps `published` at the first publish date), Edit mode reads the saved page and replays, part by part, any change Mark saved without narrating it, then reloads. Mark often narrates only after saving, and once (v1.4.2, an instruction to narrate first) not at all, so the replay is what guarantees the spotlight and the live change.
 
 ## The three drafts
 

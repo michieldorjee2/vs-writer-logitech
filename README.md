@@ -62,10 +62,10 @@ Every account page (`/<company>/`) and offer page (`/vb/<slug>`) renders in the 
 An account page in the www design renders one of two templates. The default is the agent platform template (`src/www/AgentPlatformPage.tsx`): Laura Perez Riau's eight-section page from Dan Tranter's pitch, where the lifecycle state sets the hero, headline, proof and CTAs. The account research is threaded through the page rather than kept in one homework section: one stored fact per scene, the stack and investments marked with the same tag, and each use case showing what in the account's own data put it first. It reads `AgentPlatformContent`, which `src/www/agent-platform/content.ts` fills from the stored page until the agents write it directly; `?review=1` shows where each part came from and `?state=` switches the state. `?template=takeout` renders the competitive takeout page with every stored field. On both, the one-click ask (hero, sticky bar, close) pings the account team once per page view and opens a connect panel instead of a form (`src/www/ConnectModal.tsx`). Edit mode on the agent platform page offers only the parts a stored field drives, spotlights the part Mark is working on, and re-renders the page live from Mark's streamed values (see the template's docs). The agent changes this template needs are drafted, not deployed, in [docs/agent-platform-template](docs/agent-platform-template/README.md).
 
 ```bash
-npm run check:www                              # 136 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules
+npm run check:www                              # 137 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules
 WWW_UPSTREAM=~/Claude/OptimizelyHeadless npm run check:www   # + proves src/vendor/www still matches upstream
 npm run build && npx tsx scripts/serve-prod.ts &               # local production stand-in on :5199
-npm run e2e:www                                # 74 Playwright checks, desktop + phone: layout, intro, one CTA, X-ray/Edit, all network mocked
+npm run e2e:www                                # 76 Playwright checks, desktop + phone: layout, intro, one CTA, X-ray/Edit, all network mocked
 npx tsx scripts/smoke-live-pages.ts [base]     # every live account page in the www design: renders, 8 sections, title, one CTA, no competitor/stakeholder names
 ```
 
