@@ -110,6 +110,17 @@ export const WHO_WE_ARE = {
   usage: { text: 'Nearly 1,700 companies have built 4,000+ agents on the platform.', source: 'Optimizely, May 2026', href: 'https://www.optimizely.com/company/press/agentic-momentum' },
 }
 
+/**
+ * Pages that leave "Who we are" out. Google Cloud (Dan Tranter, 3 November 2026): the pitch is
+ * Limitless for Google, not the whole suite, so the platform overview does not run there.
+ * Keyed by the CMS content key, so a route change cannot bring the section back.
+ */
+export const WITHOUT_WHO_WE_ARE: ReadonlySet<string> = new Set([
+  '21e18f692d104227b794faadb17b2331', // /google/
+])
+
+export const showsWhoWeAre = (key: string | null | undefined) => !WITHOUT_WHO_WE_ARE.has(key ?? '')
+
 /* ------------------------------------------------------- the five themes */
 
 export type ThemeId = 'content-ops' | 'personalization' | 'geo' | 'optimization' | 'analytics'

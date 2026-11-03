@@ -46,7 +46,7 @@ import offerBlueprint from '../../cms/blueprints/offer'
 import WwwAccountRoute from '../WwwAccountRoute'
 import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
 import { readStack, stackTiles } from '../agent-platform/stack'
-import { DEFAULT_TEAMS, IDENTITY_SENTENCE, THEME_ORDER } from '../agent-platform/library'
+import { DEFAULT_TEAMS, IDENTITY_SENTENCE, THEME_ORDER, WHO_WE_ARE } from '../agent-platform/library'
 
 /* ------------------------------------------------------------------ harness */
 
@@ -1077,6 +1077,18 @@ test('the agent platform template is the default; ?template=takeout is the takeo
   const ids = (html: string) => [...html.matchAll(/<section id="([^"]+)" data-scene/g)].map((m) => m[1])
   assert.deepEqual(ids(apHtml), ['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta'])
   assert.deepEqual(ids(apSearch('?template=takeout')), ['hero', 'intel', 'signals', 'challenge', 'comparison', 'proof', 'analysts', 'promo', 'roi', 'migration', 'cta'])
+})
+
+test('Google Cloud leaves "Who we are" out (Dan Tranter, 3 Nov); every other page keeps it', () => {
+  const ids = (html: string) => [...html.matchAll(/<section id="([^"]+)" data-scene/g)].map((m) => m[1])
+  const base = stackPage()
+  const google = renderToString(
+    <WwwAccountRoute page={stackPage({ _metadata: { ...base._metadata, key: '21e18f692d104227b794faadb17b2331', url: { default: '/google/', hierarchical: '/en/google/' } } })} search="" />,
+  )
+  assert.deepEqual(ids(google), ['hero', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta'])
+  assert.ok(!textOf(google).includes(WHO_WE_ARE.heading), 'the platform overview heading is still on the Google page')
+  assert.ok(!/data-xray="who-we-are"/.test(google))
+  assert.ok(textOf(apHtml).includes(WHO_WE_ARE.heading), 'another page lost "Who we are"')
 })
 
 test('hero: "Personalized for", the identity sentence first, no account name in the H1', () => {

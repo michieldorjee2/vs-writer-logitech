@@ -4,7 +4,7 @@
  * replacement for it. Eight sections, in her order:
  *
  *   1 hero              who we are → what agents do for them → their situation as the reason
- *   2 who we are        the same on every page
+ *   2 who we are        the same on every page, except those in WITHOUT_WHO_WE_ARE (Google)
  *   3 where it fits     their numbers, then teams / agent platform / their stack
  *   4 speaks your language  one leadership question; generic AI vs the agent platform
  *   5 use cases         two priority cards and a strip of three, from the five themes
@@ -30,7 +30,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { AccountMark, Colophon, CountUp, Eyebrow, Heading, HeroFrame, Reveal, Scene, StickyCta, WwwPage } from './ui'
 import { ConnectProvider, useConnect } from './ConnectModal'
 import { SCENE } from './account-helpers'
-import { FIRST_90_DAYS, PLATFORM_LAYER, PROOF_ASSETS, PROOF_STORIES, STATES, THEMES, TRUST_CENTER, WHO_WE_ARE } from './agent-platform/library'
+import { FIRST_90_DAYS, PLATFORM_LAYER, PROOF_ASSETS, PROOF_STORIES, STATES, THEMES, TRUST_CENTER, WHO_WE_ARE, showsWhoWeAre } from './agent-platform/library'
 import { fromLegacyPage, STATE_IDS, type AgentPlatformContent } from './agent-platform/content'
 import { resolveCopy, stackPhrase } from './agent-platform/copy'
 import { setShownCopy, useLivePage } from './live-edit'
@@ -61,7 +61,7 @@ export default function AgentPlatformPage({ page, search = '' }: { page: Competi
       <WwwPage className="www-ap">
         <div id="main-content">
           <Hero c={c} t={t} />
-          <WhoWeAre t={t} />
+          {showsWhoWeAre(page._metadata?.key) && <WhoWeAre t={t} />}
           <WhereItFits c={c} t={t} />
           <SpeaksYourLanguage c={c} t={t} checks={Array.isArray(copy['language.checks']) ? copy['language.checks'] : []} />
           <UseCases c={c} t={t} />
