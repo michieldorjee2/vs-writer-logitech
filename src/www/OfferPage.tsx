@@ -38,7 +38,7 @@ export default function OfferPage({ experience }: { experience: Experience }) {
   const ctaHref = str(hero?.values.offerCta, 'ButtonUrl') || '#signup'
 
   return (
-    <WwwPage accent={experience.brandAccentColor}>
+    <WwwPage accent={experience.brandAccentColor} className="www-offer">
       <div id="main-content">
         {sections.map((s, i) => (
           <OfferScene key={i} section={s} company={company} logo={logo} />
