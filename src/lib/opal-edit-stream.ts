@@ -24,6 +24,10 @@ export type EditEvent = {
   new?: string;
   /** For kind:"image" — the new image URL to swap in. */
   newUrl?: string;
+  /** The CMS property this edit changes (agent v1.4), e.g. "intelStats". */
+  field?: string;
+  /** That property's full new value after this edit (an array for array fields). */
+  value?: unknown;
 };
 
 export type AgentEvent =

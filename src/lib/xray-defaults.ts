@@ -302,6 +302,99 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
   },
 ];
 
+/**
+ * Edit mode on the www agent platform page (src/www/AgentPlatformPage.tsx). Most of that page is
+ * template copy, the same on every page (Laura's state headlines, who we are, the proof library,
+ * the 90-day plan), which no page field can change, so Edit mode offers only the parts a page
+ * field drives, and tells Mark which fields those are. `fields` are CompetitorComparisonPage
+ * property keys; `hint` is what the comment popup says the area is made of.
+ */
+export type EditSectionInfo = XraySectionInfo & { fields: string[]; hint: string };
+
+export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
+  {
+    id: 'account-logo',
+    selector: '#hero [data-xray="account-logo"]',
+    title: 'Account logo',
+    tools: ['Brandfetch', 'CMS'],
+    sources: ['customerLogo'],
+    fields: ['customerLogo'],
+    hint: 'Their logo above the headline.',
+  },
+  {
+    id: 'account-facts',
+    selector: '#hero [data-xray="intel-stats"]',
+    title: 'Account facts',
+    tools: ['Mark', 'CMS'],
+    sources: ['intelStats'],
+    fields: ['intelStats'],
+    hint: 'The first three facts show here; the next four appear one per section further down. No traffic figures.',
+  },
+  {
+    id: 'agents-at-work',
+    selector: '[data-xray="agents-at-work"]',
+    title: 'Agents at work',
+    tools: ['BuiltWith', 'CMS'],
+    sources: ['techStack'],
+    fields: ['techStack'],
+    hint: 'The tasks follow the two lead use cases; the chips are tools from their stack.',
+  },
+  {
+    id: 'tech-stack',
+    selector: '[data-xray="tech-stack"]',
+    title: 'What they run today',
+    tools: ['BuiltWith', 'CMS'],
+    sources: ['techStack'],
+    fields: ['techStack'],
+    hint: 'Their stack. A competitor shows by its category only ("Your CMS").',
+  },
+  {
+    id: 'teams',
+    selector: '[data-xray="teams"]',
+    title: 'Their teams',
+    tools: ['Salesforce', 'LinkedIn', 'CMS'],
+    sources: ['stakeholders (roles only)'],
+    fields: ['stakeholders'],
+    hint: 'Role groups from the people on the page. Names are never shown.',
+  },
+  {
+    id: 'investments',
+    selector: '[data-xray="investments"]',
+    title: "Where they're investing",
+    tools: ['Mark', 'CMS'],
+    sources: ['investments'],
+    fields: ['investments'],
+    hint: 'Up to four, primary first. Lines naming a person or a competitor are left off.',
+  },
+  {
+    id: 'use-cases',
+    selector: '[data-xray="use-cases"]',
+    title: 'Use cases',
+    tools: ['BuiltWith', 'Mark', 'CMS'],
+    sources: ['techStack', 'investments'],
+    fields: ['techStack', 'investments'],
+    hint: 'Ranked from their stack and investments; "Our homework" on each card shows which. The card copy is the same on every page.',
+  },
+  {
+    id: 'team-members',
+    selector: '[data-xray="team-members"]',
+    title: 'Account team',
+    tools: ['Salesforce', 'CMS'],
+    sources: ['teamMembers'],
+    fields: ['teamMembers'],
+    hint: 'Only an account executive is named, and only for an open opportunity or a customer.',
+  },
+  {
+    id: 'small-print',
+    selector: '[data-xray="small-print"]',
+    title: 'Small print',
+    tools: ['CMS'],
+    sources: ['footerTagline', 'footerLegal'],
+    fields: ['footerTagline', 'footerLegal'],
+    hint: 'The tagline and legal line at the very end.',
+  },
+];
+
 export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
   ...ABM_XRAY_LEGACY.map((s) => ({
     ...s,

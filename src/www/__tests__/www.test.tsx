@@ -31,7 +31,10 @@ import { comparisonTableHtml, formatStatValue, PROOF_LOGOS, realContacts } from 
 import { isOfferExperience, wantsWwwDesign } from '../design'
 import { OFFER_SLOTS, readOffer, type ElementData } from '../offer-content'
 import { plain, richToStacked } from '../ui'
-import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
+import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
+import { applyLiveField, LIVE_FIELDS, liveValue, mergeLive, resetLive } from '../live-edit'
+import AgentPlatformPage from '../AgentPlatformPage'
 import offerBlueprint from '../../cms/blueprints/offer'
 import WwwAccountRoute from '../WwwAccountRoute'
 import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
@@ -1045,6 +1048,73 @@ test('the one-click ask: buttons, no form anywhere on the page', () => {
   assert.match(apHtml, /id="hero-connect-btn"/)
   assert.match(apHtml, /id="sticky-connect-btn"/)
   assert.match(apHtml, /id="cta-connect-btn"/)
+})
+
+console.log('\nEdit mode on the agent platform page')
+
+test('Edit mode offers the parts a page field drives, each with its fields, all on the page', () => {
+  const hero = apHtml.slice(0, apHtml.indexOf('</section>'))
+  for (const sec of AGENT_PLATFORM_EDIT) {
+    const id = sec.selector.match(/data-xray="([^"]+)"/)![1]
+    assert.ok((sec.selector.startsWith('#hero') ? hero : apHtml).includes(`data-xray="${id}"`), `no hook for ${sec.title} (${id})`)
+    assert.ok(sec.fields.length && sec.fields.every((f) => USED_FIELDS.some((u) => u.field === f)), `${sec.title}: a field this template does not use`)
+    assert.ok(sec.fields.every((f) => (LIVE_FIELDS as readonly string[]).includes(f)), `${sec.title}: a field the live preview cannot show`)
+    assert.ok(sec.hint.length > 10, `${sec.title} has no hint`)
+  }
+  // Template copy is not offered: no field could change it.
+  for (const t of ['Who we are', 'Proof', 'First 90 days', 'Hero headline']) assert.ok(!AGENT_PLATFORM_EDIT.some((s) => s.title === t), t)
+})
+
+test('every field a live edit can change has the page elements that render it marked', () => {
+  const marked = new Set([...apSearch('?state=customer').matchAll(/data-field="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)))
+  for (const f of LIVE_FIELDS) assert.ok(marked.has(f), `no data-field="${f}" on the page`)
+})
+
+test('the request to Mark names the template and the fields behind each commented section', () => {
+  const ap = buildSuggestedEdit(
+    [
+      { title: 'What they run today', feedback: 'They moved to Shopify Plus', fields: ['techStack'] },
+      { title: 'Small print', feedback: 'Drop the tagline', fields: ['footerTagline', 'footerLegal'] },
+    ],
+    'agent-platform',
+  )
+  assert.ok(ap.startsWith(AGENT_PLATFORM_TEMPLATE_LINE))
+  assert.match(ap, /Section: What they run today\nFields: techStack\nFeedback: They moved to Shopify Plus\n\n---\n\nSection: Small print\nFields: footerTagline, footerLegal\nFeedback: Drop the tagline/)
+  // The takeout and legacy pages send exactly what they always did.
+  assert.equal(buildSuggestedEdit([{ title: 'Hero headline', feedback: 'Shorter' }]), 'Section: Hero headline\nFeedback: Shorter')
+})
+
+test('a live edit re-renders the page from the new value: every place the field shows changes together', () => {
+  const base = stackPage({ intelStats: [{ Value: '12000', Label: 'employees' }, { Value: '40', Label: 'countries served' }, { Value: '1998', Label: 'founded' }, { Value: '310', Label: 'distribution centers' }] })
+  const edited = mergeLive(base, {
+    // New tools go first: the page shows at most six (agent v1.4 is told so).
+    techStack: [{ Name: 'Shopify Plus', ColorTag: null }, ...(base.techStack ?? [])],
+    intelStats: [{ Value: '13500', Label: 'employees' }, ...(base.intelStats ?? []).slice(1)],
+    investments: [{ Name: 'Composable commerce', IsPrimary: true }],
+  })
+  const html = renderToString(<AgentPlatformPage page={edited} />)
+  const text = textOf(html)
+  assert.match(text, /Shopify Plus/) // stack tile (and chip / evidence)
+  assert.match(text, /13\.5K employees/) // the hero pill, formatted as the page formats it
+  assert.ok(!/12K employees/.test(text))
+  assert.match(text, /Composable commerce/)
+  assert.ok(!/Global content localization/.test(text), 'the old investment is still shown')
+  // N2/N3 still hold on live values: a competitor or a stakeholder name never shows.
+  const leak = renderToString(<AgentPlatformPage page={mergeLive(base, { investments: [{ Name: 'AEM upgrade led by Pat Example', IsPrimary: true }] })} />)
+  assert.ok(!/AEM upgrade|Pat Example/.test(textOf(leak)))
+})
+
+test('the live store checks each value\'s shape and starts empty for the server', () => {
+  assert.equal(liveValue('techStack', [{ Name: 'X', ColorTag: null }]) !== null, true)
+  assert.equal(liveValue('techStack', 'Shopify'), null)
+  assert.equal(liveValue('intelStats', [{ Value: 3, Label: 'x' }]), null)
+  assert.equal(liveValue('footerTagline', 'Hello'), 'Hello')
+  assert.equal(applyLiveField('headline', 'Takeout field'), false, 'a field this template does not show')
+  assert.equal(applyLiveField('techStack', { Name: 'not an array' }), false)
+  assert.equal(applyLiveField('footerLegal', 'Edited'), true)
+  resetLive()
+  // The server render never sees a live edit (useSyncExternalStore's server snapshot is empty).
+  assert.ok(!renderToString(<AgentPlatformPage page={stackPage()} />).includes('Edited'))
 })
 
 /* -------------------------------------------------------------------- result */

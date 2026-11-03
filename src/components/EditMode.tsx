@@ -3,11 +3,15 @@ import { createPortal } from 'react-dom';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import {
   ABM_XRAY_DEFAULTS,
+  AGENT_PLATFORM_EDIT,
   DYNAMIC_XRAY_DEFAULTS,
   PERSON_XRAY_DEFAULTS,
   resolveXraySections,
+  type EditSectionInfo,
   type XraySectionInfo,
 } from '../lib/xray-defaults';
+import { buildSuggestedEdit } from '../lib/edit-payload';
+import { applyLiveField, resetLive } from '../www/live-edit';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { streamEdit, editKind, type EditKind } from '../lib/opal-edit-stream';
 import { animateSectionEdit } from '../lib/inplace-edit';
@@ -172,14 +176,39 @@ function clamp(v: number, lo: number, hi: number): number {
 
 type Phase = 'editing' | 'working' | 'thanks';
 
+/** The www agent platform page (src/www/AgentPlatformPage.tsx) is on screen. */
+function onAgentPlatformPage(): boolean {
+  return typeof document !== 'undefined' && !!document.querySelector('.www-page.www-ap');
+}
+
+/** Flash the page elements that render `field` (data-field="… field …") once a live edit lands. */
+function flashField(field: string): HTMLElement[] {
+  const els = Array.from(document.querySelectorAll<HTMLElement>('.www-page [data-field]')).filter((el) =>
+    (el.dataset.field || '').split(/\s+/).includes(field),
+  );
+  for (const el of els) {
+    el.classList.remove('live-changed');
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    el.offsetWidth; // restart the animation when the same field changes twice
+    el.classList.add('live-changed');
+    setTimeout(() => el.classList.remove('live-changed'), 2400);
+  }
+  return els;
+}
+
+const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
 function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props) {
+  // The agent platform template is mostly template copy: Edit mode offers only the parts a page
+  // field drives, tells Mark which fields, and shows Mark's edits by re-rendering the page.
+  const agentPlatform = useMemo(() => active && onAgentPlatformPage(), [active]);
   const defaults =
     variant === 'abm' ? ABM_XRAY_DEFAULTS
       : variant === 'person' ? PERSON_XRAY_DEFAULTS
         : DYNAMIC_XRAY_DEFAULTS;
-  const sections = useMemo(
-    () => resolveXraySections(defaults, page.xraySections),
-    [defaults, page.xraySections],
+  const sections: Array<XraySectionInfo & Partial<Pick<EditSectionInfo, 'fields' | 'hint'>>> = useMemo(
+    () => (agentPlatform ? AGENT_PLATFORM_EDIT : resolveXraySections(defaults, page.xraySections)),
+    [agentPlatform, defaults, page.xraySections],
   );
 
   const [phase, setPhase] = useState<Phase>('editing');
@@ -212,6 +241,12 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
   const [liveError, setLiveError] = useState<string | null>(null);
   const [willReload, setWillReload] = useState(false);
   const liveAbort = useRef<AbortController | null>(null);
+  // The spotlight: everything but the section Mark is working on dims (the rAF loop moves the hole).
+  const spotRef = useRef<SVGRectElement | null>(null);
+  const focusRef = useRef<string | null>(null);
+  useEffect(() => {
+    focusRef.current = focusSectionId;
+  }, [focusSectionId]);
 
   /** Match an agent's section name to one of our x-ray sections. The send
    *  payload labels each comment "Section: <title>", so the agent usually
@@ -254,6 +289,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       setLiveDone(null);
       setLiveError(null);
       setWillReload(false);
+      resetLive();
       document.body.classList.remove('edit-active');
       return;
     }
@@ -327,6 +363,12 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           rect.setAttribute('width', String(o.width));
           rect.setAttribute('height', String(o.height));
           lastBox.set(e.section.id, { l: o.left, t: o.top, w: o.width, h: o.height });
+        }
+        if (e.section.id === focusRef.current && spotRef.current) {
+          spotRef.current.setAttribute('x', String(o.left));
+          spotRef.current.setAttribute('y', String(o.top));
+          spotRef.current.setAttribute('width', String(o.width));
+          spotRef.current.setAttribute('height', String(o.height));
         }
       }
 
@@ -429,14 +471,17 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     const slug = getPageSlug(page);
     const companyName = deriveCustomerName(page);
 
-    // Map sectionId → display title for nicer prompts
-    const titleById = new Map(sections.map((s) => [s.id, s.title]));
+    // Map sectionId → display title (and, on the agent platform page, the fields behind it)
+    const byId = new Map(sections.map((s) => [s.id, s]));
 
-    const suggestedEdit = entries
-      .map(([sectionId, feedback]) =>
-        `Section: ${titleById.get(sectionId) || sectionId}\nFeedback: ${feedback}`,
-      )
-      .join('\n\n---\n\n');
+    const suggestedEdit = buildSuggestedEdit(
+      entries.map(([sectionId, feedback]) => ({
+        title: byId.get(sectionId)?.title || sectionId,
+        feedback,
+        fields: byId.get(sectionId)?.fields,
+      })),
+      agentPlatform ? 'agent-platform' : undefined,
+    );
 
     const payload = {
       company_name: companyName,
@@ -507,7 +552,19 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           } else {
             const els = id ? elementsRef.current.find((x) => x.section.id === id)?.els ?? [] : [];
             let appliedInPlace = false;
-            if (els.length) {
+            if (agentPlatform && ev.field !== undefined && ev.value !== undefined && applyLiveField(ev.field, ev.value)) {
+              // The page re-renders from the new value: every place that field shows changes
+              // together (pills, homework notes, tiles, evidence lines). Then the changed parts flash.
+              await nextFrame();
+              const changed = flashField(ev.field);
+              const inFocus = changed.find((el) => els.some((s) => s.contains(el))) ?? changed[0];
+              if (inFocus) inFocus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              setLiveStatus(`Updated ${ev.target ?? ev.section}`);
+              await sleep(1400);
+              appliedInPlace = true;
+            } else if (els.length && !agentPlatform) {
+              // Text the page renders as stored: strike it through and retype it in place. (Not on
+              // the agent platform page, which React re-renders from data: its copy is derived.)
               appliedInPlace = await animateSectionEdit(
                 els,
                 { kind, old: ev.old, new: ev.new, newUrl: ev.newUrl },
@@ -596,7 +653,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       }
     }
     liveAbort.current = null;
-  }, [comments, page, sections, onSent, matchSectionId, scrollToSection]);
+  }, [comments, page, sections, onSent, matchSectionId, scrollToSection, agentPlatform]);
 
   /** Dismiss the live overlay without reloading (Close on the live HUD). */
   const dismissLive = useCallback(() => {
@@ -627,6 +684,24 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         preserveAspectRatio="none"
         aria-hidden="true"
       >
+        {phase === 'working' && (
+          <>
+            <defs>
+              <mask id="edit-spot-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={docSize.w} height={docSize.h}>
+                <rect x={0} y={0} width={docSize.w} height={docSize.h} fill="white" />
+                <rect ref={spotRef} x={0} y={0} width={0} height={0} rx={OUTLINE_RADIUS + 6} ry={OUTLINE_RADIUS + 6} fill="black" />
+              </mask>
+            </defs>
+            <rect
+              className={'edit-spot' + (focusSectionId ? ' edit-spot--on' : '')}
+              x={0}
+              y={0}
+              width={docSize.w}
+              height={docSize.h}
+              mask="url(#edit-spot-mask)"
+            />
+          </>
+        )}
         {outlines.map(({ section, box }, i) => {
           const hasComment = !!comments[section.id];
           return (
@@ -713,6 +788,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
             <div>
               <div className="edit-popup__eyebrow">Section</div>
               <div className="edit-popup__title">{entry.section.title}</div>
+              {(entry.section as EditSectionInfo).hint && <div className="edit-popup__hint">{(entry.section as EditSectionInfo).hint}</div>}
             </div>
             <button
               type="button"
