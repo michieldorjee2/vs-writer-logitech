@@ -67,10 +67,10 @@
     }
   ],
   "redirects": [
-    { "source": "/en/:path*", "destination": "/:path*", "permanent": true }
+    { "source": "/en/:path*", "destination": "/:path*", "permanent": true },
+    { "source": "/", "destination": "/search", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
     { "source": "/preview", "destination": "/index.html" },
     { "source": "/assets/:path*", "destination": "/assets/:path*" },
     { "source": "/opensearch.xml", "destination": "/opensearch.xml" },
