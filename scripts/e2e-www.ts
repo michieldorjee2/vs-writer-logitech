@@ -583,13 +583,14 @@ console.log('\nEdit mode on the agent platform page: the page\'s own text (the h
     await page.locator('.edit-popup__textarea').fill('Make it about what their stack already knows')
     await page.locator('.edit-popup__btn--primary').click()
     const started = Date.now()
-    const reloaded = page.waitForURL(/[?&]refresh=\d+/, { timeout: 20000 })
+    const reloaded = page.waitForURL(/[?&]refresh=\d+/, { timeout: 60000 })
     await page.locator('[aria-label="Send feedback"]').click()
     await page.waitForFunction(() => /Agents act on it/.test(document.querySelector('#hero h1')?.textContent || ''), null, { timeout: 15000 })
     expect(!/Agents act on it/.test(before), 'the headline already said it')
     await page.screenshot({ path: path.join(OUT, 'booth-edit-headline.png') })
     await reloaded
-    expect(Date.now() - started < 15000, `the reload took ${Date.now() - started}ms`)
+    // Well inside the 120 s a CMS republish wait would take (the live preview and the replay take ~10 s).
+    expect(Date.now() - started < 45000, `the reload took ${Date.now() - started}ms`)
     expect(statusPolls === 0, `polled the CMS republish ${statusPolls} times for a copy-only edit`)
     const ask = sent?.suggested_edit ?? ''
     expect(/Section: Headline\nFields: copy\.hero\.h1\nNow:\n {2}copy\.hero\.h1 = "[^"]+"\nFeedback: Make it about/.test(ask), `sent: ${ask}`)

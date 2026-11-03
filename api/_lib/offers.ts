@@ -8,6 +8,7 @@ import { isFromSearch } from '../../src/lib/offer-from-search.js';
 import type { OfferPage, RunningOffer } from '../../src/lib/offer-looks.js';
 import { runningOffers, type AldusOffer } from './aldus.js';
 import { offerPagesByOffer } from './offer-pages.js';
+import { parentAccountsOf, parentKey } from './parent-account.js';
 
 const routeOf = (pageUrl: string) => {
   try {
@@ -40,7 +41,19 @@ export function withPages(offer: AldusOffer, graph: Map<string, OfferPage[]>): R
 
 export async function listRunning(fresh = false): Promise<RunningOffer[]> {
   const [offers, graph] = await Promise.all([runningOffers(fresh), offerPagesByOffer().catch(() => new Map<string, OfferPage[]>())]);
-  return offers.map((o) => withPages(o, graph));
+  const running = offers.map((o) => withPages(o, graph));
+  // Pages Aldus UI wrote that Graph doesn't list yet have no logo: their parent account's, by name.
+  const inGraph = new Set([...graph.values()].flat().map((p) => p.route));
+  const bare = running.flatMap((o) => o.pages.filter((p) => !p.logoUrl && !inGraph.has(p.route)));
+  if (bare.length) {
+    const parents = await parentAccountsOf(bare.map((p) => ({ companyName: p.companyName })));
+    for (const p of bare) {
+      const parent = parents.get(parentKey(p.companyName));
+      if (parent?.logo) p.logoUrl = parent.logo;
+      if (parent?.domain) p.domain ??= parent.domain;
+    }
+  }
+  return running;
 }
 
 export async function aldusOffer(id: string, fresh = false): Promise<AldusOffer | null> {
