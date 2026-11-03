@@ -11,7 +11,7 @@ import {
   type XraySectionInfo,
 } from '../lib/xray-defaults';
 import { buildSuggestedEdit } from '../lib/edit-payload';
-import { applyLiveField, resetLive } from '../www/live-edit';
+import { applyLiveField, changedLiveFields, getLivePatch, mergeLive, resetLive } from '../www/live-edit';
 import { deriveCustomerName, getPageSlug } from '../lib/page-identity';
 import { streamEdit, editKind, type EditKind } from '../lib/opal-edit-stream';
 import { animateSectionEdit } from '../lib/inplace-edit';
@@ -649,6 +649,34 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         await waitForRepublish(pageKey, { published: baselinePublished, lastModified: baselineModified }, ac.signal);
       } else {
         await sleep(2500);
+      }
+      // Agent platform page: show every saved change on the page before the reload, part by part
+      // (spotlight, re-render, glow), including any Mark saved without narrating it.
+      if (agentPlatform && !ac.signal.aborted) {
+        try {
+          const route = slug.replace(/^\/+|\/+$/g, '');
+          const res = await fetch(`/api/content?slug=${encodeURIComponent(route)}&_=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
+          const saved = res.ok ? ((await res.json()) as Record<string, unknown>) : null;
+          if (saved) {
+            for (const [sectionId] of entries) {
+              const sec = byId.get(sectionId);
+              const shown = mergeLive(page as unknown as Record<string, unknown>, getLivePatch());
+              const changed = changedLiveFields(sec?.fields ?? [], shown, saved);
+              if (!changed.length) continue;
+              setFocusSectionId(sectionId);
+              setLiveStatus(`Showing what changed: ${sec?.title ?? sectionId}`);
+              scrollToSection(sectionId);
+              await sleep(600);
+              for (const f of changed) applyLiveField(f, saved[f]);
+              await nextFrame();
+              for (const f of changed) flashField(f);
+              await sleep(1800);
+            }
+            setFocusSectionId(null);
+          }
+        } catch {
+          /* the reload shows the saved page either way */
+        }
       }
       if (!ac.signal.aborted) {
         const u = new URL(window.location.href);

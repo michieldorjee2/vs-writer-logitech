@@ -487,6 +487,41 @@ console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
   await ctx.close()
 }
 
+console.log('\nEdit mode on the agent platform page when Mark saves without narrating (agent v1.4.2 did)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  // The stored page, and the same page as Mark saved it: one tool added to the stack.
+  const slug = ACCOUNT.replace(/^\/+|\/+$/g, '')
+  const stored = (await (await fetch(`${BASE}/api/content?slug=${encodeURIComponent(slug)}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).json()) as { techStack?: Array<{ Name: string; ColorTag: string | null }> }
+  const saved = { ...stored, techStack: [{ Name: 'Shopify Plus', ColorTag: null }, ...(stored.techStack ?? [])] }
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    // Only the terminal event: no plan, no focus, no edit lines.
+    const done = { type: 'done', saved: true, changes: ['Added Shopify Plus to the stack'] }
+    const body = `data: ${JSON.stringify({ k: 'tool', name: 'update_page', phase: 'result', ok: true })}\n\ndata: ${JSON.stringify({ k: 'text', t: JSON.stringify(done) })}\n\ndata: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
+  // The save is live at once, and the saved page is what the content API answers after it.
+  await ctx.route('**/api/edit-status**', (route) => route.fulfill({ json: { changed: true, published: '2026-01-01T00:00:00.000Z' } }))
+  await ctx.route(/\/api\/content\?slug=[^&]+&_=/, (route) => route.fulfill({ json: saved }))
+  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  await test('the saved change is shown on the page before the reload: spotlight, re-render, glow', async () => {
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.locator('[aria-label="Leave feedback on What they run today"]').click()
+    await page.locator('.edit-popup__textarea').fill('They use Shopify Plus too')
+    await page.locator('.edit-popup__btn--primary').click()
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForSelector('.edit-spot--on', { timeout: 15000 })
+    await page.waitForFunction(() => /Shopify Plus/.test(document.querySelector('[data-xray="tech-stack"]')?.textContent || ''), null, { timeout: 15000 })
+    await page.waitForFunction(() => [...document.querySelectorAll('.live-changed')].some((e) => ((e as HTMLElement).dataset.field || '').split(' ').includes('techStack')), null, { timeout: 3000 })
+    await page.screenshot({ path: path.join(OUT, 'booth-edit-replay.png') })
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
 console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
 {
   const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })

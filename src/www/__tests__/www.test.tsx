@@ -33,7 +33,7 @@ import { OFFER_SLOTS, readOffer, type ElementData } from '../offer-content'
 import { plain, richToStacked } from '../ui'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
-import { applyLiveField, LIVE_FIELDS, liveValue, mergeLive, resetLive } from '../live-edit'
+import { applyLiveField, changedLiveFields, LIVE_FIELDS, liveValue, mergeLive, resetLive } from '../live-edit'
 import AgentPlatformPage from '../AgentPlatformPage'
 import offerBlueprint from '../../cms/blueprints/offer'
 import WwwAccountRoute from '../WwwAccountRoute'
@@ -1102,6 +1102,14 @@ test('a live edit re-renders the page from the new value: every place the field 
   // N2/N3 still hold on live values: a competitor or a stakeholder name never shows.
   const leak = renderToString(<AgentPlatformPage page={mergeLive(base, { investments: [{ Name: 'AEM upgrade led by Pat Example', IsPrimary: true }] })} />)
   assert.ok(!/AEM upgrade|Pat Example/.test(textOf(leak)))
+})
+
+test('after the save, Edit mode replays the parts whose saved value differs from what the page shows', () => {
+  const shown = { intelStats: [{ Value: '1', Label: 'a' }, { Value: '2', Label: 'visitors' }], techStack: [{ Name: 'X', ColorTag: null }], headline: 'h' }
+  const saved = { intelStats: [{ Value: '1', Label: 'a' }], techStack: [{ Name: 'X', ColorTag: null }], headline: 'changed' }
+  assert.deepEqual(changedLiveFields(['intelStats', 'techStack'], shown, saved), ['intelStats'])
+  // Only fields the page can show live; a takeout field never replays.
+  assert.deepEqual(changedLiveFields(['headline'], shown, saved), [])
 })
 
 test('the live store checks each value\'s shape and starts empty for the server', () => {
