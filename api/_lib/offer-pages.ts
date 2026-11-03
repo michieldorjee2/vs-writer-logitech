@@ -71,7 +71,10 @@ export async function offerPagesByOffer(): Promise<Map<string, OfferPage[]>> {
     const items = body.data?.ABMExperience?.items ?? [];
     for (const item of items) {
       const offerId = offerIdOf(item.componentPlan);
-      const route = (item._metadata.url.hierarchical || '').replace(/^\/+|\/+$/g, '');
+      // Offer pages are served under /vb/ (the www offer page); the bare CMS path is not a page on
+      // this site, and Aldus UI's page log names the same page as vb/<slug> (api/_lib/offers.ts).
+      const slug = (item._metadata.url.hierarchical || '').replace(/^\/+|\/+$/g, '');
+      const route = slug ? `vb/${slug}` : '';
       if (!offerId || !route || !item.companyName) continue;
       const list = byOffer.get(offerId) ?? [];
       const own = item.customerLogo?.default ?? null;

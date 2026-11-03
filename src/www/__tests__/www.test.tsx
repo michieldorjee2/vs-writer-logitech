@@ -35,6 +35,7 @@ import { fitVars, plain, richToStacked } from '../ui'
 import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from '../../lib/parent-account'
 import { forgetParentAccounts, parentAccountsOf, parentKey, withParentAccount } from '../../../api/_lib/parent-account'
 import { forgetOfferPages, offerPagesByOffer } from '../../../api/_lib/offer-pages'
+import { withPages } from '../../../api/_lib/offers'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
 import { applyLiveField, changedLiveFields, getLivePatch, LIVE_FIELDS, liveFieldValue, liveValue, mergeLive, resetLive } from '../live-edit'
@@ -939,14 +940,27 @@ testAsync('the search page lists each offer page with its parent account\'s logo
         return graphAnswer(items)
       }) as typeof fetch
       forgetOfferPages()
-      const pages = (await offerPagesByOffer()).get('lab') ?? []
-      const logo = (route: string) => pages.find((p) => p.route === route)?.logoUrl
+      const graph = await offerPagesByOffer()
+      const pages = graph.get('lab') ?? []
+      // Each page is listed at the address it is served at (/vb/<slug>), not the bare CMS path.
+      assert.ok(pages.length === 5 && pages.every((p) => p.route.startsWith('vb/lab-')), pages.map((p) => p.route).join(', '))
+      const logo = (route: string) => pages.find((p) => p.route === `vb/${route}`)?.logoUrl
       assert.equal(logo('lab-ralph-lauren-corp'), RL_LOGO, 'by the company name')
       assert.equal(logo('lab-microsoft-australia'), 'https://cdn.example.test/ms.svg', 'a regional office, over a placeholder image')
       assert.equal(logo('lab-ot'), 'https://cdn.example.test/ot.svg', 'by the Salesforce account')
-      assert.equal(pages.find((p) => p.route === 'lab-ot')?.domain, 'opentable.com')
+      assert.equal(pages.find((p) => p.route === 'vb/lab-ot')?.domain, 'opentable.com')
       assert.equal(logo('lab-dynatrace'), null, 'no account page: no logo, the initials')
       assert.equal(logo('lab-own'), 'https://cdn.example.test/own.svg', 'its own logo kept')
+      // Aldus UI's page log names the same pages as /vb/ URLs: merged, each company once.
+      const offer = withPages(
+        { id: 'lab', title: 'Lab', windowStart: null, windowEnd: null, look: null, fromSearch: 'off', pages: [
+          { pageUrl: 'https://showcase.optimizely.com/vb/lab-ralph-lauren-corp', accountName: 'Ralph Lauren Corp.', liveSince: '2026-11-03' },
+          { pageUrl: '/vb/lab-new-co', accountName: 'New Co', liveSince: '2026-11-04' },
+        ] } as never,
+        graph,
+      )
+      assert.equal(offer.pages.length, 6, offer.pages.map((p) => p.route).join(', '))
+      assert.equal(offer.pages.filter((p) => p.companyName === 'Ralph Lauren Corp.').length, 1, 'Ralph Lauren listed twice')
       // One batched query for the four pages without a logo, not one each; the page with its own logo isn't asked about.
       assert.equal(parentQueries.length, 1, `${parentQueries.length} parent queries`)
       assert.ok(!parentQueries[0].urls.some((u) => u.startsWith('/own-logo')), 'asked about a page with its own logo')
