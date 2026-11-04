@@ -26,6 +26,11 @@ export type BuildRecord = {
   /** Account builds: the website Mark resolves the Salesforce account from, and its domain. */
   website?: string;
   domain?: string;
+  /**
+   * Account builds the rep picked from the search page's list: the Salesforce account Mark
+   * builds, exactly (sent as the workflow's company_name). Server-side only: summaries never carry it.
+   */
+  crmAccountId?: string;
   /** Person builds: the account page they hang off (its name as Mark wrote it). */
   companyName?: string;
   personTitle?: string;

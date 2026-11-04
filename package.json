@@ -20,7 +20,9 @@
     "tokens:build": "node scripts/build-tokens.js",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "check:from-search": "tsx scripts/check-offer-from-search.ts",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:www"
+    "check:search-fixes": "tsx scripts/check-search-fixes.ts",
+    "check:account-match": "tsx scripts/check-account-match.ts",
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:render && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:www"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.20",

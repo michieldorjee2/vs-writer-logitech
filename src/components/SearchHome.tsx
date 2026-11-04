@@ -15,6 +15,8 @@ import {
   type Entry,
 } from '../lib/search-entries';
 import { usePageRequest } from '../hooks/usePageRequest';
+import { choiceMeta, domainOf } from '../lib/account-match';
+import { brandLogoTypeUrl } from '../lib/brand-logo';
 import { clearOfflineCopies, INDEX_URL, keepIndex, readKeptIndex } from '../lib/home-offline';
 import { fillOfferWords, OFFER_ASK_WORDS, offerAddShown } from '../lib/offer-from-search';
 import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from '../lib/home-scenes';
@@ -710,7 +712,9 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
         Math.min(MAX_SEARCH_ROWS, Math.floor((box.h - rhythm.above - (look?.location || look?.dates ? 34 : 0) - panelHeight(0, rhythm)) / (rhythm.row + rhythm.gap))),
       )
     : IDLE_ROWS;
-  const rowsFor = (v: View) => (v === 'search' ? searchRows : IDLE_ROWS);
+  /* Picking an account: the note, then as many accounts as the search view has rows for. */
+  const pickRows = req.phase === 'pick' && req.matches ? Math.max(IDLE_ROWS, Math.min(searchRows, req.matches.accounts.length + 1)) : IDLE_ROWS;
+  const rowsFor = (v: View) => (v === 'search' ? searchRows : v === 'request' ? pickRows : IDLE_ROWS);
   const depth = !ready && wanted !== 'request' ? loadingHeight(rhythm) : panelHeight(rowsFor(wanted), rhythm);
 
   const motion = useRef({ depth: START_DEPTH, from: START_DEPTH, to: START_DEPTH, start: 0, dur: 1, raf: 0 });
@@ -861,7 +865,13 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       // Offered only to an empty column, it never showed for a company another page merely
       // contains: "Target" listed TechTarget and Darden, and left no way to ask for Target.
       const named = (name: string) => name.toLowerCase() === ql;
-      const companyHere = !!findCompany(q) || shownBuilds.some((b) => b.kind === 'account' && named(b.name));
+      // A page named exactly what was typed, or on the website typed. Not a page whose address
+      // merely reads like it: "lenovo" found the Atlassian page built at /lenovo (3 Nov) and hid
+      // the way to ask for Lenovo. The account list marks the accounts that have a page anyway.
+      const typedSite = domainOf(q);
+      const companyHere =
+        companies.some((e) => named(e.name) || (!!typedSite && e.domain.toLowerCase() === typedSite)) ||
+        shownBuilds.some((b) => b.kind === 'account' && named(b.name));
       const personHere = people.some((p) => named(p.name)) || shownBuilds.some((b) => b.kind === 'person' && named(b.name));
       const withAdd = (found: Row[], here: boolean, add: 'account' | 'person'): Row[] =>
         !q || here ? found : [...found.slice(0, rows - 1), { key: `add:${add}`, kind: 'add', add }];
@@ -913,7 +923,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       ];
     }
     return [];
-  }, [view, query, companies, people, recentSlugs, recentItems, mine, rows, shownBuilds, running, findCompany]);
+  }, [view, query, companies, people, recentSlugs, recentItems, mine, rows, shownBuilds, running]);
 
   // Nothing to walk (or offer to add) until the lists are on screen.
   const navRows = ready ? columns.flatMap((c) => c.rows) : [];
@@ -942,6 +952,9 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       if (e.key === 'Escape') {
         e.preventDefault();
         req.cancel();
+      } else if (req.phase === 'pick' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        req.movePick(e.key === 'ArrowDown' ? 1 : -1);
       }
       return;
     }
@@ -972,6 +985,14 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
     return () => window.removeEventListener('focus', onReturn);
   }, [focused]);
 
+  /* The field is disabled while Salesforce is asked, which drops the caret; give it back
+     when the list arrives, so the arrows and Enter pick from it. */
+  const reqBusy = req.submitting;
+  const reqPhase = req.phase;
+  useEffect(() => {
+    if (reqPhase && reqPhase !== 'sent' && !reqBusy) inputRef.current?.focus({ preventScroll: true });
+  }, [reqPhase, reqBusy]);
+
   // `/` focuses search from anywhere on the page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -997,27 +1018,40 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
     (req.offerMode
       ? OFFER_ASK_WORDS.hint[req.offerMode]
       : req.phase === 'sent'
-      ? 'It shows up in your list while Mark works; open it to watch.'
-      : req.phase === 'person'
-        ? req.companyIsNew
-          ? "Mark builds the company's page first (about 15 minutes), then this person's (about 4 more)."
-          : 'Mark builds a page for this person in about 4 minutes. It shows up in your list while it works.'
-        : req.kind === 'person'
-          ? 'First the company they work at: one that has a page, or its domain if it has none yet. Then their name.'
-          : req.askedName
-            ? `Multiple companies might match “${req.askedName}”. Enter the company's domain, e.g. anaplan.com, so we know we're building the right one. Mark then builds the page in about 15 minutes and messages you on Teams when it's live.`
-            : `Mark finds the company by its domain, researches it and builds the page in about 15 minutes. It shows up in your list while it works, and Mark messages you on Teams${
-                identity ? ` at ${identity.email}` : ''
-              } when it's live.`);
+      ? req.sentStarted
+        ? 'It shows up in your list while Mark works; open it to watch.'
+        : 'Nothing new is built.'
+      : req.phase === 'pick'
+        ? (req.kind === 'person' ? 'Which company do they work at? ' : 'Which one do you mean? ') +
+          (req.matches?.more || (req.matches && req.matches.accounts.length > pickRows - 1)
+            ? 'Not listed? Type more of the name, or its website.'
+            : 'These are the accounts in Salesforce.')
+        : req.phase === 'person'
+          ? req.companyIsNew
+            ? "Mark builds the company's page first (about 15 minutes), then this person's (about 4 more)."
+            : 'Mark builds a page for this person in about 4 minutes. It shows up in your list while it works.'
+          : req.submitting
+            ? 'Looking it up in Salesforce…'
+            : req.kind === 'person'
+              ? 'First the company they work at, by name or website. Then their name.'
+              : `Type the company's name or website, then pick the account. Mark researches it and builds the page in about 15 minutes; it shows up in your list while it works, and Mark messages you on Teams${
+                  identity ? ` at ${identity.email}` : ''
+                } when it's live.`);
 
   /* The go button turns into a + when what it would do is ask Mark for a page. */
   const activeRow = view === 'search' && !leaving ? navRows[activeIdx] : undefined;
   const addRow = activeRow?.kind === 'add' ? activeRow : null;
-  const adding = req.phase === 'company' || req.phase === 'person' || !!addRow;
+  const adding = req.phase === 'company' || req.phase === 'pick' || req.phase === 'person' || !!addRow;
   const goLabel = req.phase
     ? req.offerMode
       ? OFFER_ASK_WORDS.go[req.offerMode]
-      : 'Send to Mark'
+      : req.phase === 'pick'
+        ? req.kind === 'person'
+          ? 'Choose this company'
+          : 'Build this page'
+        : req.phase === 'company' && req.kind !== 'offer'
+          ? 'Look it up'
+          : 'Send to Mark'
     : addRow
       ? addRow.add === 'account'
         ? 'Add company'
@@ -1194,6 +1228,28 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
                 <p className={'sh-note' + (req.error ? ' sh-note--error' : '')} style={slot(1, 0)}>
                   {requestHint}
                 </p>
+                {req.phase === 'pick' &&
+                  req.matches?.accounts.slice(0, pickRows - 1).map((account, i) => (
+                    <button
+                      key={account.key}
+                      type="button"
+                      style={slot(i + 2, 0)}
+                      className={'sh-row sh-row--account' + (i === req.activePick ? ' is-active' : '')}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => req.setActivePick(i)}
+                      onClick={() => req.choose(i)}
+                      disabled={req.submitting}
+                    >
+                      <Tile sources={[account.domain ? brandLogoTypeUrl(account.domain, 'icon') : null]} label={initialsOf(account.name)} />
+                      <span className="sh-row__text">
+                        <span className="sh-row__name">
+                          {account.name}
+                          {account.page && <span className="sh-badge">Has a page</span>}
+                        </span>
+                        <span className="sh-row__meta">{choiceMeta(account)}</span>
+                      </span>
+                    </button>
+                  ))}
               </div>
             </div>
           ) : (

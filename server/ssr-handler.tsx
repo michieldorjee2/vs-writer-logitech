@@ -1055,8 +1055,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const slug = url.pathname.replace(/^\/|\/$/g, '');
   const template = htmlTemplate;
 
-  // Home + preview → SPA shell (no SSR needed)
-  if (!slug || slug === 'preview') {
+  // The site has no page of its own at its root: the search page is where everyone starts.
+  // Temporary, so browsers don't hold on to it if the root gets a page later. (vercel.json
+  // redirects / before it reaches here; this covers the dev server and serve-prod.)
+  if (!slug) {
+    res.setHeader('Location', `/search${url.search}`);
+    return res.status(307).end();
+  }
+
+  // Preview → SPA shell (no SSR needed)
+  if (slug === 'preview') {
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(template);
   }

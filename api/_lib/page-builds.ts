@@ -50,6 +50,8 @@ export async function pageExists(route: string): Promise<boolean> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: PAGE_AT_ROUTE_QUERY, variables: { url: `/${route}/` } }),
+    // A hung Graph call would otherwise hold "+ Add company" for the function's 300 s.
+    signal: AbortSignal.timeout(10_000),
   });
   const body = (await r.json()) as { data?: { _Content?: { total?: number } } };
   return (body.data?._Content?.total ?? 0) > 0;
@@ -77,7 +79,7 @@ export async function freeRoute(store: BuildStore, base: string, parent = ''): P
 
 export async function startAccountBuild(
   store: BuildStore,
-  input: { website: string; domain: string; name: string; email: string },
+  input: { website: string; domain: string; name: string; email: string; crmAccountId?: string },
 ): Promise<BuildRecord> {
   const route = await freeRoute(store, slugify(input.name) || 'company');
   const record: BuildRecord = {
@@ -87,12 +89,15 @@ export async function startAccountBuild(
     route,
     website: input.website,
     domain: input.domain,
+    ...(input.crmAccountId ? { crmAccountId: input.crmAccountId } : {}),
     email: input.email,
     startedAt: Date.now(),
     status: 'running',
   };
   record.executionId = await startWorkflow(ACCOUNT_WORKFLOW_ID, {
-    company_name: input.website,
+    // A picked account goes by its Salesforce id, so Mark builds that account and no other
+    // on the same website; the gather step reads either (wiki opal/account-intelligence).
+    company_name: input.crmAccountId || input.website,
     edit_user_email: input.email,
     page_route: route,
     requested_at: new Date().toISOString(),
@@ -150,6 +155,20 @@ function resolvedCompanyName(execution: MarkExecution): string | null {
   return null;
 }
 
+/**
+ * Why the account workflow refused the request, in its own words: the gather step's
+ * `request_problem` (e.g. no Salesforce account lists the website). The "tell the requester"
+ * agent's reply is no substitute: when the requester is the workflow's own identity it only
+ * says it cannot message itself.
+ */
+export function requestProblemOf(execution: MarkExecution): string | null {
+  for (const s of flattenSteps(execution.step_executions)) {
+    const rv = (s as { output_data?: { return_value?: { request_problem?: unknown } } }).output_data?.return_value;
+    if (typeof rv?.request_problem === 'string' && rv.request_problem.trim()) return rv.request_problem.trim();
+  }
+  return null;
+}
+
 /** Reads the build's run and moves the record on: done, failed, or (a waiting person build) started. */
 export async function refreshBuild(store: BuildStore, record: BuildRecord): Promise<{ record: BuildRecord; execution: MarkExecution | null }> {
   if (record.status === 'waiting' && record.after) {
@@ -175,9 +194,7 @@ export async function refreshBuild(store: BuildStore, record: BuildRecord): Prom
 
   const execution = await cached(`ex:${record.executionId}`, () => getExecution(record.executionId as string));
   if (record.status === 'running' && (isDone(execution.status) || isFailed(execution.status))) {
-    const steps = flattenSteps(execution.step_executions);
-    const page = steps.find((s) => s.step_id === pageStepId(record.kind));
-    const refused = steps.find((s) => s.step_id === ACCOUNT_REFUSED_STEP);
+    const page = flattenSteps(execution.step_executions).find((s) => s.step_id === pageStepId(record.kind));
     const landed = page && isDone(page.status) ? routeFromResponse(page.result?.response) : null;
     if (landed) {
       record = {
@@ -188,17 +205,23 @@ export async function refreshBuild(store: BuildStore, record: BuildRecord): Prom
         ...(record.kind === 'account' ? { companyName: resolvedCompanyName(execution) ?? record.name } : {}),
       };
     } else {
-      const why = refused ? responseText(refused.result?.response) : execution.error_message || page?.error_message || '';
-      record = {
-        ...record,
-        status: 'failed',
-        finishedAt: Date.now(),
-        error: firstSentence(why) || 'Mark finished without building the page.',
-      };
+      record = { ...record, status: 'failed', finishedAt: Date.now(), error: failedBuildError(execution, record.kind) };
     }
     await saveBuild(store, record);
   }
   return { record, execution };
+}
+
+/** The line the rep sees when a finished run built no page. */
+export function failedBuildError(execution: MarkExecution, kind: BuildRecord['kind']): string {
+  // The workflow's own reason is kept whole: its second sentence says what to do about it.
+  const problem = requestProblemOf(execution);
+  if (problem) return problem.replace(/\s+/g, ' ').slice(0, 300);
+  const steps = flattenSteps(execution.step_executions);
+  const page = steps.find((s) => s.step_id === pageStepId(kind));
+  const refused = steps.find((s) => s.step_id === ACCOUNT_REFUSED_STEP);
+  const why = refused ? responseText(refused.result?.response) : execution.error_message || page?.error_message || '';
+  return firstSentence(why) || 'Mark finished without building the page.';
 }
 
 function firstSentence(text: string): string {
