@@ -8,6 +8,7 @@
     "build": "npm run tokens:build && tsc -b && vite build && node scripts/build-ssr.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "check:badge": "node scripts/check-badge-read.mjs",
     "check:graph": "node scripts/check-graph-queries.mjs",
     "check:www": "node scripts/check-www.mjs",
     "e2e:www": "tsx scripts/e2e-www.ts",
@@ -22,7 +23,7 @@
     "check:search-fixes": "tsx scripts/check-search-fixes.ts",
     "check:account-match": "tsx scripts/check-account-match.ts",
     "check:cta-ping": "python3 mark/cta-ping/test_step.py",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:cta-ping && npm run check:www"
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:badge && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:cta-ping && npm run check:www"
   },
   "dependencies": {
     "@optimizely/cms-sdk": "3.1.0",

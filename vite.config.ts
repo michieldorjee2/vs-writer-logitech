@@ -121,6 +121,7 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
         const url = new URL(req.url || '', 'http://localhost')
         // The functions this serves, as Vercel routes them: [pattern, file, the path segment that is `id`].
         const routes: Array<[RegExp, string]> = [
+          [/^\/api\/badge-read$/, '/api/badge-read.ts'],
           [/^\/api\/page-builds$/, '/api/page-builds/index.ts'],
           // Before [id], as Vercel serves a file ahead of a dynamic segment.
           [/^\/api\/page-builds\/match$/, '/api/page-builds/match.ts'],

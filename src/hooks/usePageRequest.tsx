@@ -5,6 +5,8 @@ import { askAnswerOf, askNote } from '../lib/offer-from-search';
 import type { FromSearch } from '../lib/offer-looks';
 import type { BuildSummary } from '../lib/page-builds';
 import { looksLikeWebsite } from '../lib/search-entries';
+import { READ_FAILURE } from '../lib/badge-scan';
+import { useBadgeCard } from './useBadgeCard';
 
 /*
  * Asking Mark for a page that does not exist yet, from the search page, held
@@ -57,6 +59,23 @@ const linkTo = (route: string) => (
     showcase.optimizely.com/{route}
   </a>
 );
+
+/** The "sent" lines, for a company page and for a person's (asked for here or from a badge). */
+const accountNote = ({ build }: { build: BuildSummary }) => (
+  <>
+    Mark is building <b>{build.name}</b>. Follow along at {linkTo(build.route)}.
+  </>
+);
+const personNote = ({ build, company: first }: { build: BuildSummary; company?: BuildSummary }) =>
+  first ? (
+    <>
+      Mark builds <b>{first.name}</b>'s page first, then <b>{build.name}</b>'s at {linkTo(build.route)}.
+    </>
+  ) : (
+    <>
+      Mark is building <b>{build.name}</b>'s page. Follow along at {linkTo(build.route)}.
+    </>
+  );
 
 export function usePageRequest({
   findCompany,
@@ -141,15 +160,30 @@ export function usePageRequest({
     [findCompany, lookUp],
   );
 
+  /* A badge the rep scanned (phones, useBadgeCard): it has the bar and the panel until it is sent or put away. */
+  const badge = useBadgeCard({
+    findCompany,
+    // A read that failed: the rep types the company instead, as for any person page.
+    onFailed: (failure) => {
+      start('person', '');
+      setError(failure === 'signed-out' ? sendErrorMessage(new Error('signed-out')) : `${READ_FAILURE[failure]} Type their company instead.`);
+    },
+  });
+  const { active: badgeUp, cancel: cancelBadge, edit: editBadge, submit: submitBadge, stop: stopBadge } = badge;
+
   const cancel = useCallback(() => {
     if (submitting) return;
+    if (!phase && badgeUp) cancelBadge();
     setPhase(null);
     setMatches(null);
     setError(null);
-  }, [submitting]);
+  }, [submitting, phase, badgeUp, cancelBadge]);
 
+  /** Sends a page request; true once Mark has it (or already had it). */
   const send = useCallback(
-    async (body: Record<string, unknown>, note: (builds: { build: BuildSummary; company?: BuildSummary }) => ReactNode) => {
+    async (body: Record<string, unknown>, note: (builds: { build: BuildSummary; company?: BuildSummary }) => ReactNode): Promise<boolean> => {
+      /* Set only once it is sent: the panel's heading then names what was asked for (a badge asks for either). */
+      const sentKind: RequestKind = body.kind === 'account' ? 'account' : 'person';
       setSubmitting(true);
       setError(null);
       try {
@@ -165,7 +199,7 @@ export function usePageRequest({
           setMatches(null);
           setPhase('company');
           setError(answer?.message || 'That list is out of date. Search for the company again.');
-          return;
+          return false;
         }
         // Asked for minutes ago and still being built, or it has a page: say so instead of starting a second build.
         if (r.status === 409) {
@@ -174,17 +208,21 @@ export function usePageRequest({
             answer?.route ? <>{answer.message?.replace(/:.*$/, '')}: {linkTo(answer.route)}</> : answer?.message || 'This page was asked for a few minutes ago and is still being built.',
           );
           setSentStarted(!answer?.route);
+          setKind(sentKind);
           setPhase('sent');
-          return;
+          return true;
         }
         if (!r.ok) throw new Error(`${r.status}`);
         const started = (await r.json()) as { build: BuildSummary; company?: BuildSummary };
         onStarted([started.company, started.build].filter((b): b is BuildSummary => !!b));
         setSentNote(note(started));
         setSentStarted(true);
+        setKind(sentKind);
         setPhase('sent');
+        return true;
       } catch (err) {
         setError(sendErrorMessage(err));
+        return false;
       } finally {
         setSubmitting(false);
       }
@@ -239,11 +277,7 @@ export function usePageRequest({
         setPhase('sent');
         return;
       }
-      void send({ kind: 'account', lookup: matches.lookup, key: account.key }, ({ build }) => (
-        <>
-          Mark is building <b>{build.name}</b>. Follow along at {linkTo(build.route)}.
-        </>
-      ));
+      void send({ kind: 'account', lookup: matches.lookup, key: account.key }, accountNote);
     },
     [matches, kind, submitting, send],
   );
@@ -285,17 +319,7 @@ export function usePageRequest({
     if (phase === 'person' && companyRef) {
       const who = person.trim();
       if (!who) return setError("Enter the person's name");
-      return send({ kind: 'person', personName: who, company: companyRef }, ({ build, company: first }) =>
-        first ? (
-          <>
-            Mark builds <b>{first.name}</b>'s page first, then <b>{build.name}</b>'s at {linkTo(build.route)}.
-          </>
-        ) : (
-          <>
-            Mark is building <b>{build.name}</b>'s page. Follow along at {linkTo(build.route)}.
-          </>
-        ),
-      );
+      return send({ kind: 'person', personName: who, company: companyRef }, personNote);
     }
   }, [phase, kind, company, person, companyRef, findCompany, send, offerRef, askOffer, lookUp, choose, activePick]);
 
@@ -327,15 +351,43 @@ export function usePageRequest({
           ? 'Company domain, e.g. anaplan.com'
           : 'Company name or website, e.g. Lenovo';
 
+  /** The go button on a badge: the line being fixed goes back to the card, or the card goes to Mark. */
+  const sendCard = useCallback(async () => {
+    setError(null);
+    const asked = submitBadge();
+    if (!asked) return;
+    if (await send(asked.body, asked.body.kind === 'account' ? accountNote : personNote)) stopBadge();
+  }, [submitBadge, send, stopBadge]);
+
+  const editCard = useCallback(
+    (field: 'person' | 'company') => {
+      if (submitting) return;
+      setError(null);
+      editBadge(field);
+    },
+    [submitting, editBadge],
+  );
+
+  /* While a badge is up (and no request of this hook's own), the bar and the panel are the badge's. */
+  const shown = !phase && badgeUp ? badge : null;
   return {
-    phase,
+    phase: shown ? shown.phase : phase,
     kind,
-    value,
-    setValue,
-    placeholder,
-    error,
+    value: shown ? shown.value : value,
+    setValue: shown ? shown.setValue : setValue,
+    placeholder: shown ? shown.placeholder : placeholder,
+    error: shown?.error ?? error,
     submitting,
     sentNote,
+    /** A badge Mark read, while the rep checks it (the line being fixed: `phase`), and its company. */
+    card: shown?.card ?? null,
+    cardCompany: shown?.cardCompany ?? null,
+    /** The bar's line in place of the field while Mark reads the badge and while the card waits for a send. */
+    badgeStatus: shown?.status ?? null,
+    /** The panel's note for a badge (null otherwise). */
+    badgeHint: shown?.hint ?? null,
+    scan: badge.scan,
+    edit: editCard,
     sentStarted,
     /** While the rep picks: the accounts Salesforce matched, and the row the keyboard is on. */
     matches,
@@ -349,6 +401,6 @@ export function usePageRequest({
     offerMode: kind === 'offer' ? (offerRef?.fromSearch ?? null) : null,
     start,
     cancel,
-    submit,
+    submit: shown ? sendCard : submit,
   };
 }

@@ -17,6 +17,8 @@ import {
 import { usePageRequest } from '../hooks/usePageRequest';
 import { choiceMeta, domainOf } from '../lib/account-match';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
+import { cardLines } from '../lib/badge-card';
+import { useBadgeReady } from '../lib/badge-scan';
 import { clearOfflineCopies, INDEX_URL, keepIndex, readKeptIndex } from '../lib/home-offline';
 import { fillOfferWords, OFFER_ASK_WORDS, offerAddShown } from '../lib/offer-from-search';
 import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from '../lib/home-scenes';
@@ -33,6 +35,7 @@ import {
   type RunningOffer,
   type ShownOffer,
 } from '../lib/offer-looks';
+import BadgeScanButton from './BadgeScanButton';
 import OptimizelyWordmark from './OptimizelyWordmark';
 import ProfileMenu from './ProfileMenu';
 import '../styles/search-home.css';
@@ -348,7 +351,16 @@ function LookCard({ job, title, onRetry }: { job: LookJob; title: string; onRetr
 /** Stagger slot for the rise and drop animations: rows down a column, columns slightly apart. */
 const slot = (row: number, col: number) => ({ '--i': row + col * 0.7 }) as CSSProperties;
 
-export default function SearchHome({ scene, offer: servedOffer = null }: { scene: Scene; offer?: ShownOffer | null }) {
+export default function SearchHome({
+  scene,
+  offer: servedOffer = null,
+  badgeReady = null,
+}: {
+  scene: Scene;
+  offer?: ShownOffer | null;
+  /** Whether Mark's badge reader is set up, as the server said (null: ask; the dev server). */
+  badgeReady?: boolean | null;
+}) {
   const heroRef = useRef<HTMLElement | null>(null);
   const liftRef = useRef<HTMLDivElement | null>(null);
   const listsRef = useRef<HTMLDivElement | null>(null);
@@ -643,6 +655,13 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
     [companies],
   );
   const req = usePageRequest({ findCompany, onStarted: addBuilds });
+  /* Phones: a camera in the bar when Mark's badge reader is set up (MARK_BADGE_AGENT_ID). */
+  const scanReady = useBadgeReady(!!identity, badgeReady);
+  /* A badge line tapped to fix: the bar's field comes back in its place, ready to type. */
+  const fixingLine = !!req.card && (req.phase === 'person' || req.phase === 'company' || req.phase === 'title');
+  useEffect(() => {
+    if (fixingLine) inputRef.current?.focus();
+  }, [fixingLine, req.phase]);
 
   /* `?q=`: the browser's "search Showcase" entry (public/opensearch.xml) lands here
      with the query. Filled in after the first render, so the server's HTML and the
@@ -1013,6 +1032,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       ? `${shownCount.toLocaleString()} companies and counting…`
       : 'Search companies and people…';
 
+  const badgeLines = req.card ? cardLines(req.card, req.cardCompany) : null;
   const requestHint =
     req.error ??
     (req.offerMode
@@ -1135,9 +1155,9 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
               else inputRef.current?.focus();
             }}
           >
-            {req.phase === 'sent' ? (
+            {req.phase === 'sent' || req.badgeStatus ? (
               <p className="sh-search__status" role="status">
-                {req.sentNote}
+                {req.phase === 'sent' ? req.sentNote : req.badgeStatus}
               </p>
             ) : (
               <input
@@ -1176,15 +1196,16 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
                 Cancel
               </button>
             )}
+            {scanReady && !req.phase && <BadgeScanButton onPhoto={(file) => void req.scan(file)} />}
             {req.phase !== 'sent' && (
               <button
                 type="submit"
                 className="sh-search__go"
-                data-icon={adding ? 'add' : 'go'}
+                data-icon={adding || req.card ? 'add' : 'go'}
                 aria-label={goLabel}
-                disabled={req.submitting}
+                disabled={req.submitting || req.phase === 'reading'}
               >
-                {req.submitting ? (
+                {req.submitting || req.phase === 'reading' ? (
                   <span className="sh-spinner" aria-hidden="true" />
                 ) : (
                   <>
@@ -1221,6 +1242,47 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
         <div className="sh-panel__body" ref={listsRef}>
           {!ready && view !== 'request' ? (
             <p className={'sh-loading' + (loadingOut ? ' is-leaving' : '')}>Finding recent &amp; your brands…</p>
+          ) : view === 'request' && (req.card || req.phase === 'reading') ? (
+            // A badge Mark read: who and which company. A tapped line is fixed in the bar.
+            <div className="sh-cols sh-cols--single" data-anim={anim ?? undefined} key="request">
+              <div className="sh-col sh-badge-card">
+                <h2 style={slot(0, 0)}>From the badge</h2>
+                {badgeLines &&
+                  (['person', 'company'] as const).map((field, r) => {
+                    const line = badgeLines[field];
+                    const logo = 'route' in line && line.route ? (companies.find((e) => e.slug === line.route)?.logoUrl ?? null) : null;
+                    return (
+                      <button
+                        key={field}
+                        type="button"
+                        style={slot(r + 1, 0)}
+                        className={'sh-row' + (line.missing ? ' sh-row--add' : '') + (line.meta ? '' : ' sh-row--plain') + (req.phase === field || (field === 'person' && req.phase === 'title') ? ' is-active' : '')}
+                        disabled={req.submitting}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => req.edit(field)}
+                      >
+                        {line.missing ? (
+                          <span className="sh-tile" aria-hidden="true">
+                            <PlusIcon />
+                          </span>
+                        ) : (
+                          <Tile sources={[logo]} label={initialsOf(line.name)} />
+                        )}
+                        <span className="sh-row__text">
+                          <span className="sh-row__name">{line.name}</span>
+                          {line.meta && <span className="sh-row__meta">{line.meta}</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                {/* No note when a row already says what to tap. */}
+                {(req.error ?? req.badgeHint) && (
+                  <p className={'sh-note' + (req.error ? ' sh-note--error' : '')} style={slot(badgeLines ? 3 : 1, 0)}>
+                    {req.error ?? req.badgeHint}
+                  </p>
+                )}
+              </div>
+            </div>
           ) : view === 'request' ? (
             <div className="sh-cols sh-cols--single" data-anim={anim ?? undefined} key="request">
               <div className="sh-col">
