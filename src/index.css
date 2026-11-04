@@ -936,6 +936,12 @@ html:has(.vb-hero--full) body {
    row one shared scope: 01, 02, 03. */
 .vb-experience .vb-row { counter-reset: abm-friction; }
 
+/* In the CMS preview the frame is sized to the page, so nothing may be as tall as the frame: the
+   loading and error screens get a fixed height there (src/main.tsx sets the attribute). */
+html[data-cms-preview] .min-h-screen {
+    min-height: 560px;
+}
+
 /* The CMS preview's note while a saved draft loads (src/components/CmsPreview.tsx). The frame is
    the whole page there, so it sits at the top, where the editor is looking. */
 .cms-preview-busy {

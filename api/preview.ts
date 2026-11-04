@@ -100,6 +100,12 @@ export function concreteType(item: { __typename?: string; _metadata?: { types?: 
   return item._metadata?.types?.find(isConcrete) ?? null;
 }
 
+/** Graph refused the token (measured: `{"code":"AUTHENTICATION_ERROR","status":401,"details":{"msg":"Token expired"}}`). */
+function refused(json: unknown): string | null {
+  const j = json as { code?: unknown; details?: { msg?: unknown } } | null;
+  return j?.code === 'AUTHENTICATION_ERROR' ? String(j.details?.msg || 'refused') : null;
+}
+
 function one(query: unknown): string | undefined {
   return typeof query === 'string' ? query : undefined;
 }
@@ -128,10 +134,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (loc) variables.loc = [loc];
 
   try {
-    const typed = graphItems<{ __typename?: string; _metadata?: { types?: string[] | null } | null }>(
-      await queryGraph(auth, PREVIEW_TYPE_QUERY, variables),
-      '_Content',
-    )?.[0];
+    const typeJson = await queryGraph(auth, PREVIEW_TYPE_QUERY, variables);
+    // A CMS preview token lives five minutes; the CMS hands a new one with every save. An old one
+    // is not "no such draft": say so, so the page can tell the editor to reload it.
+    const why = previewToken ? refused(typeJson) : null;
+    if (why) return res.status(401).json({ error: `The preview token was refused (${why})`, expired: /expired/i.test(why) });
+    const typed = graphItems<{ __typename?: string; _metadata?: { types?: string[] | null } | null }>(typeJson, '_Content')?.[0];
     const typeName = concreteType(typed);
     if (!typeName) return res.status(404).json({ error: 'Content not found' });
 
