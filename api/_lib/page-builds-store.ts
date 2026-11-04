@@ -16,7 +16,7 @@ import type { BuildRecord } from '../../src/lib/page-builds.js';
 const KEEP_SECONDS = 3 * 24 * 60 * 60;
 const PER_REP = 12;
 
-export type BuildStore = Pick<Redis, 'get' | 'set' | 'del' | 'lpush' | 'ltrim' | 'lrange' | 'expire' | 'mget'>;
+export type BuildStore = Pick<Redis, 'get' | 'set' | 'del' | 'lpush' | 'ltrim' | 'lrange' | 'expire' | 'mget' | 'incr'>;
 
 export function buildStore(): BuildStore | null {
   const url = process.env.KV_REST_API_URL;

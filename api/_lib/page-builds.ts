@@ -79,7 +79,7 @@ export async function freeRoute(store: BuildStore, base: string, parent = ''): P
 
 export async function startAccountBuild(
   store: BuildStore,
-  input: { website: string; domain: string; name: string; email: string },
+  input: { website: string; domain: string; name: string; email: string; crmAccountId?: string },
 ): Promise<BuildRecord> {
   const route = await freeRoute(store, slugify(input.name) || 'company');
   const record: BuildRecord = {
@@ -89,12 +89,15 @@ export async function startAccountBuild(
     route,
     website: input.website,
     domain: input.domain,
+    ...(input.crmAccountId ? { crmAccountId: input.crmAccountId } : {}),
     email: input.email,
     startedAt: Date.now(),
     status: 'running',
   };
   record.executionId = await startWorkflow(ACCOUNT_WORKFLOW_ID, {
-    company_name: input.website,
+    // A picked account goes by its Salesforce id, so Mark builds that account and no other
+    // on the same website; the gather step reads either (wiki opal/account-intelligence).
+    company_name: input.crmAccountId || input.website,
     edit_user_email: input.email,
     page_route: route,
     requested_at: new Date().toISOString(),
