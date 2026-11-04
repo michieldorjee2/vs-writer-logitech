@@ -58,7 +58,7 @@ export default function AgentPlatformPage({ page, search = '' }: { page: Competi
     return typeof v === 'string' ? v : ''
   }
   return (
-    <ConnectProvider page={page} people={people} scheduleUrl={c.scheduleUrl} teamLabel="your Optimizely account team">
+    <ConnectProvider people={people} scheduleUrl={c.scheduleUrl} teamLabel="your Optimizely account team">
       <WwwPage className="www-ap">
         <div id="main-content">
           <Hero c={c} t={t} />

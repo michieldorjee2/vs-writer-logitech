@@ -1,0 +1,21 @@
+{
+  "event": "cta_click",
+  "ping_id": "77dfb03f-a82d-4ee3-97a1-36b20f6f4043",
+  "requested_at": "2026-11-04T23:06:28.545Z",
+  "account": "Zürich Versicherung – “Group” | AG",
+  "page": "https://showcase.optimizely.com/zurich-versicherung/",
+  "button": "the bar that follows them down the page",
+  "campaign": "source: outreach · campaign: q4 <takeout>",
+  "rep": {
+    "name": "Alex Exec",
+    "role": "Enterprise Account Executive",
+    "email": "alex.exec@optimizely.com"
+  },
+  "team": [
+    {
+      "name": "Sam Rep",
+      "role": "Sales Development Representative"
+    }
+  ],
+  "check": "d7074fcf19ee96fce1c672956f4279b46eb2a738c775dba3917bfc07b897d757"
+}

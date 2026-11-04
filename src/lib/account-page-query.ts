@@ -67,3 +67,23 @@ ${ACCOUNT_PAGE_FIELDS}
   }
 }
 `;
+
+/**
+ * What the CTA ping (api/cta-ping.ts) reads of the page at a route: enough to name the account
+ * (src/lib/page-identity.ts deriveCustomerName) and our team on it. Nothing the visitor sends
+ * decides who is messaged; this does.
+ */
+export const ACCOUNT_TEAM_QUERY = `
+query GetPageTeam($slug: String!) {
+  CompetitorComparisonPage(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+      _metadata { url { default hierarchical } }
+      eyebrow intelHeadline
+      teamMembers { Initials Name Role Email }
+    }
+  }
+}
+`;
