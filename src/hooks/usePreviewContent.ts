@@ -1,118 +1,72 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { PreviewContent } from '../lib/graph-types';
 
 interface PreviewContentState {
     data: PreviewContent | null;
     isLoading: boolean;
     error: string | null;
+    /** A later draft is loading while the current one stays on screen. */
+    isRefreshing: boolean;
+    /** Fetch the same draft again (the CMS saved it and the preview token is unchanged). */
+    reload: () => void;
 }
 
+/** What one fetch answered, and for which request (key, version, locale, token, attempt). */
+interface Loaded {
+    request: string;
+    data: PreviewContent | null;
+    error: string | null;
+}
+
+/**
+ * The draft the CMS is previewing: `key`, `ver`, `loc` and the editor's `preview_token` from the
+ * preview URL, resolved by /api/preview into the same content the live address renders.
+ *
+ * Saves are not watched here: the CMS SDK's PreviewComponent (CmsPreview.tsx) waits for each save
+ * to be ready, then either routes to the new preview URL (a new token or version: new params, so
+ * this fetches again) or calls `reload`. What is on screen stays up while the next draft loads,
+ * and a failed refresh keeps it rather than blanking the editor's view.
+ */
 export function usePreviewContent(params: URLSearchParams): PreviewContentState {
-    const [state, setState] = useState<PreviewContentState>({
-        data: null,
-        isLoading: true,
-        error: null,
-    });
+    const [attempt, setAttempt] = useState(0);
+    const reload = useCallback(() => setAttempt((n) => n + 1), []);
+    const [loaded, setLoaded] = useState<Loaded | null>(null);
 
     const key = params.get('key');
     const ver = params.get('ver');
     const loc = params.get('loc');
-    const previewToken = params.get('preview_token');
+    const token = params.get('preview_token');
+    const request = key ? JSON.stringify([key, ver, loc, token, attempt]) : null;
 
-    // Store the latest token (may be refreshed by CMS events)
-    const tokenRef = useRef(previewToken);
-    tokenRef.current = previewToken;
-
-    const load = useCallback(async (overrideToken?: string) => {
-        if (!key) {
-            setState({ data: null, isLoading: false, error: 'Missing key parameter' });
-            return;
-        }
-
-        setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-        try {
-            const qs = new URLSearchParams({ key });
-            if (ver) qs.set('ver', ver);
-            if (loc) qs.set('loc', loc);
-
-            // Use override token (from contentSaved event) or the URL token
-            const token = overrideToken || tokenRef.current;
-            if (token) qs.set('preview_token', token);
-
-            const res = await fetch(`/api/preview?${qs}`);
-
-            if (!res.ok) {
-                throw new Error(res.status === 404 ? 'Content not found' : `Failed to load (${res.status})`);
-            }
-
-            const content: PreviewContent = await res.json();
-            setState({ data: content, isLoading: false, error: null });
-        } catch (err) {
-            setState({ data: null, isLoading: false, error: (err as Error).message });
-        }
-    }, [key, ver, loc]);
-
-    // Initial load
     useEffect(() => {
-        load();
-    }, [load]);
+        if (!key || !request) return;
+        const ac = new AbortController();
+        const qs = new URLSearchParams({ key });
+        if (ver) qs.set('ver', ver);
+        if (loc) qs.set('loc', loc);
+        if (token) qs.set('preview_token', token);
 
-    // Listen for CMS SaaS live preview events
-    useEffect(() => {
-        // 1. Named custom event: optimizely:cms:contentSaved (per SaaS docs)
-        //    Includes fresh previewToken and previewUrl
-        function handleContentSaved(event: Event) {
-            const detail = (event as CustomEvent).detail;
-            if (detail?.previewToken) {
-                tokenRef.current = detail.previewToken;
-            }
-            setTimeout(() => load(detail?.previewToken), 300);
-        }
+        fetch(`/api/preview?${qs}`, { signal: ac.signal, cache: 'no-store' })
+            .then(async (res) => {
+                if (!res.ok) throw new Error(res.status === 404 ? 'Content not found' : `Failed to load (${res.status})`);
+                const content: PreviewContent = await res.json();
+                setLoaded({ request, data: content, error: null });
+            })
+            .catch((err: Error) => {
+                if (ac.signal.aborted) return;
+                setLoaded((prev) => (prev?.data ? { ...prev, request } : { request, data: null, error: err.message }));
+            });
+        return () => ac.abort();
+    }, [key, ver, loc, token, request]);
 
-        // 2. Fallback: generic postMessage for older CMS versions
-        function handleMessage(event: MessageEvent) {
-            const data = event.data;
-            if (!data) return;
-
-            const isContentUpdate =
-                (typeof data === 'string' && (
-                    data.includes('contentSaved') ||
-                    data.includes('contentPublished')
-                )) ||
-                (typeof data === 'object' && (
-                    data.type === 'beta/contentSaved' ||
-                    data.type === 'contentSaved' ||
-                    data.type === 'beta/contentPublished' ||
-                    data.type === 'contentPublished' ||
-                    data.action === 'updated' ||
-                    data.action === 'saved'
-                ));
-
-            if (isContentUpdate) {
-                // Extract fresh token if available in the message
-                const freshToken = typeof data === 'object' ? data.previewToken : null;
-                if (freshToken) tokenRef.current = freshToken;
-                setTimeout(() => load(freshToken || undefined), 500);
-            }
-        }
-
-        window.addEventListener('optimizely:cms:contentSaved', handleContentSaved);
-        window.addEventListener('message', handleMessage);
-
-        return () => {
-            window.removeEventListener('optimizely:cms:contentSaved', handleContentSaved);
-            window.removeEventListener('message', handleMessage);
-        };
-    }, [load]);
-
-    return state;
-}
-
-/** Returns true when ctx=edit (CMS editor mode with property overlays) */
-export function useIsEditMode(): boolean {
-    const [searchParams] = (typeof window !== 'undefined'
-        ? [new URLSearchParams(window.location.search)]
-        : [new URLSearchParams()]);
-    return searchParams.get('ctx') === 'edit';
+    if (!key) return { data: null, isLoading: false, isRefreshing: false, error: 'Missing key parameter', reload };
+    const settled = loaded?.request === request;
+    const data = loaded?.data ?? null;
+    return {
+        data,
+        isLoading: !data && !settled,
+        isRefreshing: !!data && !settled,
+        error: settled && loaded ? loaded.error : null,
+        reload,
+    };
 }

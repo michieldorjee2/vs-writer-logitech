@@ -33,43 +33,34 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* ABM / Aldus 1:1 landing page — granular per-component breakdown.
-   Each selector also matches `[data-xray="<id>"]`, the hook the www-design account page
-   (src/www/AccountPage.tsx, ?design=www) puts on the same component, so X-ray and Edit mode
-   work on both renderers without knowing which one is on screen. */
-const ABM_XRAY_LEGACY: XraySectionInfo[] = [
-  {
-    id: 'hero-3d',
-    selector: '#hero-canvas',
-    title: 'Hero brand mark',
-    tools: ['Brandfetch'],
-    sources: ['Brand logo', 'Brand colours', 'Brand description'],
-    notes: 'Logo extruded in real-time from the brand SVG.',
-  },
+/* The account page's parts that came from the earlier account page, under the same ids (so a
+   page's stored X-ray overrides still apply): the agent platform page puts `data-xray="<id>"` on
+   each. */
+const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
   {
     id: 'hero-title',
-    selector: '.hero__title',
+    selector: '[data-xray="hero-title"]',
     title: 'Hero headline',
     tools: ['Mark'],
     sources: ['Custom pitch copy', 'Persona-targeted messaging', 'Approved terms'],
   },
   {
     id: 'hero-subtitle',
-    selector: '.hero__subtitle',
+    selector: '[data-xray="hero-subtitle"]',
     title: 'Hero subtitle',
     tools: ['Mark'],
     sources: ['Personalised supporting line', 'Approved messaging frameworks'],
   },
   {
     id: 'intel-headline',
-    selector: '.intel__headline',
+    selector: '[data-xray="intel-headline"]',
     title: 'Account intel headline',
     tools: ['Mark', '6sense'],
     sources: ['Account name', 'Industry', 'Funnel stage'],
   },
   {
     id: 'intel-stats',
-    selector: '.intel__stat-item',
+    selector: '[data-xray="intel-stats"]',
     title: 'Stat ribbon',
     tools: ['Web browsing', 'LinkedIn', 'Sitemap'],
     sources: [
@@ -80,27 +71,15 @@ const ABM_XRAY_LEGACY: XraySectionInfo[] = [
     ],
   },
   {
-    id: 'stakeholders',
-    selector: '.intel__person-card',
-    title: 'Key stakeholders',
-    tools: ['LinkedIn', 'Salesforce', 'Gravatar'],
-    sources: [
-      'Main contacts + roles',
-      'Account owner',
-      'Key contacts on file',
-      'Profile pictures',
-    ],
-  },
-  {
     id: 'tech-stack',
-    selector: '.intel__tech-stack',
+    selector: '[data-xray="tech-stack"]',
     title: 'Current tech stack',
     tools: ['BuiltWith'],
     sources: ['Detected vendors on the live site'],
   },
   {
     id: 'investments',
-    selector: '.intel__invest-list',
+    selector: '[data-xray="investments"]',
     title: 'Strategic investments',
     tools: ['Web browsing', 'Salesforce'],
     sources: [
@@ -110,116 +89,15 @@ const ABM_XRAY_LEGACY: XraySectionInfo[] = [
     ],
   },
   {
-    id: 'news',
-    selector: '.intel__news',
-    title: 'In the news',
-    tools: ['Web browsing'],
-    sources: [
-      'Google News',
-      'Newsroom feed',
-      'Recent c-level changes',
-      'Recent acquisition news',
-    ],
-  },
-  {
-    id: 'challenge-headline',
-    selector: '.challenge__headline',
-    title: 'Challenge headline',
-    tools: ['Mark'],
-    sources: [
-      'Competitive positioning',
-      'Messaging frameworks',
-      'Website best practices',
-    ],
-  },
-  {
-    id: 'challenge-screenshot',
-    selector: '.challenge__screenshot',
-    title: 'Current website capture',
-    tools: ['Mark', 'Web browsing'],
-    sources: ['Live screenshot of brand site', 'Customer website URL'],
-    notes: 'Real capture, not stock imagery.',
-  },
-  {
-    id: 'pain-points',
-    selector: '.challenge__pain',
-    title: 'Pain points',
-    tools: ['Mark', 'Web browsing'],
-    sources: [
-      'Site-derived pain narrative',
-      'Competitive positioning',
-      'Customer website context',
-    ],
-  },
-  {
-    id: 'comparison-row',
-    selector: '.comparison__row',
-    title: 'Comparison row',
-    tools: ['CMS', 'Mark'],
-    sources: [
-      'Competitive pages',
-      'Approved product language',
-      'Competitive positioning',
-    ],
-  },
-  {
-    id: 'logo-wall',
-    selector: '.proof__logo-item, .proof__logo-you',
-    title: 'Reference customer',
-    tools: ['CMS'],
-    sources: ['Approved customer logos', 'Vertical-matched stories'],
-  },
-  {
-    id: 'testimonials',
-    selector: '.proof__testimonial',
-    title: 'Testimonial',
-    tools: ['CMS'],
-    sources: ['Customer stories', 'Approved customer quotes'],
-  },
-  {
-    id: 'analysts',
-    selector: '.proof__analyst-card',
-    title: 'Analyst recognition',
-    tools: ['CMS'],
-    sources: [
-      'Forrester TEI report',
-      'Gartner MQ',
-      'Forrester Wave',
-      'Analyst reports',
-    ],
-  },
-  {
-    id: 'roi-cards',
-    selector: '.roi__card',
-    title: 'ROI metric',
-    tools: ['CMS', '6sense'],
-    sources: [
-      'Forrester TEI report',
-      'Industry-segmented uplift bands',
-      'Account funnel stage',
-    ],
-  },
-  {
-    id: 'roi-projection',
-    selector: '.roi__projection',
-    title: 'Revenue projection',
-    tools: ['CMS', '6sense'],
-    sources: [
-      'TEI extrapolation',
-      'Industry benchmarks',
-      'Account activity signals',
-    ],
-  },
-  {
     id: 'timeline-phases',
-    selector: '.timeline__phase',
+    selector: '[data-xray="timeline-phases"]',
     title: 'Migration phase',
     tools: ['Mark'],
     sources: ['Phased rollout copy', 'Approved migration template'],
   },
   {
     id: 'team-members',
-    selector: '.migration-team__member',
+    selector: '[data-xray="team-members"]',
     title: 'Account team',
     tools: ['Salesforce', 'Gravatar'],
     sources: [
@@ -231,7 +109,7 @@ const ABM_XRAY_LEGACY: XraySectionInfo[] = [
   },
   {
     id: 'cta-title',
-    selector: '.cta__title',
+    selector: '[data-xray="cta-title"]',
     title: 'Closing CTA headline',
     tools: ['Mark', 'ODP'],
     sources: [
@@ -242,7 +120,7 @@ const ABM_XRAY_LEGACY: XraySectionInfo[] = [
   },
   {
     id: 'cta-description',
-    selector: '.cta__description',
+    selector: '[data-xray="cta-description"]',
     title: 'CTA description',
     tools: ['Mark'],
     sources: ['Closing supporting line', 'Approved messaging'],
@@ -468,30 +346,8 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
   },
 ];
 
-export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [
-  ...ABM_XRAY_LEGACY.map((s) => ({
-    ...s,
-    selector: `${s.selector}, [data-xray="${s.id}"]`,
-  })),
-  ...AGENT_PLATFORM_XRAY,
-];
-
-/** The ids the legacy page and the takeout template share. */
-export const ABM_XRAY_LEGACY_IDS = ABM_XRAY_LEGACY.map((s) => s.id);
-
-/* Dynamic comparison page — non-ABM variant. Falls back to section IDs
- * since the dynamic layout is content-driven and less themed. */
-export const DYNAMIC_XRAY_DEFAULTS: XraySectionInfo[] = [
-  { id: 'hero',         selector: '#hero',         title: 'Hero',          tools: ['Mark'],         sources: ['Eyebrow, headline, subheadline', 'Primary CTA copy'] },
-  { id: 'logos',        selector: '#logos',        title: 'Logo Bar',      tools: ['CMS'],          sources: ['Approved customer logos'] },
-  { id: 'features',     selector: '#features',     title: 'Features',      tools: ['Mark', 'CMS'],  sources: ['Feature headlines + descriptions', 'Approved product language'] },
-  { id: 'comparison',   selector: '#comparison',   title: 'Comparison',    tools: ['CMS', 'Mark'],  sources: ['Competitive pages', 'Approved product language'] },
-  { id: 'analyst',      selector: '#analyst',      title: 'Analyst Quote', tools: ['CMS'],          sources: ['Analyst reports', 'Forrester / Gartner quotes'] },
-  { id: 'testimonials', selector: '#testimonials', title: 'Testimonials',  tools: ['CMS'],          sources: ['Customer stories', 'Approved quotes'] },
-  { id: 'faq',          selector: '#faq',          title: 'FAQ',           tools: ['Mark'],         sources: ['Curated questions + answers'] },
-  { id: 'promo',        selector: '#promo',        title: 'Promo Card',    tools: ['Mark'],         sources: ['Promo headline + CTA'] },
-  { id: 'final-cta',    selector: '#final-cta',    title: 'Closing CTA',   tools: ['Mark', 'ODP'],  sources: ['Closing headline + CTA', 'One-click form-less action'] },
-];
+/** Every part X-ray and Edit mode can find on an account page (the agent platform template). */
+export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [...ACCOUNT_XRAY_SHARED, ...AGENT_PLATFORM_XRAY];
 
 /** Merge any CMS-supplied overrides into the defaults. */
 /* ── 1:1 person page ──────────────────────────────────────────────────────

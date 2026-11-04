@@ -1,7 +1,8 @@
 /**
  * A local production stand-in for end-to-end checks: serves the built `dist/` the way Vercel
- * does and runs the same two functions a page needs, api/ssr.ts (the server render) and
- * api/content.ts (client-side fetches), through a minimal Vercel request/response adapter.
+ * does and runs the functions a page needs, api/ssr.ts (the server render), api/content.ts
+ * (client-side fetches) and api/preview.ts (the CMS preview's draft), through a minimal Vercel
+ * request/response adapter.
  *
  *   npm run build && npx tsx scripts/serve-prod.ts [port]     # default 5199
  *
@@ -32,6 +33,7 @@ const TYPES: Record<string, string> = {
 type Handler = (req: unknown, res: unknown) => Promise<unknown> | unknown
 const ssr: Handler = (await import(path.join(ROOT, 'api/ssr.ts'))).default
 const content: Handler = (await import(path.join(ROOT, 'api/content.ts'))).default
+const preview: Handler = (await import(path.join(ROOT, 'api/preview.ts'))).default
 
 /** The parts of VercelRequest/VercelResponse the two handlers use. */
 function adapt(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
@@ -61,9 +63,9 @@ function adapt(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`)
   try {
-    if (url.pathname === '/api/content') {
+    if (url.pathname === '/api/content' || url.pathname === '/api/preview') {
       const [a, b] = adapt(req, res, url)
-      return await content(a, b)
+      return await (url.pathname === '/api/content' ? content : preview)(a, b)
     }
     const file = path.join(DIST, decodeURIComponent(url.pathname))
     if (file.startsWith(DIST) && url.pathname !== '/' && fs.existsSync(file) && fs.statSync(file).isFile()) {

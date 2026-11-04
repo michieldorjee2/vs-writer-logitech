@@ -2,7 +2,7 @@
 
 **Status: proposal, needs sign-off.** Nothing has been registered in the CMS.
 
-`CompetitorComparisonPage` is frozen: 67 properties, about 2,800 pages, and the takeout template still reads every one of them. Adding agent platform fields to it would change a content type that thousands of live pages depend on, so the new content goes somewhere else.
+`CompetitorComparisonPage` is frozen: 67 properties, about 2,800 pages. Adding agent platform fields to it would change a content type that thousands of live pages depend on, so the new content goes somewhere else.
 
 ## Proposal: an `agent-platform` ABMExperience blueprint
 

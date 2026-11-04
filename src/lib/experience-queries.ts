@@ -124,6 +124,15 @@ const COMPOSITION_SELECTION = `
 `;
 
 /** The account page. Page-level properties only — every line of copy is in the composition. */
+const ABM_EXPERIENCE_FIELDS = `
+      _metadata { key url { default hierarchical } published }
+      salesforceAccountID companySlug companyName
+      brandDomain brandAccentColor customerLogo { default } competitorName
+      PageTitle MetaDescription noIndex
+      componentPlan template generatedAt generatedBy
+${COMPOSITION_SELECTION}
+`;
+
 export const ABM_EXPERIENCE_QUERY = `
 query GetABMExperience($slug: String!) {
   ABMExperience(
@@ -131,12 +140,7 @@ query GetABMExperience($slug: String!) {
     locale: en
   ) {
     items {
-      _metadata { key url { default hierarchical } published }
-      salesforceAccountID companySlug companyName
-      brandDomain brandAccentColor customerLogo { default } competitorName
-      PageTitle MetaDescription noIndex
-      componentPlan template generatedAt generatedBy
-${COMPOSITION_SELECTION}
+${ABM_EXPERIENCE_FIELDS}
     }
   }
 }
@@ -144,13 +148,7 @@ ${COMPOSITION_ELEMENT_FRAGMENT}
 `;
 
 /** The person page. Same composition, a different identity block. */
-export const PERSON_EXPERIENCE_QUERY = `
-query GetPersonExperience($slug: String!) {
-  PersonExperience(
-    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
-    locale: en
-  ) {
-    items {
+const PERSON_EXPERIENCE_FIELDS = `
       _metadata { key url { default hierarchical } published }
       companySlug companyName personSlug personName personTitle personInitials
       personAvatarColor personLinkedIn { default } crmContactId
@@ -158,6 +156,48 @@ query GetPersonExperience($slug: String!) {
       PageTitle MetaDescription noIndex
       componentPlan template generatedAt generatedBy
 ${COMPOSITION_SELECTION}
+`;
+
+export const PERSON_EXPERIENCE_QUERY = `
+query GetPersonExperience($slug: String!) {
+  PersonExperience(
+    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
+    locale: en
+  ) {
+    items {
+${PERSON_EXPERIENCE_FIELDS}
+    }
+  }
+}
+${COMPOSITION_ELEMENT_FRAGMENT}
+`;
+
+/**
+ * The same two, one version by key: how the CMS previews a draft (api/preview.ts). With the
+ * editor's preview token Graph returns that draft; with the site's key, only what is published.
+ */
+export const ABM_EXPERIENCE_PREVIEW_QUERY = `
+query GetABMExperiencePreview($key: String!, $ver: String, $loc: [Locales]) {
+  ABMExperience(
+    where: { _metadata: { key: { eq: $key }, version: { eq: $ver } } }
+    locale: $loc
+  ) {
+    items {
+${ABM_EXPERIENCE_FIELDS}
+    }
+  }
+}
+${COMPOSITION_ELEMENT_FRAGMENT}
+`;
+
+export const PERSON_EXPERIENCE_PREVIEW_QUERY = `
+query GetPersonExperiencePreview($key: String!, $ver: String, $loc: [Locales]) {
+  PersonExperience(
+    where: { _metadata: { key: { eq: $key }, version: { eq: $ver } } }
+    locale: $loc
+  ) {
+    items {
+${PERSON_EXPERIENCE_FIELDS}
     }
   }
 }
@@ -169,6 +209,12 @@ export const EXPERIENCE_QUERIES: Array<{ typeName: string; query: string; templa
   { typeName: 'ABMExperience', query: ABM_EXPERIENCE_QUERY, template: 'abm-experience' },
   { typeName: 'PersonExperience', query: PERSON_EXPERIENCE_QUERY, template: 'person-experience' },
 ];
+
+/** `__typename` -> the query for one version by key, and the tag the live route gives it. */
+export const EXPERIENCE_PREVIEW_QUERIES: Record<string, { query: string; template: string }> = {
+  ABMExperience: { query: ABM_EXPERIENCE_PREVIEW_QUERY, template: 'abm-experience' },
+  PersonExperience: { query: PERSON_EXPERIENCE_PREVIEW_QUERY, template: 'person-experience' },
+};
 
 // ---------------------------------------------------------------------------
 // Normalisation

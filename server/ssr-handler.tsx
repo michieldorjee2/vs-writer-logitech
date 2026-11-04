@@ -1,29 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { renderToString } from 'react-dom/server';
 import { Suspense, type ReactElement } from 'react';
-import DynamicComparisonPageServer from '../src/components/DynamicComparisonPage.server';
-import ABMHyperPage from '../src/components/ABMHyperPage';
 import RetailCustomerPage from '../src/components/RetailCustomerPage';
 import FinServPageServer from '../src/components/FinServPage.server';
 import PersonPageServer from '../src/components/PersonPage.server';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content';
-/*
- * UseCasePage is imported DIRECTLY, not through a `.server.tsx` twin like the
- * five above it. Those twins exist for two reasons — React.lazy does not work
- * with renderToString, and the tracking hook has to come out — and neither
- * applies here: this renderer lazy-loads nothing, and useOdpTracking does all
- * its work inside useEffect, which never runs on the server. Duplicating it
- * would only buy the drift the existing twins already have (the server copy of
- * DynamicComparisonPage has quietly lost the hero's `id="hero"` anchor).
- */
-import UseCasePage from '../src/components/UseCasePage';
-import WwwAccountPage from '../src/www/WwwAccountRoute';
+import AgentPlatformPage from '../src/www/AgentPlatformPage';
 import WwwOfferPage from '../src/www/OfferPage';
-import { isOfferExperience, wantsTakeout, wantsWwwDesign } from '../src/www/design';
+import { isOfferExperience } from '../src/www/design';
 import { agentPlatformHead } from '../src/www/agent-platform/content';
-import { includes, resolveComponentPlan } from '../src/lib/limitless/component-plan';
 import { resolveUrl } from '../src/lib/graph-types';
 import { graphItems } from '../src/lib/graph-envelope';
+import { ACCOUNT_PAGE_QUERY } from '../src/lib/account-page-query';
 import type {
   AtelierNoteBlock,
   CompetitorComparisonPage,
@@ -338,45 +326,7 @@ query GetFinServPage($slug: String!) {
  * check the registered type before adding a field here, and run
  * `npm run check:graph`.
  */
-const PAGE_QUERY = `
-query GetPage($slug: String!) {
-  CompetitorComparisonPage(
-    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
-    locale: en
-  ) {
-    items {
-      _metadata { key url { default hierarchical } published lastModified }
-      PageTitle MetaDescription
-      eyebrow headline subheadline cta link { default }
-      comparisonHeadline
-      comparisonTableRows { Category OurValue CompetitorValue }
-      analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
-      promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
-      endHeadline endSubheadline endCTA endCTALink { default }
-      testimonial1 testimonial1JobTitle testimonial1Company
-      testimonial2 testimonial2JobTitle testimonial2Company
-      customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
-      challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
-      comparisonDescription logoWallCustomerSlot
-      roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
-      migrationTitle migrationDescription stickyCTAText
-      ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
-      footerTagline footerLegal
-      intelStats { Value Label }
-      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor EngagementTier EngagementNote PersonSlug CrmContactId }
-      techStack { Name ColorTag }
-      investments { Name IsPrimary }
-      newsItems { Date Headline Url { default } }
-      painPoints { Title Description }
-      roiCards { Metric Unit Label CitationText }
-      timelinePhases { Title Description MarkerColor }
-      teamMembers { Initials Name Role Email }
-      footerLinks { Text Url { default } }
-      analystCards { Badge Source Category Url { default } }
-    }
-  }
-}
-`;
+const PAGE_QUERY = ACCOUNT_PAGE_QUERY;
 
 /** The two introspection probes' answers. */
 type TypeProbe = { data?: { __type?: { name?: string; fields?: Array<{ name: string }> | null } | null } | null } | null | undefined;
@@ -1182,8 +1132,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      // The www design (src/www), the default; ?design=classic for the previous one. Mirrors VisualBuilderPage.tsx.
-      const appHtml = wantsWwwDesign(url.searchParams) && isOfferExperience(item)
+      // An offer in the www offer design, any other experience from its composition. Mirrors ExperienceBody in VisualBuilderPage.tsx.
+      const appHtml = isOfferExperience(item)
         ? renderExperienceRoute(<WwwOfferPage experience={item} />)
         : renderExperienceRoute(
             <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
@@ -1235,21 +1185,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- Render React component tree to HTML ----
-    // Three templates: retail (luxury fashion), abm (B2B account-based), comparison (B2B vs-X).
-    // Retail is tagged in fetchPageContent; ABM is signal-detected.
-    /*
-     * The use-case arm must exist HERE as well as in src/App.tsx.
-     *
-     * The two dispatches are independent copies, and a page that server-renders
-     * as ABM while the client renders it as use-case is a hydration failure on
-     * a public URL. It cannot fire yet — `componentPlan` is not a registered
-     * field and is not in PAGE_QUERY, so the plan resolves `derived` and this is
-     * false for all 2,695 pages — but it has to be wired before the field is,
-     * not after. Keep the two in step; see
-     * aldus-ui/docs/limitless-use-case-template.md.
-     */
+    // Person, retail and fin-serv pages by their tag; every account page the agent platform
+    // template. Mirrors src/App.tsx's renderPageBody.
     let appHtml: string;
-    // What the <head> is built from: the page, except on the www agent platform template.
+    // What the <head> is built from: the page, except on the agent platform template.
     let headSource: typeof page = page;
     switch (page.__template) {
       case 'person':
@@ -1269,20 +1208,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'finserv':
         appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
-      default: {
-        // The www design (src/www), the default; ?design=classic for the previous one. Mirrors App.tsx's renderPageBody.
-        if (wantsWwwDesign(url.searchParams)) {
-          appHtml = renderPageRoute(<WwwAccountPage page={page} search={url.search} />);
-          if (!wantsTakeout(url.searchParams)) headSource = agentPlatformHead(page);
-          break;
-        }
-        const componentPlan = resolveComponentPlan(page);
-        appHtml = includes(componentPlan, 'use-case-matrix')
-          ? renderPageRoute(<UseCasePage page={page} plan={componentPlan} />)
-          : page.intelEyebrow || page.customerLogo
-            ? renderPageRoute(<ABMHyperPage page={page} />)
-            : renderPageRoute(<DynamicComparisonPageServer page={page} />);
-      }
+      default:
+        // The agent platform template; its <head> replaces the stored title and description (N2).
+        appHtml = renderPageRoute(<AgentPlatformPage page={page} search={url.search} />);
+        headSource = agentPlatformHead(page);
     }
 
     // ---- Build SEO head tags ----

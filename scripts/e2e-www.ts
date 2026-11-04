@@ -16,13 +16,13 @@
  * scenes at least 75%, the close the full window; one closing CTA; the intro on load settles; the
  * hero landscape is never upscaled.
  *
- * Covers, for both account templates (the agent platform one by default, ?template=takeout)
- * and the offer page: server render + hydration without errors, no sideways scroll on a phone,
- * every section present, sticky bar, the one-click connect panel (pings once per view, from the
- * sticky bar or the close), the review layer and state switch, the offer FAQ, X-ray mode
- * outlining every section, Edit mode rewriting the hero headline in place from a (mocked) Mark
- * stream, the www design as the default with no parameter, and the previous renderers unchanged on
- * ?design=classic.
+ * Covers, for the account page (the agent platform template, the only one) and the offer page:
+ * server render + hydration without errors, no sideways scroll on a phone, every section present,
+ * sticky bar, the one-click connect panel (pings once per view, from the sticky bar or the close),
+ * the review layer and state switch, the offer FAQ, X-ray mode outlining every section, Edit mode
+ * rewriting the page in place from a (mocked) Mark stream, the old ?design=classic and
+ * ?template=takeout switches changing nothing, and the CMS preview: both pages in the CMS editor
+ * with its editing hooks, a save refreshing the draft in place, and nothing sent from it.
  */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import fs from 'node:fs'
@@ -328,62 +328,6 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await ctx.close()
   }
 
-  console.log(`\naccount page, takeout template (?template=takeout), ${vp}`)
-  const { ctx, watch } = await newContext(browser, vp)
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&template=takeout'))
-
-  await test('server-rendered and hydrated without errors', async () => {
-    const html = await (await fetch(url(ACCOUNT, 'design=www&template=takeout'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
-    expect(html.includes('class="www-page') && html.includes('id="comparison"'), 'the server did not render the takeout page')
-    expect(!watch.errors.length, watch.errors.join('\n'))
-  })
-  await test('every section the ODP tracking observes is on the page', async () => {
-    for (const id of ['hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta'])
-      expect(await page.locator(`#${id}`).count(), `#${id} missing`)
-  })
-  await test('no sideways scroll', () => noSidewaysScroll(page))
-  await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
-  if (vp === 'desktop') {
-    await test('desktop: full screen hero at 75% of the window, the next scene peeking in; scenes at least 75%', () => sceneHeights(page, 900))
-  }
-  await test('the intro plays on load and settles', () => introSettles(page))
-  await test('the hero landscape is never upscaled', () => heroImageSharp(page))
-  await test('their site screenshot is in the challenge scene, never drawn wider than it was taken', async () => {
-    const shotImg = page.locator('#challenge [data-xray="challenge-screenshot"] img')
-    if (!(await shotImg.count())) return
-    expect(!(await page.locator('#hero [data-xray="challenge-screenshot"]').count()), 'still on the hero')
-    const r = await shotImg.evaluate((img: HTMLImageElement) => ({ natural: img.naturalWidth, drawn: img.getBoundingClientRect().width }))
-    expect(r.drawn <= r.natural + 1, `drawn ${r.drawn}px wide from a ${r.natural}px capture`)
-  })
-  await test('the close has one call to action', async () => {
-    const n = await page.locator('#cta .www-btn').count()
-    expect(n === 1, `${n} buttons in the close`)
-  })
-  await test('the sticky bar appears past the hero and hides at the contact card', async () => {
-    expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
-    await page.locator('#comparison').scrollIntoViewIfNeeded()
-    await page.waitForSelector('.www-sticky--visible', { timeout: 3000 })
-    await page.locator('#cta').scrollIntoViewIfNeeded()
-    await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
-  })
-  await test('one click on the contact button tells the team, says so, and opens the connect panel', async () => {
-    await page.locator('#cta-connect-btn').click()
-    await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
-    await page.keyboard.press('Escape')
-    await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
-    const beacons = await beaconsOf(page)
-    expect(beacons.length === 1 && JSON.parse(beacons[0]).event === 'demo_button_clicked', `beacons: ${JSON.stringify(beacons)}`)
-    expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
-  })
-  if (vp === 'phone') {
-    await test('phone: the hero ask is in the first screen', async () => {
-      const cta = await page.locator('#hero .www-btn').first().boundingBox()
-      expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
-    })
-  }
-  await shot(page, `takeout-${vp}`)
-  await ctx.close()
-
   console.log(`\noffer page, ${vp}`)
   const o = await newContext(browser, vp)
   const op = await open(o.ctx, o.watch, url(OFFER, 'design=www'))
@@ -638,57 +582,102 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
   await ctx.close()
 }
 
-console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
+console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
 {
-  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
-  // Mark's edit stream, answered here: one edit to the hero headline.
-  let heroText = ''
-  await ctx.route('**/api/opal-edit-stream', async (route) => {
-    const events = [
-      { type: 'plan', sections: ['Hero headline'], summary: 'e2e' },
-      { type: 'section_focus', section: 'Hero headline' },
-      { type: 'edit', section: 'Hero headline', target: 'headline', kind: 'text', action: 'replace', status: 'applied', old: heroText, new: 'Rewritten by the e2e test' },
-      { type: 'commit', status: 'ok', edits: 1 },
-      { type: 'done', saved: true },
-    ]
-    const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
-    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  const CMS = 'https://app-opti01saas4uc99t001.cms.optimizely.com'
+  const keyOf = async (q: string) => ((await (await fetch(`${BASE}/api/content?${q}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).json()) as { _metadata?: { key?: string } })._metadata?.key
+  const accountKey = await keyOf(`slug=${encodeURIComponent(ACCOUNT.replace(/^\/|\/$/g, ''))}`)
+  const offerKey = await keyOf(`kind=experience&slug=${encodeURIComponent(OFFER.replace(/^\/vb\/|\/$/g, ''))}`)
+  const { ctx, watch } = await newContext(browser, 'desktop')
+  // The CMS's editor script is the CMS's own: stood in here, and noted, so the test stays on this machine.
+  const injector: string[] = []
+  await ctx.route(`${CMS}/**`, (route) => {
+    injector.push(route.request().url())
+    return route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.__injector = true' })
   })
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&template=takeout&search=1'))
-  heroText = (await page.locator('[data-xray="hero-title"] h1').innerText()).replace(/\s+/g, ' ').trim()
-
-  const onPage = await page.evaluate(
-    (ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)),
-    ABM_XRAY_DEFAULTS.map((s) => s.id),
-  )
-
-  await test('the page tools render for a signed-in employee', async () => {
-    await page.getByRole('button', { name: 'Enter X-ray mode' }).waitFor({ timeout: 5000 })
+  // Every draft fetch, noted. A token the test makes up is taken off before the request goes on, so
+  // the stand-in server reads the published page with its own key instead of failing the token.
+  const drafts: string[] = []
+  await ctx.route('**/api/preview?**', (route) => {
+    const u = new URL(route.request().url())
+    drafts.push(u.search)
+    u.searchParams.delete('preview_token')
+    return route.continue({ url: u.toString() })
   })
-  await test(`X-ray outlines every section on the page (${onPage.length})`, async () => {
-    await page.getByRole('button', { name: 'Enter X-ray mode' }).click()
-    await page.waitForFunction((n) => document.querySelectorAll('.xray-card').length >= n, onPage.length, { timeout: 8000 })
-    const titles = await page.$$eval('.xray-card__title', (els) => els.map((e) => e.textContent))
-    const want = ABM_XRAY_DEFAULTS.filter((s) => onPage.includes(s.id)).map((s) => s.title)
-    for (const t of want) expect(titles.includes(t), `no X-ray card for "${t}"`)
-    await page.screenshot({ path: path.join(OUT, 'booth-xray.png') })
-    await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
-  })
-  await test('Edit mode offers feedback on every section, and applies Mark\'s edit in place', async () => {
-    await page.getByRole('button', { name: 'Enter edit mode' }).click()
-    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, onPage.length, { timeout: 8000 })
-    // The edit overlay is aria-hidden from the page's own tree, so find the box by its label.
-    await page.locator('[aria-label="Leave feedback on Hero headline"]').click()
-    await page.locator('.edit-popup__textarea').fill('Make it about every CDW brand')
-    await page.locator('.edit-popup__btn--primary').click()
-    await page.locator('[aria-label="Send feedback"]').click()
-    await page.waitForFunction(
-      () => /Rewritten by the e2e test/.test(document.querySelector('[data-xray="hero-title"]')?.textContent || ''),
-      null,
-      { timeout: 15000 },
+  const savesFor = async (page: Page, previewUrl: string, token: string) =>
+    page.evaluate(
+      ([u, t]) => {
+        // What the CMS sends on a save: the editor's token and where the edit was, then "ready".
+        window.dispatchEvent(new CustomEvent('optimizely:cms:contentSaved', { detail: { previewUrl: u, previewToken: t, nodeIds: [] } }))
+        window.dispatchEvent(new CustomEvent('optimizely:cms:contentSaved', { detail: { previewUrl: u, previewToken: 'ready' } }))
+      },
+      [previewUrl, token] as const,
     )
-    await page.screenshot({ path: path.join(OUT, 'booth-edit.png') })
+
+  await test('the keys of the pages under test were found', async () => {
+    expect(accountKey && offerKey, `account ${accountKey}, offer ${offerKey}`)
   })
+  const page = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=edit`)
+  await test('an account page draft in the editor is the agent platform template, not the old layout', async () => {
+    await page.waitForSelector('.www-page.www-ap', { timeout: 10000 })
+    expect(!(await page.locator('.abm-page').count()), 'the old ABM layout is on the page')
+  })
+  await test("the CMS's editor script is loaded from the CMS", async () => {
+    await page.waitForFunction(() => (window as unknown as { __injector?: boolean }).__injector === true, null, { timeout: 5000 })
+    expect(injector.some((u) => u === `${CMS}/util/javascript/communicationinjector.js`), injector.join(', '))
+  })
+  await test('the CMS fields the page shows are outlined for the editor (data-epi-edit), the template copy is not', async () => {
+    const hooks = await page.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
+    for (const f of ['customerLogo', 'techStack', 'stakeholders']) expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
+    expect(!hooks.some((h) => h?.startsWith('copy.')), `a template copy key is outlined: ${hooks.join(', ')}`)
+  })
+  await test('a save the CMS reports refreshes the draft in place: fetched again, the page never reloads', async () => {
+    await page.evaluate(() => ((window as unknown as { __kept: number }).__kept = 1))
+    const before = drafts.length
+    await savesFor(page, page.url(), 'same-token')
+    const t0 = Date.now()
+    while (drafts.length === before && Date.now() - t0 < 5000) await page.waitForTimeout(100)
+    expect(drafts.length === before + 1, `${drafts.length - before} draft fetches after a save`)
+    expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept === 1), 'the page reloaded')
+  })
+  await test("a save with the editor's new token loads the draft with that token, still without a reload", async () => {
+    const before = drafts.length
+    const next = new URL(page.url())
+    next.searchParams.set('preview_token', 'e2e-new-token')
+    await savesFor(page, next.toString(), 'e2e-new-token')
+    const t0 = Date.now()
+    while (drafts.length === before && Date.now() - t0 < 5000) await page.waitForTimeout(100)
+    expect(drafts.slice(before).some((q) => new URLSearchParams(q).get('preview_token') === 'e2e-new-token'), `fetched ${drafts.slice(before).join(' | ')}`)
+    expect(new URL(page.url()).searchParams.get('preview_token') === 'e2e-new-token', `the address is ${page.url()}`)
+    expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept === 1), 'the page reloaded')
+    await page.waitForSelector('.www-page.www-ap')
+  })
+  await test('in the preview the one-click ask tells nobody', async () => {
+    await page.locator('#cta-connect-btn').click()
+    await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+    await page.keyboard.press('Escape')
+    expect(!(await beaconsOf(page)).length, 'the preview pinged the team')
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await shot(page, 'cms-preview-account')
+
+  const plainView = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=preview`)
+  await test("the CMS's plain preview (ctx=preview) is the reader's page, with no editing hooks", async () => {
+    await plainView.waitForSelector('.www-page.www-ap')
+    expect(!(await plainView.locator('[data-epi-edit], [data-epi-block-id]').count()), 'editing hooks outside the editor')
+  })
+
+  const op = await open(ctx, watch, `${BASE}/preview?key=${offerKey}&loc=en&ctx=edit`)
+  await test('an offer draft in the editor is the www offer page, every section outlined by its node', async () => {
+    await op.waitForSelector('.www-page.www-offer', { timeout: 10000 })
+    // The intro scene is the hero section's opening paragraph drawn on its own: the paragraph is
+    // outlined (an element of the hero section), the scene is not a section of its own.
+    const sections = await op.$$eval('section[data-scene]:not(#intro)', (els) => els.map((e) => e.getAttribute('data-epi-block-id')))
+    expect(sections.length > 3 && sections.every(Boolean), `sections: ${JSON.stringify(sections)}`)
+    if (await op.locator('#intro').count()) expect(await op.locator('#intro [data-epi-block-id]').count(), 'the intro paragraph is not outlined')
+    expect((await op.locator('#main-content [data-epi-block-id]').count()) > sections.length, 'the elements are not outlined')
+  })
+  await shot(op, 'cms-preview-offer')
   await test('no errors, and nothing reached the real webhooks', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))
     expect(!watch.escaped.length, watch.escaped.join(', '))
@@ -696,7 +685,7 @@ console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
   await ctx.close()
 }
 
-console.log('\nthe default (no parameter) and ?design=classic')
+console.log('\nthe default (no parameter); the old switches are gone')
 const fetchHtml = async (href: string) => (await fetch(href, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
 await test('an account page with no parameter is the agent platform page', async () => {
   const html = await fetchHtml(`${BASE}${ACCOUNT}`)
@@ -706,13 +695,15 @@ await test('an offer page with no parameter is the www offer page', async () => 
   const html = await fetchHtml(`${BASE}${OFFER}`)
   expect(html.includes('www-page') && html.includes('id="hero"'), 'the default offer page is not the www design')
 })
-await test('?design=classic: the account page is ABMHyperPage, as before', async () => {
-  const html = await fetchHtml(url(ACCOUNT, 'design=classic'))
-  expect(html.includes('abm-page') && !html.includes('www-page'), 'the classic account page changed')
+await test('?design=classic and ?template=takeout draw the agent platform page too (the old layouts are gone)', async () => {
+  for (const q of ['design=classic', 'template=takeout']) {
+    const html = await fetchHtml(url(ACCOUNT, q))
+    expect(/class="www-page[^"]*\bwww-ap\b/.test(html) && !html.includes('abm-page'), `${q}: not the agent platform page`)
+  }
 })
-await test('?design=classic: the offer page is the Visual Builder renderer, as before', async () => {
+await test('?design=classic draws the www offer page too', async () => {
   const html = await fetchHtml(url(OFFER, 'design=classic'))
-  expect(html.includes('vb-experience') && !html.includes('www-page'), 'the classic offer page changed')
+  expect(html.includes('www-page') && !html.includes('vb-experience'), 'the classic offer page is still served')
 })
 
 await browser.close()

@@ -24,6 +24,9 @@ const ENDPOINT = 'https://cg.optimizely.com/content/v2';
 const FILES = [
   'api/content.ts',
   'api/preview.ts',
+  // The account page's one field list: the live address, the server render, the dev server and
+  // the CMS preview all read it.
+  'src/lib/account-page-query.ts',
   'server/ssr-handler.tsx',
   // The Visual Builder experience queries. They live in one module because api/content.ts
   // and vite.config.ts both serve them, so scanning the module covers both callers.

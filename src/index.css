@@ -935,3 +935,16 @@ html:has(.vb-hero--full) body {
    instantiates its OWN counter (so every one read "01"); a reset on the row gives the cards in a
    row one shared scope: 01, 02, 03. */
 .vb-experience .vb-row { counter-reset: abm-friction; }
+
+/* The CMS preview's note while a saved draft loads (src/components/CmsPreview.tsx). */
+.cms-preview-busy {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 2147483000;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: #08251a;
+    color: #ffffff;
+    font: 500 14px/1.2 'Die Grotesk B', Roboto, system-ui, sans-serif;
+}

@@ -2,7 +2,7 @@
 import type { CompetitorComparisonPage } from '../lib/graph-types'
 
 /**
- * Stat values as the legacy page showed them (same rules as ABMHyperPage's formatStatValue):
+ * Stat values as the earlier account page showed them:
  *   104000 → "104K", 1500000 → "1.5M", "5B+" / "$380M" / "30+" unchanged.
  */
 export function formatStatValue(val: string): string {
@@ -29,45 +29,6 @@ const GENERIC_CONTACT_NAMES = new Set([
 export function realContacts(members: CompetitorComparisonPage['teamMembers']) {
   return (members || []).filter((m) => !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()))
 }
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-/**
- * The comparison rows as the HTML table optimizely.com's TableBlock renders. Yes / No / Limited
- * become TableBlock's own `{true}` / `{false}` / `{warning}` icon tokens AND keep their word,
- * so nothing a writer typed is replaced by an icon alone. Free text stays as text.
- */
-export function comparisonTableHtml(
-  rows: NonNullable<CompetitorComparisonPage['comparisonTableRows']>,
-  competitor: string,
-): string {
-  const cell = (v: string | null) => {
-    const raw = (v ?? '').trim()
-    const k = raw.toLowerCase()
-    const icon = k === 'yes' ? '{true}' : k === 'no' ? '{false}' : k === 'limited' ? '{warning}' : ''
-    return icon ? `${icon}<span class="www-cell-label">${esc(raw)}</span>` : esc(raw)
-  }
-  const body = rows
-    .map((r) => `<tr data-xray="comparison-row"><td>${esc(r.Category)}</td><td>${cell(r.CompetitorValue)}</td><td>${cell(r.OurValue)}</td></tr>`)
-    .join('')
-  return `<table><thead><tr><th>Capability</th><th>${esc(competitor)}</th><th>Optimizely</th></tr></thead><tbody>${body}</tbody></table>`
-}
-
-/**
- * The same six customer logos the legacy proof wall used (optimizely.com's CMP DAM). The legacy
- * list labelled them Salesforce / Nike / Zoom / Visa / Santander / Cox Automotive, which only ever
- * reached alt text; these names are what the images actually show (checked by rendering each).
- */
-export const PROOF_LOGOS = [
-  { url: 'https://images1.cmp.optimizely.com/Zz1hYmM3ZWVlZTQ0NGExMWYxOGViZDUyNzY1OGQ1ZDg4OA==', alt: 'Alaska Airlines' },
-  { url: 'https://images3.cmp.optimizely.com/Zz1iNGQ3OTg4YTQ0NWExMWYxYWY0YzhhNGEyZTdjMzU1YQ==', alt: 'Zoom' },
-  { url: 'https://images1.cmp.optimizely.com/Zz0wMDRlM2U2MjQ0NTcxMWYxYWVjYTUyNzY1OGQ1ZDg4OA==', alt: 'Salesforce' },
-  { url: 'https://images4.cmp.optimizely.com/Zz03ODJlY2YwODQ0NGExMWYxYWIzYTg2ZjEzODRhZmFlZg==', alt: 'Admiral' },
-  { url: 'https://images3.cmp.optimizely.com/Zz1mY2I0MzVmYzQ0NTgxMWYxOTAxYThhNGEyZTdjMzU1YQ==', alt: 'The Royal Mint' },
-  { url: 'https://images3.cmp.optimizely.com/Zz01YTg1N2VkODVhM2YxMWYxODQ4MTcyMjMyNWM5YzQ3YQ==', alt: 'Diligent' },
-]
 
 /** Hero backdrop: the Showcase's own mountain scene (public/home/scenes/v1), the mood of the site's product heroes. */
 export const SCENE = '/home/scenes/v1/mountain-wide'

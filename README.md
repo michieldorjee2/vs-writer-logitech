@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-03
+updated: 2026-11-04
 ---
 
 # vs-writer-logitech
@@ -41,31 +41,30 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:render, check:limitless, check:signup
+npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:www
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
 `npm run check` is what to run before pushing. It is deliberately not wired into `npm run build` yet — Vercel's build still runs only `tsc -b` — so a deploy is not blocked by anything new without a decision to do that.
 
-Five things it covers that the build does not:
+Four things it covers that the build does not:
 
 - **`server/` and `api/` are type-checked** (`typecheck:server`, `tsconfig.server.json`). The app config includes only `src/`, so the code that server-renders every page had never been checked; it now is, with `strictNullChecks` on, which is what the `api/` handlers' `if (!x.ok)` narrowing was written for. The app config is unchanged.
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
-- **`check:render`** server-renders the use-case template and asserts against the HTML.
 - **`check:limitless`** holds the search page's links back to Limitless to the people aldus-ui names, then reruns itself against mutants of the guarded files, each of which must fail it.
 - **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
 
 ## www design (live, the default)
 
-Every account page (`/<company>/`) and offer page (`/vb/<slug>`) renders in the www design, the default since 2 November 2026. `?design=classic` renders the previous design for that one request (to compare, or to fall back for one page without a redeploy); `?design=www` still works for old links. Person, retail and fin-serv pages are not affected. The pages are 1:1 landing pages built from optimizely.com's own React components (vendored in `src/vendor/www`, see its `UPSTREAM.md`): no navigation or footer, a full-screen hero at three quarters of the window so the next scene peeks in, then one scene per idea at least that tall, white and Neutral 3 before a full-window dark close, LFGreen for the action only. The hero says whose page it is once, with the account's logo above the headline, and plays an intro on load; every other scene plays its own entrance when it scrolls into view (the waypoints in `useScenes`, the motion section of `www.css`). The close has one call to action. The content model is untouched; `src/www/account-fields.ts` maps all 67 `CompetitorComparisonPage` properties, and offer pages are read back from their Visual Builder composition (`src/www/offer-content.ts`). X-ray and Edit mode work on both designs (`data-xray` hooks). On an offer page the hero headline is sized to its own length (`fitVars` in `src/www/ui.tsx`): live headlines run from about 30 to 75 characters, and a long one steps down instead of running to seven lines and pushing the hero past the window. The extruded run gets room above it so it clears the line before it, and the opening paragraph under the hero runs in one column on the page's content width.
+Every account page (`/<company>/`) and offer page (`/vb/<slug>`) renders in the www design, live since 2 November 2026 and the only design since 4 November, when the previous renderers (`ABMHyperPage`, `DynamicComparisonPage`, the use-case and takeout templates) and their `?design=classic` / `?template=takeout` switches were removed. Person, retail and fin-serv pages have their own renderers. The pages are 1:1 landing pages built from optimizely.com's own React components (vendored in `src/vendor/www`, see its `UPSTREAM.md`): no navigation or footer, a full-screen hero at three quarters of the window so the next scene peeks in, then one scene per idea at least that tall, white and Neutral 3 before a full-window dark close, LFGreen for the action only. The hero says whose page it is once, with the account's logo above the headline, and plays an intro on load; every other scene plays its own entrance when it scrolls into view (the waypoints in `useScenes`, the motion section of `www.css`). The close has one call to action. The content model is untouched: the template accounts for all 67 `CompetitorComparisonPage` properties (`src/www/account-fields.ts` lists them, `USED_FIELDS` and `NOT_SHOWN` say where each goes or why not), and offer pages are read back from their Visual Builder composition (`src/www/offer-content.ts`). X-ray and Edit mode find the account page's parts by their `data-xray` hooks. On an offer page the hero headline is sized to its own length (`fitVars` in `src/www/ui.tsx`): live headlines run from about 30 to 75 characters, and a long one steps down instead of running to seven lines and pushing the hero past the window. The extruded run gets room above it so it clears the line before it, and the opening paragraph under the hero runs in one column on the page's content width.
 
-An account page in the www design renders one of two templates. The default is the agent platform template (`src/www/AgentPlatformPage.tsx`): Laura Perez Riau's eight-section page from Dan Tranter's pitch, where the lifecycle state sets the hero, headline, proof and CTAs. The account research is threaded through the page rather than kept in one homework section: one stored fact per scene, the stack and investments marked with the same tag, and each use case showing what in the account's own data put it first. It reads `AgentPlatformContent`, which `src/www/agent-platform/content.ts` fills from the stored page until the agents write it directly; `?review=1` shows where each part came from and `?state=` switches the state. `?template=takeout` renders the competitive takeout page with every stored field. On both, the one-click ask (hero, sticky bar, close) pings the account team once per page view and opens a connect panel instead of a form (`src/www/ConnectModal.tsx`). Edit mode on the agent platform page offers the parts a stored field drives and the page's own text (the headline and most content, kept beside the page in the site's Redis since the content type stays as it is; labels and the proof stories stay fixed). It spotlights the part Mark is working on and re-renders the page live from Mark's streamed values (see the template's docs). An offer page without a logo shows its parent account page's (`api/_lib/parent-account.ts`: by Salesforce account, then the company name as the account page's URL, then a regional office or division of it). The agent changes this template needs are drafted, not deployed, in [docs/agent-platform-template](docs/agent-platform-template/README.md).
+Every account page renders the agent platform template (`src/www/AgentPlatformPage.tsx`): Laura Perez Riau's eight-section page from Dan Tranter's pitch, where the lifecycle state sets the hero, headline, proof and CTAs. The account research is threaded through the page rather than kept in one homework section: one stored fact per scene, the stack and investments marked with the same tag, and each use case showing what in the account's own data put it first. It reads `AgentPlatformContent`, which `src/www/agent-platform/content.ts` fills from the stored page until the agents write it directly; `?review=1` shows where each part came from and `?state=` switches the state. The one-click ask (hero, sticky bar, close) pings the account team once per page view and opens a connect panel instead of a form (`src/www/ConnectModal.tsx`). Edit mode on the agent platform page offers the parts a stored field drives and the page's own text (the headline and most content, kept beside the page in the site's Redis since the content type stays as it is; labels and the proof stories stay fixed). It spotlights the part Mark is working on and re-renders the page live from Mark's streamed values (see the template's docs). An offer page without a logo shows its parent account page's (`api/_lib/parent-account.ts`: by Salesforce account, then the company name as the account page's URL, then a regional office or division of it). The agent changes this template needs are drafted, not deployed, in [docs/agent-platform-template](docs/agent-platform-template/README.md).
 
 ```bash
-npm run check:www                              # 137 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules
+npm run check:www                              # 88 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules, the CMS preview
 WWW_UPSTREAM=~/Claude/OptimizelyHeadless npm run check:www   # + proves src/vendor/www still matches upstream
 npm run build && npx tsx scripts/serve-prod.ts &               # local production stand-in on :5199
-npm run e2e:www                                # 76 Playwright checks, desktop + phone: layout, intro, one CTA, X-ray/Edit, all network mocked
+npm run e2e:www                                # 68 Playwright checks, desktop + phone: layout, intro, one CTA, X-ray/Edit, the CMS preview, all network mocked
 npx tsx scripts/smoke-live-pages.ts [base]     # every live account page in the www design: renders, 8 sections, title, one CTA, no competitor/stakeholder names
 ```
 
@@ -107,44 +106,21 @@ OPAL_AGENT_ID=     # default 6c6d1d88-55ee-4f9c-a2d3-28de4bee1149 (account_page_
 
 Without `OPAL_PAT` the endpoint responds with a clean SSE error ("Server is missing OPAL_PAT"); the older fire-and-forget webhook lives at `api/opal-feedback.ts`.
 
-The Limitless preview routes read one more variable, browser-side and dev-only — it is never consulted on a public page render:
+## The CMS preview
 
-```bash
-VITE_INTELLIGENCE_API_URL=   # Aldus dev server; defaults to http://localhost:3000
-```
+The CMS shows every draft in its editor through the Showcase application's preview URL, `https://showcase.optimizely.com/preview?key={key}&ver={version}&loc={locale}&ctx={context}` plus the editor's `preview_token` (CMS Settings → Applications → Aldus). `/preview` (`src/components/CmsPreview.tsx`) draws the draft exactly as its live address would: an account page in the agent platform template, an offer page in the www offer design, any other experience from its composition, and the few legacy blocks still in the CMS with `BlockPreview`. `/api/preview` reads the draft with the editor's token (published content with the site key when there is none): first `_Content` for the key's type, which Graph names in `_metadata.types` (its `__typename` there is only the base type, `_Page` or `_Experience`), then that type's own query, with the same fields and extras the live page gets (the page's own copy on an account page, the parent account's logo on an offer).
 
-`next dev` does not reliably land on 3000 — several projects in this vault take turns on the same ports, and Aldus has been observed on 3111 — so set this rather than assuming. The preview's error state names the URL it tried.
+Editing goes through Optimizely's CMS SDK (`@optimizely/cms-sdk`, pinned):
 
-## Limitless: the use-case template
+- The CMS's communication injector is loaded from the CMS instance (`VITE_CMS_URL`, defaulting to Showcase's `app-opti01saas4uc99t001.cms.optimizely.com`; it was never set on Vercel, so on-page editing had not worked before).
+- `PreviewComponent` hears each save, waits until the CMS says the draft is ready, and refreshes it in place: the same URL is fetched again, a new token or version is routed to, and the page never reloads.
+- In `ctx=edit` the pages carry the SDK's hooks (`getPreviewUtils().pa`, wrapped in `src/www/cms-edit.tsx`): `data-epi-edit` on each CMS field the account page shows (logo, stats, stack, investments, stakeholders, team, small print) and `data-epi-block-id` on every offer section and element. The account page's headlines and body text are the template's own copy, kept beside the page and changed in Showcase's Edit mode, so the CMS has nothing to outline there. Outside the editor there are no hooks, so the live pages render exactly as before.
+- Nothing is sent from the preview: no tracking, no "talk to your team" ping and no sign-up (`src/lib/cms-preview.ts`).
 
-A third renderer over the `CompetitorComparisonPage` content type, alongside `ABMHyperPage` (competitive takeout) and `DynamicComparisonPage` (plain comparison). Its shape comes from Laura Perez Riau's "Siemens — Account Page (Use Case Template v2)" artifact, which is deliberately *not* a takeout: it names no competitor and shows no comparison table, ROI projection or migration timeline.
+Two things to know before touching the queries:
 
-What makes it different from the other two is that **every section is gated on a component plan, not on whether its own content is populated**:
-
-```tsx
-{includes(plan, 'why-now-thesis') && <Thesis/>}   // this renderer
-{page.roiTitle && <Roi/>}                         // the other two
-```
-
-That matters because a plan can withhold a section *and say why*, ask for a section in a named variant, and be checked — a section the plan asked for with no content behind it is a build defect rather than an invisible non-event. Measured on 240 pages sampled across the 2,695-page inventory: **one distinct section set**, every page showing all 15 renderable sections. The old template is dynamic in principle and uniform in practice.
-
-The plan has three sources and always says which: `componentPlan` on the page (the real mechanism, pending a CMS field), a live fetch from Aldus, or — for every page written before any of this existed — reconstructed from populated fields, reproducing today's output exactly. Verified field-by-field against five real CMS pages.
-
-```bash
-/use-case-preview                 # Laura's Siemens content + its own plan
-/use-case-preview/hartwell-bank   # the SAME content, plan resolved live by Aldus
-/use-case-preview/geico?plan=0    # hide the on-page decision panel
-```
-
-`/use-case-preview/:accountId` is the demonstration worth running: the content does not change, the plan does, so the sections that appear and the reasons the rest were withheld change with the account.
-
-Design, the component contract, the staged CMS fields and what the decision engine must pass the page-building agent: **`~/Claude/aldus-ui/docs/limitless-use-case-template.md`**.
-
-Two things to know before touching it:
-
-- **Adding a field to `PAGE_QUERY` before it is registered in the CMS 404s every account page.** One unknown field fails the whole GraphQL query (commit `9091988`). Register in the CMS, run `npm run check:graph`, *then* add it to the query — in all three copies (`api/content.ts`, `server/ssr-handler.tsx`, `api/preview.ts`).
-- **`npm run check:render` guards this renderer.** It server-renders the fixture and asserts against the HTML: that `renderToString` survives (the renderer is SSR'd directly, with no `.server.tsx` twin), and that components the plan withheld genuinely do not reach the output. No network, no credentials — safe in CI.
-- **`_json` is not an escape hatch for unregistered fields.** Graph rejects it on a page root (`The \`_json\` field is only supported within the \`item\` field`), so a field the content type does not register cannot be read at all — register it first. A `mergeRetailJson()` built on the opposite assumption sat in `api/content.ts` and `server/ssr-handler.tsx` as a silent no-op until it was removed.
+- **Adding a field to the account page query before it is registered in the CMS 404s every account page.** One unknown field fails the whole GraphQL query (commit `9091988`). Register in the CMS, run `npm run check:graph`, *then* add it to `src/lib/account-page-query.ts`: one field list that the live page (`api/content.ts`), the server render, the dev server and the CMS preview all read.
+- **`_json` is not an escape hatch for unregistered fields.** Graph rejects it on a page root (`The \`_json\` field is only supported within the \`item\` field`), so a field the content type does not register cannot be read at all — register it first.
 
 ## Offer pages: the email sign-up form
 

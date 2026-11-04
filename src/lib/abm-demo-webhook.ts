@@ -13,6 +13,7 @@
 
 import type { CompetitorComparisonPage } from './graph-types';
 import { getPageSlug, deriveCustomerName } from './page-identity';
+import { inCmsPreview } from './cms-preview';
 
 const WEBHOOK_URL =
   'https://webhook.opal.optimizely.com/webhooks/4f42a24e93f945bcb262bff01a9a1562/4520324a-9e6d-43df-93c1-d70d6a9c3dc1';
@@ -57,7 +58,7 @@ function buildPayload(page: CompetitorComparisonPage, source: string) {
  * back to a `no-cors` keepalive fetch. Never throws.
  */
 export function fireDemoWebhook(page: CompetitorComparisonPage, source: string): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || inCmsPreview()) return;
   try {
     const body = JSON.stringify(buildPayload(page, source));
 
