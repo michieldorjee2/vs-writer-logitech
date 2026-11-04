@@ -46,6 +46,18 @@ export const offerIdOf = (plan: string | null): string | null => {
   }
 };
 
+/**
+ * The address an offer page is served at. In the CMS every offer page sits under Start
+ * (`/vegas-dinner-d2l/`), but the site draws it at `/vb/<slug>`; the bare CMS address answers
+ * "We're not quite ready for …". Aldus UI's page log already has the /vb/ form, so using it
+ * here also stops each page being listed twice.
+ */
+export function offerPageRoute(hierarchical: string | null): string {
+  const route = (hierarchical || '').replace(/^\/+|\/+$/g, '');
+  if (!route) return '';
+  return route.startsWith('vb/') ? route : `vb/${route}`;
+}
+
 let held: { at: number; byOffer: Map<string, OfferPage[]> } | null = null;
 /** For the checks: forget what was held. */
 export function forgetOfferPages(): void {
@@ -73,8 +85,7 @@ export async function offerPagesByOffer(): Promise<Map<string, OfferPage[]>> {
       const offerId = offerIdOf(item.componentPlan);
       // Offer pages are served under /vb/ (the www offer page); the bare CMS path is not a page on
       // this site, and Aldus UI's page log names the same page as vb/<slug> (api/_lib/offers.ts).
-      const slug = (item._metadata.url.hierarchical || '').replace(/^\/+|\/+$/g, '');
-      const route = slug ? `vb/${slug}` : '';
+      const route = offerPageRoute(item._metadata.url.hierarchical);
       if (!offerId || !route || !item.companyName) continue;
       const list = byOffer.get(offerId) ?? [];
       const own = item.customerLogo?.default ?? null;

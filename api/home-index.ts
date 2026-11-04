@@ -11,6 +11,9 @@ const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
  * The cache holds Graph's answer; "mine" is cut per request.
  */
 const CACHE_MS = 5 * 60 * 1000;
+/* Graph has hung a request for the function's full 300 s (3 Nov), leaving the search page on
+   its loading line. Give up well before that: the page falls back to its offline copy. */
+const GRAPH_TIMEOUT_MS = 20_000;
 let cached: { at: number; source: HomeIndexSource } | null = null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -32,6 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, variables }),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
       });
       return r.json();
     });

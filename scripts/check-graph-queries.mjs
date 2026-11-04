@@ -40,6 +40,8 @@ const FILES = [
   'vite.config.ts',
   // The offer page a sign-up names (the email form's endpoint).
   'api/offer-signup.ts',
+  // The account pages the search page's account picker already has (api/page-builds/match.ts).
+  'api/_lib/account-lookups.ts',
 ];
 
 function authKey() {

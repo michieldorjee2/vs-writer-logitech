@@ -122,6 +122,8 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
         // The functions this serves, as Vercel routes them: [pattern, file, the path segment that is `id`].
         const routes: Array<[RegExp, string]> = [
           [/^\/api\/page-builds$/, '/api/page-builds/index.ts'],
+          // Before [id], as Vercel serves a file ahead of a dynamic segment.
+          [/^\/api\/page-builds\/match$/, '/api/page-builds/match.ts'],
           [/^\/api\/page-builds\/([^/]+)$/, '/api/page-builds/[id].ts'],
           [/^\/api\/offers$/, '/api/offers/index.ts'],
           [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
