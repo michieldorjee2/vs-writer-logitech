@@ -41,7 +41,7 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:www
+npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:www
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
@@ -53,6 +53,7 @@ Four things it covers that the build does not:
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
 - **`check:limitless`** holds the search page's links back to Limitless to the people aldus-ui names, then reruns itself against mutants of the guarded files, each of which must fail it.
 - **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
+- **`check:cta-ping`** runs Mark's code step for the one-click ask (`mark/cta-ping/test_step.py`, Python 3, no network) against stand-ins for Teams and Google Sheets.
 
 ## www design (live, the default)
 
@@ -123,6 +124,24 @@ Two things to know before touching the queries:
 
 - **Adding a field to the account page query before it is registered in the CMS 404s every account page.** One unknown field fails the whole GraphQL query (commit `9091988`). Register in the CMS, run `npm run check:graph`, *then* add it to `src/lib/account-page-query.ts`: one field list that the live page (`api/content.ts`), the server render, the dev server and the CMS preview all read.
 - **`_json` is not an escape hatch for unregistered fields.** Graph rejects it on a page root (`The \`_json\` field is only supported within the \`item\` field`), so a field the content type does not register cannot be read at all — register it first.
+
+## The one-click ask: the CTA ping
+
+"Talk to your team" on an account page (the hero, the close, the sticky bar) has no form. The click opens the connect panel and tells the account team:
+
+1. The browser (`src/lib/cta-ping.ts`, from `src/www/ConnectModal.tsx`) posts only the page's route, which button, and the visit's `utm_*` values to `POST /api/cta-ping`. Nothing is sent from the CMS preview.
+2. `api/cta-ping.ts` takes a same-site JSON post for an account page route and a known button, limits it (one per visitor per page an hour, ten per page a day, 300 a day, while the KV pair is set), reads the page's team from Graph itself, and posts the click to Mark's **Showcase CTA ping** workflow with the trigger's key. Nothing the visitor sends decides who is messaged.
+3. The workflow's one code step (`mark/cta-ping/step.py`) messages the page's account executive in Teams from Michiel's account. With no account executive on the page, or when the message fails, it adds a row to the **Showcase CTA follow-ups** Google Sheet instead. See [mark/cta-ping/README.md](mark/cta-ping/README.md).
+
+The account executive is the first real contact on the page whose role is one of `AE_ROLE` (`src/lib/account-rep.ts`). The panel names that person ("We've let Alex know"), or "your Optimizely team" when there is none, so it never names someone the ping didn't tell. On 4 Nov 2026, 1,169 of 2,812 account pages had one.
+
+Env (Production only):
+
+- `CTA_PING_WEBHOOK_URL`: the workflow's webhook (`https://webhook.mark.optimizely.com/...`). Unset, the endpoint answers 202 and sends nothing, which is what previews and local runs do.
+- `CTA_PING_WEBHOOK_KEY`: the trigger's `x-showcase-key`. Mark refuses a post without it.
+- `GRAPH_AUTH_KEY`: the page read; unset, 503. `KV_REST_API_URL`, `KV_REST_API_TOKEN`: the limits; unset, no limits.
+
+The click is still tracked in ODP as before (`useOdpTracking`).
 
 ## Offer pages: the email sign-up form
 

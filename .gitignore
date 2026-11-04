@@ -41,3 +41,6 @@ api/_ssr-bundle.mjs.map
 # own compiled output the same way — `tokens/compiled/*.css` in their
 # .gitignore — so the JSON token sets are the source of truth here too.
 tokens/compiled/
+
+# Python caches (npm run check:cta-ping)
+__pycache__/

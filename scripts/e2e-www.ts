@@ -9,9 +9,9 @@
  * (default /vb/no-account-left-behind-scale-ai), E2E_OUT (screenshot folder, default a temp dir),
  * E2E_BYPASS (Vercel protection-bypass secret, for a protected preview).
  *
- * NOTHING LEAVES THE BROWSER. The contact button's sales-team webhook, sign-in, the edit
- * stream to Mark and the republish poll are all answered here; the test fails if any request
- * reaches webhook.opal.optimizely.com.
+ * NOTHING LEAVES THE BROWSER. The contact button's ping (POST /api/cta-ping, which messages the
+ * account executive), sign-in, the edit stream to Mark and the republish poll are all answered
+ * here; the test fails if any request reaches the ping endpoint or a Mark webhook.
  *
  * Layout (Michiel, 2 Nov): a full-screen hero at 75% of the window with the next scene peeking in,
  * scenes at least 75%, the close the full window; one closing CTA; the intro on load settles; the
@@ -81,18 +81,27 @@ async function newContext(browser: Browser, vp: keyof typeof VIEWPORTS, opts: { 
   })
   const watch: Watch = { errors: [], escaped: [] }
 
-  // The one-click contact: record what would be sent, send nothing.
+  // The one-click contact: record what the page would send, inside the page, and send nothing.
   await ctx.addInitScript(() => {
-    ;(window as unknown as { __beacons: string[] }).__beacons = []
-    navigator.sendBeacon = (_url: string | URL, data?: BodyInit | null) => {
-      void new Response(data ?? '').text().then((t) => (window as unknown as { __beacons: string[] }).__beacons.push(t))
-      return true
+    const w = window as unknown as { __pings: string[] }
+    w.__pings = []
+    const real = window.fetch.bind(window)
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (new URL(url, location.href).pathname === '/api/cta-ping') {
+        w.__pings.push(String(init?.body ?? ''))
+        return Promise.resolve(new Response('{"ok":true}', { status: 202 }))
+      }
+      return real(input, init)
     }
   })
-  await ctx.route('https://webhook.opal.optimizely.com/**', (route) => {
-    watch.escaped.push(route.request().url())
-    return route.fulfill({ status: 200, body: '' })
-  })
+  // Anything that gets past that stand-in fails the run.
+  for (const pattern of ['**/api/cta-ping', 'https://webhook.opal.optimizely.com/**', 'https://webhook.mark.optimizely.com/**']) {
+    await ctx.route(pattern, (route) => {
+      watch.escaped.push(route.request().url())
+      return route.fulfill({ status: 202, json: { ok: true } })
+    })
+  }
   await ctx.route('**/api/auth/me', (route) =>
     opts.signedIn
       ? route.fulfill({ json: { email: 'e2e@optimizely.com', name: 'E2E' } })
@@ -215,7 +224,9 @@ async function introSettles(page: Page) {
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-features=AsyncDns'] })
 console.log(`www-design e2e against ${BASE}  (screenshots: ${OUT})`)
 
-const beaconsOf = (page: Page) => page.evaluate(() => (window as unknown as { __beacons: string[] }).__beacons)
+/** What the page asked /api/cta-ping to send, parsed. */
+const pingsOf = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __pings: string[] }).__pings.map((b) => JSON.parse(b) as { route: string; source: string; utm: Record<string, string> }))
 
 for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   console.log(`\naccount page, agent platform template (an agent platform pitch), ${vp}`)
@@ -298,10 +309,11 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       const panel = page.getByRole('dialog')
       await panel.getByText("You're all set").waitFor({ timeout: 3000 })
       expect(!(await panel.locator('form, input, textarea').count()), 'the panel has a form field')
-      const beacons = await beaconsOf(page)
-      expect(beacons.length === 1, `beacons: ${beacons.length}`)
-      const b = JSON.parse(beacons[0])
-      expect(b.event === 'demo_button_clicked' && b.source === 'sticky-connect-btn', `beacon: ${beacons[0]}`)
+      const pings = await pingsOf(page)
+      expect(pings.length === 1, `pings: ${pings.length}`)
+      const b = pings[0]
+      expect(b.source === 'sticky-connect-btn' && b.route === new URL(page.url()).pathname, `ping: ${JSON.stringify(b)}`)
+      expect(Object.keys(b).sort().join() === 'route,source,utm', `the browser sent more than the page and button: ${JSON.stringify(b)}`)
       // The stored "Schedule a call" link lives here now that the close has one CTA.
       const stored = await page.evaluate(() => JSON.stringify((window as unknown as { __SSR_DATA__?: unknown }).__SSR_DATA__ ?? '').match(/"modalScheduleUrl":\{"default":"([^"]+)"/)?.[1] ?? null)
       if (stored) expect((await panel.getByRole('link', { name: /Schedule a call/ }).getAttribute('href')) === stored, 'the panel does not link the stored schedule URL')
@@ -315,7 +327,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
       await page.locator('#cta-connect-btn').click()
       await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
-      expect((await beaconsOf(page)).length === 1, 'pinged twice')
+      expect((await pingsOf(page)).length === 1, 'pinged twice')
       expect(/You're all set/.test(await page.locator('#cta-connect-btn').innerText()), 'the close button does not say it is done')
       await page.getByRole('button', { name: 'Close' }).click()
       expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
@@ -379,8 +391,8 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
     await page.keyboard.press('Escape')
     await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
-    const beacons = await beaconsOf(page)
-    expect(beacons.length === 1 && JSON.parse(beacons[0]).event === 'demo_button_clicked', `beacons: ${JSON.stringify(beacons)}`)
+    const pings = await pingsOf(page)
+    expect(pings.length === 1 && pings[0].source === 'cta-connect-btn' && pings[0].route === new URL(page.url()).pathname, `pings: ${JSON.stringify(pings)}`)
     expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
   })
   if (vp === 'phone') {
@@ -810,7 +822,7 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     await page.locator('#cta-connect-btn').click()
     await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
     await page.keyboard.press('Escape')
-    expect(!(await beaconsOf(page)).length, 'the preview pinged the team')
+    expect(!(await pingsOf(page)).length, 'the preview pinged the team')
     expect(!watch.escaped.length, watch.escaped.join(', '))
   })
   await shot(page, 'cms-preview-account')

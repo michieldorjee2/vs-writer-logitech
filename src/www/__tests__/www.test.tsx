@@ -52,7 +52,9 @@ import { accountTemplateOf } from '../account-template'
 import { CmsEditProvider } from '../cms-edit'
 import { inCmsPreview } from '../../lib/cms-preview'
 import { postSignup } from '../../lib/offer-signup'
-import { fireDemoWebhook } from '../../lib/abm-demo-webhook'
+import { sendCtaPing } from '../../lib/cta-ping'
+import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
+import ctaPingHandler, { accountSegmentOf, buildPing, canonicalJson, checkOf, type CtaPing } from '../../../api/cta-ping'
 import previewHandler, { concreteType } from '../../../api/preview'
 import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
 import { readStack, stackTiles } from '../agent-platform/stack'
@@ -1750,30 +1752,28 @@ test('the CMS preview is not a visit: it is known by its address, and nothing el
 testAsync('in the CMS preview the sign-up form and the one-click ask send nothing; for a visitor they do', async () => {
   const realFetch = globalThis.fetch
   const g = globalThis as unknown as { window?: unknown }
-  const realNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   const fetched: string[] = []
-  const beacons: string[] = []
+  const pings: Array<{ url: string; body: string }> = []
   // Stand-ins only: nothing here reaches the network (the webhook is never called for real).
-  globalThis.fetch = (async (url: unknown) => {
-    fetched.push(String(url))
+  globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+    if (String(url) === '/api/cta-ping') pings.push({ url: String(url), body: String(init?.body) })
+    else fetched.push(String(url))
     return new Response('{}', { status: 200 })
   }) as typeof fetch
-  Object.defineProperty(globalThis, 'navigator', { value: { sendBeacon: (u: string) => (beacons.push(u), true) }, configurable: true })
   try {
     assert.equal(await postSignup('offer-1', 'editor@optimizely.com', '', { pathname: '/preview', search: '?key=k' }), 'done')
     assert.deepEqual(fetched, [], 'the preview sent a sign-up')
     assert.equal(await postSignup('offer-1', 'reader@example.com', '', { pathname: '/vb/acme', search: '' }), 'done')
     assert.equal(fetched.length, 1, "a visitor's sign-up is not sent")
-    g.window = { location: { pathname: '/preview', href: 'https://showcase.optimizely.com/preview?key=k' } }
-    fireDemoWebhook(stackPage(), 'cta-connect-btn')
-    assert.deepEqual(beacons, [], 'the preview pinged the team')
-    g.window = { location: { pathname: '/acme/', href: 'https://showcase.optimizely.com/acme/' } }
-    fireDemoWebhook(stackPage(), 'cta-connect-btn')
-    assert.equal(beacons.length, 1, "a visitor's ask does not reach the team")
+    sendCtaPing('cta-connect-btn', { pathname: '/preview', search: '?key=k' })
+    assert.deepEqual(pings, [], 'the preview pinged the team')
+    sendCtaPing('cta-connect-btn', { pathname: '/acme/', search: '?utm_source=outreach&utm_campaign=q4&email=someone%40acme.com' })
+    assert.equal(pings.length, 1, "a visitor's ask does not reach the team")
+    // The browser names the page and the button, and nothing about who is on the team.
+    assert.deepEqual(JSON.parse(pings[0].body), { route: '/acme/', source: 'cta-connect-btn', utm: { source: 'outreach', campaign: 'q4' } })
   } finally {
     globalThis.fetch = realFetch
     delete g.window
-    if (realNavigator) Object.defineProperty(globalThis, 'navigator', realNavigator)
   }
 })
 
@@ -1954,6 +1954,183 @@ test('the CMS preview loads the editor script from the CMS and refreshes through
   assert.ok(!/location\.(reload|replace|assign)\(/.test(src), 'the preview reloads the page')
   const hook = readFileSync('src/hooks/usePreviewContent.ts', 'utf8')
   assert.ok(!/addEventListener\(/.test(hook), 'a second save listener beside the SDK')
+})
+
+console.log('\nthe CTA ping: the click reaches the account executive, or the follow-up sheet')
+
+/* The team a page stores, in the order the builder wrote it: an SDR first, a placeholder, then the AE. */
+const PING_TEAM = [
+  { Initials: 'SR', Name: 'Sam Rep', Role: 'Sales Development Representative', Email: 'sam.rep@optimizely.com' },
+  { Initials: 'SA', Name: 'Solutions Architect', Role: 'Solutions Architect', Email: null },
+  { Initials: 'AE', Name: 'Alex Exec', Role: 'Enterprise Account Executive', Email: 'Alex.Exec@optimizely.com' },
+]
+const PING_PAGE = {
+  _metadata: { url: { default: '/en/zurich-versicherung/', hierarchical: '/en/zurich-versicherung/' } },
+  eyebrow: 'Personalized for Zürich Versicherung',
+  intelHeadline: 'We know <em>Zürich Versicherung – “Group” | AG</em>',
+  teamMembers: PING_TEAM,
+}
+
+test('the account executive is found by role, never by position, and placeholders are nobody', () => {
+  assert.equal(accountExecutiveOf(PING_TEAM)?.Name, 'Alex Exec')
+  assert.equal(accountExecutiveOf(PING_TEAM.slice(0, 2)), null, 'an SDR is not the account executive')
+  assert.equal(accountExecutiveOf([{ Initials: 'AE', Name: 'Your Account Executive', Role: 'Account Executive', Email: null }]), null, 'a role title is not a person')
+  assert.equal(accountExecutiveOf([{ Initials: 'x', Name: ' ', Role: 'Account Executive', Email: 'a@optimizely.com' }]), null, 'an unnamed AE')
+  assert.equal(accountExecutiveOf(null), null)
+  // The panel says the person the ping told, so with no AE it names nobody ("your Optimizely team").
+  const people = PING_TEAM.map((m) => ({ name: m.Name, role: m.Role, email: m.Email, initials: m.Initials }))
+  assert.equal(toldFirstName(people), 'Alex')
+  assert.equal(toldFirstName(people.slice(0, 1)), undefined)
+})
+
+test('a ping names the page, its account executive and the rest of the team; the visitor only the button and campaign', () => {
+  const ping = buildPing(PING_PAGE as never, 'zurich-versicherung', 'sticky-connect-btn', { source: 'outreach', campaign: 'q4 <takeout>' }, new Date('2026-11-04T23:06:28.545Z'), '77dfb03f-a82d-4ee3-97a1-36b20f6f4043')
+  assert.deepEqual(ping.rep, { name: 'Alex Exec', role: 'Enterprise Account Executive', email: 'alex.exec@optimizely.com' })
+  assert.deepEqual(ping.team, [{ name: 'Sam Rep', role: 'Sales Development Representative' }], 'the AE twice, or the placeholder')
+  assert.equal(ping.page, 'https://showcase.optimizely.com/zurich-versicherung/')
+  assert.equal(ping.account, 'Zürich Versicherung – “Group” | AG')
+  assert.equal(ping.campaign, 'source: outreach · campaign: q4 <takeout>')
+  assert.ok(!JSON.stringify(ping).includes('sam.rep@'), 'only the AE needs an address')
+  // Mark's step (mark/cta-ping/step.py) reads exactly this ping in its own tests: Node and Python agree on `check`.
+  const fixture = JSON.parse(readFileSync('mark/cta-ping/fixture.json', 'utf8')) as CtaPing
+  assert.deepEqual(ping, fixture, 'regenerate mark/cta-ping/fixture.json and rerun python3 mark/cta-ping/test_step.py')
+  const { check, ...rest } = ping
+  assert.equal(check, checkOf(rest))
+  assert.equal(canonicalJson({ b: 1, a: [{ d: null, c: 'ü' }] }), '{"a":[{"c":"ü","d":null}],"b":1}')
+  const changed = { ...rest, rep: { ...rest.rep!, email: 'someone.else@optimizely.com' } }
+  assert.notEqual(checkOf(changed), check, 'a changed ping keeps its check')
+  // No AE on the page: rep is null and everyone real is the team.
+  const none = buildPing({ ...PING_PAGE, teamMembers: PING_TEAM.slice(0, 2) } as never, 'zurich-versicherung', 'hero-connect-btn', {})
+  assert.equal(none.rep, null)
+  assert.deepEqual(none.team.map((m) => m.name), ['Sam Rep'])
+  assert.equal(none.campaign, '')
+  assert.match(none.ping_id, /^[0-9a-f-]{36}$/)
+})
+
+test('a ping is only ever for an account page route', () => {
+  assert.equal(accountSegmentOf('/tungsten-automation/'), 'tungsten-automation')
+  assert.equal(accountSegmentOf('/Lenovo'), 'lenovo')
+  for (const bad of ['/', '/vb/offer', '/acme/jane-smith/', '/-acme/', '/acme-/', '/../x/', '/acme?x=1', 'acme', 42, null, `/${'a'.repeat(201)}/`]) {
+    assert.equal(accountSegmentOf(bad), null, String(bad))
+  }
+})
+
+type PingCall = { url: string; headers: Record<string, string>; body: string }
+
+/** POST /api/cta-ping with Graph and Mark stood in. Nothing reaches the network; KV is off. */
+async function ping(
+  input: { method?: string; headers?: Record<string, string>; body?: unknown },
+  stand: { page?: unknown; mark?: number; env?: Record<string, string | undefined> } = {},
+) {
+  const env = { CTA_PING_WEBHOOK_URL: 'https://webhook.mark.optimizely.com/webhooks/inst/trigger', CTA_PING_WEBHOOK_KEY: 'k'.repeat(32), GRAPH_AUTH_KEY: 'graph-key', KV_REST_API_URL: undefined, KV_REST_API_TOKEN: undefined, ...stand.env }
+  const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]))
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined) delete process.env[k]
+    else process.env[k] = v
+  }
+  const realFetch = globalThis.fetch
+  const graph: string[] = []
+  const mark: PingCall[] = []
+  globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+    const u = String(url)
+    if (u.startsWith('https://cg.optimizely.com/')) {
+      const { variables } = JSON.parse(String(init?.body)) as { variables: { slug: string } }
+      graph.push(variables.slug)
+      const items = stand.page && variables.slug === '/en/zurich-versicherung/' ? [stand.page] : []
+      return new Response(JSON.stringify({ data: { CompetitorComparisonPage: { items } } }), { status: 200 })
+    }
+    if (u.startsWith('https://webhook.')) {
+      mark.push({ url: u, headers: init?.headers as Record<string, string>, body: String(init?.body) })
+      return new Response('{}', { status: stand.mark ?? 200 })
+    }
+    throw new Error(`unexpected fetch ${u}`)
+  }) as typeof fetch
+  const out = { status: 0, body: undefined as unknown, headers: {} as Record<string, string> }
+  const res = {
+    setHeader(k: string, v: string) {
+      out.headers[k.toLowerCase()] = v
+    },
+    status(c: number) {
+      out.status = c
+      return this
+    },
+    json(b: unknown) {
+      out.body = b
+      return this
+    },
+  }
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', 'x-forwarded-for': '203.0.113.7', ...input.headers }
+  try {
+    await ctaPingHandler({ method: input.method ?? 'POST', headers, body: input.body, socket: {} } as never, res as never)
+  } finally {
+    globalThis.fetch = realFetch
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  }
+  return { ...out, graph, mark }
+}
+
+const CLICK = { route: '/zurich-versicherung/', source: 'cta-connect-btn', utm: { campaign: 'q4', medium: 'x'.repeat(201) } }
+
+testAsync('POST /api/cta-ping hands Mark the page\'s own team, with the trigger key, and nothing the visitor made up', async () => {
+  const r = await ping({ body: { ...CLICK, rep: { email: 'attacker@evil.example' }, team: [{ name: 'Mallory' }] } }, { page: PING_PAGE })
+  assert.equal(r.status, 202)
+  assert.equal(r.headers['cache-control'], 'no-store')
+  assert.deepEqual(r.graph, ['/zurich-versicherung/', '/en/zurich-versicherung/'])
+  assert.equal(r.mark.length, 1)
+  assert.equal(r.mark[0].url, 'https://webhook.mark.optimizely.com/webhooks/inst/trigger')
+  assert.equal(r.mark[0].headers['x-showcase-key'], 'k'.repeat(32))
+  const sent = JSON.parse(r.mark[0].body) as CtaPing
+  assert.equal(sent.rep?.email, 'alex.exec@optimizely.com', 'the rep came from the request')
+  assert.ok(!r.mark[0].body.includes('evil') && !r.mark[0].body.includes('Mallory'))
+  assert.equal(sent.button, 'the button at the end of the page')
+  assert.equal(sent.campaign, 'campaign: q4', 'an over-long utm value is dropped')
+  const { check, ...rest } = sent
+  assert.equal(check, checkOf(rest))
+})
+
+testAsync('POST /api/cta-ping refuses anything but a same-site JSON click on an account page', async () => {
+  const cases: Array<[string, Parameters<typeof ping>[0], number]> = [
+    ['GET', { method: 'GET' }, 405],
+    ['a form post', { headers: { 'content-type': 'text/plain' }, body: JSON.stringify(CLICK) }, 415],
+    ['another site', { headers: { 'sec-fetch-site': 'cross-site' }, body: CLICK }, 403],
+    ['an offer page', { body: { ...CLICK, route: '/vb/zurich' } }, 400],
+    ['a person page', { body: { ...CLICK, route: '/zurich-versicherung/alex-exec/' } }, 400],
+    ['an unknown button', { body: { ...CLICK, source: 'admin-btn' } }, 400],
+    ['no body', { body: undefined }, 400],
+    ['too large', { body: JSON.stringify({ ...CLICK, pad: 'x'.repeat(3000) }) }, 413],
+  ]
+  for (const [name, input, status] of cases) {
+    const r = await ping(input, { page: PING_PAGE })
+    assert.equal(r.status, status, name)
+    assert.equal(r.mark.length + r.graph.length, 0, `${name} reached Graph or Mark`)
+  }
+})
+
+testAsync('POST /api/cta-ping sends nothing when off, misconfigured, or the page is not there', async () => {
+  const off = await ping({ body: CLICK }, { page: PING_PAGE, env: { CTA_PING_WEBHOOK_URL: undefined } })
+  assert.equal(off.status, 202, 'previews and local runs (no webhook set) answer as if sent')
+  assert.equal(off.mark.length + off.graph.length, 0)
+  const elsewhere = await ping({ body: CLICK }, { page: PING_PAGE, env: { CTA_PING_WEBHOOK_URL: 'https://example.com/hook' } })
+  assert.equal(elsewhere.status, 202)
+  assert.equal(elsewhere.mark.length, 0, 'a webhook that is not Mark got the team')
+  const plain = await ping({ body: CLICK }, { page: PING_PAGE, env: { CTA_PING_WEBHOOK_URL: 'http://webhook.mark.optimizely.com/x' } })
+  assert.equal(plain.mark.length, 0, 'sent over http')
+  const missing = await ping({ body: { ...CLICK, route: '/nobody-here/' } }, { page: PING_PAGE })
+  assert.equal(missing.status, 404)
+  assert.equal(missing.mark.length, 0)
+  const refused = await ping({ body: CLICK }, { page: PING_PAGE, mark: 401 })
+  assert.equal(refused.status, 502, 'Mark refusing the key looks like success')
+})
+
+testAsync('the browser never holds the Mark webhook or its key', async () => {
+  for (const file of ['src/lib/cta-ping.ts', 'src/www/ConnectModal.tsx']) {
+    const src = readFileSync(file, 'utf8')
+    assert.ok(!/webhook\.(mark|opal)\.optimizely\.com|CTA_PING_WEBHOOK/.test(src), file)
+  }
+  assert.ok(!/fireDemoWebhook|abm-demo-webhook/.test(readFileSync('src/www/ConnectModal.tsx', 'utf8')))
 })
 
 /* -------------------------------------------------------------------- result */

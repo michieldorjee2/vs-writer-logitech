@@ -19,16 +19,8 @@ export function formatStatValue(val: string): string {
   return prefix + out + suffix
 }
 
-/* The legacy renderer's rule: a team member whose Name is a generic role title is a placeholder. */
-const GENERIC_CONTACT_NAMES = new Set([
-  'solutions architect',
-  'solution architect',
-  'migration engineer',
-  'customer success manager',
-])
-export function realContacts(members: CompetitorComparisonPage['teamMembers']) {
-  return (members || []).filter((m) => !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()))
-}
+/* The page's real contacts (placeholders dropped): one rule for the page and the CTA ping. */
+export { realContacts } from '../lib/account-rep'
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

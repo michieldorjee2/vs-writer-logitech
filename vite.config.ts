@@ -128,6 +128,8 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/offers$/, '/api/offers/index.ts'],
           [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
           [/^\/api\/offer-signup$/, '/api/offer-signup.ts'],
+          // The one-click ask. Sends nothing in dev: the Mark webhook is set on Production only.
+          [/^\/api\/cta-ping$/, '/api/cta-ping.ts'],
           [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],
           // The CMS preview's draft: the function itself, so dev reads it exactly as production does.
           [/^\/api\/preview$/, '/api/preview.ts'],

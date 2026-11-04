@@ -77,7 +77,7 @@ export default function AccountPage({ page: stored }: Props) {
       .replace(/^\/+|\/+$/g, '') || null
 
   return (
-    <ConnectProvider page={page} {...connectProps(page)}>
+    <ConnectProvider {...connectProps(page)}>
     <WwwPage accent={page.brandAccentColor} className="www-takeout">
       <div id="main-content">
         <Hero page={page} company={company} />
