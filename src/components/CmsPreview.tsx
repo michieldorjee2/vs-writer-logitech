@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PreviewComponent } from '@optimizely/cms-sdk/react/client';
 import { usePreviewContent } from '../hooks/usePreviewContent';
 import { useHeadMeta } from '../hooks/useHeadMeta';
 import type { CompetitorComparisonPage, PreviewBlock } from '../lib/graph-types';
 import { agentPlatformHead } from '../www/agent-platform/content';
+import { accountTemplateOf } from '../www/account-template';
 import { CmsEditProvider } from '../www/cms-edit';
 import type { Experience } from './VisualBuilderPage';
 
@@ -14,7 +15,7 @@ import type { Experience } from './VisualBuilderPage';
  * `{host}/preview?key={key}&ver={version}&loc={locale}&ctx={context}`, plus `preview_token`).
  *
  * It draws what the live address draws, from the same content (/api/preview):
- *   - an account page: the agent platform template (src/www/AgentPlatformPage.tsx)
+ *   - an account page: the template its pitch calls for (src/www/account-template.ts)
  *   - an offer page: the www offer design; any other experience: its composition (ExperienceBody)
  *   - one of the few legacy blocks still in the CMS: BlockPreview
  *
@@ -36,7 +37,7 @@ const CMS_URL = (() => {
 })();
 const INJECTOR_ID = 'opti-cms-injector';
 
-const AgentPlatformPage = lazy(() => import('../www/AgentPlatformPage'));
+const AccountRoute = lazy(() => import('../www/AccountRoute'));
 const ExperienceBody = lazy(() => import('./VisualBuilderPage').then((m) => ({ default: m.ExperienceBody })));
 const BlockPreview = lazy(() => import('./BlockPreview'));
 
@@ -48,6 +49,17 @@ function Spinner() {
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-optimizely-blue" />
         </div>
     );
+}
+
+/**
+ * The CMS sizes its preview frame to the page's height, so the page must not size itself by the
+ * frame's: with this on <html>, the www design lays out for a 900 px window (src/www/www.css).
+ */
+function useFixedWindowHeight() {
+    useLayoutEffect(() => {
+        document.documentElement.setAttribute('data-cms-preview', '');
+        return () => document.documentElement.removeAttribute('data-cms-preview');
+    }, []);
 }
 
 /** The CMS's script that connects this frame to the editor (on-page editing, save messages). */
@@ -67,10 +79,15 @@ export default function CmsPreview() {
     const navigate = useNavigate();
     const { data, isLoading, isRefreshing, error, reload } = usePreviewContent(searchParams);
     const editing = searchParams.get('ctx') === 'edit';
+    useFixedWindowHeight();
     useCommunicationInjector();
 
     const isAccountPage = data?.__typename === 'CompetitorComparisonPage';
-    const headPage = useMemo(() => (isAccountPage ? agentPlatformHead(data as CompetitorComparisonPage) : null), [data, isAccountPage]);
+    const headPage = useMemo(() => {
+        if (!isAccountPage) return null;
+        const page = data as CompetitorComparisonPage;
+        return accountTemplateOf(page) === 'agent-platform' ? agentPlatformHead(page) : page;
+    }, [data, isAccountPage]);
     useHeadMeta(headPage);
 
     /*
@@ -101,7 +118,7 @@ export default function CmsPreview() {
             </div>
         );
     } else if (isAccountPage) {
-        body = <AgentPlatformPage page={data as CompetitorComparisonPage} search={searchParams.toString()} />;
+        body = <AccountRoute page={data as CompetitorComparisonPage} search={searchParams.toString()} />;
     } else if (EXPERIENCE_TYPES.has(String(data.__typename))) {
         body = <ExperienceBody experience={data as unknown as Experience} preview={editing} />;
     } else {

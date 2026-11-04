@@ -1,6 +1,6 @@
 # Agent platform template: what the agents need to change
 
-**Status: draft, not deployed.** Nothing in this folder has been applied to Mark, the wiki or the CMS. It is the proposal that goes with the agent platform template in `src/www/AgentPlatformPage.tsx` (live on every account page).
+**Status: draft, not deployed.** Nothing in this folder has been applied to Mark, the wiki or the CMS. It is the proposal that goes with the agent platform template in `src/www/AgentPlatformPage.tsx` (live on the account pages that pitch the agent platform: `src/www/account-template.ts`).
 
 The template is Laura Perez Riau's, built from Dan Tranter's pitch and debriefed on 27 October 2026 (Mark artifact "limitless-agent-platform-template-debrief-for-michiel.md", with the Tyler Technologies reference build). It presents Optimizely as the layer on top of the stack an account already runs, in eight sections: hero, who we are, where it fits, speaks your language, use cases, proof, first 90 days, close.
 

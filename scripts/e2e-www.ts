@@ -4,7 +4,8 @@
  *   npm run build && npx tsx scripts/serve-prod.ts &      # or point E2E_BASE at a deployment
  *   npm run e2e:www
  *
- * Env: E2E_BASE (default http://127.0.0.1:5199), E2E_ACCOUNT (default /cdw/), E2E_OFFER
+ * Env: E2E_BASE (default http://127.0.0.1:5199), E2E_ACCOUNT (a takeout pitch, default /cdw/),
+ * E2E_AP_ACCOUNT (an agent platform pitch, default /smartsheet/), E2E_OFFER
  * (default /vb/no-account-left-behind-scale-ai), E2E_OUT (screenshot folder, default a temp dir),
  * E2E_BYPASS (Vercel protection-bypass secret, for a protected preview).
  *
@@ -16,7 +17,8 @@
  * scenes at least 75%, the close the full window; one closing CTA; the intro on load settles; the
  * hero landscape is never upscaled.
  *
- * Covers, for the account page (the agent platform template, the only one) and the offer page:
+ * Covers, for both account templates (each page's own pitch picks one: src/www/account-template.ts)
+ * and the offer page:
  * server render + hydration without errors, no sideways scroll on a phone, every section present,
  * sticky bar, the one-click connect panel (pings once per view, from the sticky bar or the close),
  * the review layer and state switch, the offer FAQ, X-ray mode outlining every section, Edit mode
@@ -31,7 +33,10 @@ import path from 'node:path'
 import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../src/lib/xray-defaults'
 
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
+/** A page that pitches a CMS takeout: the takeout template. */
 const ACCOUNT = process.env.E2E_ACCOUNT || '/cdw/'
+/** A page that pitches the agent platform: Laura's template. */
+const AP_ACCOUNT = process.env.E2E_AP_ACCOUNT || '/smartsheet/'
 const OFFER = process.env.E2E_OFFER || '/vb/no-account-left-behind-scale-ai'
 const OUT = process.env.E2E_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'www-e2e-'))
 const BYPASS = process.env.E2E_BYPASS
@@ -41,7 +46,7 @@ const VIEWPORTS = {
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
 } as const
 
-const url = (p: string, q: string) => `${BASE}${p}${p.includes('?') ? '&' : '?'}${q}`
+const url = (p: string, q = '') => (q ? `${BASE}${p}${p.includes('?') ? '&' : '?'}${q}` : `${BASE}${p}`)
 
 /* ------------------------------------------------------------------ harness */
 
@@ -210,17 +215,17 @@ console.log(`www-design e2e against ${BASE}  (screenshots: ${OUT})`)
 const beaconsOf = (page: Page) => page.evaluate(() => (window as unknown as { __beacons: string[] }).__beacons)
 
 for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
-  console.log(`\naccount page, agent platform template (the default), ${vp}`)
+  console.log(`\naccount page, agent platform template (an agent platform pitch), ${vp}`)
   {
     const { ctx, watch } = await newContext(browser, vp)
-    const page = await open(ctx, watch, url(ACCOUNT, 'design=www'))
+    const page = await open(ctx, watch, url(AP_ACCOUNT))
     await test('server-rendered and hydrated without errors', async () => {
-      const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
       expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the server did not render the agent platform page')
       expect(!watch.errors.length, watch.errors.join('\n'))
     })
     await test('the tab title is the template\'s, before and after hydration (no takeout pitch)', async () => {
-      const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
       const server = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? ''
       const client = await page.title()
       expect(/^Optimizely agent platform · Personalized for /.test(server), `server title: ${server}`)
@@ -315,7 +320,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     if (vp === 'desktop') {
       await test('?review=1 shows where each part came from, and switches the lifecycle state', async () => {
         expect(!(await page.locator('.www-review').count()), 'review layer on the production page')
-        const rp = await open(ctx, watch, url(ACCOUNT, 'design=www&review=1'))
+        const rp = await open(ctx, watch, url(AP_ACCOUNT, 'review=1'))
         await rp.locator('.www-review').waitFor()
         await rp.locator('.www-review__state', { hasText: 'Ex-customer' }).click()
         await rp.waitForURL(/state=ex-customer/)
@@ -328,9 +333,65 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await ctx.close()
   }
 
+  console.log(`\naccount page, takeout template (a CMS takeout pitch), ${vp}`)
+  const { ctx, watch } = await newContext(browser, vp)
+  const page = await open(ctx, watch, url(ACCOUNT))
+
+  await test('server-rendered and hydrated without errors', async () => {
+    const html = await (await fetch(url(ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+    expect(html.includes('class="www-page') && html.includes('id="comparison"'), 'the server did not render the takeout page')
+    expect(!watch.errors.length, watch.errors.join('\n'))
+  })
+  await test('every section the ODP tracking observes is on the page', async () => {
+    for (const id of ['hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta'])
+      expect(await page.locator(`#${id}`).count(), `#${id} missing`)
+  })
+  await test('no sideways scroll', () => noSidewaysScroll(page))
+  await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
+  if (vp === 'desktop') {
+    await test('desktop: full screen hero at 75% of the window, the next scene peeking in; scenes at least 75%', () => sceneHeights(page, 900))
+  }
+  await test('the intro plays on load and settles', () => introSettles(page))
+  await test('the hero landscape is never upscaled', () => heroImageSharp(page))
+  await test('their site screenshot is in the challenge scene, never drawn wider than it was taken', async () => {
+    const shotImg = page.locator('#challenge [data-xray="challenge-screenshot"] img')
+    if (!(await shotImg.count())) return
+    expect(!(await page.locator('#hero [data-xray="challenge-screenshot"]').count()), 'still on the hero')
+    const r = await shotImg.evaluate((img: HTMLImageElement) => ({ natural: img.naturalWidth, drawn: img.getBoundingClientRect().width }))
+    expect(r.drawn <= r.natural + 1, `drawn ${r.drawn}px wide from a ${r.natural}px capture`)
+  })
+  await test('the close has one call to action', async () => {
+    const n = await page.locator('#cta .www-btn').count()
+    expect(n === 1, `${n} buttons in the close`)
+  })
+  await test('the sticky bar appears past the hero and hides at the contact card', async () => {
+    expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
+    await page.locator('#comparison').scrollIntoViewIfNeeded()
+    await page.waitForSelector('.www-sticky--visible', { timeout: 3000 })
+    await page.locator('#cta').scrollIntoViewIfNeeded()
+    await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
+  })
+  await test('one click on the contact button tells the team, says so, and opens the connect panel', async () => {
+    await page.locator('#cta-connect-btn').click()
+    await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+    await page.keyboard.press('Escape')
+    await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
+    const beacons = await beaconsOf(page)
+    expect(beacons.length === 1 && JSON.parse(beacons[0]).event === 'demo_button_clicked', `beacons: ${JSON.stringify(beacons)}`)
+    expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
+  })
+  if (vp === 'phone') {
+    await test('phone: the hero ask is in the first screen', async () => {
+      const cta = await page.locator('#hero .www-btn').first().boundingBox()
+      expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
+    })
+  }
+  await shot(page, `takeout-${vp}`)
+  await ctx.close()
+
   console.log(`\noffer page, ${vp}`)
   const o = await newContext(browser, vp)
-  const op = await open(o.ctx, o.watch, url(OFFER, 'design=www'))
+  const op = await open(o.ctx, o.watch, url(OFFER))
   await test('server-rendered and hydrated without errors', async () => {
     expect(!o.watch.errors.length, o.watch.errors.join('\n'))
   })
@@ -358,7 +419,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   // Laura, 3 Nov: tighten the space after "What you'll leave with". Scenes on the same
   // background follow each other at one scene's padding, not two scenes each padded to 75%.
   await test('offer scenes on the same background are one gap apart, not two padded scenes', async () => {
-    const lp = await open(o.ctx, o.watch, url('/vb/sitecore-switch-volvo-cars', 'design=www'))
+    const lp = await open(o.ctx, o.watch, url('/vb/sitecore-switch-volvo-cars'))
     await lp.evaluate(async () => {
       for (let y = 0; y < document.body.scrollHeight; y += 400) {
         scrollTo(0, y)
@@ -392,7 +453,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   })
   for (const long of ['/vb/sitecore-switch-volvo-cars', '/vb/the-north-face-retail-cx-personalization-lab-ralph-lauren-corp']) {
     await test(`a long headline steps down instead of pushing the hero past the window (${long})`, async () => {
-      const lp = await open(o.ctx, o.watch, url(long, 'design=www'))
+      const lp = await open(o.ctx, o.watch, url(long))
       const r = await lp.evaluate(() => {
         const h1 = document.querySelector('#hero h1') as HTMLElement
         const run = h1.querySelector('.origin-bottom-left') as HTMLElement | null
@@ -438,10 +499,10 @@ console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
     const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
     await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
   })
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(AP_ACCOUNT, 'search=1'))
   // The stored stack, from the server HTML's hydration data (the page drops it once hydrated).
   {
-    const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+    const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
     const data = JSON.parse(html.match(/window\.__SSR_DATA__=(\{[\s\S]*?\})<\/script>/)![1]) as { techStack?: typeof stack }
     stack = data.techStack ?? []
   }
@@ -519,7 +580,7 @@ console.log('\nEdit mode on the agent platform page: the page\'s own text (the h
     statusPolls++
     return route.fulfill({ json: { changed: false } })
   })
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(AP_ACCOUNT, 'search=1'))
   const before = await page.locator('#hero h1').innerText()
   await test('Mark\'s new headline shows live, and Edit mode reloads without waiting for a CMS republish', async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
@@ -551,7 +612,7 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
 {
   const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
   // The stored page, and the same page as Mark saved it: one tool added to the stack.
-  const slug = ACCOUNT.replace(/^\/+|\/+$/g, '')
+  const slug = AP_ACCOUNT.replace(/^\/+|\/+$/g, '')
   const stored = (await (await fetch(`${BASE}/api/content?slug=${encodeURIComponent(slug)}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).json()) as { techStack?: Array<{ Name: string; ColorTag: string | null }> }
   const saved = { ...stored, techStack: [{ Name: 'Shopify Plus', ColorTag: null }, ...(stored.techStack ?? [])] }
   await ctx.route('**/api/opal-edit-stream', async (route) => {
@@ -563,7 +624,7 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
   // The save is live at once, and the saved page is what the content API answers after it.
   await ctx.route('**/api/edit-status**', (route) => route.fulfill({ json: { changed: true, published: '2026-01-01T00:00:00.000Z' } }))
   await ctx.route(/\/api\/content\?slug=[^&]+&_=/, (route) => route.fulfill({ json: saved }))
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(AP_ACCOUNT, 'search=1'))
   await test('the saved change is shown on the page before the reload: spotlight, re-render, glow', async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
     await page.locator('[aria-label="Leave feedback on What they run today"]').click()
@@ -582,11 +643,70 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
   await ctx.close()
 }
 
+console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  // Mark's edit stream, answered here: one edit to the hero headline.
+  let heroText = ''
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    const events = [
+      { type: 'plan', sections: ['Hero headline'], summary: 'e2e' },
+      { type: 'section_focus', section: 'Hero headline' },
+      { type: 'edit', section: 'Hero headline', target: 'headline', kind: 'text', action: 'replace', status: 'applied', old: heroText, new: 'Rewritten by the e2e test' },
+      { type: 'commit', status: 'ok', edits: 1 },
+      { type: 'done', saved: true },
+    ]
+    const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
+  const page = await open(ctx, watch, url(ACCOUNT, 'search=1'))
+  heroText = (await page.locator('[data-xray="hero-title"] h1').innerText()).replace(/\s+/g, ' ').trim()
+
+  const onPage = await page.evaluate(
+    (ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)),
+    ABM_XRAY_DEFAULTS.map((s) => s.id),
+  )
+
+  await test('the page tools render for a signed-in employee', async () => {
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).waitFor({ timeout: 5000 })
+  })
+  await test(`X-ray outlines every section on the page (${onPage.length})`, async () => {
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('.xray-card').length >= n, onPage.length, { timeout: 8000 })
+    const titles = await page.$$eval('.xray-card__title', (els) => els.map((e) => e.textContent))
+    const want = ABM_XRAY_DEFAULTS.filter((s) => onPage.includes(s.id)).map((s) => s.title)
+    for (const t of want) expect(titles.includes(t), `no X-ray card for "${t}"`)
+    await page.screenshot({ path: path.join(OUT, 'booth-xray.png') })
+    await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
+  })
+  await test('Edit mode offers feedback on every section, and applies Mark\'s edit in place', async () => {
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, onPage.length, { timeout: 8000 })
+    // The edit overlay is aria-hidden from the page's own tree, so find the box by its label.
+    await page.locator('[aria-label="Leave feedback on Hero headline"]').click()
+    await page.locator('.edit-popup__textarea').fill('Make it about every CDW brand')
+    await page.locator('.edit-popup__btn--primary').click()
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForFunction(
+      () => /Rewritten by the e2e test/.test(document.querySelector('[data-xray="hero-title"]')?.textContent || ''),
+      null,
+      { timeout: 15000 },
+    )
+    await page.screenshot({ path: path.join(OUT, 'booth-edit.png') })
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
 console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
 {
   const CMS = 'https://app-opti01saas4uc99t001.cms.optimizely.com'
   const keyOf = async (q: string) => ((await (await fetch(`${BASE}/api/content?${q}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).json()) as { _metadata?: { key?: string } })._metadata?.key
   const accountKey = await keyOf(`slug=${encodeURIComponent(ACCOUNT.replace(/^\/|\/$/g, ''))}`)
+  const apKey = await keyOf(`slug=${encodeURIComponent(AP_ACCOUNT.replace(/^\/|\/$/g, ''))}`)
   const offerKey = await keyOf(`kind=experience&slug=${encodeURIComponent(OFFER.replace(/^\/vb\/|\/$/g, ''))}`)
   const { ctx, watch } = await newContext(browser, 'desktop')
   // The CMS's editor script is the CMS's own: stood in here, and noted, so the test stays on this machine.
@@ -615,21 +735,32 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     )
 
   await test('the keys of the pages under test were found', async () => {
-    expect(accountKey && offerKey, `account ${accountKey}, offer ${offerKey}`)
+    expect(accountKey && apKey && offerKey, `account ${accountKey}, agent platform ${apKey}, offer ${offerKey}`)
   })
   const page = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=edit`)
-  await test('an account page draft in the editor is the agent platform template, not the old layout', async () => {
-    await page.waitForSelector('.www-page.www-ap', { timeout: 10000 })
-    expect(!(await page.locator('.abm-page').count()), 'the old ABM layout is on the page')
+  await test('a takeout pitch in the editor is the takeout page in the new design, as at its address', async () => {
+    await page.waitForSelector('.www-page #comparison', { timeout: 10000 })
+    expect(!(await page.locator('.www-ap, .abm-page').count()), 'not the takeout page')
+  })
+  await test('the page lays out for a fixed window, so the frame the CMS sizes to it cannot run away', async () => {
+    // The CMS sets its frame to the page's height. Stand in for that: a frame 20 times taller.
+    const before = await page.evaluate(() => document.documentElement.scrollHeight)
+    await page.setViewportSize({ width: 1440, height: 18000 })
+    await page.waitForTimeout(400)
+    const after = await page.evaluate(() => document.documentElement.scrollHeight)
+    const hero = await page.evaluate(() => document.querySelector('#hero')?.getBoundingClientRect().height ?? 0)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    expect(after <= Math.max(before, 18000) + 2 && Math.abs(after - before) < 50 + Math.max(0, 18000 - before), `page ${before}px in a 900px frame, ${after}px in an 18,000px one`)
+    expect(hero > 300 && hero < 900, `the hero is ${hero}px tall in an 18,000px frame`)
   })
   await test("the CMS's editor script is loaded from the CMS", async () => {
     await page.waitForFunction(() => (window as unknown as { __injector?: boolean }).__injector === true, null, { timeout: 5000 })
     expect(injector.some((u) => u === `${CMS}/util/javascript/communicationinjector.js`), injector.join(', '))
   })
-  await test('the CMS fields the page shows are outlined for the editor (data-epi-edit), the template copy is not', async () => {
+  await test('every stored field the takeout page shows is outlined for the editor (data-epi-edit)', async () => {
     const hooks = await page.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
-    for (const f of ['customerLogo', 'techStack', 'stakeholders']) expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
-    expect(!hooks.some((h) => h?.startsWith('copy.')), `a template copy key is outlined: ${hooks.join(', ')}`)
+    for (const f of ['headline', 'subheadline', 'customerLogo', 'techStack', 'challengeHeadline', 'comparisonTableRows', 'competitorName', 'roiTitle', 'timelinePhases', 'ctaTitle', 'teamMembers'])
+      expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
   })
   await test('a save the CMS reports refreshes the draft in place: fetched again, the page never reloads', async () => {
     await page.evaluate(() => ((window as unknown as { __kept: number }).__kept = 1))
@@ -650,7 +781,7 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     expect(drafts.slice(before).some((q) => new URLSearchParams(q).get('preview_token') === 'e2e-new-token'), `fetched ${drafts.slice(before).join(' | ')}`)
     expect(new URL(page.url()).searchParams.get('preview_token') === 'e2e-new-token', `the address is ${page.url()}`)
     expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept === 1), 'the page reloaded')
-    await page.waitForSelector('.www-page.www-ap')
+    await page.waitForSelector('.www-page #comparison')
   })
   await test('in the preview the one-click ask tells nobody', async () => {
     await page.locator('#cta-connect-btn').click()
@@ -661,9 +792,18 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
   })
   await shot(page, 'cms-preview-account')
 
+  const apView = await open(ctx, watch, `${BASE}/preview?key=${apKey}&loc=en&ctx=edit`)
+  await test('an agent platform pitch in the editor is the agent platform page, its CMS fields outlined and its template copy not', async () => {
+    await apView.waitForSelector('.www-page.www-ap', { timeout: 10000 })
+    const hooks = await apView.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
+    for (const f of ['customerLogo', 'techStack', 'stakeholders']) expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
+    expect(!hooks.some((h) => h?.startsWith('copy.')), `a template copy key is outlined: ${hooks.join(', ')}`)
+  })
+  await shot(apView, 'cms-preview-agent-platform')
+
   const plainView = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=preview`)
   await test("the CMS's plain preview (ctx=preview) is the reader's page, with no editing hooks", async () => {
-    await plainView.waitForSelector('.www-page.www-ap')
+    await plainView.waitForSelector('.www-page #comparison')
     expect(!(await plainView.locator('[data-epi-edit], [data-epi-block-id]').count()), 'editing hooks outside the editor')
   })
 
@@ -685,25 +825,25 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
   await ctx.close()
 }
 
-console.log('\nthe default (no parameter); the old switches are gone')
+console.log('\neach account page follows its own pitch; no address switches it')
 const fetchHtml = async (href: string) => (await fetch(href, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
-await test('an account page with no parameter is the agent platform page', async () => {
-  const html = await fetchHtml(`${BASE}${ACCOUNT}`)
-  expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the default account page is not the agent platform page')
+const isAp = (html: string) => /class="www-page[^"]*\bwww-ap\b/.test(html)
+const isTakeout = (html: string) => html.includes('class="www-page') && html.includes('id="comparison"') && !isAp(html)
+await test(`a CMS takeout pitch (${ACCOUNT}) is the takeout page; an agent platform pitch (${AP_ACCOUNT}) is the agent platform page`, async () => {
+  expect(isTakeout(await fetchHtml(url(ACCOUNT))), `${ACCOUNT} is not the takeout page`)
+  expect(isAp(await fetchHtml(url(AP_ACCOUNT))), `${AP_ACCOUNT} is not the agent platform page`)
 })
-await test('an offer page with no parameter is the www offer page', async () => {
-  const html = await fetchHtml(`${BASE}${OFFER}`)
-  expect(html.includes('www-page') && html.includes('id="hero"'), 'the default offer page is not the www design')
-})
-await test('?design=classic and ?template=takeout draw the agent platform page too (the old layouts are gone)', async () => {
+await test('?design=classic and ?template=takeout change nothing (no switches in the address)', async () => {
   for (const q of ['design=classic', 'template=takeout']) {
-    const html = await fetchHtml(url(ACCOUNT, q))
-    expect(/class="www-page[^"]*\bwww-ap\b/.test(html) && !html.includes('abm-page'), `${q}: not the agent platform page`)
+    expect(isTakeout(await fetchHtml(url(ACCOUNT, q))), `${ACCOUNT}?${q}: not the takeout page`)
+    expect(isAp(await fetchHtml(url(AP_ACCOUNT, q))), `${AP_ACCOUNT}?${q}: not the agent platform page`)
   }
 })
-await test('?design=classic draws the www offer page too', async () => {
-  const html = await fetchHtml(url(OFFER, 'design=classic'))
-  expect(html.includes('www-page') && !html.includes('vb-experience'), 'the classic offer page is still served')
+await test('an offer page is the www offer page, with or without ?design=classic', async () => {
+  for (const q of ['', 'design=classic']) {
+    const html = await fetchHtml(url(OFFER, q))
+    expect(html.includes('www-page') && html.includes('id="hero"') && !html.includes('vb-experience'), `?${q}: not the www offer page`)
+  }
 })
 
 await browser.close()

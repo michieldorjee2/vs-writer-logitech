@@ -1,8 +1,8 @@
 /**
- * The www design is the only design for account pages (`/<company>/`, the agent platform template)
- * and offer pages (`/vb/<slug>`). Live since 2 November 2026 (Michiel: "switch all pages to it");
- * the previous renderers and their `?design=classic` / `?template=takeout` switches were removed
- * on 4 November. Person, retail and fin-serv pages have their own renderers.
+ * The www design is the only design for account pages (`/<company>/`, in the template the page's
+ * own pitch calls for: ./account-template.ts) and offer pages (`/vb/<slug>`). Live since 2 November
+ * 2026 (Michiel: "switch all pages to it"); the previous renderers and every switch in the address
+ * were removed on 4 November. Person, retail and fin-serv pages have their own renderers.
  */
 
 /** An ABMExperience written by the offer blueprint. */

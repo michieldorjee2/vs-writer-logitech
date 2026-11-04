@@ -5,7 +5,8 @@ import RetailCustomerPage from '../src/components/RetailCustomerPage';
 import FinServPageServer from '../src/components/FinServPage.server';
 import PersonPageServer from '../src/components/PersonPage.server';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content';
-import AgentPlatformPage from '../src/www/AgentPlatformPage';
+import AccountRoute from '../src/www/AccountRoute';
+import { accountTemplateOf } from '../src/www/account-template';
 import WwwOfferPage from '../src/www/OfferPage';
 import { isOfferExperience } from '../src/www/design';
 import { agentPlatformHead } from '../src/www/agent-platform/content';
@@ -1217,9 +1218,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
       default:
-        // The agent platform template; its <head> replaces the stored title and description (N2).
-        appHtml = renderPageRoute(<AgentPlatformPage page={page} search={url.search} />);
-        headSource = agentPlatformHead(page);
+        // The template the page's own pitch calls for (src/www/account-template.ts). The agent
+        // platform template's <head> replaces the stored title and description (N2).
+        appHtml = renderPageRoute(<AccountRoute page={page} search={url.search} />);
+        if (accountTemplateOf(page) === 'agent-platform') headSource = agentPlatformHead(page);
     }
 
     // ---- Build SEO head tags ----
