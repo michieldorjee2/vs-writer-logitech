@@ -48,7 +48,15 @@ export function usePreviewContent(params: URLSearchParams): PreviewContentState 
 
         fetch(`/api/preview?${qs}`, { signal: ac.signal, cache: 'no-store' })
             .then(async (res) => {
-                if (!res.ok) throw new Error(res.status === 404 ? 'Content not found' : `Failed to load (${res.status})`);
+                if (!res.ok) {
+                    throw new Error(
+                        res.status === 404
+                            ? 'Content not found'
+                            : res.status === 401
+                              ? 'This preview has timed out. Reload it in the CMS to see the draft.'
+                              : `Failed to load (${res.status})`,
+                    );
+                }
                 const content: PreviewContent = await res.json();
                 setLoaded({ request, data: content, error: null });
             })

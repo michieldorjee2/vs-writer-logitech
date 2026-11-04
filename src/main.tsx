@@ -16,6 +16,14 @@ import './index.css'
  */
 import 'material-symbols/rounded.css'
 import App from './App.tsx'
+import { inCmsPreview } from './lib/cms-preview'
+
+/*
+ * The CMS's preview (/preview): set before anything renders, so even the first loading screen is
+ * laid out for a fixed window. The CMS sizes its frame to the page, so a page sized by the frame
+ * would grow without end (src/www/www.css, src/index.css).
+ */
+if (inCmsPreview()) document.documentElement.setAttribute('data-cms-preview', '');
 
 const root = document.getElementById('root')!;
 

@@ -792,6 +792,23 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
   })
   await shot(page, 'cms-preview-account')
 
+  // A preview token lives five minutes. An old one gets a plain message, and the page stays its
+  // own size in the CMS's frame (it grew to Chrome's 16,777,213 px limit on the error screen).
+  {
+    const tp = await ctx.newPage()
+    await tp.route('**/api/preview?**', (route) =>
+      route.fulfill({ status: 401, json: { error: 'The preview token was refused (Token expired)', expired: true } }),
+    )
+    await tp.setViewportSize({ width: 1440, height: 18000 })
+    await tp.goto(`${BASE}/preview?key=${accountKey}&loc=en&ctx=edit&preview_token=expired`)
+    await test('an expired preview says so, and stays its own size in a frame sized to it', async () => {
+      await tp.getByText('This preview has timed out').waitFor({ timeout: 8000 })
+      const h = await tp.evaluate(() => document.documentElement.scrollHeight)
+      expect(h <= 18000 && (await tp.evaluate(() => document.querySelector('h1')?.getBoundingClientRect().top ?? 1e9)) < 600, `error screen in an 18,000px frame: page ${h}px, message out of sight`)
+    })
+    await tp.close()
+  }
+
   const apView = await open(ctx, watch, `${BASE}/preview?key=${apKey}&loc=en&ctx=edit`)
   await test('an agent platform pitch in the editor is the agent platform page, its CMS fields outlined and its template copy not', async () => {
     await apView.waitForSelector('.www-page.www-ap', { timeout: 10000 })

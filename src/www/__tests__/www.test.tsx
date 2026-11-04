@@ -1669,6 +1669,9 @@ test('in the CMS preview the page lays out for a fixed window: no scene grows wi
   assert.match(css, /html\[data-cms-preview\] \{\s*--www-vh: 9px;\s*--www-svh: 9px;/)
   assert.match(css, /html\[data-cms-preview\] \.www-page,\s*html\[data-cms-preview\] \.vb-experience \{\s*min-height: 0;/)
   assert.match(readFileSync('src/components/CmsPreview.tsx', 'utf8'), /setAttribute\('data-cms-preview', ''\)/)
+  // Set before the first render, so the loading and error screens are bounded too.
+  assert.match(readFileSync('src/main.tsx', 'utf8'), /if \(inCmsPreview\(\)\) document\.documentElement\.setAttribute\('data-cms-preview', ''\)/)
+  assert.match(readFileSync('src/index.css', 'utf8'), /html\[data-cms-preview\] \.min-h-screen \{\s*min-height: 560px;/)
 })
 
 test('in the CMS editor every offer section and element is outlined by its Visual Builder node', () => {
@@ -1860,6 +1863,19 @@ testAsync('/api/preview refuses what is not a key, version, locale or token, and
     assert.equal(calls.length, 0, 'a refused request reached Graph')
     assert.equal((await preview({ key: KEY, preview_token: TOKEN })).status, 404)
   })
+})
+
+testAsync("an expired editor token is said as such (401), never read as \"no such draft\"", async () => {
+  // Graph's answer to a CMS preview token past its five minutes, as measured on the live instance.
+  const expired = { code: 'AUTHENTICATION_ERROR', status: 401, details: { msg: 'Token expired' } }
+  await withPreviewGraph({ GetPreviewType: expired }, async (calls) => {
+    const r = await preview({ key: KEY, ver: '7', preview_token: TOKEN })
+    assert.equal(r.status, 401)
+    assert.match((r.body as { error: string }).error, /Token expired/)
+    assert.equal((r.body as { expired: boolean }).expired, true)
+    assert.equal(calls.length, 1, 'kept asking Graph after it refused the token')
+  })
+  assert.match(readFileSync('src/hooks/usePreviewContent.ts', 'utf8'), /401[\s\S]*timed out[\s\S]*Reload it in the CMS/)
 })
 
 testAsync('a Graph error is logged with the key and version, never with the editor token', async () => {
