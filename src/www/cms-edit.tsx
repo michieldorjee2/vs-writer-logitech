@@ -14,7 +14,7 @@
  * Edit mode, so the CMS has nothing to outline there. On an offer page every section and element is
  * a Visual Builder node, so each one is outlined and opens in the editor.
  */
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 import { getPreviewUtils } from '@optimizely/cms-sdk/core'
 
 type Attrs = Record<string, string>
@@ -45,3 +45,12 @@ export function CmsEditProvider({ editing, children }: { editing: boolean; child
 }
 
 export const useCmsEdit = () => useContext(Ctx)
+
+/**
+ * The hooks for an element that shows one stored field: Edit mode's (`data-field`, which a live
+ * edit flashes: src/components/EditMode.tsx) and, in the CMS editor, the CMS's (`data-epi-edit`).
+ */
+export function useShowsField(): (property: string) => Attrs {
+  const { field } = useCmsEdit()
+  return useCallback((property: string) => ({ 'data-field': property, ...field(property) }), [field])
+}

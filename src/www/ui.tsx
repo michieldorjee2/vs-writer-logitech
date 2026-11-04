@@ -309,11 +309,11 @@ export function Scene({
 }) {
   return (
     <section
-      {...attrs}
       id={id}
       data-scene
       data-tone={tone}
       className={cn('www-scene', `www-scene--${tone}`, fill && 'www-scene--fill', compact && 'www-scene--compact', className)}
+      {...attrs}
     >
       <div className={cn('www-scene__inner vb-container mx-auto w-full px-4 lg:px-8', innerClassName)}>{children}</div>
     </section>

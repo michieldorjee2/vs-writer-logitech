@@ -487,7 +487,7 @@ function SignUp({
   // takes another id (one id per page); the hero link and the sticky bar land on the form.
   const signupId = str(close, 'SignupOfferId')
   return (
-    <section {...attrs} id={signupId ? 'signup-band' : 'signup'} data-scene data-tone="dark" data-band="dark" className="www-scene www-scene--dark www-scene--fill">
+    <section id={signupId ? 'signup-band' : 'signup'} data-scene data-tone="dark" data-band="dark" className="www-scene www-scene--dark www-scene--fill" {...attrs}>
       <div className="www-scene__inner vb-container mx-auto w-full px-4 lg:px-8">
         <div className="grid items-center gap-[min(6vh,56px)] lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-7" {...closeAttrs}>

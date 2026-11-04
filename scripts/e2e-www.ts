@@ -30,7 +30,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../src/lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, TAKEOUT_EDIT } from '../src/lib/xray-defaults'
 
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
 /** A page that pitches a CMS takeout: the takeout template. */
@@ -111,9 +111,12 @@ async function open(ctx: BrowserContext, watch: Watch, href: string): Promise<Pa
   page.on('console', (m) => {
     if (m.type() === 'error' && !NOISE.test(m.text())) watch.errors.push(`console: ${m.text()}`)
   })
-  const res = await page.goto(href, { waitUntil: 'load' })
+  // Our page drawn, not every third-party image loaded: a slow logo CDN (Brandfetch) held the
+  // load event past 30s now and then, and failed a run that had nothing wrong with it.
+  const res = await page.goto(href, { waitUntil: 'domcontentloaded' })
   expect(res?.ok(), `${href} answered ${res?.status()}`)
   await page.waitForSelector('.www-page')
+  await page.waitForLoadState('load', { timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(1200) // hydration + fonts
   return page
 }
@@ -646,14 +649,19 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
 console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
 {
   const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
-  // Mark's edit stream, answered here: one edit to the hero headline.
+  // Mark's edit stream, answered here, as the agent sends it: each applied edit with its field and
+  // the field's full new value. One to the hero headline, one to a part the page newly offers.
   let heroText = ''
+  let asked = ''
   await ctx.route('**/api/opal-edit-stream', async (route) => {
+    asked = route.request().postData() || ''
     const events = [
-      { type: 'plan', sections: ['Hero headline'], summary: 'e2e' },
+      { type: 'plan', sections: ['Hero headline', 'Comparison headline'], summary: 'e2e' },
       { type: 'section_focus', section: 'Hero headline' },
-      { type: 'edit', section: 'Hero headline', target: 'headline', kind: 'text', action: 'replace', status: 'applied', old: heroText, new: 'Rewritten by the e2e test' },
-      { type: 'commit', status: 'ok', edits: 1 },
+      { type: 'edit', section: 'Hero headline', target: 'headline', kind: 'text', action: 'replace', status: 'applied', old: heroText, new: 'Rewritten by the e2e test', field: 'headline', value: 'Rewritten by the e2e test' },
+      { type: 'section_focus', section: 'Comparison headline' },
+      { type: 'edit', section: 'Comparison headline', target: 'comparisonHeadline', kind: 'text', action: 'replace', status: 'applied', old: '', new: 'Compared by the e2e test', field: 'comparisonHeadline', value: 'Compared by the e2e test' },
+      { type: 'commit', status: 'ok', edits: 2 },
       { type: 'done', saved: true },
     ]
     const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
@@ -679,19 +687,34 @@ console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
     await page.screenshot({ path: path.join(OUT, 'booth-xray.png') })
     await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
   })
-  await test('Edit mode offers feedback on every section, and applies Mark\'s edit in place', async () => {
+  const editable = await page.evaluate((ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)), TAKEOUT_EDIT.map((s) => s.id))
+  await test(`Edit mode offers every part of the takeout page (${editable.length} of ${TAKEOUT_EDIT.length}), each named for Mark`, async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
-    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, onPage.length, { timeout: 8000 })
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, editable.length, { timeout: 8000 })
+    const labels = await page.$$eval('[aria-label^="Leave feedback on "]', (els) => els.map((e) => e.getAttribute('aria-label')!.replace('Leave feedback on ', '')))
+    for (const s of TAKEOUT_EDIT.filter((x) => editable.includes(x.id))) expect(labels.includes(s.title), `"${s.title}" is not offered`)
+    expect(editable.length >= TAKEOUT_EDIT.length - 3, `only ${editable.length} of the parts are on the page`)
+  })
+  await test("Mark is told each section's fields, and his streamed values re-render the page live", async () => {
     // The edit overlay is aria-hidden from the page's own tree, so find the box by its label.
-    await page.locator('[aria-label="Leave feedback on Hero headline"]').click()
-    await page.locator('.edit-popup__textarea').fill('Make it about every CDW brand')
-    await page.locator('.edit-popup__btn--primary').click()
+    for (const [part, note] of [['Hero headline', 'Make it about every CDW brand'], ['Comparison headline', 'Name AEM as a Service']]) {
+      await page.locator(`[aria-label="Leave feedback on ${part}"]`).click()
+      await page.locator('.edit-popup__textarea').fill(note)
+      await page.locator('.edit-popup__btn--primary').click()
+    }
     await page.locator('[aria-label="Send feedback"]').click()
     await page.waitForFunction(
-      () => /Rewritten by the e2e test/.test(document.querySelector('[data-xray="hero-title"]')?.textContent || ''),
+      () =>
+        /Rewritten by the e2e test/.test(document.querySelector('[data-xray="hero-title"]')?.textContent || '') &&
+        /Compared by the e2e test/.test(document.querySelector('[data-xray="comparison-heading"]')?.textContent || ''),
       null,
       { timeout: 15000 },
     )
+    const req = JSON.parse(asked || '{}').suggested_edit || ''
+    expect(/Section: Hero headline\nFields: headline\n/.test(req), `the request does not name the headline field: ${req.slice(0, 200)}`)
+    expect(/Section: Comparison headline\nFields: comparisonHeadline, comparisonDescription, competitorName\n/.test(req), 'the request does not name the comparison fields')
+    // React drew it from the value (the element that shows the field flashed), not a retyped overlay.
+    expect(await page.locator('[data-field="headline"]').count(), 'the headline has no data-field')
     await page.screenshot({ path: path.join(OUT, 'booth-edit.png') })
   })
   await test('no errors, and nothing reached the real webhooks', async () => {

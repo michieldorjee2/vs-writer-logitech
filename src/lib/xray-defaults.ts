@@ -467,6 +467,58 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
   },
 ];
 
+/**
+ * Edit mode on the takeout template (src/www/AccountPage.tsx): every part the page shows, the
+ * stored fields it is drawn from, and a hint for Mark. With the fields named, Mark changes exactly
+ * those and sends each one's full new value, and the page re-renders from it as it streams
+ * (src/www/live-edit.ts), as on the agent platform page. The titles are the section names Mark's
+ * prompt maps to fields. Between them, the parts cover every stored field the page shows.
+ */
+const TAKEOUT_PARTS: Array<{ id: string; title?: string; fields: string[]; hint: string; tools?: string[]; sources?: string[] }> = [
+  { id: 'hero-3d', fields: ['eyebrow', 'customerLogo', 'brandAccentColor'], hint: 'The account\'s logo, the line beside it and the accent stripe under it.' },
+  { id: 'hero-title', fields: ['headline'], hint: 'The headline: the page\'s pitch in a few words.' },
+  { id: 'hero-subtitle', fields: ['subheadline'], hint: 'The line under the headline: what the pitch means for them.' },
+  { id: 'hero-cta', title: 'Hero button', fields: ['cta', 'link'], hint: 'The second button in the hero and where it goes.', tools: ['Mark'], sources: ['cta', 'link'] },
+  { id: 'intel-headline', fields: ['intelEyebrow', 'intelHeadline'], hint: 'The research section\'s eyebrow and headline.' },
+  { id: 'intel-stats', fields: ['intelStats'], hint: 'The account facts: each a value and a label.' },
+  { id: 'stakeholders', fields: ['stakeholders'], hint: 'The people we\'d love to meet: name, role, LinkedIn.' },
+  { id: 'tech-stack', fields: ['techStack', 'brandDomain'], hint: 'The tools they run today; the one being replaced is marked.' },
+  { id: 'investments', fields: ['investments'], hint: 'What they invest in; the primary one is highlighted.' },
+  { id: 'news', fields: ['newsItems'], hint: 'Recent news: date, headline, link.' },
+  { id: 'challenge-headline', fields: ['challengeHeadline'], hint: 'The challenge headline ("You\'re on Sitecore. We hear you.").' },
+  { id: 'challenge-screenshot', fields: ['challengeScreenshotUrl', 'challengeScreenshotAlt', 'challengeBrowserUrl'], hint: 'Their site today: the capture, its alt text and the address shown above it.' },
+  { id: 'pain-points', fields: ['painPoints'], hint: 'The pain points: each a title and a line.' },
+  { id: 'comparison-heading', title: 'Comparison headline', fields: ['comparisonHeadline', 'comparisonDescription', 'competitorName'], hint: 'The comparison\'s headline, its intro and the platform it compares against.', tools: ['Mark'], sources: ['comparisonHeadline', 'comparisonDescription', 'competitorName'] },
+  { id: 'comparison-row', title: 'Comparison table', fields: ['comparisonTableRows'], hint: 'The rows: a capability, then theirs and ours (Yes, No, Limited or a short phrase).' },
+  { id: 'logo-wall', fields: ['logoWallCustomerSlot'], hint: 'The name on their tile in the customer logo strip.' },
+  { id: 'testimonials', title: 'Testimonials', fields: ['testimonial1', 'testimonial1JobTitle', 'testimonial1Company', 'testimonial2', 'testimonial2JobTitle', 'testimonial2Company'], hint: 'Two customer quotes, each with a job title and company.' },
+  { id: 'analysts', fields: ['analystHeadline', 'analystQuote', 'analystSource', 'analystCTA', 'analystCTALink', 'analystCards'], hint: 'The analyst headline, quote and source, its button, and the report cards.' },
+  { id: 'promo', title: 'Promo statement', fields: ['promoEyebrow', 'promoHeading', 'promoDescription', 'promoCTA', 'promoCTALink'], hint: 'The big statement mid-page: eyebrow, heading, line and its button.', tools: ['Mark'], sources: ['promoHeading', 'promoDescription'] },
+  { id: 'roi-heading', title: 'ROI headline', fields: ['roiTitle', 'roiDescription'], hint: 'The impact section\'s headline and intro.', tools: ['Mark'], sources: ['roiTitle', 'roiDescription'] },
+  { id: 'roi-projection', fields: ['roiProjectionValue', 'roiProjectionLabel', 'roiProjectionDetail'], hint: 'The big projected number, its label and the line under it.' },
+  { id: 'roi-cards', title: 'ROI cards', fields: ['roiCards'], hint: 'The impact numbers: metric, unit, label and a citation.' },
+  { id: 'end-cta', title: 'Next step card', fields: ['endHeadline', 'endSubheadline', 'endCTA', 'endCTALink'], hint: 'The card under the impact numbers: a headline, a line and a button.', tools: ['Mark'], sources: ['endHeadline', 'endSubheadline', 'endCTA'] },
+  { id: 'path-heading', title: 'Migration headline', fields: ['migrationTitle', 'migrationDescription'], hint: 'The path section\'s headline and intro.', tools: ['Mark'], sources: ['migrationTitle', 'migrationDescription'] },
+  { id: 'timeline-phases', title: 'Timeline', fields: ['timelinePhases'], hint: 'The phases: each a title and a line.' },
+  { id: 'cta-title', fields: ['ctaTitle'], hint: 'The closing headline.' },
+  { id: 'cta-description', fields: ['ctaDescription', 'ctaButtonText', 'stickyCTAText'], hint: 'The closing line, its button, and the line in the sticky bar.' },
+  { id: 'team-members', fields: ['teamMembers', 'modalScheduleUrl'], hint: 'The Optimizely team on the account, and the schedule link in the panel.' },
+  { id: 'small-print', title: 'Small print', fields: ['footerTagline', 'footerLegal', 'footerLinks'], hint: 'The tagline, legal line and links at the very end.', tools: ['Mark'], sources: ['footerTagline', 'footerLegal', 'footerLinks'] },
+]
+
+export const TAKEOUT_EDIT: EditSectionInfo[] = TAKEOUT_PARTS.map((p) => {
+  const x = ACCOUNT_XRAY_SHARED.find((s) => s.id === p.id)
+  return {
+    id: p.id,
+    selector: `[data-xray="${p.id}"]`,
+    title: p.title ?? x?.title ?? p.id,
+    tools: p.tools ?? x?.tools ?? ['Mark'],
+    sources: p.sources ?? x?.sources ?? p.fields,
+    fields: p.fields,
+    hint: p.hint,
+  }
+})
+
 /** Every part X-ray and Edit mode can find on an account page, either template: each finds what is on screen. */
 export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [...ACCOUNT_XRAY_SHARED, ...AGENT_PLATFORM_XRAY];
 
