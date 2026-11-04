@@ -1,8 +1,9 @@
 /**
- * Live edits on the www agent platform page: while Mark streams an edit (Edit mode, booth only),
- * the page re-renders from the edited data, so the visitor watches the real layout change (the
- * pills, the stack tiles, the homework notes, the use-case evidence all re-derive together)
- * instead of a text overlay. Mark sends each changed field's full new value with the edit
+ * Live edits on the account page, either template: while Mark streams an edit (Edit mode, booth
+ * only), the page re-renders from the edited data, so the visitor watches the real layout change
+ * (on the agent platform page the pills, the stack tiles, the homework notes and the use-case
+ * evidence all re-derive together; on the takeout page the stored text and lists) instead of a
+ * text overlay. Mark sends each changed field's full new value with the edit
  * (`field` + `value`, agent account_page_live_edit v1.4); this store holds those values until the
  * saved page is reloaded.
  *
@@ -20,8 +21,24 @@ const EMPTY: Patch = Object.freeze({}) as Patch
 let patch: Patch = EMPTY
 const listeners = new Set<() => void>()
 
-/** The stored fields a live edit may change on this template (USED_FIELDS that a reader sees). */
-export const LIVE_FIELDS = ['intelStats', 'techStack', 'investments', 'stakeholders', 'teamMembers', 'customerLogo', 'footerTagline', 'footerLegal'] as const
+/**
+ * The stored fields a live edit may change: the agent platform template's (USED_FIELDS that a
+ * reader sees) and every text and list the takeout template shows. Link fields (`{ default }`)
+ * are not live: their change shows when the saved page reloads.
+ */
+export const LIVE_FIELDS = [
+  'intelStats', 'techStack', 'investments', 'stakeholders', 'teamMembers', 'customerLogo', 'footerTagline', 'footerLegal',
+  // the takeout template's own
+  'eyebrow', 'headline', 'subheadline', 'cta', 'intelEyebrow', 'intelHeadline', 'newsItems', 'brandDomain',
+  'challengeHeadline', 'challengeScreenshotAlt', 'challengeBrowserUrl', 'painPoints',
+  'comparisonHeadline', 'comparisonDescription', 'competitorName', 'comparisonTableRows', 'logoWallCustomerSlot',
+  'testimonial1', 'testimonial1JobTitle', 'testimonial1Company', 'testimonial2', 'testimonial2JobTitle', 'testimonial2Company',
+  'analystHeadline', 'analystQuote', 'analystSource', 'analystCTA', 'analystCards',
+  'promoEyebrow', 'promoHeading', 'promoDescription', 'promoCTA',
+  'roiTitle', 'roiDescription', 'roiProjectionValue', 'roiProjectionLabel', 'roiProjectionDetail', 'roiCards',
+  'endHeadline', 'endSubheadline', 'endCTA', 'migrationTitle', 'migrationDescription', 'timelinePhases',
+  'ctaTitle', 'ctaDescription', 'ctaButtonText', 'stickyCTAText', 'footerLinks',
+] as const
 export type LiveField = (typeof LIVE_FIELDS)[number]
 
 export function isLiveField(field: unknown): field is LiveField {
@@ -50,6 +67,20 @@ export function liveValue(field: LiveField, value: unknown): unknown | null {
       return rows(['Name', 'Role'])
     case 'teamMembers':
       return rows(['Name', 'Role'])
+    case 'newsItems':
+      return rows(['Date', 'Headline'])
+    case 'painPoints':
+      return rows(['Title', 'Description'])
+    case 'comparisonTableRows':
+      return rows(['Category', 'OurValue', 'CompetitorValue'])
+    case 'analystCards':
+      return rows(['Badge', 'Source', 'Category'])
+    case 'roiCards':
+      return rows(['Metric', 'Unit', 'Label', 'CitationText'])
+    case 'timelinePhases':
+      return rows(['Title', 'Description'])
+    case 'footerLinks':
+      return rows(['Text'])
     default:
       return value === null || str(value) ? value : null
   }

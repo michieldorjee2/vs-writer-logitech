@@ -54,7 +54,8 @@ import {
   richToStacked,
 } from './ui'
 import { formatStatValue, comparisonTableHtml, realContacts, PROOF_LOGOS, SCENE } from './account-helpers'
-import { useCmsEdit } from './cms-edit'
+import { useCmsEdit, useShowsField } from './cms-edit'
+import { useLivePage } from './live-edit'
 
 interface Props {
   page: CompetitorComparisonPage
@@ -65,8 +66,10 @@ export function connectProps(page: CompetitorComparisonPage) {
   return { people: toPeople(page.teamMembers), scheduleUrl: page.modalScheduleUrl?.default || null }
 }
 
-export default function AccountPage({ page }: Props) {
+export default function AccountPage({ page: stored }: Props) {
   useOdpTracking('abm')
+  // Edit mode's live edits (booth only) re-render the page from Mark's streamed values.
+  const page = useLivePage(stored)
   const company = deriveCustomerName(page)
   const companySlug =
     (page._metadata?.url?.hierarchical || page._metadata?.url?.default || '')
@@ -75,7 +78,7 @@ export default function AccountPage({ page }: Props) {
 
   return (
     <ConnectProvider page={page} {...connectProps(page)}>
-    <WwwPage accent={page.brandAccentColor}>
+    <WwwPage accent={page.brandAccentColor} className="www-takeout">
       <div id="main-content">
         <Hero page={page} company={company} />
         <Intel page={page} company={company} companySlug={companySlug} />
@@ -104,7 +107,7 @@ function localHref(url: string | null | undefined, fallback = '#cta'): string {
 /* ======================================================================= 1 HERO */
 
 function Hero({ page, company }: { page: CompetitorComparisonPage; company: string }) {
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   return (
     <HeroFrame
       scene={SCENE}
@@ -135,7 +138,7 @@ function Hero({ page, company }: { page: CompetitorComparisonPage; company: stri
             </Button>
             {page.cta && page.link?.default && (
               <Button asChild variant="white" className="www-btn">
-                <a href={localHref(page.link.default)} {...field('cta')}>
+                <a href={localHref(page.link.default)} data-xray="hero-cta" {...field('cta')}>
                   {page.cta}
                 </a>
               </Button>
@@ -152,7 +155,7 @@ function Hero({ page, company }: { page: CompetitorComparisonPage; company: stri
 function Intel({ page, company, companySlug }: { page: CompetitorComparisonPage; company: string; companySlug: string | null }) {
   const stats = page.intelStats ?? []
   const people = page.stakeholders ?? []
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   return (
     <Scene id="intel">
       <div data-xray="intel-headline" className="mb-[min(7vh,64px)]">
@@ -219,7 +222,7 @@ function Intel({ page, company, companySlug }: { page: CompetitorComparisonPage;
 /* ==================================================================== 3 SIGNALS */
 
 function Signals({ page, company }: { page: CompetitorComparisonPage; company: string }) {
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   const stack = page.techStack ?? []
   const investments = page.investments ?? []
   const news = page.newsItems ?? []
@@ -306,7 +309,7 @@ function Signals({ page, company }: { page: CompetitorComparisonPage; company: s
 function Challenge({ page, company }: { page: CompetitorComparisonPage; company: string }) {
   const pains = page.painPoints ?? []
   const shot = page.challengeScreenshotUrl?.default
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   if (!page.challengeHeadline && !shot) return null
   return (
     <Scene id="challenge">
@@ -362,14 +365,15 @@ function Challenge({ page, company }: { page: CompetitorComparisonPage; company:
 /* ================================================================= 5 COMPARISON */
 
 function Comparison({ page }: { page: CompetitorComparisonPage }) {
-  const { field, editing } = useCmsEdit()
+  const field = useShowsField()
+  const { editing } = useCmsEdit()
   const rows = page.comparisonTableRows ?? []
   if (!rows.length) return null
   const competitor = page.competitorName || 'Your current platform'
   return (
     <Scene id="comparison">
       <div className="mx-auto max-w-[960px]">
-        <div className="mb-[min(5vh,48px)] text-center">
+        <div className="mb-[min(5vh,48px)] text-center" data-xray="comparison-heading">
           <Reveal i={0}>
             <Eyebrow className="justify-center">The Optimizely advantage</Eyebrow>
           </Reveal>
@@ -434,7 +438,7 @@ function Proof({ page, company }: { page: CompetitorComparisonPage; company: str
     page.testimonial1 && { q: page.testimonial1, who: page.testimonial1JobTitle, co: page.testimonial1Company },
     page.testimonial2 && { q: page.testimonial2, who: page.testimonial2JobTitle, co: page.testimonial2Company },
   ].filter(Boolean) as Array<{ q: string; who: string | null; co: string | null }>
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   const tile = (name: string, url: string | null) => (
     <CompanyBlock
       CompanyName={name}
@@ -487,7 +491,7 @@ function Proof({ page, company }: { page: CompetitorComparisonPage; company: str
 
 function Analysts({ page }: { page: CompetitorComparisonPage }) {
   const cards = page.analystCards ?? []
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   if (!page.analystHeadline && !page.analystQuote && !cards.length) return null
   return (
     <Scene id="analysts">
@@ -538,10 +542,10 @@ function Analysts({ page }: { page: CompetitorComparisonPage }) {
 /* ================================================================== 8 STATEMENT */
 
 function Statement({ page }: { page: CompetitorComparisonPage }) {
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   if (!page.promoHeading) return null
   return (
-    <Scene id="promo" tone="neutral" innerClassName="text-center">
+    <Scene id="promo" tone="neutral" innerClassName="text-center" attrs={{ 'data-xray': 'promo' }}>
       <Reveal i={0} {...field('promoEyebrow')}>
         <Eyebrow className="justify-center">{page.promoEyebrow}</Eyebrow>
       </Reveal>
@@ -570,12 +574,12 @@ function Statement({ page }: { page: CompetitorComparisonPage }) {
 
 function Roi({ page }: { page: CompetitorComparisonPage }) {
   const cards = page.roiCards ?? []
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   if (!page.roiTitle && !cards.length && !page.endHeadline) return null
   return (
     <Scene id="roi">
       <div className="grid gap-[min(5vh,48px)] lg:grid-cols-12 lg:items-end lg:gap-12">
-        <div className="lg:col-span-6">
+        <div className="lg:col-span-6" data-xray="roi-heading">
           <Reveal i={0}>
             <Eyebrow>Your team&apos;s impact</Eyebrow>
           </Reveal>
@@ -620,7 +624,7 @@ function Roi({ page }: { page: CompetitorComparisonPage }) {
         </dl>
       )}
       {page.endHeadline && (
-        <Reveal i={8} className="www-card www-card--neutral mt-[min(6vh,56px)] flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <Reveal i={8} data-xray="end-cta" className="www-card www-card--neutral mt-[min(6vh,56px)] flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="www-h3" {...field('endHeadline')}>
               {page.endHeadline}
@@ -666,11 +670,11 @@ function citation(text: string) {
 
 function Path({ page }: { page: CompetitorComparisonPage }) {
   const phases = page.timelinePhases ?? []
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   if (!page.migrationTitle && !phases.length) return null
   return (
     <Scene id="migration">
-      <div className="mb-[min(6vh,56px)] max-w-[760px]">
+      <div className="mb-[min(6vh,56px)] max-w-[760px]" data-xray="path-heading">
         <Reveal i={0}>
           <Eyebrow>The path forward</Eyebrow>
         </Reveal>
@@ -703,7 +707,7 @@ function StickyAsk({ text }: { text: string }) {
 
 function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<typeof realContacts> }) {
   const { connect, sent } = useConnect()
-  const { field } = useCmsEdit()
+  const field = useShowsField()
   return (
     <section id="cta" data-scene data-tone="dark" className="www-scene www-scene--dark www-scene--fill">
       <div id="form" className="www-scene__inner vb-container mx-auto w-full px-4 lg:px-8">
@@ -759,7 +763,7 @@ function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<
             )}
           </div>
         </div>
-        <Colophon>
+        <Colophon xray="small-print">
           {page.footerTagline && <span {...field('footerTagline')}>{page.footerTagline}</span>}
           {(page.footerLinks ?? []).map((l, i) => (
             <a key={i} href={l.Url?.default || '#'} target="_blank" rel="noopener noreferrer" {...field('footerLinks')}>

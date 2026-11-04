@@ -38,7 +38,7 @@ import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from 
 import { forgetParentAccounts, parentAccountsOf, parentKey, withParentAccount } from '../../../api/_lib/parent-account'
 import { forgetOfferPages, offerPagesByOffer } from '../../../api/_lib/offer-pages'
 import { withPages } from '../../../api/_lib/offers'
-import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, TAKEOUT_EDIT } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
 import { applyLiveField, changedLiveFields, getLivePatch, LIVE_FIELDS, liveFieldValue, liveValue, mergeLive, resetLive } from '../live-edit'
 import { COPY_KEYS, COPY_THEMES, copyEdits, copyKey, copyValue, expandFields, readCopy } from '../../lib/page-copy'
@@ -1187,7 +1187,7 @@ test('hero: the page says whose it is once, with their logo above the H1 (Michie
     const hero = html.slice(html.indexOf('<section id="hero"'), html.indexOf('</section>'))
     const mark = hero.search(/class="www-account[ "]/)
     assert.ok(mark > -1 && mark < hero.indexOf('<h1'), `${name}: no account logo above the H1`)
-    assert.match(hero, /class="www-account__logo"><img src="https:\/\/example\.test\/F-customerLogo\.png"/)
+    assert.match(hero, /class="www-account__logo"[^>]*><img src="https:\/\/example\.test\/F-customerLogo\.png"/)
     // One personalization line: no "Made for" in the corner, no account name on the landscape.
     assert.ok(!/Made for|Built for/.test(textOf(hero)), `${name}: a second personalization line`)
   }
@@ -1433,6 +1433,54 @@ test('the one-click ask: buttons, no form anywhere on the page', () => {
   assert.match(apHtml, /id="cta-connect-btn"/)
 })
 
+console.log('\nEdit mode on the takeout page')
+
+test('Edit mode offers every part of the takeout page, each with its fields and a hint, and each on the page', () => {
+  const ids = TAKEOUT_EDIT.map((s) => s.id)
+  assert.equal(new Set(ids).size, ids.length, 'a part is offered twice')
+  assert.equal(new Set(TAKEOUT_EDIT.map((s) => s.title)).size, ids.length, 'two parts share a title (Mark matches by title)')
+  assert.deepEqual(ids.filter((id) => !accountHtml.includes(`data-xray="${id}"`)), [], 'offered but not on the page')
+  for (const s of TAKEOUT_EDIT) {
+    assert.ok(s.hint.length > 12, `${s.id}: no hint`)
+    assert.ok(s.fields.length > 0 && s.fields.every((f) => ACCOUNT_PAGE_PROPERTIES.includes(f)), `${s.id}: fields`)
+  }
+})
+
+test('between them the takeout parts cover every stored field the page shows (nothing unmapped)', () => {
+  const offered = new Set(TAKEOUT_EDIT.flatMap((s) => s.fields))
+  const shown = ACCOUNT_FIELDS.filter((f) => f.use === 'text' || f.use === 'attr').map((f) => f.field)
+  assert.deepEqual(shown.filter((f) => !offered.has(f)), [])
+})
+
+test('the request to Mark from a takeout page names each section\'s fields, with no template line', () => {
+  const req = buildSuggestedEdit([{ title: 'Comparison headline', feedback: 'Name Sitecore XM Cloud', fields: ['comparisonHeadline', 'comparisonDescription', 'competitorName'] }], 'takeout')
+  assert.equal(req, 'Section: Comparison headline\nFields: comparisonHeadline, comparisonDescription, competitorName\nFeedback: Name Sitecore XM Cloud')
+  assert.ok(!req.includes(AGENT_PLATFORM_TEMPLATE_LINE))
+})
+
+test('a live edit re-renders the takeout page from Mark\'s value: text and lists, every place they show', () => {
+  resetLive()
+  assert.equal(applyLiveField('headline', 'Live headline for Acme'), true)
+  assert.equal(applyLiveField('comparisonTableRows', [{ Category: 'Live capability', OurValue: 'Yes', CompetitorValue: 'No' }]), true)
+  assert.equal(applyLiveField('comparisonTableRows', 'not rows'), false)
+  assert.equal(applyLiveField('timelinePhases', [{ Title: 'Live phase', Description: 'Live step' }]), true)
+  const shown = mergeLive(account, getLivePatch())
+  const text = textOf(renderToString(<AccountPage page={shown as CompetitorComparisonPage} />))
+  for (const t of ['Live headline for Acme', 'Live capability', 'Live phase']) assert.match(text, new RegExp(t))
+  resetLive()
+  // Each field a takeout part offers that a live edit may change has an element to flash.
+  const NO_ELEMENT = new Set(['stickyCTAText', 'testimonial1JobTitle', 'testimonial1Company', 'testimonial2JobTitle', 'testimonial2Company', 'roiProjectionLabel', 'challengeScreenshotAlt', 'competitorName'])
+  const flashable = TAKEOUT_EDIT.flatMap((s) => s.fields).filter((f) => (LIVE_FIELDS as readonly string[]).includes(f) && !NO_ELEMENT.has(f))
+  assert.deepEqual(flashable.filter((f) => !accountHtml.includes(`data-field="${f}"`)), [])
+})
+
+test('Edit mode runs the takeout page the way it runs the agent platform page', () => {
+  const src = readFileSync('src/components/EditMode.tsx', 'utf8')
+  assert.match(src, /template === 'takeout' \? TAKEOUT_EDIT/)
+  assert.match(src, /if \(live && ev\.field !== undefined && ev\.value !== undefined && applyLiveField/)
+  assert.match(accountHtml, /class="www-page[^"]*\bwww-takeout\b/)
+})
+
 console.log('\nEdit mode on the agent platform page')
 
 test('Edit mode offers the parts a page field drives and the page\'s own text, each on the page', () => {
@@ -1462,9 +1510,11 @@ test('Edit mode offers the parts a page field drives and the page\'s own text, e
   assert.ok(!offered.some((f) => /eyebrow|caption|button|story|stories/i.test(f)), 'a label or a proof story is offered')
 })
 
-test('every field a live edit can change has the page elements that render it marked', () => {
+test('every field a live edit can change on this template has the page elements that render it marked', () => {
   const marked = new Set([...apSearch('?state=customer').matchAll(/data-field="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)))
-  for (const f of LIVE_FIELDS) assert.ok(marked.has(f), `no data-field="${f}" on the page`)
+  const here = USED_FIELDS.map((f) => f.field).filter((f) => (LIVE_FIELDS as readonly string[]).includes(f))
+  assert.ok(here.length >= 8)
+  for (const f of here) assert.ok(marked.has(f), `no data-field="${f}" on the page`)
 })
 
 test('page copy: only the template\'s keys, plain text within limits, lists for the checklist', () => {
@@ -1573,8 +1623,8 @@ test('after the save, Edit mode replays the parts whose saved value differs from
   const shown = { intelStats: [{ Value: '1', Label: 'a' }, { Value: '2', Label: 'visitors' }], techStack: [{ Name: 'X', ColorTag: null }], headline: 'h' }
   const saved = { intelStats: [{ Value: '1', Label: 'a' }], techStack: [{ Name: 'X', ColorTag: null }], headline: 'changed' }
   assert.deepEqual(changedLiveFields(['intelStats', 'techStack'], shown, saved), ['intelStats'])
-  // Only fields the page can show live; a takeout field never replays.
-  assert.deepEqual(changedLiveFields(['headline'], shown, saved), [])
+  // Only fields a live edit may change; a colour never replays.
+  assert.deepEqual(changedLiveFields(['brandAccentColor'], { ...shown, brandAccentColor: 'a' }, { ...saved, brandAccentColor: 'b' }), [])
 })
 
 test('the live store checks each value\'s shape and starts empty for the server', () => {
@@ -1582,7 +1632,8 @@ test('the live store checks each value\'s shape and starts empty for the server'
   assert.equal(liveValue('techStack', 'Shopify'), null)
   assert.equal(liveValue('intelStats', [{ Value: 3, Label: 'x' }]), null)
   assert.equal(liveValue('footerTagline', 'Hello'), 'Hello')
-  assert.equal(applyLiveField('headline', 'Takeout field'), false, 'a field this template does not show')
+  assert.equal(applyLiveField('brandAccentColor', '#ff0000'), false, 'a field no live edit may change (a colour)')
+  assert.equal(applyLiveField('link', 'https://example.test'), false, 'a link field (it changes on the reload)')
   assert.equal(applyLiveField('techStack', { Name: 'not an array' }), false)
   assert.equal(applyLiveField('footerLegal', 'Edited'), true)
   resetLive()
