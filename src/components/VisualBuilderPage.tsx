@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import VisualBuilderExperience from '../cms/rendering/visual-builder';
 import WwwOfferPage from '../www/OfferPage';
-import { isOfferExperience, wantsWwwDesign } from '../www/design';
+import { isOfferExperience } from '../www/design';
 import type { SafeVisualBuilderExperience } from '@/lib/optimizely/types/experience';
 
 /**
@@ -11,7 +11,7 @@ import type { SafeVisualBuilderExperience } from '@/lib/optimizely/types/experie
  * WHY ITS OWN ROUTE AND NOT THE CATCH-ALL. `/*` is `PageLoader`, which serves the 2,695
  * pages on the flat content types and picks a renderer by sniffing which fields happen to be
  * populated. An experience has none of those fields, so it would fall through every arm of
- * that dispatch to `DynamicComparisonPage` and render an empty shell. A prefix route cannot
+ * that dispatch to the account template and render an empty shell. A prefix route cannot
  * collide with it: react-router matches `/vb/:slug` ahead of `/*` because it is the more
  * specific pattern, and no legacy page's slug begins with `vb/` (they are all single-segment
  * company slugs).
@@ -23,7 +23,7 @@ import type { SafeVisualBuilderExperience } from '@/lib/optimizely/types/experie
  * walks.
  */
 
-type Experience = SafeVisualBuilderExperience & Record<string, unknown>;
+export type Experience = SafeVisualBuilderExperience & Record<string, unknown>;
 
 interface ExperienceState {
   data: Experience | null;
@@ -151,10 +151,16 @@ export default function VisualBuilderPage() {
     );
   }
 
-  // The www design, the default for offer pages (?design=classic for the previous one). Mirrored in server/ssr-handler.tsx.
-  if (wantsWwwDesign(searchParams) && isOfferExperience(data)) {
-    return <WwwOfferPage experience={data} />;
-  }
+  return <ExperienceBody experience={data} preview={searchParams.get('ctx') === 'edit'} />;
+}
+
+/**
+ * One experience's page: an offer (the offer blueprint's pages) in the www offer design, any other
+ * experience drawn from its composition. The /vb/ route and the CMS preview (CmsPreview.tsx) both
+ * draw through this, and server/ssr-handler.tsx mirrors it.
+ */
+export function ExperienceBody({ experience, preview }: { experience: Experience; preview: boolean }) {
+  if (isOfferExperience(experience)) return <WwwOfferPage experience={experience} />;
 
   return (
     /*
@@ -173,9 +179,9 @@ export default function VisualBuilderPage() {
      */
     <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
       <VisualBuilderExperience
-        experience={data}
+        experience={experience}
         locale="en"
-        preview={searchParams.get('ctx') === 'edit'}
+        preview={preview}
       />
     </div>
   );

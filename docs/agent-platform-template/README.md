@@ -1,6 +1,6 @@
 # Agent platform template: what the agents need to change
 
-**Status: draft, not deployed.** Nothing in this folder has been applied to Mark, the wiki or the CMS. It is the proposal that goes with the agent platform template in `src/www/AgentPlatformPage.tsx` (preview: any account page with `?design=www`).
+**Status: draft, not deployed.** Nothing in this folder has been applied to Mark, the wiki or the CMS. It is the proposal that goes with the agent platform template in `src/www/AgentPlatformPage.tsx` (live on every account page).
 
 The template is Laura Perez Riau's, built from Dan Tranter's pitch and debriefed on 27 October 2026 (Mark artifact "limitless-agent-platform-template-debrief-for-michiel.md", with the Tyler Technologies reference build). It presents Optimizely as the layer on top of the stack an account already runs, in eight sections: hero, who we are, where it fits, speaks your language, use cases, proof, first 90 days, close.
 
@@ -22,13 +22,17 @@ The renderer reads one shape, `AgentPlatformContent` (`src/www/agent-platform/co
 
 `?review=1` on a page shows this provenance for every part, and lets a reviewer switch the state (`?state=prospect|open-opp|evaluated|customer|ex-customer`). That layer never renders without the parameter (rule N12).
 
-Ten of the 67 stored fields feed the template (`USED_FIELDS` in `content.ts`); the other 57 are deliberately not shown, each with the rule that keeps it off (`NOT_SHOWN`). Two of those, `eyebrow` and `intelHeadline`, are still read for the account's name. A unit test fails if any field is in neither list. Nothing is deleted: the fields stay in the CMS untouched and `?template=takeout` still renders every one of them.
+Ten of the 67 stored fields feed the template (`USED_FIELDS` in `content.ts`); the other 57 are deliberately not shown, each with the rule that keeps it off (`NOT_SHOWN`). Two of those, `eyebrow` and `intelHeadline`, are still read for the account's name. A unit test fails if any field is in neither list. Nothing is deleted: the fields stay in the CMS untouched.
 
 ## Changes after Michiel's review (2 November 2026)
 
 - **One closing CTA.** Laura's state table had two ("Explore the agent platform" as the second). The close now has only the one-click ask; scheduling and the contact are in the panel it opens.
 - **Homework through the page.** The facts after the hero's three are no longer a block in one section: one sits in each of where it fits, use cases, proof and the first 90 days. The stack, the investments and each use case carry the same "Our homework" tag. Agent 2's `stats` field feeds these, so the output contract is unchanged.
 - **Hero.** Full screen at 75% of the window, the account logo above the headline, "Personalized for" said once.
+
+## In the CMS editor
+
+The CMS previews a draft account page in this template too (`/preview`, see the main README's "The CMS preview"). There the editor can outline and open the CMS fields the page shows: the logo, the stats, the stack, the investments, the stakeholders, the team and the small print. The headlines and body text are the template's own copy, not CMS properties, so they are changed in Showcase's Edit mode below, not in the CMS.
 
 ## Edit mode on this template (live since 2 November 2026)
 

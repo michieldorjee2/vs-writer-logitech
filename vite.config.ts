@@ -14,50 +14,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
  * same way it already fails for the other two files. One module, two callers.
  */
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries'
+import { ACCOUNT_PAGE_QUERY } from './src/lib/account-page-query'
 import { graphItems, type GraphResponse } from './src/lib/graph-envelope'
 import { homeIndexFor, loadHomeIndex } from './src/lib/home-index'
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2'
 
-const PAGE_QUERY = `
-query GetPage($slug: String!) {
-  CompetitorComparisonPage(
-    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
-    locale: en
-  ) {
-    items {
-      _metadata { key url { default hierarchical } published }
-      PageTitle MetaDescription
-      eyebrow headline subheadline cta link { default }
-      comparisonHeadline
-      comparisonTableRows { Category OurValue CompetitorValue }
-      analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
-      promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
-      endHeadline endSubheadline endCTA endCTALink { default }
-      testimonial1 testimonial1JobTitle testimonial1Company
-      testimonial2 testimonial2JobTitle testimonial2Company
-      customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
-      challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
-      comparisonDescription logoWallCustomerSlot
-      roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
-      migrationTitle migrationDescription stickyCTAText
-      ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
-      footerTagline footerLegal
-      intelStats { Value Label }
-      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor }
-      techStack { Name ColorTag }
-      investments { Name IsPrimary }
-      newsItems { Date Headline Url { default } }
-      painPoints { Title Description }
-      roiCards { Metric Unit Label CitationText }
-      timelinePhases { Title Description MarkerColor }
-      teamMembers { Initials Name Role Email }
-      footerLinks { Text Url { default } }
-      analystCards { Badge Source Category Url { default } }
-    }
-  }
-}
-`
+/* The account page: the same field list as api/content.ts and the CMS preview. */
+const PAGE_QUERY = ACCOUNT_PAGE_QUERY
 
 const SEARCH_INDEX_QUERY = `
 query SearchIndex($limit: Int!, $skip: Int!) {
@@ -84,56 +48,6 @@ query SearchIndex($limit: Int!, $skip: Int!) {
 const SEARCH_INDEX_PAGE_SIZE = 100
 const SEARCH_INDEX_MAX = 5000
 
-const PREVIEW_QUERY = `
-query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
-  _Content(
-    where: { _metadata: { key: { eq: $key }, version: { eq: $ver } } }
-    locale: $loc
-  ) {
-    items {
-      __typename
-      _metadata { key version url { default hierarchical } published }
-      ... on CompetitorComparisonPage {
-        PageTitle MetaDescription
-        eyebrow headline subheadline cta link { default }
-        comparisonHeadline
-        comparisonTableRows { Category OurValue CompetitorValue }
-        analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
-        promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
-        endHeadline endSubheadline endCTA endCTALink { default }
-        testimonial1 testimonial1JobTitle testimonial1Company
-        testimonial2 testimonial2JobTitle testimonial2Company
-        customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
-        challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
-        comparisonDescription logoWallCustomerSlot
-        roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
-        migrationTitle migrationDescription stickyCTAText
-        ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
-        footerTagline footerLegal
-        intelStats { Value Label }
-        stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor }
-        techStack { Name ColorTag }
-        investments { Name IsPrimary }
-        newsItems { Date Headline Url { default } }
-        painPoints { Title Description }
-        roiCards { Metric Unit Label CitationText }
-        timelinePhases { Title Description MarkerColor }
-        teamMembers { Initials Name Role Email }
-        footerLinks { Text Url { default } }
-        analystCards { Badge Source Category Url { default } }
-      }
-      ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
-      ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } }
-      ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } }
-      ... on ComparisonTableBlock { OurLabel CompetitorLabel Rows { Category OurValue CompetitorValue } }
-      ... on AnalystSectionBlock { SectionHeading { html } Quote AnalystSource CtaText CtaUrl { default } }
-      ... on TestimonialBlock { Quote AuthorName AuthorTitle }
-      ... on PromoCardBlock { Eyebrow Heading Description CtaText CtaUrl { default } }
-      ... on ClosingCtaBlock { Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
-    }
-  }
-}
-`
 
 /** Helper to send a JSON response in Vite middleware */
 function jsonResponse(res: ServerResponse, status: number, body: unknown) {
@@ -215,6 +129,8 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
           [/^\/api\/offer-signup$/, '/api/offer-signup.ts'],
           [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],
+          // The CMS preview's draft: the function itself, so dev reads it exactly as production does.
+          [/^\/api\/preview$/, '/api/preview.ts'],
         ]
         let file: string | null = null
         let id: string | null = null
@@ -395,10 +311,10 @@ function opalCreatePageDevProxy(devEmail: string | null): Plugin {
 }
 
 /**
- * Vite plugin that proxies /api/content and /api/preview during dev.
+ * Vite plugin that proxies /api/content during dev (/api/preview runs the function itself: pageBuildsDev).
  * Auth keys stay server-side — never shipped to the browser.
  */
-function graphDevProxy(authKey: string, singleKey: string, devEmail: string | null, env: Record<string, string>): Plugin {
+function graphDevProxy(authKey: string, devEmail: string | null, env: Record<string, string>): Plugin {
   return {
     name: 'graph-dev-proxy',
     configureServer(server) {
@@ -546,27 +462,6 @@ function graphDevProxy(authKey: string, singleKey: string, devEmail: string | nu
           }
         }
 
-        if (url.pathname === '/api/preview') {
-          const key = url.searchParams.get('key')
-          if (!key) return jsonResponse(res, 400, { error: 'Missing key parameter' })
-
-          const variables: Record<string, unknown> = { key }
-          const ver = url.searchParams.get('ver')
-          const loc = url.searchParams.get('loc')
-          if (ver) variables.ver = ver
-          if (loc) variables.loc = [loc]
-
-          try {
-            const item = await queryGraph(singleKey, PREVIEW_QUERY, variables, '_Content')
-            if (!item) return jsonResponse(res, 404, { error: 'Content not found' })
-            res.setHeader('Cache-Control', 'no-store')
-            jsonResponse(res, 200, item)
-          } catch (err) {
-            console.error('[graph-dev-proxy]', err)
-            jsonResponse(res, 500, { error: 'Graph fetch failed' })
-          }
-          return
-        }
 
         next()
       })
@@ -577,14 +472,13 @@ function graphDevProxy(authKey: string, singleKey: string, devEmail: string | nu
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const authKey = env.GRAPH_AUTH_KEY || ''
-  const singleKey = env.GRAPH_SINGLE_KEY || authKey
   const devEmail = (env.DEV_AUTH_EMAIL || '').trim().toLowerCase() || null
 
   return {
     plugins: [
       react(),
       stripHtmlComments(),
-      ...(authKey ? [graphDevProxy(authKey, singleKey, devEmail, env)] : []),
+      ...(authKey ? [graphDevProxy(authKey, devEmail, env)] : []),
       devAuthProxy(devEmail),
       opalFeedbackDevProxy(devEmail),
       opalCreatePageDevProxy(devEmail),
@@ -624,7 +518,7 @@ export default defineConfig(({ mode }) => {
       modulePreload: {
         resolveDependencies: (_filename, deps) =>
           deps.filter(
-            (d) => !/vendor-motion|content-mappers|ABMHyperPage|DynamicComparisonPage|BlockPreview|FloatingSidebar/.test(d),
+            (d) => !/vendor-motion|content-mappers|BlockPreview|CmsPreview|FloatingSidebar/.test(d),
           ),
       },
       rollupOptions: {

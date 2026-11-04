@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content.js';
 import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
 import { graphItems } from '../src/lib/graph-envelope.js';
+import { ACCOUNT_PAGE_QUERY } from '../src/lib/account-page-query.js';
 import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
 import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
 import { withParentAccount } from './_lib/parent-account.js';
@@ -130,45 +131,7 @@ query GetRetailPage($slug: String!) {
  * check the registered type before adding a field here, and run
  * `npm run check:graph`.
  */
-const PAGE_QUERY = `
-query GetPage($slug: String!) {
-  CompetitorComparisonPage(
-    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
-    locale: en
-  ) {
-    items {
-      _metadata { key url { default hierarchical } published lastModified }
-      PageTitle MetaDescription
-      eyebrow headline subheadline cta link { default }
-      comparisonHeadline
-      comparisonTableRows { Category OurValue CompetitorValue }
-      analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
-      promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
-      endHeadline endSubheadline endCTA endCTALink { default }
-      testimonial1 testimonial1JobTitle testimonial1Company
-      testimonial2 testimonial2JobTitle testimonial2Company
-      customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
-      challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
-      comparisonDescription logoWallCustomerSlot
-      roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
-      migrationTitle migrationDescription stickyCTAText
-      ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
-      footerTagline footerLegal
-      intelStats { Value Label }
-      stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor EngagementTier EngagementNote PersonSlug CrmContactId }
-      techStack { Name ColorTag }
-      investments { Name IsPrimary }
-      newsItems { Date Headline Url { default } }
-      painPoints { Title Description }
-      roiCards { Metric Unit Label CitationText }
-      timelinePhases { Title Description MarkerColor }
-      teamMembers { Initials Name Role Email }
-      footerLinks { Text Url { default } }
-      analystCards { Badge Source Category Url { default } }
-    }
-  }
-}
-`;
+const PAGE_QUERY = ACCOUNT_PAGE_QUERY;
 
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
   const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {

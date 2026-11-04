@@ -1,16 +1,9 @@
 /**
- * The www design is the default for every account page (`/<company>/`) and offer page
- * (`/vb/<slug>`), live since 2 November 2026 (Michiel: "switch all pages to it").
- * `?design=classic` renders the previous design for that one request: to compare, or to fall
- * back for one page without a redeploy. `?design=www` still works (old links keep working).
- * Both the server render and the client read the same parameter, so the two always agree and
- * hydration holds. Person, retail and fin-serv pages are not affected.
+ * The www design is the only design for account pages (`/<company>/`, the agent platform template)
+ * and offer pages (`/vb/<slug>`). Live since 2 November 2026 (Michiel: "switch all pages to it");
+ * the previous renderers and their `?design=classic` / `?template=takeout` switches were removed
+ * on 4 November. Person, retail and fin-serv pages have their own renderers.
  */
-export function wantsWwwDesign(search: string | URLSearchParams | null | undefined): boolean {
-  if (!search) return true
-  const p = typeof search === 'string' ? new URLSearchParams(search) : search
-  return p.get('design') !== 'classic'
-}
 
 /** An ABMExperience written by the offer blueprint. */
 export function isOfferExperience(value: unknown): boolean {
@@ -20,11 +13,4 @@ export function isOfferExperience(value: unknown): boolean {
   const plan = item.componentPlan
   if (typeof plan === 'string') return /"blueprint"\s*:\s*"offer"|"kind"\s*:\s*"offer-page"/.test(plan)
   return false
-}
-
-/** `?template=takeout`: the competitive takeout template instead of the agent platform one. */
-export function wantsTakeout(search: string | URLSearchParams | null | undefined): boolean {
-  if (!search) return false
-  const p = typeof search === 'string' ? new URLSearchParams(search) : search
-  return p.get('template') === 'takeout'
 }

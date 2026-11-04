@@ -246,15 +246,18 @@ export function HeroFrame({
   scene,
   copy,
   visual,
+  attrs,
 }: {
   look?: string
   state?: string
   scene: string
   copy: ReactNode
   visual?: ReactNode
+  /** Extra attributes for the section: the CMS editor's hook in its preview (./cms-edit.tsx). */
+  attrs?: Record<string, string>
 }) {
   return (
-    <section id="hero" data-scene className="www-hero is-in">
+    <section id="hero" data-scene className="www-hero is-in" {...attrs}>
       <div className={cn('www-hero__card', `www-hero__card--${look}`)} data-state={state}>
         <div className="www-hero__copy">
           <TopStrip />
@@ -285,6 +288,7 @@ export function Scene({
   compact = false,
   className,
   innerClassName,
+  attrs,
   children,
 }: {
   id?: string
@@ -294,10 +298,13 @@ export function Scene({
   compact?: boolean
   className?: string
   innerClassName?: string
+  /** Extra attributes for the section: the CMS editor's hook in its preview (./cms-edit.tsx). */
+  attrs?: Record<string, string>
   children: ReactNode
 }) {
   return (
     <section
+      {...attrs}
       id={id}
       data-scene
       data-tone={tone}
@@ -341,21 +348,6 @@ export function Reveal({
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   if (!children) return null
   return <p className={cn('www-eyebrow', className)}>{children}</p>
-}
-
-/**
- * Converts the legacy rich headings (`We know <em>CDW</em>`, `You're on <span
- * class="text--highlight">AEM.</span><br>We hear you.`) into StackedHeading's `##run##`.
- */
-export function richToStacked(html: string | null | undefined): string {
-  if (!html) return ''
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<(em|strong|b)>([\s\S]*?)<\/\1>/gi, '##$2##')
-    .replace(/<span[^>]*class="[^"]*highlight[^"]*"[^>]*>([\s\S]*?)<\/span>/gi, '##$1##')
-    .replace(/<[^>]+>/g, '')
-    .replace(/####/g, '')
-    .trim()
 }
 
 /** Removes `##` emphasis marks, for places that show the words but not the emphasis. */
@@ -483,15 +475,18 @@ export function Card({
   className,
   children,
   xray,
+  attrs,
 }: {
   tone?: 'neutral' | 'white' | 'dark'
   className?: string
   children: ReactNode
   /** The X-ray / Edit mode hook (see ABM_XRAY_DEFAULTS in src/lib/xray-defaults.ts). */
   xray?: string
+  /** Extra attributes: the CMS editor's hook in its preview (./cms-edit.tsx). */
+  attrs?: Record<string, string>
 }) {
   return (
-    <div data-xray={xray} className={cn('www-card', `www-card--${tone}`, className)}>
+    <div {...attrs} data-xray={xray} className={cn('www-card', `www-card--${tone}`, className)}>
       {children}
     </div>
   )
@@ -573,14 +568,14 @@ export function Steps({
   xray,
   tone = 'light',
 }: {
-  steps: Array<{ label: string; title: string; body: string }>
+  steps: Array<{ label: string; title: string; body: string; attrs?: Record<string, string> }>
   xray?: string
   tone?: 'light' | 'dark'
 }) {
   return (
     <ol className={cn('www-steps', `www-steps--${steps.length > 4 ? 'many' : steps.length}`, tone === 'dark' && 'www-steps--dark')} role="list">
       {steps.map((s, i) => (
-        <Reveal key={i} as="li" i={3 + i} data-xray={xray} className="www-step">
+        <Reveal key={i} as="li" i={3 + i} data-xray={xray} className="www-step" {...s.attrs}>
           <span className="www-step__dot" aria-hidden="true" />
           <p className="www-caption">{s.label}</p>
           <h3 className="www-h3 mt-2">{s.title}</h3>

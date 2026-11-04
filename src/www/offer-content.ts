@@ -120,6 +120,8 @@ export const OFFER_SLOTS: SlotSpec[] = [
 
 export interface OfferSection {
   slot: string | null // null = a section no slot claims
+  /** The section's Visual Builder node key: the CMS editor's handle on it (src/www/cms-edit.tsx). */
+  key: string | null
   name: string
   anchor: string | null
   values: Record<string, ElementData | ElementData[]>
@@ -127,17 +129,32 @@ export interface OfferSection {
 }
 
 type Node = {
+  key?: string
   nodeType?: string
   displayName?: string
   displaySettings?: Array<{ key: string; value: string }>
-  rows?: Array<{ columns?: Array<{ elements?: Array<{ component?: ElementData }> }> }>
+  rows?: Array<{ columns?: Array<{ elements?: Array<{ key?: string; component?: ElementData }> }> }>
   nodes?: Node[]
+}
+
+/**
+ * Each element's Visual Builder node key, kept beside the element rather than on it: an element's
+ * own fields are exactly the CMS's (Leftovers renders whatever strings it has).
+ */
+const nodeKeys = new WeakMap<object, string>()
+
+/** The node key of the element (or the first of a list) the page drew: the CMS editor's handle on it. */
+export function nodeKeyOf(el: ElementData | ElementData[] | undefined | null): string | null {
+  const one = Array.isArray(el) ? el[0] : el
+  return (one && nodeKeys.get(one)) || null
 }
 
 function elementsOf(section: Node): ElementData[] {
   const out: ElementData[] = []
   for (const r of section.rows ?? []) for (const c of r.columns ?? []) for (const e of c.elements ?? []) {
-    if (e.component?.__typename) out.push(e.component)
+    if (!e.component?.__typename) continue
+    if (e.key) nodeKeys.set(e.component, e.key)
+    out.push(e.component)
   }
   return out
 }
@@ -151,7 +168,8 @@ export function readOffer(experience: { composition?: Node | null }): OfferSecti
     const elements = elementsOf(s)
     const values: OfferSection['values'] = {}
     const extras: ElementData[] = []
-    if (!spec) return { slot: null, name, anchor, values, extras: elements }
+    const key = s.key ?? null
+    if (!spec) return { slot: null, key, name, anchor, values, extras: elements }
     let f = 0
     for (const el of elements) {
       // Advance past feeds that cannot take this element (a feed the writer left empty).
@@ -177,7 +195,7 @@ export function readOffer(experience: { composition?: Node | null }): OfferSecti
         f = i + 1
       }
     }
-    return { slot: spec.id, name, anchor, values, extras }
+    return { slot: spec.id, key, name, anchor, values, extras }
   })
 }
 

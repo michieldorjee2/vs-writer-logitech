@@ -14,6 +14,8 @@
  * touches the network (the global fetch, the form's one request).
  */
 
+import { inCmsPreview } from './cms-preview.js';
+
 /** The form's anchor: the hero's main button points here when the form is on. */
 export const SIGNUP_ANCHOR = 'signup';
 
@@ -89,6 +91,8 @@ export async function postSignup(
   website: string,
   location: { pathname: string; search: string },
 ): Promise<SignupOutcome> {
+  // The CMS's preview of a draft shows the form working without signing anyone up.
+  if (inCmsPreview(location)) return 'done';
   try {
     const res = await fetch(SIGNUP_ENDPOINT, {
       method: 'POST',

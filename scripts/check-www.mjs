@@ -6,7 +6,7 @@
  *   npm run check:www
  *   WWW_UPSTREAM=~/Claude/OptimizelyHeadless npm run check:www
  *
- * Bundled like check:render (TSX importing TSX; react-dom/server is CommonJS), with the app's
+ * Bundled with esbuild (TSX importing TSX; react-dom/server is CommonJS), with the app's
  * tsconfig so the `@/` alias the Visual Builder blueprints use resolves. No network.
  */
 import { build } from 'esbuild';

@@ -4,7 +4,6 @@ import type { CompetitorComparisonPage } from '../lib/graph-types';
 import {
   ABM_XRAY_DEFAULTS,
   AGENT_PLATFORM_EDIT,
-  DYNAMIC_XRAY_DEFAULTS,
   PERSON_XRAY_DEFAULTS,
   resolveXraySections,
   type EditSectionInfo,
@@ -29,7 +28,7 @@ interface Props {
    */
   onSent?: () => void;
   page: CompetitorComparisonPage;
-  variant: 'abm' | 'dynamic' | 'person';
+  variant: 'abm' | 'person';
   /**
    * The signed-in person (src/lib/auth.ts). Shown so they know who the edit
    * is attributed to, and not editable: the server sends Opal the session's
@@ -214,9 +213,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
   // field drives, tells Mark which fields, and shows Mark's edits by re-rendering the page.
   const agentPlatform = useMemo(() => active && onAgentPlatformPage(), [active]);
   const defaults =
-    variant === 'abm' ? ABM_XRAY_DEFAULTS
-      : variant === 'person' ? PERSON_XRAY_DEFAULTS
-        : DYNAMIC_XRAY_DEFAULTS;
+    variant === 'person' ? PERSON_XRAY_DEFAULTS : ABM_XRAY_DEFAULTS;
   const sections: Array<XraySectionInfo & Partial<Pick<EditSectionInfo, 'fields' | 'hint'>>> = useMemo(
     () => (agentPlatform ? AGENT_PLATFORM_EDIT : resolveXraySections(defaults, page.xraySections)),
     [agentPlatform, defaults, page.xraySections],

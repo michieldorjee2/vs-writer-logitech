@@ -152,19 +152,19 @@ visual-baseline.mjs — capture the app's rendered pixels and CSS.
  * the route is recorded as NOT rendered rather than screenshotted as a spinner
  * or a "we're not quite ready" miss page.
  *
- * /ofx/ carries intelEyebrow + customerLogo, so App.tsx's isABMPage() sends it
- * to ABMHyperPage — the 2,700-page template. It is also the parent of the
- * person page below, which means api/content.ts's fetchParentShot() finds a
- * real screenshot for the person hero instead of silently skipping it.
+ * /ofx/ is an account page: the agent platform template, the 2,800-page one. It
+ * is also the parent of the person page below, which means api/content.ts's
+ * fetchParentShot() finds a real screenshot for the person hero instead of
+ * silently skipping it.
  */
 const ROUTES = [
     {
         name: 'abm-account-page',
         url: '/ofx/',
-        ready: '.abm-page',
-        template: 'CompetitorComparisonPage -> ABMHyperPage',
-        note: 'ABM account template; 2,700 live CompetitorComparisonPage instances.',
-        nondeterministic: ['ABM hero 3D canvas (three.js)'],
+        ready: '.www-page.www-ap',
+        template: 'CompetitorComparisonPage -> AgentPlatformPage',
+        note: 'The account template; 2,800 live CompetitorComparisonPage instances.',
+        nondeterministic: ['Scene reveals and count-ups play on scroll'],
         noiseFloorPct: 0.7,
     },
     {
@@ -232,15 +232,6 @@ const ROUTES = [
                 'and the logo-wall slot. An offline capture renders both as broken images.',
         ],
         noiseFloorPct: 0.5,
-    },
-    {
-        name: 'use-case-preview',
-        url: '/use-case-preview',
-        ready: '.uc-page',
-        template: 'UseCasePreview -> UseCasePage',
-        note: 'Local Siemens fixture; needs no CMS content.',
-        nondeterministic: [],
-        noiseFloorPct: 0,
     },
 ];
 

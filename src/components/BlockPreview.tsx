@@ -21,7 +21,7 @@ const ComparisonTable = lazy(() => import('./ComparisonTable/comparison-table.co
 const HighlightSection = lazy(() => import('./Highlight/highlight.component'));
 const GridOverlay = lazy(() => import('./GridOverlay/_grid-overlay'));
 
-// --- Logo mapper (shared with DynamicComparisonPage) ---
+// --- Logo mapper ---
 
 function mapLogos(logos: ImageRef[]) {
     return logos

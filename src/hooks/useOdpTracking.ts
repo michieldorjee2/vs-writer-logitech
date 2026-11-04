@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
+import { inCmsPreview } from '../lib/cms-preview';
 
 /**
- * ODP tracking hook for VS Writer pages.
+ * ODP tracking for the account page (src/www/AgentPlatformPage.tsx).
  *
  * Uses the ODP client SDK (loaded in index.html as zaius-min.js).
  * Tracks: page view, section visibility, CTA clicks, engagement on exit.
@@ -16,30 +17,19 @@ declare global {
   }
 }
 
-/** Sections tracked on DynamicComparisonPage */
-const COMPARISON_SECTIONS = [
-  'hero', 'logos', 'features', 'comparison', 'analyst', 'testimonials', 'faq', 'promo', 'final-cta',
-];
-
-/** Sections tracked on ABMHyperPage */
-const ABM_SECTIONS = [
-  'hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta',
-];
-
 /**
- * Sections tracked on UseCasePage. A SUPERSET of what any one page renders —
- * the plan decides which of these exist in the DOM, and observing an id that
- * is not there is a no-op (getElementById returns null). Keep it in step with
- * the sectionIds in src/lib/limitless/component-plan.ts.
+ * The account page's scenes (src/www/AgentPlatformPage.tsx), by their ids. An id not on the page
+ * (Who we are is left off some pages) is a no-op: getElementById returns null.
  */
-const USE_CASE_SECTIONS = [
-  'hero', 'use-cases', 'why', 'gaps', 'close', 'promo', 'comparison', 'testimonials',
+const ABM_SECTIONS = [
+  'hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta',
 ];
 
 /** Send an ODP event via the client SDK (queued if SDK still loading) */
 function odpEvent(eventType: string, action: string, data?: Record<string, string | number>) {
   try {
-    if (typeof window !== 'undefined' && window.zaius) {
+    // An editor looking at a draft in the CMS is not a visit.
+    if (typeof window !== 'undefined' && window.zaius && !inCmsPreview()) {
       window.zaius.event(eventType, { action, ...data });
     }
   } catch {
@@ -47,7 +37,7 @@ function odpEvent(eventType: string, action: string, data?: Record<string, strin
   }
 }
 
-export function useOdpTracking(pageType: 'comparison' | 'abm' | 'use-case', slug?: string) {
+export function useOdpTracking(pageType: 'abm', slug?: string) {
   const viewedSections = useRef(new Set<string>());
   // Set on mount by the effect below, before anything reads it. Date.now() here
   // would run on every render for a value that is thrown away (react-hooks/purity).
@@ -71,8 +61,7 @@ export function useOdpTracking(pageType: 'comparison' | 'abm' | 'use-case', slug
     });
 
     // ── Section visibility ─────────────────────────────────────────
-    const sectionIds =
-      pageType === 'abm' ? ABM_SECTIONS : pageType === 'use-case' ? USE_CASE_SECTIONS : COMPARISON_SECTIONS;
+    const sectionIds = ABM_SECTIONS;
 
     const observer = new IntersectionObserver(
       (entries) => {

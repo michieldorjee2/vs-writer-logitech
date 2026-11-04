@@ -1,23 +1,48 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { graphItems } from '../src/lib/graph-envelope.js';
+import { ACCOUNT_PAGE_PREVIEW_QUERY } from '../src/lib/account-page-query.js';
+import { EXPERIENCE_PREVIEW_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
+import { withPageCopy } from './_lib/page-copy.js';
+import { withParentAccount } from './_lib/parent-account.js';
+import { withOfferSignup } from './_lib/offer-signup.js';
+
+/**
+ * `/api/preview?key=&ver=&loc=&preview_token=` — the draft the CMS is previewing (src/components/CmsPreview.tsx).
+ *
+ * It answers with what the live address would serve for that draft, so the preview draws the same
+ * page: an account page with the same fields and its own copy (`withPageCopy`, as api/content.ts),
+ * an experience normalised with its parent account's logo and its sign-up form (as the /vb/ route),
+ * and the few legacy blocks still in the CMS as they are.
+ *
+ * Two steps, because a selection on a type is only valid on that type: `_Content` says what the key
+ * is, then that type's own query fetches it. With the editor's `preview_token` (Bearer) Graph returns
+ * the draft; without one the site's key reads only what is published.
+ */
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
-// Query _Content (base interface) so we can resolve ANY content type by key —
-// pages AND individual blocks. The __typename tells the frontend what it got.
 /**
- * Six fields the flat content model never had — CanonicalUrl, FeatureSection and
- * FaqSection on the page, OurHighlight/CompetitorHighlight on ComparisonRow, Weeks
- * on ABMTimelinePhase — were carried forward from the pre-flat nested-block query
- * (a4a6fe7) and sat in this selection returning null on every page for months.
- * Optimizely Graph kept advertising the legacy names in its schema, so the query
- * still parsed; when that schema refreshed, the whole query 400'd and all 2,676
- * account pages 404'd. A selection on one unknown field fails the entire query —
- * check the registered type before adding a field here, and run
- * `npm run check:graph`.
+ * What the key is. Through `_Content`, Graph names only the base type in `__typename` (`_Page`,
+ * `_Experience`, `_Component`) unless the query names the concrete one; `_metadata.types` lists
+ * the concrete type first (measured: ["CompetitorComparisonPage", "_Page", "_Content", …]).
  */
-const PREVIEW_QUERY = `
-query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
+const PREVIEW_TYPE_QUERY = `
+query GetPreviewType($key: String!, $ver: String, $loc: [Locales]) {
+  _Content(
+    where: { _metadata: { key: { eq: $key }, version: { eq: $ver } } }
+    locale: $loc
+  ) {
+    items { __typename _metadata { types } }
+  }
+}
+`;
+
+/**
+ * The legacy blocks BlockPreview draws: one or two of each are still in the CMS, from before the
+ * pages went flat. Check the registered type before adding a field (`npm run check:graph`).
+ */
+const BLOCK_PREVIEW_QUERY = `
+query GetPreviewBlock($key: String!, $ver: String, $loc: [Locales]) {
   _Content(
     where: { _metadata: { key: { eq: $key }, version: { eq: $ver } } }
     locale: $loc
@@ -25,35 +50,6 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
     items {
       __typename
       _metadata { key version url { default hierarchical } published }
-      ... on CompetitorComparisonPage {
-        PageTitle MetaDescription
-        eyebrow headline subheadline cta link { default }
-        comparisonHeadline
-        comparisonTableRows { Category OurValue CompetitorValue }
-        analystHeadline analystQuote analystSource analystCTA analystCTALink { default }
-        promoEyebrow promoHeading promoDescription promoCTA promoCTALink { default }
-        endHeadline endSubheadline endCTA endCTALink { default }
-        testimonial1 testimonial1JobTitle testimonial1Company
-        testimonial2 testimonial2JobTitle testimonial2Company
-        customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
-        challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
-        comparisonDescription logoWallCustomerSlot
-        roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail
-        migrationTitle migrationDescription stickyCTAText
-        ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
-        footerTagline footerLegal
-        intelStats { Value Label }
-        stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor EngagementTier EngagementNote PersonSlug CrmContactId }
-        techStack { Name ColorTag }
-        investments { Name IsPrimary }
-        newsItems { Date Headline Url { default } }
-        painPoints { Title Description }
-        roiCards { Metric Unit Label CitationText }
-        timelinePhases { Title Description MarkerColor }
-        teamMembers { Initials Name Role Email }
-        footerLinks { Text Url { default } }
-        analystCards { Badge Source Category Url { default } }
-      }
       ... on HeroSectionBlock { Eyebrow Headline { html } Subheadline PrimaryCtaText PrimaryCtaUrl { default } }
       ... on LogoBarBlock { Heading Logos { key item { ... on ImageMedia { _metadata { url { default } displayName } } } } }
       ... on FeatureSectionBlock { Headline { html } Features { Title Description { html } } }
@@ -67,65 +63,97 @@ query GetPreviewContent($key: String!, $ver: String, $loc: [Locales]) {
 }
 `;
 
-async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
-  const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  });
-  return res.json();
-}
+/** A CMS content key or version id. */
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** A CMS locale: `en`, `en-GB`, `en_GB`. */
+const LOCALE = /^[A-Za-z]{2}(?:[_-][A-Za-z]{2,4})?$/;
+/** The editor's preview token: a JWT. */
+const TOKEN = /^[A-Za-z0-9._-]{1,8192}$/;
 
-async function queryGraphWithToken(token: string, query: string, variables: Record<string, unknown>) {
-  const res = await fetch(GRAPH_ENDPOINT, {
+type Auth = { token: string } | { key: string };
+
+async function queryGraph(auth: Auth, query: string, variables: Record<string, unknown>) {
+  const url = 'token' in auth ? GRAPH_ENDPOINT : `${GRAPH_ENDPOINT}?auth=${encodeURIComponent(auth.key)}`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      ...('token' in auth ? { Authorization: `Bearer ${auth.token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
   });
-  return res.json();
+  const json = await res.json();
+  const errors = (json as { errors?: Array<{ message: string }> })?.errors;
+  if (errors?.length) {
+    // The variables are the key, version and locale: never the token, which rides in the header.
+    const op = /query\s+(\w+)/.exec(query)?.[1] ?? 'anonymous';
+    console.error(`[api/preview] ${op} failed (HTTP ${res.status}) for ${JSON.stringify(variables)}: ${errors.map((e) => e.message).join(' | ')}`);
+  }
+  return json;
+}
+
+/** The item's own content type: `__typename` when Graph gave the concrete one, else the first of `_metadata.types` that is not a base type. */
+export function concreteType(item: { __typename?: string; _metadata?: { types?: string[] | null } | null } | null | undefined): string | null {
+  if (!item) return null;
+  const isConcrete = (t: unknown): t is string => typeof t === 'string' && t.length > 0 && !t.startsWith('_');
+  if (isConcrete(item.__typename)) return item.__typename;
+  return item._metadata?.types?.find(isConcrete) ?? null;
+}
+
+function one(query: unknown): string | undefined {
+  return typeof query === 'string' ? query : undefined;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { key, ver, loc, preview_token } = req.query;
+  // A draft is the editor's, never a cache's.
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
 
-  if (!key || typeof key !== 'string') {
-    return res.status(400).json({ error: 'Missing key parameter' });
-  }
+  const key = one(req.query.key);
+  const ver = one(req.query.ver);
+  const loc = one(req.query.loc);
+  const previewToken = one(req.query.preview_token);
 
-  // Prefer preview_token (Bearer auth from CMS live preview) over HMAC key
-  const previewToken = typeof preview_token === 'string' ? preview_token : null;
+  if (!key || !ID.test(key)) return res.status(400).json({ error: 'Missing or invalid key parameter' });
+  if (ver && !ID.test(ver)) return res.status(400).json({ error: 'Invalid ver parameter' });
+  if (loc && !LOCALE.test(loc)) return res.status(400).json({ error: 'Invalid loc parameter' });
+  if (previewToken && !TOKEN.test(previewToken)) return res.status(400).json({ error: 'Invalid preview_token parameter' });
+
   const singleKey = process.env.GRAPH_SINGLE_KEY || process.env.GRAPH_AUTH_KEY;
+  if (!previewToken && !singleKey) return res.status(500).json({ error: 'No auth configured for preview' });
+  const auth: Auth = previewToken ? { token: previewToken } : { key: singleKey! };
 
-  if (!previewToken && !singleKey) {
-    return res.status(500).json({ error: 'No auth configured for preview' });
-  }
+  const variables: Record<string, unknown> = { key };
+  if (ver) variables.ver = ver;
+  if (loc) variables.loc = [loc];
 
   try {
-    const variables: Record<string, unknown> = { key };
-    if (ver && typeof ver === 'string') variables.ver = ver;
-    if (loc && typeof loc === 'string') variables.loc = [loc];
+    const typed = graphItems<{ __typename?: string; _metadata?: { types?: string[] | null } | null }>(
+      await queryGraph(auth, PREVIEW_TYPE_QUERY, variables),
+      '_Content',
+    )?.[0];
+    const typeName = concreteType(typed);
+    if (!typeName) return res.status(404).json({ error: 'Content not found' });
 
-    // Use Bearer token auth if preview_token is provided, otherwise HMAC key
-    const json = previewToken
-      ? await queryGraphWithToken(previewToken, PREVIEW_QUERY, variables)
-      : await queryGraph(singleKey!, PREVIEW_QUERY, variables);
-
-    const items = graphItems<Record<string, unknown>>(json, '_Content');
-
-    if (!items || items.length === 0) {
-      return res.status(404).json({ error: 'Content not found' });
+    if (typeName === 'CompetitorComparisonPage') {
+      const items = graphItems<Record<string, unknown>>(await queryGraph(auth, ACCOUNT_PAGE_PREVIEW_QUERY, variables), typeName);
+      if (!items?.length) return res.status(404).json({ error: 'Content not found' });
+      return res.status(200).json(await withPageCopy({ ...items[0], __typename: typeName }));
     }
 
-    const content = items[0];
+    const experience = EXPERIENCE_PREVIEW_QUERIES[typeName];
+    if (experience) {
+      const items = graphItems<Record<string, unknown>>(await queryGraph(auth, experience.query, variables), typeName);
+      if (!items?.length) return res.status(404).json({ error: 'Content not found' });
+      const item = normalizeExperienceItem({ ...items[0], __typename: typeName, __template: experience.template });
+      return res.status(200).json(await withOfferSignup(await withParentAccount(item)));
+    }
 
-    // Never cache preview content
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json(content);
+    const items = graphItems<Record<string, unknown>>(await queryGraph(auth, BLOCK_PREVIEW_QUERY, variables), '_Content');
+    if (!items?.length) return res.status(404).json({ error: 'Content not found' });
+    return res.status(200).json(items[0]);
   } catch (err) {
-    console.error('[api/preview] Graph fetch failed:', err);
+    console.error('[api/preview] Graph fetch failed:', err instanceof Error ? err.message : err);
     return res.status(500).json({ error: 'Failed to fetch preview content' });
   }
 }

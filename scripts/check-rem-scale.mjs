@@ -40,7 +40,7 @@
  * `[state=open]`, `[16/10]` — is not a length and is never flagged.
  *
  * Usage:  npm run check:rem-scale
- * Not part of `npm run build` — see check:graph and check:render for the same convention.
+ * Not part of `npm run build` — see check:graph for the same convention.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';

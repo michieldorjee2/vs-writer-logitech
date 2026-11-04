@@ -34,6 +34,7 @@ import { FIRST_90_DAYS, PLATFORM_LAYER, PROOF_ASSETS, PROOF_STORIES, STATES, THE
 import { fromLegacyPage, STATE_IDS, type AgentPlatformContent } from './agent-platform/content'
 import { resolveCopy, stackPhrase } from './agent-platform/copy'
 import { setShownCopy, useLivePage } from './live-edit'
+import { useCmsEdit } from './cms-edit'
 import { useEffect } from 'react'
 import type { LifecycleState } from './agent-platform/library'
 
@@ -92,9 +93,10 @@ type T = (key: string) => string
  * a reader sees the homework wherever they are. X-ray finds every one as `intel-stats`.
  */
 function Homework({ stat, source, i = 2 }: { stat?: { value: string; label: string }; source?: { label: string; href: string } | null; i?: number }) {
+  const cms = useCmsEdit()
   if (!stat) return null
   return (
-    <Reveal i={i} fx="right" as="aside" data-xray="intel-stats" data-field="intelStats" className="www-note">
+    <Reveal i={i} fx="right" as="aside" data-xray="intel-stats" data-field="intelStats" {...cms.field('intelStats')} className="www-note">
       <HomeworkTag />
       <p className="www-note__value">{/^(1[89]|20)\d{2}$/.test(stat.value) ? stat.value : <CountUp value={stat.value} />}</p>
       <p className="www-note__label">{stat.label}</p>
@@ -131,6 +133,7 @@ function SceneHead({ children, note }: { children: ReactNode; note?: ReactNode }
 /* ======================================================================= HERO */
 
 function Hero({ c, t }: { c: AgentPlatformContent; t: T }) {
+  const cms = useCmsEdit()
   const st = STATES[c.state.value]
   const { connect } = useConnect()
   const lead = c.themes.value[0]
@@ -146,7 +149,7 @@ function Hero({ c, t }: { c: AgentPlatformContent; t: T }) {
       copy={
         <>
           {/* The page says whose it is once: their logo and one line, above the headline. */}
-          <Reveal i={0} fx="scale" data-field="customerLogo">
+          <Reveal i={0} fx="scale" data-field="customerLogo" {...cms.field('customerLogo')}>
             <AccountMark name={c.account} logo={c.logo} label={`Personalized for ${c.account}`} xray="account-logo" />
           </Reveal>
           <Reveal i={1} data-xray="hero-title" data-field="copy.hero.h1">
@@ -157,7 +160,7 @@ function Hero({ c, t }: { c: AgentPlatformContent; t: T }) {
             {t('hero.sub')}
           </Reveal>
           {c.pills.value.length > 0 && (
-            <Reveal i={3} as="div" data-xray="intel-stats" data-field="intelStats" className="flex flex-wrap gap-2">
+            <Reveal i={3} as="div" data-xray="intel-stats" data-field="intelStats" {...cms.field('intelStats')} className="flex flex-wrap gap-2">
               {c.pills.value.map((p) => (
                 <span key={p} className={cn('www-pill', dark && 'www-pill--on-dark')}>
                   {p}
@@ -199,7 +202,7 @@ function Hero({ c, t }: { c: AgentPlatformContent; t: T }) {
             ))}
           </ul>
           {chips.length > 0 && (
-            <div className="www-agents__chips mt-4 flex flex-wrap gap-1.5" data-field="techStack">
+            <div className="www-agents__chips mt-4 flex flex-wrap gap-1.5" data-field="techStack" {...cms.field('techStack')}>
               {chips.map((t) => (
                 <span key={t.label} className="www-agents__chip">
                   {t.label}
@@ -265,6 +268,7 @@ function WhoWeAre({ t }: { t: T }) {
 /* ============================================================== WHERE IT FITS */
 
 function WhereItFits({ c, t }: { c: AgentPlatformContent; t: T }) {
+  const cms = useCmsEdit()
   const teamsFromPage = c.teams.from === 'derived'
   return (
     <Scene id="intel" tone="neutral">
@@ -284,7 +288,7 @@ function WhereItFits({ c, t }: { c: AgentPlatformContent; t: T }) {
           <Homework stat={c.stats.value[0]} source={c.statsSource.value} i={3} />
         </div>
         <div className="flex flex-col gap-2 lg:col-span-7">
-          <Reveal i={2} fx="drop" className="www-layer www-layer--teams" data-xray="teams" data-field="stakeholders">
+          <Reveal i={2} fx="drop" className="www-layer www-layer--teams" data-xray="teams" data-field="stakeholders" {...cms.field('stakeholders')}>
             <p className="www-layer__label">{teamsFromPage ? <HomeworkTag>Your teams</HomeworkTag> : 'Your teams'}</p>
             <div className="flex flex-wrap gap-2">
               {c.teams.value.map((t) => (
@@ -312,7 +316,7 @@ function WhereItFits({ c, t }: { c: AgentPlatformContent; t: T }) {
           <Reveal i={5} className="www-layer__arrow" aria-hidden="true">
             <MaterialIcon name="swap_vert" size="24" />
           </Reveal>
-          <Reveal i={6} className="www-layer www-layer--stack" data-xray="tech-stack" data-field="techStack">
+          <Reveal i={6} className="www-layer www-layer--stack" data-xray="tech-stack" data-field="techStack" {...cms.field('techStack')}>
             <p className="www-layer__label">
               <HomeworkTag>{`What ${c.account} runs today`}</HomeworkTag>
             </p>
@@ -343,6 +347,7 @@ function WhereItFits({ c, t }: { c: AgentPlatformContent; t: T }) {
 /* ======================================================= SPEAKS YOUR LANGUAGE */
 
 function SpeaksYourLanguage({ c, t, checks }: { c: AgentPlatformContent; t: T; checks: string[] }) {
+  const cms = useCmsEdit()
   return (
     <Scene id="language">
       <div data-xray="speaks-language" className="mx-auto max-w-[1000px]">
@@ -378,7 +383,7 @@ function SpeaksYourLanguage({ c, t, checks }: { c: AgentPlatformContent; t: T; c
         </div>
         {c.priorities.value.length > 0 && (
           // What they are investing in is the language the agents start from.
-          <Reveal i={5} className="www-priorities mt-3" data-xray="investments" data-field="investments">
+          <Reveal i={5} className="www-priorities mt-3" data-xray="investments" data-field="investments" {...cms.field('investments')}>
             <HomeworkTag>{`Where ${c.account} is investing`}</HomeworkTag>
             <div className="flex flex-wrap gap-2">
               {c.priorities.value.map((p) => (
@@ -592,6 +597,7 @@ function FirstNinetyDays({ c, t }: { c: AgentPlatformContent; t: T }) {
 /* ====================================================================== CLOSE */
 
 function Close({ c, t }: { c: AgentPlatformContent; t: T }) {
+  const cms = useCmsEdit()
   const st = STATES[c.state.value]
   const { connect, sent } = useConnect()
   const reasons = [t('close.reason1'), t('close.reason2'), t('close.reason3')]
@@ -617,7 +623,7 @@ function Close({ c, t }: { c: AgentPlatformContent; t: T }) {
             </ol>
           </div>
           <div className="flex flex-col gap-3 lg:col-span-5">
-            <Reveal i={3} fx="right" className="www-card www-card--dark-2" data-field="teamMembers">
+            <Reveal i={3} fx="right" className="www-card www-card--dark-2" data-field="teamMembers" {...cms.field('teamMembers')}>
               {people.length ? (
                 <ul className="flex flex-col gap-3" role="list">
                   {people.map((p) => (
@@ -640,7 +646,7 @@ function Close({ c, t }: { c: AgentPlatformContent; t: T }) {
                 </div>
               )}
             </Reveal>
-            <Reveal i={4} fx="right" className="www-card www-card--dark-2" data-field="stakeholders">
+            <Reveal i={4} fx="right" className="www-card www-card--dark-2" data-field="stakeholders" {...cms.field('stakeholders')}>
               <p className="www-caption text-white/70">Built for</p>
               <ul className="mt-2 flex flex-col gap-1.5" role="list">
                 {c.teams.value.slice(0, 3).map((t) => (
@@ -663,8 +669,8 @@ function Close({ c, t }: { c: AgentPlatformContent; t: T }) {
           </Button>
         </Reveal>
         <Colophon xray="small-print" field="footerTagline footerLegal">
-          {c.smallPrint.tagline && <span>{c.smallPrint.tagline}</span>}
-          {c.smallPrint.legal && <span>{c.smallPrint.legal}</span>}
+          {c.smallPrint.tagline && <span {...cms.field('footerTagline')}>{c.smallPrint.tagline}</span>}
+          {c.smallPrint.legal && <span {...cms.field('footerLegal')}>{c.smallPrint.legal}</span>}
           <a href="https://www.optimizely.com/ai/" target="_blank" rel="noopener noreferrer">
             Agent Platform
           </a>
@@ -743,7 +749,7 @@ function ReviewLayer({ c, search }: { c: AgentPlatformContent; search: string })
           .map((e) => `${THEMES[e.theme].name} ${e.score}`)
           .join(' · ')}
       </p>
-      <p className="mt-1">{c.notShown.length} legacy fields not shown on this template (see account-fields).</p>
+      <p className="mt-1">{c.notShown.length} legacy fields not shown on this template (see NOT_SHOWN).</p>
     </aside>
   )
 }
