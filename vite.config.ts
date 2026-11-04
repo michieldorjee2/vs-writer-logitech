@@ -131,6 +131,9 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],
           // The CMS preview's draft: the function itself, so dev reads it exactly as production does.
           [/^\/api\/preview$/, '/api/preview.ts'],
+          // Activity mode: the visitor index write and the report, both straight from their files.
+          [/^\/api\/page-visit$/, '/api/page-visit.ts'],
+          [/^\/api\/page-activity$/, '/api/page-activity.ts'],
         ]
         let file: string | null = null
         let id: string | null = null

@@ -1,0 +1,768 @@
+/* ============================================================
+   Activity mode (src/components/ActivityMode.tsx)
+   Same family as X-ray and Edit: the solid Dark Fir bar at the top, lime
+   for what matters, Figtree for words and a mono face for numbers. Solid
+   surfaces, no backdrop blur: on the www page blur flickers (floating-sidebar.css).
+   px only: the showcase's root font size is 10px.
+   ============================================================ */
+
+:root {
+  --act-bg: #08251a;
+  --act-surface: #0d3a29;
+  --act-line: rgba(255, 255, 255, 0.1);
+  --act-text: #eff6e9;
+  --act-muted: #a1ac8d;
+  --act-accent: #abff44;
+  --act-accent-soft: rgba(171, 255, 68, 0.22);
+  --act-accent-glow: rgba(171, 255, 68, 0.55);
+  /* Clicks on things that can't be clicked: warm, apart from the brand green. */
+  --act-dead: #ff9a6b;
+  --act-dead-soft: rgba(255, 154, 107, 0.22);
+  --act-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --act-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ------------ Document layer: scenes and elements ------------ */
+
+.activity-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* Its height is the page's (set each frame); a glow past the last scene must not lengthen it. */
+  overflow: hidden;
+  z-index: 1000;
+  pointer-events: none;
+  font-family: var(--act-sans);
+}
+
+.activity-scene,
+.activity-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+/* Reach: a rail down the scene's left edge, filled to the share of visitors who saw it. */
+.activity-scene__rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: rgba(8, 37, 26, 0.18);
+}
+.activity-scene__fill {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: calc(var(--reach, 0) * 100%);
+  background: var(--act-accent);
+  box-shadow: 0 0 12px var(--act-accent-glow);
+  transform-origin: top;
+  animation: activity-rail 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes activity-rail {
+  from { transform: scaleY(0); }
+}
+
+.activity-scene__chip {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* Narrow enough to sit in the page's left margin, clear of its content and the logo. */
+  max-width: 84px;
+  padding: 7px 9px 8px;
+  border-radius: 12px;
+  background: var(--act-bg);
+  border: 1px solid rgba(171, 255, 68, 0.35);
+  color: var(--act-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  animation: activity-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+}
+.activity-scene__row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.activity-scene__value {
+  font: 700 15px/1 var(--act-mono);
+  color: var(--act-accent);
+}
+.activity-scene__name {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--act-muted);
+}
+.activity-scene--none .activity-scene__value {
+  color: var(--act-muted);
+}
+.activity-scene--none .activity-scene__rail {
+  display: none;
+}
+
+/* Elements: outline, heat and a count badge. */
+.activity-mark__box {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  border: 2px solid var(--act-accent);
+  background: rgba(171, 255, 68, calc(0.03 + var(--heat, 0) * 0.1));
+  box-shadow: 0 0 calc(6px + var(--heat, 0) * 18px) var(--act-accent-glow);
+  opacity: calc(0.45 + var(--heat, 0) * 0.55);
+  animation: activity-fade 420ms ease backwards;
+  animation-delay: calc(var(--i, 0) * 25ms);
+}
+.activity-mark__heat {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(80px, 140%, 320px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(171, 255, 68, calc(0.15 + var(--heat, 0) * 0.45)), rgba(171, 255, 68, 0));
+  mix-blend-mode: screen;
+  animation: activity-fade 600ms ease backwards;
+}
+.activity-mark__badge {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--act-accent);
+  color: #08251a;
+  font: 700 12px/26px var(--act-mono);
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(171, 255, 68, 0.5);
+  pointer-events: auto;
+  cursor: default;
+  animation: activity-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 25ms + 200ms);
+}
+.activity-mark__badge:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.activity-mark__rage {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--act-dead);
+  border: 2px solid var(--act-bg);
+}
+.activity-mark--cta .activity-mark__box {
+  border-width: 2.5px;
+}
+.activity-mark--dead .activity-mark__box {
+  border-style: dashed;
+  border-color: var(--act-dead);
+  background: var(--act-dead-soft);
+  box-shadow: 0 0 12px rgba(255, 154, 107, 0.4);
+}
+.activity-mark--dead .activity-mark__heat {
+  background: radial-gradient(closest-side, rgba(255, 154, 107, calc(0.15 + var(--heat, 0) * 0.4)), rgba(255, 154, 107, 0));
+}
+.activity-mark--dead .activity-mark__badge {
+  background: var(--act-dead);
+  box-shadow: 0 4px 12px rgba(255, 154, 107, 0.5);
+}
+.activity-mark.is-hover {
+  z-index: 2;
+}
+.activity-mark.is-hover .activity-mark__box {
+  opacity: 1;
+}
+
+.activity-tip {
+  position: absolute;
+  top: 18px;
+  right: -12px;
+  transform: translateX(calc(100% + 8px)) translateY(-50%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(64px, auto));
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--act-bg);
+  border: 1px solid rgba(171, 255, 68, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 3;
+  animation: activity-fade 140ms ease;
+}
+
+@keyframes activity-pop {
+  from { opacity: 0; transform: scale(0.5); }
+}
+@keyframes activity-fade {
+  from { opacity: 0; }
+}
+
+/* ------------ Fixed layer: the bar and the panel ------------ */
+
+.activity-fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  pointer-events: none;
+  font-family: var(--act-sans);
+  color: var(--act-text);
+}
+
+.activity-hud {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: var(--act-bg);
+  border: 1px solid rgba(171, 255, 68, 0.35);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  white-space: nowrap;
+  animation: activity-hud-in 340ms ease 80ms backwards;
+}
+@keyframes activity-hud-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+}
+.activity-hud__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--act-accent);
+  box-shadow: 0 0 8px var(--act-accent-glow);
+}
+.activity-hud__dot--busy {
+  animation: activity-busy 1s ease-in-out infinite;
+}
+.activity-hud__dot--error {
+  background: var(--act-dead);
+  box-shadow: 0 0 8px rgba(255, 154, 107, 0.6);
+}
+@keyframes activity-busy {
+  50% { opacity: 0.25; }
+}
+.activity-hud__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--act-accent);
+}
+
+.activity-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--act-line);
+}
+.activity-seg__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--act-muted);
+  padding: 5px 10px;
+  border-radius: 999px;
+  font: 600 11px/1 var(--act-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 160ms ease, color 160ms ease;
+}
+.activity-seg__btn:hover {
+  color: var(--act-text);
+}
+.activity-seg__btn.is-on {
+  background: var(--act-accent);
+  color: #08251a;
+}
+.activity-seg__n {
+  font-family: var(--act-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.activity-seg__btn.is-on .activity-seg__n {
+  background: rgba(8, 37, 26, 0.18);
+}
+.activity-seg__btn:focus-visible,
+.activity-hud__icon:focus-visible,
+.activity-hud__close:focus-visible,
+.activity-panel__toggle:focus-visible {
+  outline: 2px solid var(--act-accent);
+  outline-offset: 2px;
+}
+
+.activity-hud__icon,
+.activity-hud__close {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--act-text);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.activity-hud__icon {
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+}
+.activity-hud__close {
+  padding: 7px 12px;
+  font: 600 11px/1 var(--act-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.activity-hud__icon:hover,
+.activity-hud__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* The panel: docked right, the numbers. */
+.activity-panel {
+  position: absolute;
+  top: 80px;
+  right: 16px;
+  bottom: 16px;
+  width: 340px;
+  display: flex;
+  pointer-events: auto;
+  transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: activity-panel-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 120ms backwards;
+}
+@keyframes activity-panel-in {
+  from { opacity: 0; transform: translateX(24px); }
+}
+.activity-panel--closed {
+  transform: translateX(calc(100% - 4px));
+}
+.activity-panel__toggle {
+  position: absolute;
+  left: -34px;
+  top: 12px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(171, 255, 68, 0.35);
+  background: var(--act-bg);
+  color: var(--act-text);
+  cursor: pointer;
+}
+.activity-panel__body,
+.activity-panel--loading,
+.activity-panel--error {
+  background: var(--act-bg);
+  border: 1px solid rgba(171, 255, 68, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 30px rgba(171, 255, 68, 0.08);
+}
+.activity-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(171, 255, 68, 0.3) transparent;
+}
+.activity-panel--loading,
+.activity-panel--error {
+  bottom: auto;
+  padding: 16px;
+  display: block;
+}
+
+.activity-skeleton {
+  display: grid;
+  gap: 12px;
+}
+.activity-skeleton span {
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(171, 255, 68, 0.1), rgba(255, 255, 255, 0.04));
+  background-size: 200% 100%;
+  animation: activity-shimmer 1.2s linear infinite;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+@keyframes activity-shimmer {
+  to { background-position: -200% 0; }
+}
+
+.activity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.activity-grid--kpi {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.activity-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.activity-grid .activity-stat {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--act-surface);
+  border: 1px solid var(--act-line);
+}
+.activity-stat__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--act-muted);
+  white-space: nowrap;
+}
+.activity-stat__value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font: 700 18px/1.1 var(--act-mono);
+  color: var(--act-text);
+}
+.activity-tip .activity-stat__value {
+  font-size: 15px;
+}
+.activity-stat--warn .activity-stat__value {
+  color: var(--act-dead);
+}
+
+.activity-delta {
+  font: 600 10px/1 var(--act-mono);
+  padding: 2px 5px;
+  border-radius: 999px;
+  letter-spacing: 0;
+}
+.activity-delta--up {
+  color: #08251a;
+  background: var(--act-accent);
+}
+.activity-delta--down {
+  color: var(--act-dead);
+  background: var(--act-dead-soft);
+}
+.activity-delta--flat {
+  color: var(--act-muted);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.activity-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.activity-block__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--act-muted);
+}
+
+.activity-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.activity-legend i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 2px;
+}
+.activity-legend__built,
+.activity-series__mark--built { background: #ffffff; }
+.activity-legend__saved,
+.activity-series__mark--saved { background: #7ad1ff; }
+.activity-legend__copy,
+.activity-series__mark--copy { background: var(--act-dead); }
+
+.activity-series {
+  position: relative;
+  height: 72px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--act-line);
+}
+.activity-series__bar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 2px 2px 0 0;
+  background: var(--act-accent);
+  opacity: 0.85;
+  transform-origin: bottom;
+  animation: activity-rail-x 600ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes activity-rail-x {
+  from { transform: scaleY(0); }
+}
+.activity-series__mark {
+  position: absolute;
+  top: -4px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  opacity: 0.9;
+}
+.activity-series__mark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: inherit;
+}
+.activity-series__axis {
+  display: flex;
+  justify-content: space-between;
+  font: 500 10px/1 var(--act-mono);
+  color: var(--act-muted);
+}
+
+.activity-bars,
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.activity-bars__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.activity-bars__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--act-text);
+  text-transform: capitalize;
+}
+.activity-bars__track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.activity-bars__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(171, 255, 68, 0.55);
+}
+.activity-bars__row.is-mark .activity-bars__fill {
+  background: var(--act-accent);
+  box-shadow: 0 0 8px var(--act-accent-glow);
+}
+.activity-bars__row.is-mark .activity-bars__name {
+  color: var(--act-accent);
+  font-weight: 700;
+}
+.activity-bars__n,
+.activity-list__n {
+  font: 600 12px/1 var(--act-mono);
+  text-align: right;
+  color: var(--act-text);
+}
+
+.activity-list__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+.activity-list__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--act-muted);
+}
+.activity-list__row.is-mark .activity-list__label {
+  color: var(--act-text);
+}
+.activity-chip {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--act-accent);
+  color: #08251a;
+}
+.activity-chip--quiet {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--act-text);
+}
+
+.activity-cols {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  height: 84px;
+}
+.activity-cols__col {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  align-items: end;
+  justify-items: center;
+  gap: 4px;
+}
+.activity-cols__bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: rgba(171, 255, 68, 0.55);
+}
+.activity-cols__col:last-child .activity-cols__bar {
+  background: var(--act-accent);
+}
+.activity-cols__n {
+  font: 600 11px/1 var(--act-mono);
+}
+.activity-cols__label {
+  font: 500 10px/1 var(--act-mono);
+  color: var(--act-muted);
+}
+
+.activity-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.activity-split .activity-bars__row {
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+.activity-split .activity-bars__track {
+  display: none;
+}
+
+.activity-foot {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--act-line);
+  font: 500 10px/1 var(--act-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--act-muted);
+}
+
+/* While Activity is open the sticky bar would cover the page's lower scenes. */
+body.activity-active .www-sticky {
+  opacity: 0.35;
+}
+
+@media (max-width: 900px) {
+  .activity-hud {
+    top: 10px;
+    gap: 8px;
+    padding-left: 12px;
+    max-width: calc(100vw - 20px);
+    overflow-x: auto;
+  }
+  .activity-hud__title {
+    display: none;
+  }
+  .activity-panel {
+    top: auto;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+    max-height: 46vh;
+  }
+  .activity-panel--closed {
+    transform: translateY(calc(100% - 4px));
+  }
+  .activity-panel__toggle {
+    left: auto;
+    right: 12px;
+    top: -36px;
+    transform: rotate(-90deg);
+  }
+  .activity-grid--kpi {
+    grid-template-columns: 1fr 1fr;
+  }
+  .activity-tip {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-scene__fill,
+  .activity-scene__chip,
+  .activity-mark__box,
+  .activity-mark__heat,
+  .activity-mark__badge,
+  .activity-series__bar,
+  .activity-panel,
+  .activity-hud {
+    animation: none;
+  }
+  .activity-hud__dot--busy,
+  .activity-skeleton span {
+    animation-duration: 2.4s;
+  }
+}

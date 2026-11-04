@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { useAuth, type Identity } from '../lib/auth';
 import XrayMode from './XrayMode';
+import ActivityMode from './ActivityMode';
 import EditMode from './EditMode';
 import '../styles/floating-sidebar.css';
 
@@ -182,6 +183,7 @@ function EmployeeLinkRedirect() {
 function BoothTools({ page, variant, identity }: Props & { identity: Identity }) {
   const [xrayActive, setXrayActive] = useState(false);
   const [editActive, setEditActive] = useState(false);
+  const [activityActive, setActivityActive] = useState(false);
   const [workingUntil, setWorkingUntil] = useState<number>(() => readWorkingUntil());
   const [now, setNow] = useState<number>(() => Date.now());
   const [showWorkingModal, setShowWorkingModal] = useState(false);
@@ -192,7 +194,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
 
   const isWorking = workingUntil > now;
   const remaining = Math.max(0, workingUntil - now);
-  const sidebarHidden = xrayActive || editActive;
+  const sidebarHidden = xrayActive || editActive || activityActive;
 
   /* Strip the `?refresh=…` cache-buster the toast Refresh button
    * appends so the address bar doesn't keep the timestamp once the
@@ -236,6 +238,11 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   const handleXrayClick = useCallback(() => {
     setXrayActive((v) => !v);
   }, []);
+
+  const handleActivityClick = useCallback(() => {
+    setActivityActive((v) => !v);
+  }, []);
+  const closeActivity = useCallback(() => setActivityActive(false), []);
 
   const handleEditClick = useCallback(() => {
     if (isWorking) {
@@ -370,6 +377,29 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           <span className="xray-sidebar__label">X-ray</span>
         </button>
 
+        {/* Account pages only: they are the pages that send their activity to ODP. */}
+        {variant === 'abm' && (
+        <button
+          type="button"
+          className={
+            'xray-sidebar__btn xray-sidebar__btn--activity' +
+            (activityActive ? ' xray-sidebar__btn--active' : '')
+          }
+          onClick={handleActivityClick}
+          aria-pressed={activityActive}
+          aria-label={activityActive ? 'Exit Activity' : 'Show this page\'s activity'}
+          title={activityActive ? 'Exit Activity' : 'Activity on this page'}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Three bars rising, the analytics glyph */}
+            <path d="M5 20v-6" />
+            <path d="M12 20V9" />
+            <path d="M19 20V4" />
+          </svg>
+          <span className="xray-sidebar__label">Activity</span>
+        </button>
+        )}
+
         <button
           type="button"
           className={
@@ -435,6 +465,8 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         page={page}
         variant={variant}
       />
+
+      {variant === 'abm' && <ActivityMode active={activityActive} onClose={closeActivity} />}
 
       <EditMode
         active={editActive}

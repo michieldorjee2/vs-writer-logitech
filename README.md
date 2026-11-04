@@ -52,6 +52,7 @@ Four things it covers that the build does not:
 - **`server/` and `api/` are type-checked** (`typecheck:server`, `tsconfig.server.json`). The app config includes only `src/`, so the code that server-renders every page had never been checked; it now is, with `strictNullChecks` on, which is what the `api/` handlers' `if (!x.ok)` narrowing was written for. The app config is unchanged.
 - **Lint runs and passes.** It had been crashing at config load — a stale `node_modules` with `zod@3.22.4` hoisted — so 204 errors built up unseen. A clean `npm ci` fixes the crash; if `npm run lint` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED … zod`, that is the cause. `src/vendor/**` is ignored on purpose (see its `UPSTREAM.md`). The remaining warnings are `react-refresh` hot-reload hints, a dev-server convenience.
 - **`check:limitless`** holds the search page's links back to Limitless to the people aldus-ui names, then reruns itself against mutants of the guarded files, each of which must fail it.
+- **`check:page-activity`** holds Activity mode (below): keys, element paths, who counts as a visitor, the report, and both endpoints against stand-ins for ODP and Redis that refuse what the real ones refuse.
 - **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
 
 ## www design (live, the default)
@@ -105,6 +106,18 @@ OPAL_AGENT_ID=     # default 6c6d1d88-55ee-4f9c-a2d3-28de4bee1149 (account_page_
 ```
 
 Without `OPAL_PAT` the endpoint responds with a clean SSE error ("Server is missing OPAL_PAT"); the older fire-and-forget webhook lives at `api/opal-feedback.ts`.
+
+## Activity mode (booth tools, preview)
+
+The fourth button in the `?search=1` sidebar, on account pages only. It draws the page's own analytics over the page, in X-ray and Edit's look: each scene's reach (the share of visitors who saw it, with the gap to the account-page average) on a rail down its left edge, every clicked element outlined with its click count and a heat glow, clicks on things that are not links or buttons in a warm dashed outline, rage clicks dotted. The panel on the right holds the numbers: visitors, visits, median time on page, the connect rate, CTA clicks by button and position, visits over time with the page's history on them (built, saved in the CMS, copy edits), scroll depth, sources, networks (the account's own network marked), countries and devices, and the account's Salesforce opportunities. The bar at the top picks the period (7, 30, 90 days or all, from 15 Apr 2026) and whether Optimizely people count.
+
+**Where the numbers come from.** ODP, through `GET /api/page-activity` (`api/page-activity.ts`, signed-in employees only, a built report held 5 minutes). Two tags write the events: ODP's universal tag records every click with the element's path in the page, rage clicks and final scroll depth; the tracking hook (`src/hooks/useOdpTracking.ts`) records the pageview, the scenes seen, CTA clicks (with `cta_type` and `position`: the connect buttons by id, the connect panel's tiles by `data-cta`) and the exit summary. ODP serves events one visitor at a time and cannot list a page's visitors, so every page view also posts `{ page, vuid }` to `POST /api/page-visit`, the one thing kept outside ODP: which ODP visitor ids opened which page (`api/_lib/page-activity-store.ts`). A signed-in employee's visit marks their id as team. Pages read before the index existed were filled from Optimizely Analytics' copy of the same ODP data (`scripts/page-activity-backfill.ts`). The account-page averages are `scripts/page-activity-bench.ts`, run by hand for now. Who counts as a visitor, the element keys and the report itself are in `src/lib/page-activity.ts`; `npm run check:page-activity` covers them (71 checks, no network). `scripts/page-activity-report.ts <page>` prints a page's report from the live data.
+
+Env:
+
+- `ODP_PRIVATE_KEY`: the ODP account's private API key (Production and this branch's previews). Read only in `api/_lib/odp-events.ts`, never sent to the browser. Unset, the report answers 503 and the pages still record visits.
+- `KV_REST_API_URL`, `KV_REST_API_TOKEN`: the visitor index, the report cache and the averages.
+- `OPAL_PAT`: the Salesforce opportunities, through Mark's Salesforce tool, as for the search page.
 
 ## The CMS preview
 
