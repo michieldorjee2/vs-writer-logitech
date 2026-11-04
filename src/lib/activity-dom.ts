@@ -1,5 +1,5 @@
 /**
- * Finding Activity mode's elements on the live page again (src/components/ActivityMode.tsx).
+ * Finding a clicked element on the live page again, for the report's per-element clicks (not drawn by the Report card at the moment).
  * Kept apart from the component so the checks can run it against a page.
  */
 import type { PathSegment } from './page-activity';

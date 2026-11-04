@@ -22,110 +22,6 @@
   --edit-card-border: rgba(255, 255, 255, 0.1);
 }
 
-/* ------------ Sidebar Edit button ------------ */
-
-.xray-sidebar__btn--edit:hover {
-  color: var(--edit-blue);
-  border-color: rgba(171, 255, 68, 0.35);
-  background: rgba(171, 255, 68, 0.08);
-}
-
-.xray-sidebar__btn--edit.xray-sidebar__btn--active {
-  color: #ffffff !important;
-  background: var(--edit-blue) !important;
-  border-color: var(--edit-blue) !important;
-  box-shadow: 0 0 22px var(--edit-blue-glow);
-}
-
-/* Working state: dimmer chrome, gentle pulse, progress ring on top.
- * The button itself becomes a "do-not-touch" indicator — clicking it
- * routes the user to the still-working modal instead of toggling the
- * mode. Cursor stays default-ish (help) so it doesn't pretend to be
- * inactive — a click *will* still do something, just not what they
- * expected.
- *
- * Foreground stays white — the optimizely-blue chrome looks great as
- * the progress ring but is hard to read at the small label size. */
-.xray-sidebar__btn--edit.xray-sidebar__btn--working {
-  color: #ffffff !important;
-  background: rgba(171, 255, 68, 0.08) !important;
-  border-color: rgba(171, 255, 68, 0.28) !important;
-  cursor: help;
-  position: relative;
-  animation: edit-working-breathe 2.4s ease-in-out infinite;
-}
-
-@keyframes edit-working-breathe {
-  0%, 100% { box-shadow: 0 0 14px rgba(171, 255, 68, 0.32); }
-  50%      { box-shadow: 0 0 22px rgba(171, 255, 68, 0.55); }
-}
-
-/* The ring + clock icon sit together in the icon-area of the flex
- * column; the regular `.xray-sidebar__label` flows below them showing
- * the countdown. Wrapping them in a sized box keeps the ring exactly
- * where the original pencil icon used to be. */
-.xray-sidebar__working-wrap {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.xray-sidebar__ring {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.xray-sidebar__ring-track {
-  fill: none;
-  stroke: rgba(171, 255, 68, 0.18);
-  stroke-width: 2.4;
-}
-
-.xray-sidebar__ring-fill {
-  fill: none;
-  stroke: var(--edit-blue);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-dasharray: 100;
-  /* `pathLength=100` is set inline so the offset always reads as a
-   * percentage. The transition keeps the ring sweeping smoothly
-   * even though React only updates `strokeDashoffset` once a second. */
-  transition: stroke-dashoffset 900ms linear;
-  transform: rotate(-90deg);
-  transform-origin: 50% 50%;
-  filter: drop-shadow(0 0 6px var(--edit-blue-glow));
-}
-
-.xray-sidebar__working-icon {
-  position: relative;
-  z-index: 1;
-  pointer-events: none;
-  /* White on the dark sidebar chip — the blue ring around it carries
-   * the brand colour, the inner glyph just needs to be legible. */
-  color: #ffffff;
-  animation: edit-working-tick 4s linear infinite;
-  transform-origin: 50% 50%;
-}
-
-@keyframes edit-working-tick {
-  from { transform: rotate(0); }
-  to   { transform: rotate(360deg); }
-}
-
-.xray-sidebar__btn--edit.xray-sidebar__btn--working .xray-sidebar__label {
-  position: relative;
-  z-index: 2;
-  color: #ffffff;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-}
-
 /* While edit-mode is active, hide the sticky CTA so it doesn't fight
    for attention with the top send-feedback bar. */
 body.edit-active .sticky-cta {
@@ -1036,8 +932,6 @@ body.edit-active .sticky-cta {
   .edit-hud__dot {
     animation: none;
   }
-  .xray-sidebar__btn--working,
-  .xray-sidebar__working-icon,
   .edit-working-modal__icon,
   .edit-working-modal__chip-dot,
   .edit-landed-toast,

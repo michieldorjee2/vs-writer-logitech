@@ -1,5 +1,5 @@
 /**
- * The visitor index behind Activity mode, in the site's Upstash Redis.
+ * The visitor index behind the booth's Report, in the site's Upstash Redis.
  *
  * ODP answers events per visitor, never per page, so this is the one thing kept outside ODP: which
  * visitors (ODP vuids, pseudonymous) opened which page, and when last. Everything they did is read
@@ -8,8 +8,8 @@
  *   pa:v:<page>      sorted set   vuid -> last visit (epoch s)   newest MAX_PER_PAGE kept, 400-day TTL
  *   pa:team          hash         vuid -> first seen signed in    an employee's browser
  *   pa:rl:<ip>       counter      visits recorded this minute     abuse limit on the public write
- *   pa:r:<page>:<r>  json         a built report                  REPORT_TTL_S
- *   pa:deal:<sfid>   json         Salesforce opportunities        DEAL_TTL_S
+ *   pa:r2:<page>:<r> json         a built report                  REPORT_TTL_S
+ *   pa:acct:<sfid>   json         the account's stage, from ODP   ACCOUNT_TTL_S
  *   pa:bench         json         account-page averages           written by scripts/page-activity-bench.ts
  */
 import { Redis } from '@upstash/redis';
@@ -22,7 +22,7 @@ const INDEX_TTL_S = 400 * 86400;
  */
 export const VISITS_PER_MINUTE = 60;
 export const REPORT_TTL_S = 5 * 60;
-export const DEAL_TTL_S = 60 * 60;
+export const ACCOUNT_TTL_S = 60 * 60;
 
 export type ActivityStore = Pick<Redis, 'zadd' | 'zremrangebyrank' | 'zrange' | 'expire' | 'hset' | 'hmget' | 'incr' | 'set' | 'get'>;
 

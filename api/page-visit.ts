@@ -7,7 +7,7 @@ import { isPageKey, normalizeVuid, pageKey } from '../src/lib/page-activity.js';
  * POST /api/page-visit  { page, vuid }  ->  204
  *
  * Sent by every account and offer page once per view (src/hooks/useOdpTracking.ts): "this ODP
- * visitor opened this page". It is the index Activity mode reads, because ODP cannot list a page's
+ * visitor opened this page". It is the index the booth's Report reads, because ODP cannot list a page's
  * visitors (api/_lib/page-activity-store.ts). A signed-in employee's visit also marks their vuid
  * as team, so their own reading never counts as a prospect's.
  *

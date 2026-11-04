@@ -1,5 +1,5 @@
 /**
- * page-activity-backfill — fills Activity mode's visitor index (pa:v:<page>, see
+ * page-activity-backfill — fills the Report's visitor index (pa:v:<page>, see
  * api/_lib/page-activity-store.ts) with the visitors pages had before the site recorded them
  * itself (api/page-visit.ts, from Nov 2026).
  *

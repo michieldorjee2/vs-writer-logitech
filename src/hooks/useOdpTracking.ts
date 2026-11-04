@@ -32,7 +32,7 @@ const CONNECT_POSITIONS: Record<string, string> = {
 
 /** Everything the booth tools draw over the page (FloatingSidebar and its modes). */
 const BOOTH_CHROME =
-  '.xray-sidebar, .xray-fixed-layer, .xray-overlay, .edit-overlay, .edit-fixed-layer, .edit-popup, .edit-landed-toast, .edit-working-modal, .employee-link-alert, .activity-fixed, .activity-layer';
+  '.booth-rail, .booth-rail-mini, .activity-view, .xray-fixed-layer, .xray-overlay, .edit-overlay, .edit-fixed-layer, .edit-popup, .edit-landed-toast, .edit-working-modal, .employee-link-alert';
 
 /** A button's words without its icon: Material icons render their name as text ("bolt"). */
 function visibleLabel(el: HTMLElement): string {
@@ -44,7 +44,7 @@ function visibleLabel(el: HTMLElement): string {
 }
 
 /**
- * Tells the site which ODP visitor opened this page (api/page-visit.ts), so Activity mode can ask
+ * Tells the site which ODP visitor opened this page (api/page-visit.ts), so the booth's Report can ask
  * ODP for their events: ODP cannot list a page's visitors itself. Waits for the SDK to assign the
  * visitor id, up to ten seconds; a visit without one is simply not indexed.
  */
@@ -145,7 +145,7 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
       if (target.closest(BOOTH_CHROME)) return;
 
       // A CTA: the connect buttons and the connect panel's tiles by name (data-cta), any other
-      // button by its class. `cta_type` and `position` say which one; Activity mode counts them.
+      // button by its class. `cta_type` and `position` say which one; the Report counts them.
       const btn = target.closest('[data-cta], a[class*="btn"], button[class*="btn"]') as HTMLElement | null;
       if (btn) {
         const type = btn.dataset.cta || (CONNECT_POSITIONS[btn.id] ? 'connect' : 'cta');

@@ -1,5 +1,5 @@
 /**
- * page-activity-report — prints what Activity mode would show for pages, read live from ODP and the
+ * page-activity-report — prints what the booth's Report would show for pages, read live from ODP and the
  * visitor index. For checking the numbers by hand.
  *
  *   npx tsx --env-file=.env.local scripts/page-activity-report.ts <page> [<page>…] [--range 7d|30d|90d|all]
@@ -7,7 +7,7 @@
 import { Redis } from '@upstash/redis';
 import { fetchPageEvents, odpClient } from '../api/_lib/odp-events.js';
 import { pageVisitors, teamOf, type ActivityStore } from '../api/_lib/page-activity-store.js';
-import { ACTIVITY_RANGES, buildActivityReport, pageKey, rangeStart, TRACKING_START_TS, type ActivityRange } from '../src/lib/page-activity.js';
+import { activitySlots, ACTIVITY_RANGES, buildActivityReport, channelName, factsOf, journeyOf, pageKey, rangeStart, TRACKING_START_TS, type ActivityRange } from '../src/lib/page-activity.js';
 
 const args = process.argv.slice(2);
 const ri = args.indexOf('--range');
@@ -31,4 +31,11 @@ for (const page of pages.map(pageKey)) {
   console.log(`  elements ${v.elements.slice(0, 6).map((x) => `${x.key}=${x.clicks}${x.dead ? ' (dead)' : ''}`).join('  ')}`);
   console.log(`  CTAs ${v.ctas.map((c) => `${c.type}/${c.position ?? '-'}/${c.label}=${c.clicks}`).join('  ')}`);
   console.log(`  sources ${v.sources.map((s) => `${s.name}=${s.n}`).join(' ')} · networks ${v.networks.slice(0, 4).map((n) => `${n.name}=${n.n}${n.account ? ' (account)' : ''}`).join(' ')}`);
+  const day = (t: number | null) => (t ? new Date(t * 1000).toISOString().slice(0, 10) : '-');
+  const j = journeyOf(v, []);
+  const f = factsOf(v);
+  console.log(`  journey viewed ${day(j.viewed)} · engaged ${day(j.engaged)} · cta ${day(j.cta)} → ${j.stage} (${j.visits.length} visits behind it)`);
+  console.log(`  data first ${day(f.firstSeen)} · last ${day(f.lastSeen)} · most engaged ${day(f.mostEngaged)} · CTA ${f.ctaClicks} · channel ${channelName(f.lastChannel)} · country ${f.lastCountry}`);
+  const s = activitySlots(v.visitList.map((x) => x.ts), f.firstSeen, now);
+  console.log(`  chart (${s.unit}) ${s.slots.map((x) => `${day(x.start).slice(5)}=${x.n}`).join(' ')}`);
 }

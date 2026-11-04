@@ -1,6 +1,6 @@
 /* ============================================================
-   Floating sidebar + X-ray mode overlay
-   Rendered on top of both ABM + Dynamic comparison pages.
+   X-ray mode overlay and the signed-out employee-link alert.
+   The booth rail itself is booth-rail.css.
    ============================================================ */
 
 :root {
@@ -14,81 +14,6 @@
   --xray-card-border: rgba(171, 255, 68, 0.35);
 }
 
-/* ------------ Floating action column ------------ */
-
-.xray-sidebar {
-  position: fixed;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 900;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 18px;
-  background: rgba(13, 58, 41, 0.72);
-  backdrop-filter: saturate(140%) blur(18px);
-  -webkit-backdrop-filter: saturate(140%) blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  color: #eff6e9;
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  transition:
-    opacity 240ms ease,
-    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (max-width: 640px) {
-  .xray-sidebar {
-    top: auto;
-    bottom: 16px;
-    left: 16px;
-    transform: none;
-    flex-direction: row;
-  }
-}
-
-/* While X-ray is active the sidebar slides out to the left. We force
- * the hidden values with !important AND wipe the inherited transition
- * — without that wipe, the inherited transition claims opacity/transform
- * and pins them at the from-value when the host browser's animation
- * timeline stalls (the Claude Preview embed does this). A short
- * @keyframes animation drives the actual smooth slide-out, with
- * `forwards` fill so the rule's static !important values take over
- * once it lands. */
-.xray-sidebar--hidden {
-  opacity: 0 !important;
-  transform: translateY(-50%) translateX(-130%) !important;
-  pointer-events: none !important;
-  transition: none !important;
-  animation: xray-sidebar-out 320ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
-}
-
-@keyframes xray-sidebar-out {
-  from {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-50%) translateX(-130%);
-  }
-}
-
-@media (max-width: 640px) {
-  .xray-sidebar--hidden {
-    transform: translateX(0) translateY(130%) !important;
-    animation-name: xray-sidebar-out-mobile;
-  }
-  @keyframes xray-sidebar-out-mobile {
-    from { opacity: 1; transform: translateY(0); }
-    to   { opacity: 0; transform: translateY(130%); }
-  }
-}
-
 /* Sticky CTA is owned by the ABM page CSS — body.xray-active reaches
  * across components and !important is the cheapest way to win against
  * its existing translate-based show/hide rules. */
@@ -99,122 +24,6 @@ body.xray-active .sticky-cta {
   transition:
     opacity 220ms ease,
     transform 360ms cubic-bezier(0.5, 0, 0.75, 0) !important;
-}
-
-body.xray-active .sticky-cta {
-  opacity: 0 !important;
-  transform: translateY(140%) !important;
-  pointer-events: none !important;
-  transition:
-    opacity 220ms ease,
-    transform 360ms cubic-bezier(0.5, 0, 0.75, 0) !important;
-}
-
-.xray-sidebar__btn {
-  appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: #eff6e9;
-  border-radius: 12px;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  cursor: pointer;
-  transition:
-    background 160ms ease,
-    transform 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-  padding: 0;
-}
-
-.xray-sidebar__btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.xray-sidebar__btn:active {
-  transform: translateY(0);
-}
-
-.xray-sidebar__btn:focus-visible {
-  outline: 2px solid var(--xray-accent);
-  outline-offset: 2px;
-}
-
-.xray-sidebar__btn--back:hover {
-  color: #ffffff;
-}
-
-.xray-sidebar__btn--xray {
-  /* Subtle idle pulse so attendees notice the button */
-  position: relative;
-}
-
-.xray-sidebar__btn--xray::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 14px;
-  pointer-events: none;
-  box-shadow: 0 0 0 0 var(--xray-accent-glow);
-  animation: xray-btn-pulse 2.6s ease-in-out infinite;
-}
-
-@keyframes xray-btn-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(171, 255, 68, 0); }
-  50%      { box-shadow: 0 0 0 6px rgba(171, 255, 68, 0); }
-  60%      { box-shadow: 0 0 0 6px rgba(171, 255, 68, 0.18); }
-}
-
-/* Scan-icon laser line — gentle vertical sweep so the button reads as
- * an active scanner rather than a static frame. The two corners stay
- * put; only the middle line moves. */
-.xray-sidebar__scan-line {
-  transform-origin: 12px 12px;
-  animation: xray-scan-sweep 2.2s ease-in-out infinite;
-}
-
-@keyframes xray-scan-sweep {
-  0%, 100% { transform: translateY(-3.5px); opacity: 0.55; }
-  50%      { transform: translateY(3.5px); opacity: 1; }
-}
-
-.xray-sidebar__btn--xray.xray-sidebar__btn--active .xray-sidebar__scan-line,
-.xray-sidebar__btn--xray:hover .xray-sidebar__scan-line {
-  /* Keep sweeping a touch faster on hover/active for a hint of liveness. */
-  animation-duration: 1.4s;
-}
-
-.xray-sidebar__btn--xray:hover {
-  color: var(--xray-accent);
-  border-color: var(--xray-accent-soft);
-  background: rgba(171, 255, 68, 0.06);
-}
-
-.xray-sidebar__btn--active {
-  color: #031218 !important;
-  background: var(--xray-accent) !important;
-  border-color: var(--xray-accent) !important;
-  box-shadow: 0 0 18px var(--xray-accent-glow);
-}
-
-.xray-sidebar__btn--active::before {
-  animation: none;
-}
-
-.xray-sidebar__label {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 600;
-  opacity: 0.9;
 }
 
 /* ------------ Signed out: the employee-link alert ------------
@@ -899,25 +708,16 @@ body.xray-active .sticky-cta {
     animation-duration: 160ms;
     animation-delay: 0ms !important;
   }
-  .xray-sidebar__btn--xray::before {
-    animation: none;
-  }
 }
 
 /* ------------ On the www pages: solid, no blur ------------
  * Under the booth chrome a www page never stops moving while you scroll (the hero's parallax,
  * each scene's entrance, the progress hairline). A backdrop blur over layers that keep changing
- * flickers in Chrome and Safari, and the sidebar's 72% fill flashed lighter and darker as the
- * dark and white scenes passed behind it (Michiel, 3 Nov: "flickering for the admin sidebar when
- * scrolling"). There the sidebar and the X-ray and Edit bars are solid Dark Fir, and the
- * sidebar keeps its own compositing layer. */
-body:has(.www-page) .xray-sidebar,
+ * flickers in Chrome and Safari (Michiel, 3 Nov: "flickering for the admin sidebar when
+ * scrolling"). There the X-ray and Edit bars are solid Dark Fir; the rail is solid already. */
 body:has(.www-page) .xray-hud,
 body:has(.www-page) .edit-hud {
   background: #08251a;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-body:has(.www-page) .xray-sidebar {
-  will-change: transform;
 }

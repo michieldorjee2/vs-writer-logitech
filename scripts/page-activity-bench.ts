@@ -1,5 +1,5 @@
 /**
- * page-activity-bench — the account-page averages Activity mode compares a page against
+ * page-activity-bench — the account-page averages the Report can compare a page against
  * (pa:bench: each scene's reach, median time, connect rate; src/lib/page-activity.ts
  * benchmarkFrom). Reads every indexed visitor's events from ODP once, builds each account page's
  * visitor report for the last 90 days, and averages the pages that had visitors.

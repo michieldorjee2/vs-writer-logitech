@@ -1,0 +1,395 @@
+/* ============================================================
+   The booth rail (FloatingSidebar.tsx) and the tokens its Report
+   card shares (activity-mode.css).
+   The search page's surfaces and type: Axiom v3 tokens, light or
+   dark with the system (search-home.css), Die Grotesk B for words,
+   VC Nudge for headings. The page sits in beside the rail with
+   rounded corners, as the search page's scene sits in its frame.
+   px only: the showcase's root font size is 10px.
+   ============================================================ */
+
+:root {
+  --booth-rail-w: 72px;
+  --booth-corner: 20px;
+  --booth-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --booth-ease-out: cubic-bezier(0.5, 0, 0.75, 0);
+
+  --booth-page: #f9fcf8;              /* bg.page */
+  --booth-raised: #eff5eb;            /* bg.secondary: the chart's tile */
+  --booth-tile: #eff5eb;              /* a rail button's tile */
+  --booth-hover: #5f931f14;           /* bg.default.hovered */
+  --booth-fg: #202320;                /* fg.default */
+  --booth-fg-2: #484e46;              /* fg.secondary */
+  --booth-fg-3: #616755;              /* fg.tertiary */
+  --booth-quiet: rgb(32 35 32 / 0.28); /* a step not reached; the fold button */
+  --booth-focus: #197a94;             /* border.focus */
+  --booth-accent: #abff44;            /* LFGreen, the same in both themes */
+  --booth-accent-text: #3d8a00;       /* LFGreen deepened to read on the light page */
+  --booth-bar: #3d8b14;               /* the Report glyph's bars, the journey line */
+  --booth-bar-rest: rgb(32 35 32 / 0.14);
+  --booth-plot: #202320;              /* the chart's bars */
+  --booth-plot-empty: rgb(32 35 32 / 0.12);
+  --booth-plot-now: rgb(32 35 32 / 0.45);
+  --booth-fir: #08251a;               /* the scene: the brand's, the same in both themes */
+  --booth-font: 'Die Grotesk B', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --booth-display: 'VC Nudge', 'Die Grotesk B', Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --booth-page: #252825;
+    --booth-raised: #2b2e2b;
+    --booth-tile: rgb(57 62 50 / 0.32);
+    --booth-hover: rgb(57 62 50 / 0.32);
+    --booth-fg: #ffffff;
+    --booth-fg-2: #b2bd9e;
+    --booth-fg-3: #a1ac8d;
+    --booth-quiet: #484e46;
+    --booth-focus: #409aab;
+    --booth-accent-text: #abff44;
+    --booth-bar: #abff44;
+    --booth-bar-rest: rgb(57 62 50 / 0.32);
+    --booth-plot: #ffffff;
+    --booth-plot-empty: #3c3d40;
+    --booth-plot-now: rgb(245 246 247 / 0.51);
+  }
+}
+
+/* ------------ The page beside the rail ------------
+ * The page moves over rather than under: a full-height rail would cover its logo. Fixed parts of
+ * the page stay on the window; the sticky ask is re-centred on the page. Phones keep the page
+ * full width and lay the rail over it. */
+
+html.booth-page body {
+  transition: padding-left 520ms var(--booth-ease);
+}
+html.booth-page--rail body {
+  padding-left: var(--booth-rail-w);
+}
+html.booth-page--rail .www-page .www-sticky {
+  left: calc(50% + var(--booth-rail-w) / 2);
+}
+
+/* ------------ The rail ------------ */
+
+.booth-rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 960;
+  width: var(--booth-rail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 16px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  /* Closed: off the window with its corners. Closing waits for the buttons to leave. */
+  transform: translateX(calc(-100% - var(--booth-corner)));
+  transition: transform 360ms var(--booth-ease-out) 140ms;
+}
+.booth-rail.is-open {
+  transform: none;
+  transition: transform 520ms var(--booth-ease);
+}
+
+/* The page's two left corners, cut from the rail's colour. */
+.booth-rail::before,
+.booth-rail::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  width: var(--booth-corner);
+  height: var(--booth-corner);
+  pointer-events: none;
+}
+.booth-rail::before {
+  top: 0;
+  background: radial-gradient(circle at 100% 100%, transparent calc(var(--booth-corner) - 0.5px), var(--booth-page) var(--booth-corner));
+}
+.booth-rail::after {
+  bottom: 0;
+  background: radial-gradient(circle at 100% 0, transparent calc(var(--booth-corner) - 0.5px), var(--booth-page) var(--booth-corner));
+}
+
+.booth-rail__items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.booth-rail__btn,
+.booth-rail__fold {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  /* The cascade: each button slides in from the left after the one above it, and leaves the
+   * other way round (--i is its place, --n the rail's count). */
+  opacity: 0;
+  transform: translateX(-24px);
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 200ms var(--booth-ease-out) calc((var(--n, 6) - var(--i, 0)) * 25ms),
+    opacity 160ms ease calc((var(--n, 6) - var(--i, 0)) * 25ms);
+}
+.booth-rail.is-open .booth-rail__btn,
+.booth-rail.is-open .booth-rail__fold {
+  opacity: 1;
+  transform: none;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 560ms var(--booth-ease) calc(120ms + var(--i, 0) * 55ms),
+    opacity 360ms ease calc(120ms + var(--i, 0) * 55ms);
+}
+
+.booth-rail__btn {
+  width: 50px;
+  height: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 10px;
+  background: transparent;
+  font: 500 12px/1 var(--booth-font);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.booth-rail__btn--back {
+  height: 50px;
+  margin-bottom: -2px;
+  background: var(--booth-tile);
+}
+.booth-rail__btn:hover,
+.booth-rail__btn.is-on {
+  background: var(--booth-hover);
+}
+.booth-rail__btn--back:hover {
+  background: var(--booth-tile);
+  color: var(--booth-accent-text);
+}
+.booth-rail__btn:focus-visible,
+.booth-rail__fold:focus-visible,
+.booth-rail-mini:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 2px;
+}
+
+.booth-rail__icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.booth-rail__icon svg {
+  display: block;
+  overflow: visible;
+}
+.booth-rail__label {
+  display: block;
+}
+
+/* X-ray: the scan line sweeps while the pointer is on it. */
+.booth-rail__scan {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.booth-rail__btn--xray:hover .booth-rail__scan,
+.booth-rail__btn--xray.is-on .booth-rail__scan {
+  animation: booth-scan 1.4s ease-in-out infinite;
+}
+@keyframes booth-scan {
+  0%, 100% { transform: translateY(-3px); }
+  50% { transform: translateY(3px); }
+}
+
+/* Share: copied, said in the label for a moment. */
+.booth-rail__btn--share.is-copied {
+  color: var(--booth-accent-text);
+}
+.booth-rail__btn--share.is-failed .booth-rail__label {
+  color: var(--booth-fg-3);
+}
+
+/* Edit while Mark works on the last feedback: a ring empties with the countdown. */
+.booth-rail__btn--edit.is-working {
+  cursor: help;
+}
+.booth-rail__btn--edit.is-working .booth-rail__label {
+  font-variant-numeric: tabular-nums;
+}
+.booth-rail__working {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.booth-rail__ring {
+  display: block;
+  transform: rotate(-90deg);
+}
+.booth-rail__ring-track {
+  fill: none;
+  stroke: var(--booth-hover);
+  stroke-width: 3.5;
+}
+.booth-rail__ring-fill {
+  fill: none;
+  stroke: var(--booth-bar);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  /* React moves the offset once a second; this keeps the sweep smooth between. */
+  transition: stroke-dashoffset 900ms linear;
+}
+
+/* The fold button at the foot of the rail. */
+.booth-rail__fold {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--booth-quiet);
+}
+.booth-rail__fold:hover {
+  background: var(--booth-hover);
+  color: var(--booth-fg);
+}
+.booth-rail__fold svg {
+  display: block;
+}
+
+/* ------------ Folded: one button at the bottom left ------------ */
+
+.booth-rail-mini {
+  position: fixed;
+  left: 11px;
+  bottom: 11px;
+  z-index: 960;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  box-shadow: 0 10px 30px -8px rgb(8 37 26 / 0.45);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(-16px) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 200ms var(--booth-ease-out);
+}
+.booth-rail-mini.is-shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  /* After the rail has gone. */
+  transition:
+    opacity 300ms ease 420ms,
+    transform 560ms var(--booth-ease) 420ms;
+}
+.booth-rail-mini:hover {
+  color: var(--booth-accent-text);
+}
+
+/* ------------ The Report glyph ------------
+ * A wave that keeps moving while the report loads; when it is in, the wave settles and four bars
+ * rise one after another. */
+
+.booth-report-icon__wave {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 220ms ease,
+    transform 320ms var(--booth-ease);
+}
+.booth-report-icon.is-loading .booth-report-icon__wave {
+  animation: booth-wave 0.9s ease-in-out infinite alternate;
+}
+@keyframes booth-wave {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(-1); }
+}
+.booth-report-icon.is-error .booth-report-icon__wave {
+  opacity: 0.45;
+}
+.booth-report-icon.is-ready .booth-report-icon__wave,
+.booth-report-icon.is-empty .booth-report-icon__wave {
+  opacity: 0;
+  transform: scaleX(0.3);
+}
+
+.booth-report-icon__bar {
+  stroke: var(--booth-bar);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0);
+  opacity: 0;
+  transition:
+    transform 520ms var(--booth-ease) calc(160ms + var(--b, 0) * 80ms),
+    opacity 120ms ease calc(160ms + var(--b, 0) * 80ms);
+}
+.booth-report-icon__bar--rest {
+  stroke: var(--booth-bar-rest);
+}
+.booth-report-icon.is-ready .booth-report-icon__bar,
+.booth-report-icon.is-empty .booth-report-icon__bar {
+  transform: none;
+  opacity: 1;
+}
+/* In, but no visits yet: the bars without the green. */
+.booth-report-icon.is-empty .booth-report-icon__bar {
+  stroke: var(--booth-quiet);
+}
+
+/* ------------ Phones ------------ */
+
+@media (max-width: 640px) {
+  html.booth-page--rail body {
+    padding-left: 0;
+  }
+  html.booth-page--rail .www-page .www-sticky {
+    left: 50%;
+  }
+  .booth-rail::before,
+  .booth-rail::after {
+    display: none;
+  }
+  .booth-rail.is-open {
+    box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.booth-page body,
+  .booth-rail,
+  .booth-rail.is-open,
+  .booth-rail__btn,
+  .booth-rail__fold,
+  .booth-rail-mini,
+  .booth-report-icon__bar {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+  .booth-report-icon.is-loading .booth-report-icon__wave,
+  .booth-rail__scan {
+    animation: none !important;
+  }
+}

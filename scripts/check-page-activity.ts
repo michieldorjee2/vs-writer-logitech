@@ -1,7 +1,7 @@
 /**
- * check-page-activity — Activity mode (src/lib/page-activity.ts, src/lib/activity-dom.ts,
+ * check-page-activity — the booth's Report (src/lib/page-activity.ts, src/lib/activity-dom.ts,
  * api/page-activity.ts, api/page-visit.ts, api/_lib/odp-events.ts, api/_lib/page-activity-store.ts,
- * src/hooks/useOdpTracking.ts).
+ * src/hooks/useOdpTracking.ts, src/components/FloatingSidebar.tsx).
  *
  *   1. Keys: page keys and ODP visitor ids as ODP and the site spell them.
  *   2. Elements, from real `html_element_path` values captured on 4 Nov 2026: the key survives the
@@ -12,13 +12,17 @@
  *   4. CTAs: labels without icon words, connect clicks by id/type, booth buttons never counted.
  *   5. The report, on a fixture of real-shaped events: visits, median, reach, final scroll only
  *      (ODP's load-time 25–100% ignored), clicks and rage, CTAs, sources, the account's network,
- *      team kept out of "visitors", other pages and other periods kept out.
+ *      team kept out of "visitors", other pages and other periods kept out. Then what the card
+ *      shows: the visit rows, the journey's steps, the Data column, the chart's slots in the
+ *      viewer's own days, channel names and the Salesforce link.
  *   6. Finding the element again on a page (resolveElement on a stand-in DOM).
  *   7. The API: page-visit accepts only its shape, from the site, at a rate, and marks signed-in
  *      visitors as team; page-activity needs sign-in, asks ODP only what ODP accepts (stand-in that
- *      refuses dashed ids, unknown fields and a bare `page`), and never returns a visitor id.
- *   8. Wiring, read from the sources: the ODP key is read in one server file; the hook skips the
- *      booth tools; the connect panel's tiles are named.
+ *      refuses dashed ids, unknown fields and a bare `page`), and never returns a visitor id. The
+ *      account's stage from ODP, which knows accounts by their 18-character id only.
+ *   8. Wiring, read from the sources: the ODP key is read in one server file; the report API makes
+ *      no Salesforce call; the hook skips the booth tools; the report loads as the rail mounts;
+ *      the connect panel's tiles are named.
  *
  * No network, no credentials.
  *
@@ -29,25 +33,30 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   accountTerms,
+  activitySlots,
   benchmarkFrom,
   buildActivityReport,
   classifyVisitors,
+  channelName,
   ctaKind,
   ctaLabel,
   elementRef,
+  factsOf,
   isAccountNetwork,
   isBoothLabel,
   isPageKey,
+  journeyOf,
   normalizeVuid,
   pageKey,
+  salesforceAccountUrl,
   sourceOf,
   type ActivityEvent,
 } from '../src/lib/page-activity.js';
 import { resolveElement } from '../src/lib/activity-dom.js';
-import { pathFilter, type OdpClient } from '../api/_lib/odp-events.js';
+import { fetchAccountStage, pathFilter, type OdpClient } from '../api/_lib/odp-events.js';
 import type { ActivityStore } from '../api/_lib/page-activity-store.js';
 import visitHandler, { setVisitStore } from '../api/page-visit.js';
-import activityHandler, { historyOf, summarizeDeal, setActivitySources } from '../api/page-activity.js';
+import activityHandler, { historyOf, setActivitySources } from '../api/page-activity.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
@@ -90,6 +99,10 @@ check('control: keeping classes would split it', keyWithClasses(CARD_TEXT) !== k
 const dotted = elementRef('html > body > div#main-content > section#proof.www-scene > div.py-1.5.leading-[1.3].2xl:px-8.grid > a.www-link');
 check('a class with a dot in it stays one class', JSON.stringify(dotted?.segments[1].classes) === '["py-1.5","leading-[1.3]","2xl:px-8","grid"]', dotted?.segments[1].classes);
 check('booth chrome is not the page', elementRef('html.www-js > body > div#root > aside.xray-sidebar > button.xray-sidebar__btn.xray-sidebar__btn--xray > span.xray-sidebar__label') === null);
+const RAIL_CLICK = 'html.www-js.booth-page.booth-page--rail > body > div#root > nav.booth-rail.is-open > div.booth-rail__items > button.booth-rail__btn.booth-rail__btn--report > span.booth-rail__label';
+check('…nor the rail (Nov 2026)', elementRef(RAIL_CLICK) === null);
+// The rail marks <html>, and only a signed-in rep has the rail: their clicks on the page are a demo.
+check('…nor a click on the page made with the rail open (the hero CTA alone is kept, above)', elementRef(HERO_CTA.replace('html.www-js', 'html.www-js.booth-page.booth-page--rail')) === null && elementRef(HERO_CTA) !== null);
 check('…nor a click while Activity is open', elementRef(HERO_CTA.replace('> body >', '> body.activity-active >')) === null);
 check('a dialog (the connect panel) cannot be placed', elementRef('html.www-js > body > div#radix-_r_0_ > div > button > span') === null);
 check('no id on the path: no element', elementRef('html > body > div > p') === null);
@@ -183,6 +196,28 @@ const empty = buildActivityReport({ page: '/nobody/', range: '7d', nowS: NOW, ev
 check('a page nobody visited is zeros, not an error', empty.visitors.visitors === 0 && empty.visitors.medianSec === null);
 const bench = benchmarkFrom([v, empty.visitors], new Date(NOW * 1000).toISOString());
 check('averages count only pages with visitors', bench.pages === 1 && bench.sectionReach.hero === 1 && bench.sectionReach.who === 0.5 && bench.connectRate === 0.5, bench);
+
+// What the card shows.
+const rows = v.visitList;
+check('visit rows: one per visit, oldest first, never who', rows.length === 3 && rows[0].ts === NOW - 2 * day && rows[2].ts === NOW - 3600 && !JSON.stringify(rows).match(/[0-9a-f]{32}/), rows);
+check('…time, scroll, clicks, CTAs, source and country per visit', JSON.stringify(rows[0]) === JSON.stringify({ ts: NOW - 2 * day, sec: 90, scroll: 100, clicks: 1, ctas: ['Arrange a session'], source: 'linkedin', country: 'USA', engaged: true }), rows[0]);
+check('…engaged: 30 s, half the page, or a click; a 20 s skim at 10% is not', rows[1].engaged && rows[1].clicks === 2 && rows[1].sec === 10 && !rows[2].engaged, rows.map((r) => [r.sec, r.scroll, r.clicks, r.engaged]));
+const marks = [{ kind: 'built' as const, ts: NOW - 10 * day }, { kind: 'saved' as const, ts: NOW - 5 * day }];
+const jr = journeyOf(v, marks);
+check('journey: built, last update, then viewed, engaged and CTA dates; at "CTA clicked"', jr.created === NOW - 10 * day && jr.updated === NOW - 5 * day && jr.viewed === NOW - 2 * day && jr.engaged === NOW - 2 * day && jr.cta === NOW - 2 * day && jr.stage === 'cta' && jr.visits.length === 1, jr);
+const noCta = journeyOf({ ...v, visitList: rows.map((r) => ({ ...r, ctas: [] })) }, marks);
+check('…no CTA yet: at "Engaged", its visits newest first', noCta.stage === 'engaged' && noCta.cta === null && noCta.visits.map((r) => r.ts).join() === [NOW - day, NOW - 2 * day].join(), noCta);
+check('…nobody yet: at "Page created"', journeyOf(empty.visitors, marks).stage === 'created' && journeyOf(empty.visitors, marks).visits.length === 0);
+const facts = factsOf(v);
+check('data: first and last seen, the longest visit, CTA clicks, last channel', facts.firstSeen === NOW - 2 * day && facts.lastSeen === NOW - 3600 && facts.mostEngaged === NOW - 2 * day && facts.ctaClicks === 1 && facts.lastChannel === 'direct', facts);
+check('…the last country known, when the last visit had none', facts.lastCountry === 'CAN', facts.lastCountry);
+const slots = activitySlots(rows.map((r) => r.ts), facts.firstSeen, NOW);
+check('chart: seven days to today for a page first seen this week', slots.unit === 'day' && slots.slots.map((x) => x.n).join() === '0,0,0,0,1,1,1', slots);
+check('…weeks once older than a week, months once older than seven weeks', activitySlots([NOW - 20 * day], NOW - 20 * day, NOW).unit === 'week' && activitySlots([NOW - 20 * day], NOW - 20 * day, NOW).slots[4].n === 1 && activitySlots([], NOW - 100 * day, NOW).unit === 'month');
+// NOW is 13:46 UTC; seven hours earlier is 06:46 UTC, which is 22:46 the evening before in California.
+check('…"today" is the viewer\'s today', activitySlots([NOW - 7 * 3600], NOW - 7 * 3600, NOW, 480).slots[5].n === 1 && activitySlots([NOW - 7 * 3600], NOW - 7 * 3600, NOW, 0).slots[6].n === 1);
+check('channel names', channelName('linkedin') === 'LinkedIn' && channelName('marketo') === 'Marketo' && channelName('newsletter') === 'Newsletter' && channelName('news.ycombinator.com') === 'news.ycombinator.com' && channelName(null) === null);
+check('the Salesforce link: an account id only', salesforceAccountUrl('0014x00001AbCdEAAV') === 'https://optimizely.lightning.force.com/lightning/r/Account/0014x00001AbCdEAAV/view' && salesforceAccountUrl('APPLEACCOUNTID00') === null && salesforceAccountUrl('001"><x') === null && salesforceAccountUrl(null) === null);
 
 /* ---------- 6. Finding the element again ---------- */
 
@@ -290,13 +325,31 @@ check('…asked ODP only for dash-free ids, known fields and `page { page }`', a
 check('…with the page in both forms it is sent in', asked.some((q) => q.includes(pathFilter('cdw'))) && pathFilter('cdw').includes("page = '/cdw/' or page = '/cdw'"));
 check('…and never returns a visitor id', !JSON.stringify(got.body).match(/[0-9a-f]{32}/));
 check('…nor caches anything a browser could share', got.headers['cache-control'] === 'no-store');
+check('…with the account (none for a page without one) and no Salesforce deal', 'account' in (got.body as object) && (got.body as { account: unknown }).account === null && !('deal' in (got.body as object)));
 setActivitySources({});
 
-check('deal: open pipeline per currency, next close, won and lost', JSON.stringify(summarizeDeal([
-  { StageName: 'Discovery', Amount: 100, CurrencyIsoCode: 'USD', CloseDate: '2027-01-01', IsClosed: false },
-  { StageName: 'Negotiation', Amount: 50, CurrencyIsoCode: 'USD', CloseDate: '2026-12-01', IsClosed: false },
-  { StageName: 'Closed Won', Amount: 10, CurrencyIsoCode: 'GBP', CloseDate: '2025-01-01', IsClosed: true, IsWon: true },
-])) === JSON.stringify({ open: 2, openAmounts: [{ currency: 'USD', amount: 150 }], next: { stage: 'Negotiation', closeDate: '2026-12-01' }, won: 1, lost: 0, lastClosed: { stage: 'Closed Won', closeDate: '2025-01-01', won: true } }));
+// The account's stage: ODP's Salesforce sync knows accounts by the 18-character id only (probed 4 Nov 2026).
+const ID18 = '0014x00001AbCdEAAV';
+const ID15 = ID18.slice(0, 15);
+const accountAsked: string[] = [];
+const odpAccounts: OdpClient = {
+  async query(q) {
+    accountAsked.push(q);
+    const data: Record<string, unknown> = {};
+    for (const m of q.matchAll(/(\w+): salesforce_crm_sync_account\(salesforce_crm_sync_account_id: "([^"]*)"\)/g)) {
+      data[m[1]] = m[2] === ID18
+        ? { salesforce_crm_sync_account_name: 'CDW', account_stage: 'Active Customer', customer_stage: null }
+        : { salesforce_crm_sync_account_name: null, account_stage: null, customer_stage: null };
+    }
+    return { data: data as never };
+  },
+};
+check('account stage: from ODP, by whichever form of the id it holds', JSON.stringify(await fetchAccountStage(odpAccounts, [ID15, ID18])) === JSON.stringify({ id: ID18, stage: 'Active Customer' }));
+check('…an account ODP does not hold: none', (await fetchAccountStage(odpAccounts, [ID15])) === null);
+accountAsked.length = 0;
+check('…an id that is not one is never sent', (await fetchAccountStage(odpAccounts, ['x" ) { y }'])) === null && accountAsked.length === 0);
+check('…ODP not answering is not "no account"', (await fetchAccountStage({ query: async () => { throw new Error('503'); } }, [ID18])) === undefined);
+
 const hist = historyOf({ created: '2026-10-29T20:44:07Z', published: null, lastModified: '2026-10-29T20:50:00Z', salesforceAccountID: null, brandDomain: null, eyebrow: null }, [{ at: '2026-11-02T10:00:10Z' }, { at: '2026-11-02T10:00:40Z' }]);
 check('history: built; a save minutes after the build is the build; one copy edit per minute', hist.map((h) => h.kind).join() === 'built,copy', hist);
 
@@ -306,10 +359,13 @@ const files = (dir: string): string[] => readdirSync(join(root, dir)).flatMap((f
 const keyReaders = [...files('src'), ...files('api'), ...files('server')].filter((f) => /\.(ts|tsx)$/.test(f) && read(f).includes('ODP_PRIVATE_KEY'));
 check('the ODP key is read in one server file and nowhere in the browser code', keyReaders.join() === 'api/_lib/odp-events.ts', keyReaders);
 const hook = read('src/hooks/useOdpTracking.ts');
-check('the tracking hook skips the booth tools', hook.includes('target.closest(BOOTH_CHROME)') && /\.xray-sidebar/.test(hook) && /\.activity-fixed/.test(hook));
+check('the tracking hook skips the booth tools', hook.includes('target.closest(BOOTH_CHROME)') && /\.booth-rail\b/.test(hook) && /\.activity-view/.test(hook));
+check('the report API makes no Salesforce call (the stage is ODP\'s)', !/salesforce\.js/.test(read('api/page-activity.ts')));
 check('the hook records the visit, never in the CMS preview', /if \(!inCmsPreview\(\)\) recordVisit\(/.test(hook));
 check('the connect panel\'s tiles are named for tracking', /data-cta="schedule"/.test(read('src/www/ConnectModal.tsx')) && /data-cta="contact"/.test(read('src/www/ConnectModal.tsx')));
-check('Activity is offered on account pages only', /variant === 'abm' && \(/.test(read('src/components/FloatingSidebar.tsx')));
+const sidebar = read('src/components/FloatingSidebar.tsx');
+check('the Report is offered on account pages only', /const hasReport = variant === 'abm';/.test(sidebar) && /\{hasReport && \(/.test(sidebar));
+check('…and its data is asked for as the rail mounts, not when it is opened', /usePageActivity\(reportPage, hasReport\)/.test(sidebar));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

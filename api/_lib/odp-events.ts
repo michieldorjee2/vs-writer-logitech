@@ -1,6 +1,7 @@
 /**
  * Reads showcase events from ODP, one visitor at a time (the only way ODP serves events: the
- * `events` query requires an identifier). Many visitors go in one request as aliases.
+ * `events` query requires an identifier). Many visitors go in one request as aliases. Also the
+ * page's Salesforce account as ODP holds it (synced from Salesforce), for its stage.
  *
  * Server-only: ODP_PRIVATE_KEY is a full-access account key. It is read here and nowhere else, is
  * never logged, and never reaches the browser.
@@ -167,4 +168,27 @@ export async function fetchVisitorEvents(odp: OdpClient, vuids: string[], since:
     }
   });
   return out;
+}
+
+/**
+ * The account's stage as ODP's Salesforce sync holds it (`account_stage`: Prospect, Active
+ * Customer, Ex-Customer; `customer_stage` is empty on the accounts seen, 4 Nov 2026). ODP keys
+ * accounts by the 18-character id only, so each form of the id is tried. `undefined` when ODP did
+ * not answer, null when it holds no such account or no stage.
+ */
+export async function fetchAccountStage(odp: OdpClient, ids: string[]): Promise<{ id: string; stage: string | null } | null | undefined> {
+  const valid = ids.filter((id) => /^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$/.test(id));
+  if (!valid.length) return null;
+  try {
+    const r = await odp.query(
+      `{ ${valid.map((id, i) => `a${i}: salesforce_crm_sync_account(salesforce_crm_sync_account_id: "${id}") { salesforce_crm_sync_account_name account_stage customer_stage }`).join(' ')} }`,
+    );
+    for (const [i, id] of valid.entries()) {
+      const a = r.data?.[`a${i}`] as unknown as Record<string, string | null> | null | undefined;
+      if (a?.salesforce_crm_sync_account_name) return { id, stage: a.account_stage || a.customer_stage || null };
+    }
+    return null;
+  } catch {
+    return undefined;
+  }
 }

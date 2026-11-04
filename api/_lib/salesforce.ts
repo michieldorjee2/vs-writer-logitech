@@ -2,8 +2,7 @@
  * Salesforce, read through Mark's own Salesforce tool (tools-mgmt-service
  * invoke), as the OPAL_PAT's owner: the same connection the account workflow's
  * gather step uses, so the search page and the build agree on what an account is.
- * Read-only: the one tool called here only lists records (Accounts for the search page,
- * Opportunities for Activity mode).
+ * Read-only: the one tool called here only lists Account records.
  *
  * Env: OPAL_PAT (required), OPAL_BASE_URL, OPAL_INSTANCE_ID, OPAL_REGION.
  */
@@ -43,19 +42,6 @@ export function rowsOf(response: unknown): SalesforceAccountRow[] | null {
 
 /** The rows, or null when Salesforce did not answer (never read as "no accounts"). */
 async function listAccounts(filters: Record<string, unknown>): Promise<SalesforceAccountRow[] | null> {
-  return listRecords<SalesforceAccountRow>('Account', ACCOUNT_FIELDS, filters, { sortBy: 'Name', sortOrder: 'ASC', limit: PER_CALL, title: 'Accounts' });
-}
-
-/**
- * Records of one Salesforce object through the tool, or null when Salesforce did not answer.
- * `objectType` and `fields` are constants of this file; `filters` values come from validated ids.
- */
-async function listRecords<T>(
-  objectType: string,
-  fields: string,
-  filters: Record<string, unknown>,
-  opts: { sortBy: string; sortOrder: 'ASC' | 'DESC'; limit: number; title: string },
-): Promise<T[] | null> {
   const pat = process.env.OPAL_PAT;
   if (!pat) return null;
   try {
@@ -71,46 +57,33 @@ async function listRecords<T>(
       body: JSON.stringify({
         tool_name: 'salesforce_crm_list_object',
         timeout: 12,
-        parameters: { objectType, fields, filters: JSON.stringify(filters), ...opts },
+        parameters: {
+          objectType: 'Account',
+          fields: ACCOUNT_FIELDS,
+          filters: JSON.stringify(filters),
+          sortBy: 'Name',
+          sortOrder: 'ASC',
+          limit: PER_CALL,
+          title: 'Accounts',
+        },
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!r.ok) {
-      console.warn(`[salesforce] ${objectType} list answered ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+      console.warn(`[salesforce] account list answered ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
       return null;
     }
     const body = (await r.json()) as { response?: unknown };
     const rows = rowsOf(typeof body.response === 'string' ? JSON.parse(body.response) : body.response);
     if (!rows) {
-      console.warn(`[salesforce] ${objectType} list answer not understood:`, JSON.stringify(body).slice(0, 200));
+      console.warn('[salesforce] account list answer not understood:', JSON.stringify(body).slice(0, 200));
       return null;
     }
-    return rows as unknown as T[];
+    return rows;
   } catch (err) {
-    console.warn(`[salesforce] ${objectType} list failed:`, err instanceof Error ? err.message : err);
+    console.warn('[salesforce] account list failed:', err instanceof Error ? err.message : err);
     return null;
   }
-}
-
-export interface OpportunityRow {
-  Name?: string;
-  StageName?: string;
-  Amount?: number | null;
-  CurrencyIsoCode?: string | null;
-  CloseDate?: string | null;
-  IsClosed?: boolean;
-  IsWon?: boolean;
-}
-
-/** An account's opportunities, newest close date first (at most 25), or null when Salesforce did not answer. */
-export async function listOpportunities(accountId: string): Promise<OpportunityRow[] | null> {
-  if (!/^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$/.test(accountId)) return [];
-  return listRecords<OpportunityRow>('Opportunity', 'Name,StageName,Amount,CurrencyIsoCode,CloseDate,IsClosed,IsWon', { AccountId: accountId }, {
-    sortBy: 'CloseDate',
-    sortOrder: 'DESC',
-    limit: PER_CALL,
-    title: 'Opportunities',
-  });
 }
 
 /**

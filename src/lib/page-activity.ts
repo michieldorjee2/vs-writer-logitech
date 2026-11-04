@@ -168,8 +168,11 @@ export function accountTerms(domain: string | null | undefined, name: string | n
 const DYNAMIC_CLASS = /^(is-|live-changed|www-js$|focus|hover|active$)/;
 /** ODP's tag cuts the last segment (the selector) at about 150 characters. */
 const SELECTOR_CUT = 140;
-/** The booth chrome's own class prefixes (src/styles/floating-sidebar.css, edit-mode.css, activity-mode.css). */
-const BOOTH_CLASS = /^(xray|edit|activity|employee-link)-/;
+/**
+ * The booth chrome's own class prefixes (booth-rail.css, floating-sidebar.css, edit-mode.css,
+ * activity-mode.css). `xray-sidebar` was the rail's name until Nov 2026 and is in older data.
+ */
+const BOOTH_CLASS = /^(booth|xray|edit|activity|employee-link)-/;
 const INTERACTIVE_TAGS = new Set(['a', 'button', 'input', 'select', 'textarea', 'label', 'summary', 'option']);
 
 export interface PathSegment {
@@ -297,6 +300,30 @@ export interface CtaStat {
   last: number;
 }
 
+/** A visit counts as engaged from this long on the page, this deep a scroll, or any click. */
+export const ENGAGED_SEC = 30;
+export const ENGAGED_SCROLL = 50;
+/** The visits a report lists, newest kept: enough for any account page's whole history. */
+export const MAX_VISIT_ROWS = 400;
+
+/** One visit, as the report's Journey and Activity chart read it. Never who: no visitor id. */
+export interface VisitRow {
+  /** The visit's first pageview. */
+  ts: number;
+  /** Seconds on the page (page_exit's own timer, else first to last event; at most 30 min). */
+  sec: number;
+  /** Deepest scroll, percent, when the visit reported one. */
+  scroll: number | null;
+  /** Clicks on the page itself (ODP's tag), the booth tools left out. */
+  clicks: number;
+  /** The CTAs pressed in this visit, by their words. */
+  ctas: string[];
+  /** Where it came from (sourceOf). */
+  source: string;
+  country: string | null;
+  engaged: boolean;
+}
+
 export interface AudienceReport {
   visitors: number;
   visits: number;
@@ -305,7 +332,10 @@ export interface AudienceReport {
   ctaClicks: number;
   /** Visitors who pressed a connect button ("Arrange a session"): the page's conversion. */
   connectVisitors: number;
+  firstTs: number | null;
   lastTs: number | null;
+  /** Every visit in the period, oldest first (the newest MAX_VISIT_ROWS). */
+  visitList: VisitRow[];
   /** Visits per bin, oldest first: daily for 7d/30d/90d, weekly for all. */
   series: { start: number; step: number; counts: number[] };
   /** Visitors who saw each scene (by scene id). */
@@ -454,7 +484,8 @@ function seriesFor(range: ActivityRange, from: number, now: number) {
 function audienceReport(events: ActivityEvent[], range: ActivityRange, from: number, now: number, terms: string[]): AudienceReport {
   const visitorsSeen = new Set<string>();
   // A visit is a (visitor, ODP session) with a pageview on this page.
-  const visits = new Map<string, { first: number; last: number; exitSec: number | null; scroll: number | null; vuid: string }>();
+  type Visit = { first: number; last: number; exitSec: number | null; scroll: number | null; clicks: number; ctas: Set<string>; source: string; country: string | null };
+  const visits = new Map<string, Visit>();
   const visitKey = (e: ActivityEvent) => `${e.vuid}|${e.session_id ?? Math.floor(e.ts / 1800)}`;
   const sections = new Map<string, Set<string>>();
   const elements = new Map<string, ElementStat & { who: Set<string> }>();
@@ -466,6 +497,7 @@ function audienceReport(events: ActivityEvent[], range: ActivityRange, from: num
   const countries = new Map<string, Set<string>>();
   const devices = new Map<string, Set<string>>();
   const series = seriesFor(range, from, now);
+  let firstTs: number | null = null;
   let lastTs: number | null = null;
 
   const sorted = [...events].sort((a, b) => a.ts - b.ts);
@@ -474,11 +506,12 @@ function audienceReport(events: ActivityEvent[], range: ActivityRange, from: num
     if (e.action === 'pageview') {
       visitorsSeen.add(e.vuid);
       if (!visits.has(k)) {
-        visits.set(k, { first: e.ts, last: e.ts, exitSec: null, scroll: null, vuid: e.vuid });
+        visits.set(k, { first: e.ts, last: e.ts, exitSec: null, scroll: null, clicks: 0, ctas: new Set(), source: sourceOf(e), country: e.country ? e.country.toUpperCase() : null });
         const bin = Math.floor((e.ts - series.start) / series.step);
         if (bin >= 0 && bin < series.counts.length) series.counts[bin]++;
         sources.set(sourceOf(e), (sources.get(sourceOf(e)) ?? 0) + 1);
       }
+      firstTs = firstTs ?? e.ts;
       lastTs = Math.max(lastTs ?? 0, e.ts);
     }
     const v = visits.get(k);
@@ -503,6 +536,7 @@ function audienceReport(events: ActivityEvent[], range: ActivityRange, from: num
     if (e.event_type === 'click' && e.html_element_path) {
       const ref = elementRef(e.html_element_path);
       if (ref) {
+        if (v) v.clicks++;
         const s = elements.get(ref.key) ?? { key: ref.key, section: ref.section, segments: ref.segments, tag: ref.tag, clicks: 0, visitors: 0, rage: 0, last: 0, dead: !ref.interactive, who: new Set<string>() };
         s.clicks++;
         s.who.add(e.vuid);
@@ -522,16 +556,22 @@ function audienceReport(events: ActivityEvent[], range: ActivityRange, from: num
       c.who.add(e.vuid);
       ctas.set(ck, c);
       if (kind.type === 'connect') connectWho.add(e.vuid);
+      if (v && label) v.ctas.add(label);
     }
   }
 
   const scroll: AudienceReport['scroll'] = [0, 0, 0, 0, 0];
   const durations: number[] = [];
+  const visitList: VisitRow[] = [];
   for (const v of visits.values()) {
     // page_exit's own timer when it arrived; else the span between the visit's first and last event.
-    durations.push(Math.min(v.exitSec ?? v.last - v.first, 30 * 60));
+    const sec = Math.min(v.exitSec ?? v.last - v.first, 30 * 60);
+    durations.push(sec);
     if (v.scroll !== null) scroll[v.scroll >= 100 ? 4 : v.scroll >= 75 ? 3 : v.scroll >= 50 ? 2 : v.scroll >= 25 ? 1 : 0]++;
+    const engaged = sec >= ENGAGED_SEC || (v.scroll ?? 0) >= ENGAGED_SCROLL || v.clicks > 0 || v.ctas.size > 0;
+    visitList.push({ ts: v.first, sec: Math.round(sec), scroll: v.scroll, clicks: v.clicks, ctas: [...v.ctas], source: v.source, country: v.country, engaged });
   }
+  visitList.sort((a, b) => a.ts - b.ts);
   const sizes = (m: Map<string, Set<string>>) => new Map([...m].map(([k, s]) => [k, s.size]));
   return {
     visitors: visitorsSeen.size,
@@ -539,7 +579,9 @@ function audienceReport(events: ActivityEvent[], range: ActivityRange, from: num
     medianSec: median(durations),
     ctaClicks,
     connectVisitors: connectWho.size,
+    firstTs,
     lastTs,
+    visitList: visitList.slice(-MAX_VISIT_ROWS),
     series,
     sections: Object.fromEntries([...sections].map(([k, s]) => [k, s.size])),
     scroll,
@@ -563,28 +605,138 @@ function add(m: Map<string, Set<string>>, k: string, v: string) {
 
 // ─── What the API answers (api/page-activity.ts) ─────────────────────────────
 
-export interface DealSummary {
-  open: number;
-  /** Open pipeline per currency, as Salesforce holds it (no conversion). */
-  openAmounts: Array<{ currency: string; amount: number }>;
-  /** The open opportunity closing soonest. */
-  next: { stage: string; closeDate: string | null } | null;
-  won: number;
-  lost: number;
-  /** The most recent closed opportunity. */
-  lastClosed: { stage: string; closeDate: string | null; won: boolean } | null;
-}
-
 export interface HistoryMark {
   kind: 'built' | 'saved' | 'copy';
   ts: number;
 }
 
+/** The Salesforce Account the page was built for, as ODP's Salesforce sync holds it. */
+export interface AccountSummary {
+  id: string;
+  /** ODP's account_stage: Prospect, Active Customer or Ex-Customer. */
+  stage: string | null;
+}
+
 export interface ActivityResponse {
   report: ActivityReport;
   history: HistoryMark[];
-  deal: DealSummary | null;
   bench: ActivityBenchmark | null;
+  account: AccountSummary | null;
+}
+
+/** Optimizely's Salesforce (the host its record links use). */
+const SALESFORCE_ORIGIN = 'https://optimizely.lightning.force.com';
+export function salesforceAccountUrl(id: string | null | undefined): string | null {
+  return id && /^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$/.test(id) ? `${SALESFORCE_ORIGIN}/lightning/r/Account/${id}/view` : null;
+}
+
+// ─── What the report card shows (src/components/ActivityMode.tsx) ───────────
+
+export type JourneyStage = 'created' | 'viewed' | 'engaged' | 'cta';
+export const JOURNEY_STAGES: JourneyStage[] = ['created', 'viewed', 'engaged', 'cta'];
+
+/** When the page reached each step, and the step it is at now (the last one reached). */
+export interface Journey {
+  created: number | null;
+  /** The last save or copy edit after the build; the build itself when there is none. */
+  updated: number | null;
+  viewed: number | null;
+  engaged: number | null;
+  cta: number | null;
+  stage: JourneyStage;
+  /** The visits behind the current step, newest first. */
+  visits: VisitRow[];
+}
+
+export function journeyOf(r: AudienceReport, history: HistoryMark[]): Journey {
+  const built = history.find((h) => h.kind === 'built')?.ts ?? null;
+  const updated = history.reduce<number | null>((t, h) => Math.max(t ?? 0, h.ts) || null, built);
+  const visits = r.visitList ?? [];
+  const engagedVisits = visits.filter((v) => v.engaged);
+  const ctaVisits = visits.filter((v) => v.ctas.length > 0);
+  const j = {
+    created: built,
+    updated,
+    viewed: visits[0]?.ts ?? r.firstTs ?? null,
+    engaged: engagedVisits[0]?.ts ?? null,
+    cta: ctaVisits[0]?.ts ?? null,
+  };
+  const stage: JourneyStage = j.cta !== null ? 'cta' : j.engaged !== null ? 'engaged' : j.viewed !== null ? 'viewed' : 'created';
+  const behind = stage === 'cta' ? ctaVisits : stage === 'engaged' ? engagedVisits : stage === 'viewed' ? visits : [];
+  return { ...j, stage, visits: [...behind].reverse() };
+}
+
+/** The Data column. */
+export interface ReportFacts {
+  firstSeen: number | null;
+  lastSeen: number | null;
+  /** The visit that spent longest on the page (the later one on a tie). */
+  mostEngaged: number | null;
+  ctaClicks: number;
+  lastChannel: string | null;
+  /** The country of the latest visit that reported one. */
+  lastCountry: string | null;
+}
+
+export function factsOf(r: AudienceReport): ReportFacts {
+  const visits = r.visitList ?? [];
+  const last = visits[visits.length - 1];
+  const most = visits.reduce<VisitRow | null>((best, v) => (!best || v.sec >= best.sec ? v : best), null);
+  // Not every pageview carries a country: the latest one that did.
+  const located = [...visits].reverse().find((v) => v.country);
+  return {
+    firstSeen: visits[0]?.ts ?? r.firstTs ?? null,
+    lastSeen: last?.ts ?? r.lastTs ?? null,
+    mostEngaged: most && most.sec > 0 ? most.ts : null,
+    ctaClicks: r.ctaClicks,
+    lastChannel: last ? last.source : null,
+    lastCountry: located?.country ?? null,
+  };
+}
+
+const CHANNEL_NAMES: Record<string, string> = {
+  linkedin: 'LinkedIn',
+  email: 'Email',
+  chat: 'Teams or Slack',
+  search: 'Search',
+  direct: 'Direct',
+  marketo: 'Marketo',
+  outreach: 'Outreach',
+};
+/** "linkedin" -> "LinkedIn"; a campaign source as sent, capitalised; a referring host as is. */
+export function channelName(source: string | null | undefined): string | null {
+  if (!source) return null;
+  if (CHANNEL_NAMES[source]) return CHANNEL_NAMES[source];
+  return source.includes('.') ? source : source.charAt(0).toUpperCase() + source.slice(1);
+}
+
+export type SlotUnit = 'day' | 'week' | 'month';
+export interface ActivitySlot {
+  start: number;
+  n: number;
+}
+export const ACTIVITY_SLOTS = 7;
+
+/**
+ * Visits in ACTIVITY_SLOTS slots ending with the one that holds `nowS`: days when the page's first
+ * visit is under a week old, else weeks, else 30-day months. Slots are local days, so "today" is
+ * the viewer's today (`tzOffsetMin` is Date#getTimezoneOffset).
+ */
+export function activitySlots(visitTs: number[], firstTs: number | null, nowS: number, tzOffsetMin = 0): { unit: SlotUnit; slots: ActivitySlot[] } {
+  const off = tzOffsetMin * 60;
+  const dayStart = (t: number) => Math.floor((t - off) / 86400) * 86400 + off;
+  const today = dayStart(nowS);
+  const age = firstTs === null ? 0 : today - dayStart(firstTs);
+  const unit: SlotUnit = age < ACTIVITY_SLOTS * 86400 ? 'day' : age < ACTIVITY_SLOTS * 7 * 86400 ? 'week' : 'month';
+  const days = unit === 'day' ? 1 : unit === 'week' ? 7 : 30;
+  // The last slot ends with today; each slot starts `days` before the next.
+  const end = today + 86400;
+  const slots: ActivitySlot[] = Array.from({ length: ACTIVITY_SLOTS }, (_, i) => ({ start: end - (ACTIVITY_SLOTS - i) * days * 86400, n: 0 }));
+  for (const t of visitTs) {
+    const i = Math.floor((t - slots[0].start) / (days * 86400));
+    if (i >= 0 && i < ACTIVITY_SLOTS) slots[i].n++;
+  }
+  return { unit, slots };
 }
 
 // ─── Benchmark across account pages ─────────────────────────────────────────

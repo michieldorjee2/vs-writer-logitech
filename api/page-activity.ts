@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireIdentity, firstQuery } from './_lib/auth.js';
-import { fetchPageEvents, odpClient, type OdpClient } from './_lib/odp-events.js';
-import { activityStore, cache, cached, DEAL_TTL_S, pageVisitors, REPORT_TTL_S, teamOf, type ActivityStore } from './_lib/page-activity-store.js';
-import { listOpportunities, type OpportunityRow } from './_lib/salesforce.js';
+import { fetchAccountStage, fetchPageEvents, odpClient, type OdpClient } from './_lib/odp-events.js';
+import { ACCOUNT_TTL_S, activityStore, cache, cached, pageVisitors, REPORT_TTL_S, teamOf, type ActivityStore } from './_lib/page-activity-store.js';
 import { salesforceIds } from '../src/lib/parent-account.js';
 import {
   accountTerms,
@@ -14,19 +13,20 @@ import {
   TRACKING_START_TS,
   type ActivityBenchmark,
   type ActivityRange,
+  type AccountSummary,
   type ActivityResponse,
-  type DealSummary,
   type HistoryMark,
 } from '../src/lib/page-activity.js';
 
 /**
  * GET /api/page-activity?page=lenovo&range=30d[&fresh=1]
  *
- * Activity mode's data (src/components/ActivityMode.tsx): what visitors did on one page, read from
+ * The booth's Report (src/components/ActivityMode.tsx): what visitors did on one page, read from
  * ODP for the visitors the index holds (api/_lib/page-activity-store.ts), plus the page's history
- * (built, saved, copy edits), its account's Salesforce opportunities and the account-page averages.
+ * (built, saved, copy edits), its Salesforce account (id and stage, as ODP's Salesforce sync holds
+ * it) and the account-page averages.
  *
- * Signed-in employees only: it names networks and deal amounts. It never returns a visitor id or
+ * Signed-in employees only: it names networks and the account. It never returns a visitor id or
  * an employee's identity, only counts.
  */
 const MAX_VISITORS = 600;
@@ -76,33 +76,18 @@ async function pageMeta(page: string): Promise<PageMeta | null> {
   }
 }
 
-export function summarizeDeal(rows: OpportunityRow[]): DealSummary {
-  const open = rows.filter((o) => !o.IsClosed);
-  const closed = rows.filter((o) => o.IsClosed).sort((a, b) => (b.CloseDate ?? '').localeCompare(a.CloseDate ?? ''));
-  const amounts = new Map<string, number>();
-  for (const o of open) if (o.Amount) amounts.set(o.CurrencyIsoCode || 'USD', (amounts.get(o.CurrencyIsoCode || 'USD') ?? 0) + o.Amount);
-  const next = [...open].sort((a, b) => (a.CloseDate ?? '9999').localeCompare(b.CloseDate ?? '9999'))[0];
-  return {
-    open: open.length,
-    openAmounts: [...amounts].map(([currency, amount]) => ({ currency, amount })),
-    next: next ? { stage: next.StageName ?? '', closeDate: next.CloseDate ?? null } : null,
-    won: closed.filter((o) => o.IsWon).length,
-    lost: closed.filter((o) => !o.IsWon).length,
-    lastClosed: closed[0] ? { stage: closed[0].StageName ?? '', closeDate: closed[0].CloseDate ?? null, won: Boolean(closed[0].IsWon) } : null,
-  };
-}
-
-async function deal(store: ActivityStore, sfid: string | null): Promise<DealSummary | null> {
-  const id = salesforceIds(sfid)[0];
-  if (!id) return null;
-  const key = `pa:deal:${id}`;
-  const hit = await cached<DealSummary>(store, key);
+/** The page's Salesforce account and its stage, from ODP; cached for an hour. */
+async function accountOf(store: ActivityStore, odp: OdpClient, sfid: string | null): Promise<AccountSummary | null> {
+  const ids = salesforceIds(sfid);
+  if (!ids.length) return null;
+  const key = `pa:acct:${ids[0]}`;
+  const hit = await cached<AccountSummary>(store, key);
   if (hit) return hit;
-  const rows = await listOpportunities(id);
-  if (!rows) return null;
-  const summary = summarizeDeal(rows);
-  await cache(store, key, summary, DEAL_TTL_S);
-  return summary;
+  const found = await fetchAccountStage(odp, ids);
+  // ODP holding no such account still links to Salesforce by the page's id; no answer is not cached.
+  const account = found ?? { id: ids[0], stage: null };
+  if (found !== undefined) await cache(store, key, account, ACCOUNT_TTL_S);
+  return account;
 }
 
 export function historyOf(meta: PageMeta | null, copyEdits: Array<{ at?: string }>): HistoryMark[] {
@@ -140,7 +125,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const odp = 'odp' in override ? override.odp : odpClient();
   if (!store || !odp) return res.status(503).json({ error: 'Activity is not configured here' });
 
-  const cacheKey = `pa:r:${page}:${range}`;
+  // r2: the report carries visit rows since the Report card (Nov 2026); older entries lack them.
+  const cacheKey = `pa:r2:${page}:${range}`;
   try {
     if (!fresh) {
       const hit = await cached<ActivityResponse>(store, cacheKey);
@@ -153,10 +139,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pageVisitors(store, page, from, MAX_VISITORS),
       store.get<{ edits?: Array<{ at?: string }> }>(`pc:${page}`).catch(() => null),
     ]);
-    const [events, team, dealSummary, bench] = await Promise.all([
+    const [events, team, account, bench] = await Promise.all([
       fetchPageEvents(odp, page, vuids, from, TRACKING_START_TS),
       teamOf(store, vuids),
-      deal(store, meta?.salesforceAccountID ?? null).catch(() => null),
+      accountOf(store, odp, meta?.salesforceAccountID ?? null).catch(() => null),
       cached<ActivityBenchmark>(store, 'pa:bench'),
     ]);
     const report = buildActivityReport({
@@ -167,7 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       teamVuids: team,
       accountTerms: accountTerms(meta?.brandDomain, meta?.eyebrow),
     });
-    const body: ActivityResponse = { report, history: historyOf(meta, copy?.edits ?? []), deal: dealSummary, bench };
+    const body: ActivityResponse = { report, history: historyOf(meta, copy?.edits ?? []), bench, account };
     await cache(store, cacheKey, body, REPORT_TTL_S);
     return res.status(200).json(body);
   } catch (error) {
