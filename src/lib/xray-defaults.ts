@@ -33,10 +33,18 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* The account page's parts that came from the earlier account page, under the same ids (so a
-   page's stored X-ray overrides still apply): the agent platform page puts `data-xray="<id>"` on
-   each. */
+/* The takeout account page's parts (src/www/AccountPage.tsx), one per stored component, each found
+   by its `data-xray` hook. The agent platform page carries ten of the same ids for the parts it
+   shares, so a page's stored X-ray overrides apply to both. */
 const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
+  {
+    id: 'hero-3d',
+    selector: '[data-xray="hero-3d"]',
+    title: 'Hero brand mark',
+    tools: ['Brandfetch'],
+    sources: ['Brand logo', 'Brand colours', 'Brand description'],
+    notes: 'Logo extruded in real-time from the brand SVG.',
+  },
   {
     id: 'hero-title',
     selector: '[data-xray="hero-title"]',
@@ -71,6 +79,18 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     ],
   },
   {
+    id: 'stakeholders',
+    selector: '[data-xray="stakeholders"]',
+    title: 'Key stakeholders',
+    tools: ['LinkedIn', 'Salesforce', 'Gravatar'],
+    sources: [
+      'Main contacts + roles',
+      'Account owner',
+      'Key contacts on file',
+      'Profile pictures',
+    ],
+  },
+  {
     id: 'tech-stack',
     selector: '[data-xray="tech-stack"]',
     title: 'Current tech stack',
@@ -86,6 +106,107 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
       'Investor reports',
       'Recent acquisition news',
       'Account communication context',
+    ],
+  },
+  {
+    id: 'news',
+    selector: '[data-xray="news"]',
+    title: 'In the news',
+    tools: ['Web browsing'],
+    sources: [
+      'Google News',
+      'Newsroom feed',
+      'Recent c-level changes',
+      'Recent acquisition news',
+    ],
+  },
+  {
+    id: 'challenge-headline',
+    selector: '[data-xray="challenge-headline"]',
+    title: 'Challenge headline',
+    tools: ['Mark'],
+    sources: [
+      'Competitive positioning',
+      'Messaging frameworks',
+      'Website best practices',
+    ],
+  },
+  {
+    id: 'challenge-screenshot',
+    selector: '[data-xray="challenge-screenshot"]',
+    title: 'Current website capture',
+    tools: ['Mark', 'Web browsing'],
+    sources: ['Live screenshot of brand site', 'Customer website URL'],
+    notes: 'Real capture, not stock imagery.',
+  },
+  {
+    id: 'pain-points',
+    selector: '[data-xray="pain-points"]',
+    title: 'Pain points',
+    tools: ['Mark', 'Web browsing'],
+    sources: [
+      'Site-derived pain narrative',
+      'Competitive positioning',
+      'Customer website context',
+    ],
+  },
+  {
+    id: 'comparison-row',
+    selector: '[data-xray="comparison-row"]',
+    title: 'Comparison row',
+    tools: ['CMS', 'Mark'],
+    sources: [
+      'Competitive pages',
+      'Approved product language',
+      'Competitive positioning',
+    ],
+  },
+  {
+    id: 'logo-wall',
+    selector: '[data-xray="logo-wall"]',
+    title: 'Reference customer',
+    tools: ['CMS'],
+    sources: ['Approved customer logos', 'Vertical-matched stories'],
+  },
+  {
+    id: 'testimonials',
+    selector: '[data-xray="testimonials"]',
+    title: 'Testimonial',
+    tools: ['CMS'],
+    sources: ['Customer stories', 'Approved customer quotes'],
+  },
+  {
+    id: 'analysts',
+    selector: '[data-xray="analysts"]',
+    title: 'Analyst recognition',
+    tools: ['CMS'],
+    sources: [
+      'Forrester TEI report',
+      'Gartner MQ',
+      'Forrester Wave',
+      'Analyst reports',
+    ],
+  },
+  {
+    id: 'roi-cards',
+    selector: '[data-xray="roi-cards"]',
+    title: 'ROI metric',
+    tools: ['CMS', '6sense'],
+    sources: [
+      'Forrester TEI report',
+      'Industry-segmented uplift bands',
+      'Account funnel stage',
+    ],
+  },
+  {
+    id: 'roi-projection',
+    selector: '[data-xray="roi-projection"]',
+    title: 'Revenue projection',
+    tools: ['CMS', '6sense'],
+    sources: [
+      'TEI extrapolation',
+      'Industry benchmarks',
+      'Account activity signals',
     ],
   },
   {
@@ -346,8 +467,11 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
   },
 ];
 
-/** Every part X-ray and Edit mode can find on an account page (the agent platform template). */
+/** Every part X-ray and Edit mode can find on an account page, either template: each finds what is on screen. */
 export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [...ACCOUNT_XRAY_SHARED, ...AGENT_PLATFORM_XRAY];
+
+/** The takeout page's part ids. */
+export const ABM_XRAY_LEGACY_IDS = ACCOUNT_XRAY_SHARED.map((s) => s.id);
 
 /** Merge any CMS-supplied overrides into the defaults. */
 /* ── 1:1 person page ──────────────────────────────────────────────────────

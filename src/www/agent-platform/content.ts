@@ -346,7 +346,7 @@ export const USED_FIELDS: Array<{ field: string; where: string }> = [
 
 /**
  * Legacy fields the agent platform template deliberately leaves off, with Laura's rule. They stay
- * in the CMS untouched.
+ * in the CMS untouched, and a page with another pitch shows them all on the takeout template.
  */
 export const NOT_SHOWN: Array<{ field: string; rule: string }> = [
   { field: 'eyebrow', rule: 'fixed eyebrow "Personalized for {account}" (4.1); still read for the account name' },
