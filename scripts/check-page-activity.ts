@@ -87,6 +87,8 @@ const later = elementRef(CARD_TEXT.replace('.is-in.is-current', '.is-in'));
 check('the classes the page toggles never split an element', later?.key === card?.key);
 const keyWithClasses = (p: string) => p.split(' > ').slice(6).join('>');
 check('control: keeping classes would split it', keyWithClasses(CARD_TEXT) !== keyWithClasses(CARD_TEXT.replace('.is-in.is-current', '.is-in')));
+const dotted = elementRef('html > body > div#main-content > section#proof.www-scene > div.py-1.5.leading-[1.3].2xl:px-8.grid > a.www-link');
+check('a class with a dot in it stays one class', JSON.stringify(dotted?.segments[1].classes) === '["py-1.5","leading-[1.3]","2xl:px-8","grid"]', dotted?.segments[1].classes);
 check('booth chrome is not the page', elementRef('html.www-js > body > div#root > aside.xray-sidebar > button.xray-sidebar__btn.xray-sidebar__btn--xray > span.xray-sidebar__label') === null);
 check('…nor a click while Activity is open', elementRef(HERO_CTA.replace('> body >', '> body.activity-active >')) === null);
 check('a dialog (the connect panel) cannot be placed', elementRef('html.www-js > body > div#radix-_r_0_ > div > button > span') === null);
@@ -127,6 +129,7 @@ check('a connect click by type and position', JSON.stringify(ctaKind({ cta_type:
 check('an older connect click by its words', ctaKind({ element: 'cta', label: 'Arrange a session with Chuck' }).type === 'connect');
 check('any other button is a button', ctaKind({ element: 'cta', label: 'See where agents start' }).type === 'cta');
 check('the booth\'s own buttons are never CTAs', isBoothLabel('X-ray') && isBoothLabel('Edit') && isBoothLabel("You're all set") && !isBoothLabel('Arrange a session'));
+check('sources: a referring host the SDK put in `source` is read as a host', sourceOf({ source: 'teams.public.onecdn.static.microsoft' }) === 'chat' && sourceOf({ source: 'www.linkedin.com', medium: 'referral' }) === 'linkedin');
 check('sources: campaign, then referrer kind, then direct', sourceOf({ source: 'outreach', referral_host: 'x.com' }) === 'outreach' && sourceOf({ referral_host: 'www.linkedin.com' }) === 'linkedin' && sourceOf({ referral_host: 'outlook.office.com' }) === 'email' && sourceOf({}) === 'direct');
 
 /* ---------- 5. The report ---------- */
@@ -187,10 +190,15 @@ type FakeEl = { tagName: string; id?: string; classList: { contains: (c: string)
 const el = (tag: string, cls: string[] = [], children: FakeEl[] = [], id?: string): FakeEl => ({ tagName: tag.toUpperCase(), id, classList: { contains: (c) => cls.includes(c) }, children });
 const p2 = el('p', ['www-body', 'mt-2']);
 const cardA = el('div', ['www-card', 'www-usecase'], [el('p', ['www-body'])]);
-const cardB = el('div', ['www-card', 'www-usecase'], [el('h3'), p2]);
-const usecases = el('section', ['www-scene'], [el('div', ['www-scene__inner'], [el('div', [], [el('div', ['grid'], [cardA, cardB])])])], 'usecases');
+const inner = ['www-scene__inner', 'vb-container', 'mx-auto', 'w-full', 'px-4', 'lg:px-8'];
+const cardB2 = el('div', ['www-card', 'www-card--white', 'www-usecase'], [el('h3'), p2]);
+const usecases = el('section', ['www-scene'], [el('div', inner, [el('div', [], [el('div', ['grid', 'gap-3', 'md:grid-cols-2'], [cardA, cardB2])])])], 'usecases');
 const doc = { getElementById: (id: string) => (id === 'usecases' ? usecases : null) } as unknown as Document;
 check('found again by its path from the scene', resolveElement(card!.segments, doc) === (p2 as unknown));
+// The same position in another layout (the pre-2-Nov template's classes): not this element.
+const oldLayout = el('section', [], [el('div', ['abm-intel'], [el('div', [], [el('div', ['grid'], [cardA, el('div', ['abm-card'], [el('h3'), el('p', ['www-body', 'mt-2'])])])])])], 'usecases');
+const oldDoc = { getElementById: (id: string) => (id === 'usecases' ? oldLayout : null) } as unknown as Document;
+check('a click from another layout is not drawn on whatever sits there now', resolveElement(card!.segments, oldDoc) === null);
 check('a scene not on the page: not found, no guess', resolveElement(hero!.segments, doc) === null);
 
 /* ---------- 7. The API ---------- */

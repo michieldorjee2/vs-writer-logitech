@@ -198,9 +198,14 @@ export function parseSegment(raw: string, last = false): PathSegment | null {
     id = idm[1];
     rest = rest.slice(idm[0].length);
   }
-  // Classes are separated by dots; Tailwind classes hold no dots except in arbitrary values like
-  // `py-1.5`, which split into a harmless extra token that no element will lack.
-  let classes = rest.split('.').filter(Boolean);
+  // Classes are separated by dots, but a Tailwind class can hold one (`py-1.5`, `leading-[1.3]`):
+  // a token that continues a number or an open bracket is joined back to the one before.
+  let classes: string[] = [];
+  for (const t of rest.split('.')) {
+    const prev = classes[classes.length - 1];
+    if (prev !== undefined && /^\d/.test(t) && !t.includes(':') && (/\d$/.test(prev) || (prev.split('[').length > prev.split(']').length))) classes[classes.length - 1] = `${prev}.${t}`;
+    else if (t) classes.push(t);
+  }
   if (last && raw.length >= SELECTOR_CUT) classes = classes.slice(0, -1);
   classes = classes.filter((c) => !DYNAMIC_CLASS.test(c));
   return { tag, id, classes, nth };
@@ -345,15 +350,19 @@ function top(map: Map<string, number>, limit: number): Count[] {
   return [...map].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit).map(([name, n]) => ({ name, n }));
 }
 
-/** Where a visit came from: the campaign source, else the referring site, else direct. */
+/**
+ * Where a visit came from: the campaign source, else the kind of referring site, else direct.
+ * Without a campaign, ODP's SDK puts the referring host in `source` itself
+ * (reference: zaius-min.js trafficSources), so a `source` that is a host name is read as one.
+ */
 export function sourceOf(e: Pick<ActivityEvent, 'source' | 'medium' | 'referral_host'>): string {
   const src = (e.source ?? '').trim().toLowerCase();
-  if (src && src !== 'direct' && src !== '(direct)') return src;
-  const host = (e.referral_host ?? '').toLowerCase().replace(/^www\./, '');
+  if (src && src !== 'direct' && src !== '(direct)' && !src.includes('.')) return src;
+  const host = (src.includes('.') ? src : (e.referral_host ?? '').toLowerCase()).replace(/^www\./, '');
   if (host && !/showcase\.optimizely\.com$/.test(host)) {
     if (/(^|\.)linkedin\.com$|lnkd\.in/.test(host)) return 'linkedin';
     if (/outlook|office\.com|office365|mail\.google|gmail/.test(host)) return 'email';
-    if (/teams\.|slack/.test(host)) return 'chat';
+    if (/(^|\.)teams\.|onecdn|slack/.test(host)) return 'chat';
     if (/(^|\.)google\.|bing\.com|duckduckgo|yahoo\./.test(host)) return 'search';
     return host;
   }

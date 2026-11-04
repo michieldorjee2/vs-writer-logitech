@@ -4,28 +4,32 @@
  */
 import type { PathSegment } from './page-activity';
 
-/** Walks ODP's path from its anchor (the nearest element with an id) down to the element. */
+/**
+ * Walks ODP's path from its anchor (the nearest element with an id) down to the element.
+ *
+ * Strict on purpose: every step must have the tag and every class ODP recorded for it (classes
+ * the page toggles were already dropped, src/lib/page-activity.ts). A click recorded on an older
+ * layout of the page (the template changed on 2 Nov 2026) can line up by position with something
+ * unrelated today; it is not found, rather than drawn on the wrong element.
+ */
 export function resolveElement(segments: PathSegment[], root: Document = document): Element | null {
   const [anchor, ...rest] = segments;
   let el: Element | null = anchor?.id ? root.getElementById(anchor.id) : null;
+  const fits = (k: Element, seg: PathSegment) => k.tagName.toLowerCase() === seg.tag && seg.classes.every((c) => k.classList.contains(c));
   for (const seg of rest) {
     if (!el) return null;
     if (seg.id) {
       el = root.getElementById(seg.id);
+      if (el && !fits(el, seg)) return null;
       continue;
     }
     const kids = Array.from(el.children);
-    const byNth = seg.nth ? kids[seg.nth - 1] : undefined;
-    if (byNth && byNth.tagName.toLowerCase() === seg.tag) {
-      el = byNth;
+    if (seg.nth) {
+      const k = kids[seg.nth - 1];
+      el = k && fits(k, seg) ? k : null;
       continue;
     }
-    let cands = kids.filter((k) => k.tagName.toLowerCase() === seg.tag);
-    if (cands.length > 1 && seg.classes.length) {
-      const exact = cands.filter((k) => seg.classes.every((c) => k.classList.contains(c)));
-      if (exact.length) cands = exact;
-    }
-    el = cands[0] ?? null;
+    el = kids.find((k) => fits(k, seg)) ?? null;
   }
   return el;
 }
