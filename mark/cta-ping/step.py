@@ -36,7 +36,8 @@ SHEET_ID = "1ZkyFBynQu4k8UynJmgYhrDmdKlMyJgC7VAQYCHoCnOg"  # "Showcase CTA follo
 SHEET_RANGE = "Pings!A:I"
 MARKERS = "/workspace/cta-ping"
 
-PAGE = re.compile(r"^https://showcase\.optimizely\.com/[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/$")
+# An account page (/<slug>/) or a person page (/<company>/<person>/).
+PAGE = re.compile(r"^https://showcase\.optimizely\.com/[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/(?:[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/)?$")
 PING_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 OPTIMIZELY_EMAIL = re.compile(r"^[a-z0-9._%+'-]{1,64}@optimizely\.com$")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
@@ -149,9 +150,14 @@ def open_chat(member):
 
 def message(ping):
     rep_first = text(ping["rep"]["name"], 120).split(" ")[0] or "there"
+    where = (
+        "the Showcase page we wrote for %s at %s" % (html.escape(ping["person"]), html.escape(ping["account"]))
+        if ping["person"]
+        else "the %s Showcase page" % html.escape(ping["account"])
+    )
     lines = [
-        "<p>Hi %s, <b>someone on the %s Showcase page just asked to talk to their Optimizely team.</b></p>"
-        % (html.escape(rep_first), html.escape(ping["account"])),
+        "<p>Hi %s, <b>someone on %s just asked to talk to their Optimizely team.</b></p>"
+        % (html.escape(rep_first), where),
         "<p>They clicked %s. The page lists you as the account executive, and it told them"
         " we've let you know.</p>" % html.escape(ping["button"]),
         '<p><a href="%s">%s</a><br>%s%s</p>'
@@ -195,6 +201,7 @@ def read_ping(raw):
         "ping_id": ping_id,
         "requested_at": text(p.get("requested_at"), 40),
         "account": text(p.get("account"), 160) or "their account",
+        "person": text(p.get("person"), 120),
         "page": page,
         "button": text(p.get("button"), 80) or "the button",
         "campaign": text(p.get("campaign"), 600),
@@ -253,7 +260,7 @@ def add_row(ping, why):
         team.insert(0, {"name": ping["rep"]["name"], "role": ping["rep"]["role"]})
     row = [
         ping["requested_at"],
-        ping["account"],
+        "%s, page for %s" % (ping["account"], ping["person"]) if ping["person"] else ping["account"],
         ping["page"],
         ping["button"],
         why,

@@ -17,7 +17,7 @@ import type {
  */
 const RetailCustomerPage = lazy(() => import('./components/RetailCustomerPage'));
 const FinServPage = lazy(() => import('./components/FinServPage'));
-const PersonPage = lazy(() => import('./components/PersonPage'));
+const PersonPage = lazy(() => import('./www/PersonPage'));
 /*
  * Booth-only sales sidebar. Gated on `?search=1` in the URL — visitors
  * arriving through any normal channel never even download this chunk
@@ -120,8 +120,8 @@ function HomePage() {
  * Pick the renderer for a page: person, retail and fin-serv pages by their tag, every account
  * page the agent platform template. Mirrored in server/ssr-handler.tsx's dispatch.
  */
-function renderPageBody(data: CompetitorComparisonPage, editMode: boolean, search: string) {
-    if (isPersonPage(data)) return <PersonPage page={data} editMode={editMode} />;
+function renderPageBody(data: CompetitorComparisonPage, search: string) {
+    if (isPersonPage(data)) return <PersonPage page={data} />;
     if (isRetailPage(data)) return <RetailCustomerPage page={data} />;
     if (isFinServPage(data)) return <FinServPage page={data} />;
     return <AccountRoute page={data} search={search} />;
@@ -176,7 +176,7 @@ function PageLoader() {
         // server/ssr-handler.tsx's renderPageRoute() reproduces this exact shape — including
         // the second slot — because useId() counts a children array. Change one, change both.
         <Suspense fallback={<RouteSpinner />}>
-            {renderPageBody(data, searchParams.get('ctx') === 'edit', searchParams.toString())}
+            {renderPageBody(data, searchParams.toString())}
             {fromSearch && !isRetailPage(data) && !isFinServPage(data) && (
                 <FloatingSidebar page={data} variant={isPersonPage(data) ? 'person' : 'abm'} />
             )}

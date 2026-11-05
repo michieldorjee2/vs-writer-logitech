@@ -19,12 +19,15 @@ const GENERIC_CONTACT_NAMES = new Set([
   'customer success manager',
 ])
 
-export function realContacts(members: Members): TeamMember[] {
+/** Anyone on a page's team: an account page's `teamMembers`, a person page's `team`. */
+type Named = { Name?: string | null; Role?: string | null }
+
+export function realContacts<T extends Named>(members: T[] | null | undefined): T[] {
   return (members || []).filter((m) => !!m && !GENERIC_CONTACT_NAMES.has((m.Name || '').trim().toLowerCase()))
 }
 
 /** The roles that count as the account executive (rule N4, and who the CTA ping messages). */
-export const AE_ROLE = /account executive|\bAE\b|account director|client director/i
+export const AE_ROLE = /accounts? executive|\bAE\b|account director|client director/i
 
 /**
  * A named account executive: the role is one of AE_ROLE, and the name is a person's, not a role
@@ -34,7 +37,7 @@ export const isAccountExecutive = (name: string | null | undefined, role: string
   !!name?.trim() && AE_ROLE.test(role || '') && !AE_ROLE.test(name)
 
 /** The page's account executive: the first real contact who is one. */
-export function accountExecutiveOf(members: Members): TeamMember | null {
+export function accountExecutiveOf<T extends Named>(members: T[] | null | undefined): T | null {
   return realContacts(members).find((m) => isAccountExecutive(m.Name, m.Role)) ?? null
 }
 

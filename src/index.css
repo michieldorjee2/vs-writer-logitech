@@ -84,7 +84,6 @@
    Scoped via .finserv-page so other templates' themes are unaffected. */
 @import './styles/finserv-variables.css';
 @import './styles/finserv-layout.css';
-@import './styles/person-page.css';
 
 /* Use-case account page (the `use-case-default` ladder rung) */
 @import './styles/use-case-layout.css';

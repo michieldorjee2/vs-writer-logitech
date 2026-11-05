@@ -100,6 +100,22 @@ class Teams(Base):
         self.assertIn("4 Nov 2026, 23:06 UTC", body)
         self.assertIn("Michiel's account", body)
 
+    def test_a_person_page_says_whose_page_it_was(self):
+        ping = copy.deepcopy(FIXTURE)
+        ping.update(person="Ben <Yu>", page="https://showcase.optimizely.com/logitech/ben-yu/", account="Logitech G")
+        self.assertEqual(self.run_step(resign(ping))["done"], "teams")
+        body = FAKE.calls[1][1]["body"]
+        self.assertIn("the Showcase page we wrote for Ben &lt;Yu&gt; at Logitech G", body)
+        self.assertIn('href="https://showcase.optimizely.com/logitech/ben-yu/"', body)
+
+    def test_a_person_page_row_names_the_person(self):
+        ping = copy.deepcopy(FIXTURE)
+        ping.update(person="Ben Yu", page="https://showcase.optimizely.com/logitech/ben-yu/", account="Logitech G", rep=None)
+        self.assertEqual(self.run_step(resign(ping))["done"], "sheet")
+        _, cells = self.row()
+        self.assertEqual(cells[1], "Logitech G, page for Ben Yu")
+        self.assertEqual(cells[2], "https://showcase.optimizely.com/logitech/ben-yu/")
+
     def test_a_message_to_the_sender_goes_to_their_own_notes(self):
         ping = copy.deepcopy(FIXTURE)
         ping["rep"]["email"] = "michiel@optimizely.com"
@@ -215,9 +231,11 @@ class Ignored(Base):
     def test_anything_else_is_ignored_and_calls_nothing(self):
         bad_page = copy.deepcopy(FIXTURE)
         bad_page["page"] = "https://evil.example/zurich/"
+        too_deep = copy.deepcopy(FIXTURE)
+        too_deep["page"] = "https://showcase.optimizely.com/logitech/ben-yu/extra/"
         bad_id = copy.deepcopy(FIXTURE)
         bad_id["ping_id"] = "../../etc/passwd"
-        for raw in [None, "", "not json", [], {"event": "other"}, resign(bad_page), resign(bad_id)]:
+        for raw in [None, "", "not json", [], {"event": "other"}, resign(bad_page), resign(bad_id), resign(too_deep)]:
             self.assertEqual(self.run_step(raw), {"done": "ignored"}, raw)
         self.assertEqual(FAKE.calls, [])
 

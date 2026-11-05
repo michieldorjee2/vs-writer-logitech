@@ -19,11 +19,11 @@ export interface SectionComment {
 }
 
 /**
- * The request to Mark. On either account template each section names its `Fields:` (the stored
- * fields it shows, so Mark changes exactly those); the agent platform request also opens with its
- * template line and gives each copy field's text under `Now:`. A person page's request is plain.
+ * The request to Mark. On either account template and the person page each section names its
+ * `Fields:` (the stored fields it shows, so Mark changes exactly those); the agent platform request
+ * also opens with its template line and gives each copy field's text under `Now:`.
  */
-export function buildSuggestedEdit(comments: SectionComment[], template?: 'agent-platform' | 'takeout'): string {
+export function buildSuggestedEdit(comments: SectionComment[], template?: 'agent-platform' | 'takeout' | 'person'): string {
   const blocks = comments.map((c) => {
     if (!template || !c.fields?.length) return `Section: ${c.title}\nFeedback: ${c.feedback}`
     const now = Object.entries(c.copy ?? {})

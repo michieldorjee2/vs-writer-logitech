@@ -152,10 +152,7 @@ visual-baseline.mjs — capture the app's rendered pixels and CSS.
  * the route is recorded as NOT rendered rather than screenshotted as a spinner
  * or a "we're not quite ready" miss page.
  *
- * /ofx/ is an account page: the agent platform template, the 2,800-page one. It
- * is also the parent of the person page below, which means api/content.ts's
- * fetchParentShot() finds a real screenshot for the person hero instead of
- * silently skipping it.
+ * /ofx/ is an account page, and the parent of the person page below.
  */
 const ROUTES = [
     {
@@ -170,11 +167,11 @@ const ROUTES = [
     {
         name: 'person-page',
         url: '/ofx/olatz-beitia/',
-        ready: '.person',
-        template: 'PersonPage -> PersonPageView',
-        note: 'Nested 1:1 buyer page; 15 live instances.',
-        nondeterministic: ['canvas#person-galaxy (three.js)', 'starfield canvas'],
-        noiseFloorPct: 0.3,
+        ready: '.www-page.www-person',
+        template: 'PersonPage -> src/www/PersonPage',
+        note: 'Nested 1:1 buyer page in the www design; 33 live instances.',
+        nondeterministic: ['Scene reveals and count-ups play on scroll'],
+        noiseFloorPct: 0.7,
     },
     {
         name: 'retail-customer-page',

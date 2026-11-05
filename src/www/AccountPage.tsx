@@ -56,6 +56,7 @@ import {
 import { formatStatValue, comparisonTableHtml, realContacts, PROOF_LOGOS, SCENE } from './account-helpers'
 import { useCmsEdit, useShowsField } from './cms-edit'
 import { useLivePage } from './live-edit'
+import type { TeamMember } from '../lib/account-rep'
 
 interface Props {
   page: CompetitorComparisonPage
@@ -705,7 +706,7 @@ function StickyAsk({ text }: { text: string }) {
   return <StickyCta text={text} onAction={() => connect('sticky-connect-btn')} />
 }
 
-function Ask({ page, team }: { page: CompetitorComparisonPage; team: ReturnType<typeof realContacts> }) {
+function Ask({ page, team }: { page: CompetitorComparisonPage; team: TeamMember[] }) {
   const { connect, sent } = useConnect()
   const field = useShowsField()
   return (
