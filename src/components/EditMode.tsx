@@ -5,6 +5,7 @@ import {
   ABM_XRAY_DEFAULTS,
   AGENT_PLATFORM_EDIT,
   TAKEOUT_EDIT,
+  PERSON_EDIT,
   PERSON_XRAY_DEFAULTS,
   resolveXraySections,
   type EditSectionInfo,
@@ -181,10 +182,11 @@ function clamp(v: number, lo: number, hi: number): number {
 type Phase = 'editing' | 'working' | 'thanks';
 
 /** Which account template is on screen: the agent platform page or the takeout page (src/www/account-template.ts). */
-function pageTemplate(): 'agent-platform' | 'takeout' | null {
+function pageTemplate(): 'agent-platform' | 'takeout' | 'person' | null {
   if (typeof document === 'undefined') return null;
   if (document.querySelector('.www-page.www-ap')) return 'agent-platform';
   if (document.querySelector('.www-page.www-takeout')) return 'takeout';
+  if (document.querySelector('.www-page.www-person')) return 'person';
   return null;
 }
 
@@ -218,11 +220,19 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
   // agent platform page is mostly template copy: its parts are the ones a field drives.
   const template = useMemo(() => (active ? pageTemplate() : null), [active]);
   const agentPlatform = template === 'agent-platform';
-  const live = template !== null;
+  // Live re-render reads account page fields (src/www/live-edit.ts); a person page shows Mark's edits after the save.
+  const live = template === 'agent-platform' || template === 'takeout';
   const defaults =
     variant === 'person' ? PERSON_XRAY_DEFAULTS : ABM_XRAY_DEFAULTS;
   const sections: Array<XraySectionInfo & Partial<Pick<EditSectionInfo, 'fields' | 'hint'>>> = useMemo(
-    () => (agentPlatform ? AGENT_PLATFORM_EDIT : template === 'takeout' ? TAKEOUT_EDIT : resolveXraySections(defaults, page.xraySections)),
+    () =>
+      agentPlatform
+        ? AGENT_PLATFORM_EDIT
+        : template === 'takeout'
+          ? TAKEOUT_EDIT
+          : template === 'person'
+            ? PERSON_EDIT
+            : resolveXraySections(defaults, page.xraySections),
     [agentPlatform, template, defaults, page.xraySections],
   );
 

@@ -3,15 +3,16 @@
  * (src/lib/cta-ping.ts). Public, so it trusts nothing it is sent beyond which page and which button:
  *
  *   1. a JSON post (415 otherwise), from the page's own site when the browser says (Sec-Fetch-Site,
- *      403 otherwise), at most 2 KB; the route must be an account page's (`/<slug>/`) and the button
- *      one of CTA_SOURCES (400 otherwise)
+ *      403 otherwise), at most 2 KB; the route must be an account page's (`/<slug>/`) or a person
+ *      page's (`/<company>/<person>/`) and the button one of CTA_SOURCES (400 otherwise)
  *   2. off unless CTA_PING_WEBHOOK_URL (a Mark webhook) and CTA_PING_WEBHOOK_KEY are set: answers 202
  *      and sends nothing. Set for Production only, so previews and local runs never message anyone
  *   3. while KV_REST_API_* is set: one ping per visitor (address, hashed) per page an hour, ten per
  *      page a day, 300 a day in all. Over a limit answers 202 and sends nothing: the team has been
  *      told already. No KV, or KV down, is no limit (the Mark webhook's key still stands)
- *   4. the page itself, read from Graph (404 without one): the account's name and our team on it.
- *      The account executive is src/lib/account-rep.ts's, the person the page's panel names
+ *   4. the page itself, read from Graph (404 without one): the account's name (and on a person page,
+ *      whose page it is) and our team on it. The account executive is src/lib/account-rep.ts's, the
+ *      person the page's panel names
  *   5. handed to Mark's "Showcase CTA ping" workflow (mark/cta-ping/), which messages the account
  *      executive in Teams from Michiel's account, or adds a row to the follow-up sheet when the
  *      page has none. 202 once Mark has it, 502 when Mark refused it (the panel opens either way)
@@ -24,9 +25,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Redis } from '@upstash/redis';
 
 import { ACCOUNT_TEAM_QUERY } from '../src/lib/account-page-query.js';
+import { PERSON_TEAM_QUERY } from '../src/lib/person-page-query.js';
 import { accountExecutiveOf, realContacts } from '../src/lib/account-rep.js';
 import { CTA_SOURCES, type CtaSource } from '../src/lib/cta-ping.js';
-import type { CompetitorComparisonPage } from '../src/lib/graph-types.js';
+import type { CompetitorComparisonPage, PersonPage } from '../src/lib/graph-types.js';
 import { UTM_KEYS } from '../src/lib/offer-signup.js';
 import { deriveCustomerName } from '../src/lib/page-identity.js';
 
@@ -50,6 +52,8 @@ export interface CtaPing {
   ping_id: string;
   requested_at: string;
   account: string;
+  /** Whose page it is on a person page ("Ben Yu"); empty on an account page. */
+  person: string;
   page: string;
   button: string;
   campaign: string;
@@ -59,6 +63,28 @@ export interface CtaPing {
 }
 
 type TeamPage = Pick<CompetitorComparisonPage, '_metadata' | 'eyebrow' | 'intelHeadline' | 'teamMembers'>;
+type PersonTeamPage = Pick<PersonPage, '_metadata' | 'companyName' | 'personName'> & {
+  team?: Array<{ Initials?: string | null; Name?: string | null; Role?: string | null; Email?: string | null }> | null;
+};
+
+/** What a ping needs of the page it came from, account or person. */
+export interface PingSource {
+  account: string;
+  person: string;
+  team: Array<{ Name?: string | null; Role?: string | null; Email?: string | null }> | null | undefined;
+}
+
+export const accountSource = (page: TeamPage): PingSource => ({
+  account: deriveCustomerName(page as CompetitorComparisonPage),
+  person: '',
+  team: page.teamMembers,
+});
+
+export const personSource = (page: PersonTeamPage): PingSource => ({
+  account: page.companyName || '',
+  person: page.personName || '',
+  team: page.team,
+});
 
 /** One line of text: no control characters, single spaces, at most `max` characters. */
 function clean(value: unknown, max: number): string {
@@ -67,11 +93,19 @@ function clean(value: unknown, max: number): string {
   return value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-/** An account page's route segment ("/tungsten-automation/" -> "tungsten-automation"), or null. */
-export function accountSegmentOf(route: unknown): string | null {
+const SEGMENT = '[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?';
+const ROUTE = new RegExp(`^/(${SEGMENT})(?:/(${SEGMENT}))?/?$`, 'i');
+
+/**
+ * The page a click came from: an account page ("/tungsten-automation/" -> "tungsten-automation")
+ * or a person page ("/logitech/ben-yu/" -> "logitech/ben-yu", person: true). Null for anything else.
+ */
+export function pingRouteOf(route: unknown): { path: string; person: boolean } | null {
   if (typeof route !== 'string') return null;
-  const m = /^\/([a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?)\/?$/i.exec(route.trim());
-  return m ? m[1].toLowerCase() : null;
+  const m = ROUTE.exec(route.trim());
+  // /vb/<slug> is an offer page: it has its own sign-up, and no team to tell.
+  if (!m || m[1].toLowerCase() === 'vb') return null;
+  return { path: (m[2] ? `${m[1]}/${m[2]}` : m[1]).toLowerCase(), person: !!m[2] };
 }
 
 /** JSON with every object's keys sorted and no spaces: the same bytes in Node and in Python. */
@@ -88,18 +122,18 @@ export const checkOf = (ping: Omit<CtaPing, 'check'>): string => createHash('sha
 
 /** The click as Mark receives it: everything about the account from the page, nothing from the visitor but the button and campaign. */
 export function buildPing(
-  page: TeamPage,
-  segment: string,
+  page: PingSource,
+  path: string,
   source: CtaSource,
   utm: Record<string, string>,
   now = new Date(),
   pingId: string = randomUUID(),
 ): CtaPing {
-  const ae = accountExecutiveOf(page.teamMembers);
+  const ae = accountExecutiveOf(page.team);
   const rep = ae
     ? { name: clean(ae.Name, 120), role: clean(ae.Role, 120), email: clean(ae.Email, 254).toLowerCase() }
     : null;
-  const team = realContacts(page.teamMembers)
+  const team = realContacts(page.team)
     .filter((m) => m !== ae && clean(m.Name, 120))
     .slice(0, 5)
     .map((m) => ({ name: clean(m.Name, 120), role: clean(m.Role, 120) }));
@@ -110,8 +144,9 @@ export function buildPing(
     event: 'cta_click',
     ping_id: pingId,
     requested_at: now.toISOString(),
-    account: clean(deriveCustomerName(page as CompetitorComparisonPage), 160) || 'their account',
-    page: `${SITE}/${segment}/`,
+    account: clean(page.account, 160) || 'their account',
+    person: clean(page.person, 120),
+    page: `${SITE}/${path}/`,
     button: BUTTON_LABEL[source],
     campaign: clean(campaign, 600),
     rep,
@@ -120,17 +155,18 @@ export function buildPing(
   return { ...body, check: checkOf(body) };
 }
 
-async function pageAt(segment: string, authKey: string): Promise<TeamPage | null> {
-  for (const slug of [`/${segment}/`, `/en/${segment}/`]) {
+async function pageAt(route: { path: string; person: boolean }, authKey: string): Promise<PingSource | null> {
+  const type = route.person ? 'PersonPage' : 'CompetitorComparisonPage';
+  for (const slug of [`/${route.path}/`, `/en/${route.path}/`]) {
     const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: ACCOUNT_TEAM_QUERY, variables: { slug } }),
+      body: JSON.stringify({ query: route.person ? PERSON_TEAM_QUERY : ACCOUNT_TEAM_QUERY, variables: { slug } }),
       signal: AbortSignal.timeout(5000),
     });
-    const body = (await res.json().catch(() => ({}))) as { data?: { CompetitorComparisonPage?: { items?: TeamPage[] } } };
-    const item = body.data?.CompetitorComparisonPage?.items?.[0];
-    if (item) return item;
+    const body = (await res.json().catch(() => ({}))) as { data?: Record<string, { items?: unknown[] } | undefined> };
+    const item = body.data?.[type]?.items?.[0];
+    if (item) return route.person ? personSource(item as PersonTeamPage) : accountSource(item as TeamPage);
   }
   return null;
 }
@@ -161,7 +197,7 @@ function clientIp(req: VercelRequest): string {
 }
 
 /** Already told, or over a limit? Never blocks a ping when KV is unset or down. */
-async function overLimit(ip: string, segment: string, now: Date): Promise<boolean> {
+async function overLimit(ip: string, path: string, now: Date): Promise<boolean> {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!url || !token) return false;
@@ -169,10 +205,10 @@ async function overLimit(ip: string, segment: string, now: Date): Promise<boolea
     const redis = new Redis({ url, token });
     const day = now.toISOString().slice(0, 10);
     // The address as a hash: the key outlives the request by an hour.
-    const visitor = createHash('sha256').update(`${ip}|${segment}`).digest('hex').slice(0, 32);
+    const visitor = createHash('sha256').update(`${ip}|${path}`).digest('hex').slice(0, 32);
     const first = await redis.set(`cta:visit:${visitor}`, '1', { nx: true, ex: 3600 });
     if (first === null) return true;
-    const pageKey = `cta:page:${segment}:${day}`;
+    const pageKey = `cta:page:${path}:${day}`;
     const allKey = `cta:all:${day}`;
     const [byPage, all] = await Promise.all([redis.incr(pageKey), redis.incr(allKey)]);
     await Promise.all([byPage === 1 && redis.expire(pageKey, 172800), all === 1 && redis.expire(allKey, 172800)]);
@@ -212,9 +248,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(body ? 413 : 400).json({ error: body ? 'Too large' : 'Bad request' });
   }
   const b = body as Record<string, unknown>;
-  const segment = accountSegmentOf(b.route);
+  const route = pingRouteOf(b.route);
   const source = CTA_SOURCES.find((s) => s === b.source);
-  if (!segment || !source) return res.status(400).json({ error: 'Bad request' });
+  if (!route || !source) return res.status(400).json({ error: 'Bad request' });
   const given = (b.utm && typeof b.utm === 'object' ? b.utm : {}) as Record<string, unknown>;
   const utm: Record<string, string> = {};
   for (const key of UTM_KEYS) {
@@ -227,23 +263,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!hook) return res.status(202).json({ ok: true });
 
   const now = new Date();
-  if (await overLimit(clientIp(req), segment, now)) return res.status(202).json({ ok: true });
+  if (await overLimit(clientIp(req), route.path, now)) return res.status(202).json({ ok: true });
 
   const authKey = process.env.GRAPH_AUTH_KEY;
   if (!authKey) {
     console.error('[cta-ping] GRAPH_AUTH_KEY unset: nothing sent');
     return res.status(503).json({ error: 'Unavailable' });
   }
-  let page: TeamPage | null;
+  let page: PingSource | null;
   try {
-    page = await pageAt(segment, authKey);
+    page = await pageAt(route, authKey);
   } catch (err) {
     console.error('[cta-ping] page read failed:', err instanceof Error ? err.message : err);
     return res.status(502).json({ error: 'Unavailable' });
   }
   if (!page) return res.status(404).json({ error: 'Not found' });
 
-  const ping = buildPing(page, segment, source, utm, now);
+  const ping = buildPing(page, route.path, source, utm, now);
   try {
     const r = await fetch(hook.url, {
       method: 'POST',
@@ -253,9 +289,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     if (!r.ok) throw new Error(`Mark answered ${r.status}`);
   } catch (err) {
-    console.error(`[cta-ping] /${segment}/: not handed to Mark:`, err instanceof Error ? err.message : err);
+    console.error(`[cta-ping] /${route.path}/: not handed to Mark:`, err instanceof Error ? err.message : err);
     return res.status(502).json({ error: 'Unavailable' });
   }
-  console.info(`[cta-ping] /${segment}/ ${ping.ping_id}: handed to Mark (${ping.rep ? 'account executive' : 'follow-up sheet'})`);
+  console.info(`[cta-ping] /${route.path}/ ${ping.ping_id}: handed to Mark (${ping.rep ? 'account executive' : 'follow-up sheet'})`);
   return res.status(202).json({ ok: true });
 }

@@ -5,7 +5,7 @@
  *   npm run e2e:www
  *
  * Env: E2E_BASE (default http://127.0.0.1:5199), E2E_ACCOUNT (a takeout pitch, default /cdw/),
- * E2E_AP_ACCOUNT (an agent platform pitch, default /smartsheet/), E2E_OFFER
+ * E2E_AP_ACCOUNT (an agent platform pitch, default /smartsheet/), E2E_PERSON (default /logitech/ben-yu/), E2E_OFFER
  * (default /vb/no-account-left-behind-scale-ai), E2E_OUT (screenshot folder, default a temp dir),
  * E2E_BYPASS (Vercel protection-bypass secret, for a protected preview).
  *
@@ -17,8 +17,8 @@
  * scenes at least 75%, the close the full window; one closing CTA; the intro on load settles; the
  * hero landscape is never upscaled.
  *
- * Covers, for both account templates (each page's own pitch picks one: src/www/account-template.ts)
- * and the offer page:
+ * Covers, for both account templates (each page's own pitch picks one: src/www/account-template.ts),
+ * the person page and the offer page:
  * server render + hydration without errors, no sideways scroll on a phone, every section present,
  * sticky bar, the one-click connect panel (pings once per view, from the sticky bar or the close),
  * the review layer and state switch, the offer FAQ, X-ray mode outlining every section, Edit mode
@@ -30,7 +30,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, TAKEOUT_EDIT } from '../src/lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, PERSON_EDIT, PERSON_XRAY_DEFAULTS, TAKEOUT_EDIT } from '../src/lib/xray-defaults'
 
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
 /** A page that pitches a CMS takeout: the takeout template. */
@@ -38,6 +38,8 @@ const ACCOUNT = process.env.E2E_ACCOUNT || '/cdw/'
 /** A page that pitches the agent platform: Laura's template. */
 const AP_ACCOUNT = process.env.E2E_AP_ACCOUNT || '/smartsheet/'
 const OFFER = process.env.E2E_OFFER || '/vb/no-account-left-behind-scale-ai'
+/** A person page (the 1:1 buyer page, `/<company>/<person>/`) whose team has an account executive. */
+const PERSON = process.env.E2E_PERSON || '/logitech/ben-yu/'
 const OUT = process.env.E2E_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'www-e2e-'))
 const BYPASS = process.env.E2E_BYPASS
 
@@ -404,6 +406,70 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   await shot(page, `takeout-${vp}`)
   await ctx.close()
 
+  console.log(`\nperson page, ${vp}`)
+  {
+    const { ctx, watch } = await newContext(browser, vp)
+    const page = await open(ctx, watch, url(PERSON))
+    await test('server-rendered in the www design and hydrated without errors', async () => {
+      const html = await (await fetch(url(PERSON), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      expect(/class="www-page[^"]*\bwww-person\b/.test(html) && html.includes('id="cta"'), 'the server did not render the www person page')
+      expect(!/person__sky|person-galaxy/.test(html), 'the old galaxy page is still rendered')
+      expect(!watch.errors.length, watch.errors.join('\n'))
+    })
+    await test('every scene of the person page is there', async () => {
+      for (const id of ['hero', 'note', 'problem', 'operation', 'practice', 'how', 'proof', 'working', 'cta'])
+        expect(await page.locator(`#${id}`).count(), `#${id} missing`)
+    })
+    await test('no sideways scroll', () => noSidewaysScroll(page))
+    await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
+    if (vp === 'desktop') {
+      await test('desktop: full screen hero at 75% of the window; scenes at least 75%', () => sceneHeights(page, 900))
+    }
+    await test('the intro plays on load and settles', () => introSettles(page))
+    await test('the hero landscape is never upscaled', () => heroImageSharp(page))
+    await test('personalization said once: their account logo and the stored eyebrow above the h1', async () => {
+      expect((await page.locator('#hero .www-account').count()) === 1, 'no account mark, or two')
+      expect(/Written for/i.test(await page.locator('#hero .www-account__label').innerText()), 'the eyebrow is not beside the logo')
+    })
+    await test('the close has one call to action', async () => {
+      const n = await page.locator('#cta .www-btn').count()
+      expect(n === 1, `${n} buttons in the close`)
+    })
+    await test('the sticky bar appears past the hero and hides at the close', async () => {
+      await page.evaluate(() => scrollTo(0, 0))
+      await page.waitForTimeout(300)
+      expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
+      await page.locator('#practice').scrollIntoViewIfNeeded()
+      await page.waitForSelector('.www-sticky--visible', { timeout: 3000 })
+      await page.locator('#cta').scrollIntoViewIfNeeded()
+      await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
+    })
+    await test('one click tells their account executive (the panel names them), once, and asks for no form', async () => {
+      await page.locator('#cta-connect-btn').click()
+      const panel = page.getByRole('dialog')
+      await panel.getByText("You're all set").waitFor({ timeout: 3000 })
+      expect(!(await panel.locator('form, input, textarea').count()), 'the panel has a form field')
+      expect(/We've let Caleb know/.test(await panel.innerText()), `the panel does not name the account executive: ${(await panel.innerText()).slice(0, 120)}`)
+      await page.waitForTimeout(500)
+      await page.screenshot({ path: path.join(OUT, `person-connect-${vp}.png`) })
+      await page.keyboard.press('Escape')
+      await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
+      const pings = await pingsOf(page)
+      expect(pings.length === 1 && pings[0].source === 'cta-connect-btn' && pings[0].route === new URL(page.url()).pathname, `pings: ${JSON.stringify(pings)}`)
+      expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
+    })
+    if (vp === 'phone') {
+      await test('phone: the hero ask is in the first screen', async () => {
+        await page.evaluate(() => scrollTo(0, 0))
+        await page.waitForTimeout(300)
+        const cta = await page.locator('#hero .www-btn').first().boundingBox()
+        expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
+      })
+    }
+    await shot(page, `person-${vp}`)
+    await ctx.close()
+  }
+
   console.log(`\noffer page, ${vp}`)
   const o = await newContext(browser, vp)
   const op = await open(o.ctx, o.watch, url(OFFER))
@@ -736,6 +802,56 @@ console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
   await ctx.close()
 }
 
+console.log('\nbooth tools on the person page (signed in, ?search=1)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  let asked = ''
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    asked = route.request().postData() || ''
+    const events = [
+      { type: 'plan', sections: ['The note'], summary: 'e2e' },
+      { type: 'section_focus', section: 'The note' },
+      { type: 'done', saved: false },
+    ]
+    const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
+  const page = await open(ctx, watch, url(PERSON, 'search=1'))
+  const onPage = await page.evaluate((ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)), PERSON_XRAY_DEFAULTS.map((s) => s.id))
+  await test('the page tools render for a signed-in employee', async () => {
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).waitFor({ timeout: 5000 })
+  })
+  await test(`X-ray outlines every part of the person page (${onPage.length} of ${PERSON_XRAY_DEFAULTS.length})`, async () => {
+    expect(onPage.length >= PERSON_XRAY_DEFAULTS.length - 2, `only ${onPage.join(', ')}`)
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('.xray-card').length >= n, onPage.length, { timeout: 8000 })
+    const titles = await page.$$eval('.xray-card__title', (els) => els.map((e) => e.textContent))
+    for (const t of PERSON_XRAY_DEFAULTS.filter((s) => onPage.includes(s.id)).map((s) => s.title)) expect(titles.includes(t), `no X-ray card for "${t}"`)
+    await page.screenshot({ path: path.join(OUT, 'booth-person-xray.png') })
+    await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
+  })
+  await test('Edit mode offers every part of the person page and names its fields for Mark', async () => {
+    const editable = PERSON_EDIT.filter((s) => onPage.includes(s.id))
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, editable.length, { timeout: 8000 })
+    const labels = await page.$$eval('[aria-label^="Leave feedback on "]', (els) => els.map((e) => e.getAttribute('aria-label')!.replace('Leave feedback on ', '')))
+    for (const s of editable) expect(labels.includes(s.title), `"${s.title}" is not offered`)
+    await page.locator('[aria-label="Leave feedback on The note"]').click()
+    await page.locator('.edit-popup__textarea').fill('Shorter, please')
+    await page.locator('.edit-popup__btn--primary').click()
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForFunction(() => true, null, { timeout: 2000 })
+    for (let i = 0; i < 30 && !asked; i++) await page.waitForTimeout(200)
+    const req = JSON.parse(asked || '{}').suggested_edit || ''
+    expect(/Section: The note\nFields: noteBody, noteSignedBy, noteSignedByRole, noteSignedByInitials, noteDate\nFeedback: Shorter, please/.test(req), `the request does not name the note's fields: ${req.slice(0, 200)}`)
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
 console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
 {
   const CMS = 'https://app-opti01saas4uc99t001.cms.optimizely.com'
@@ -743,6 +859,7 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
   const accountKey = await keyOf(`slug=${encodeURIComponent(ACCOUNT.replace(/^\/|\/$/g, ''))}`)
   const apKey = await keyOf(`slug=${encodeURIComponent(AP_ACCOUNT.replace(/^\/|\/$/g, ''))}`)
   const offerKey = await keyOf(`kind=experience&slug=${encodeURIComponent(OFFER.replace(/^\/vb\/|\/$/g, ''))}`)
+  const personKey = await keyOf(`slug=${encodeURIComponent(PERSON.replace(/^\/|\/$/g, ''))}`)
   const { ctx, watch } = await newContext(browser, 'desktop')
   // The CMS's editor script is the CMS's own: stood in here, and noted, so the test stays on this machine.
   const injector: string[] = []
@@ -770,7 +887,7 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     )
 
   await test('the keys of the pages under test were found', async () => {
-    expect(accountKey && apKey && offerKey, `account ${accountKey}, agent platform ${apKey}, offer ${offerKey}`)
+    expect(accountKey && apKey && offerKey && personKey, `account ${accountKey}, agent platform ${apKey}, offer ${offerKey}, person ${personKey}`)
   })
   const page = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=edit`)
   await test('a takeout pitch in the editor is the takeout page in the new design, as at its address', async () => {
@@ -870,6 +987,19 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     expect((await op.locator('#main-content [data-epi-block-id]').count()) > sections.length, 'the elements are not outlined')
   })
   await shot(op, 'cms-preview-offer')
+
+  const pv = await open(ctx, watch, `${BASE}/preview?key=${personKey}&loc=en&ctx=edit`)
+  await test('a person page in the editor is the www person page, its stored fields outlined, and its ask tells nobody', async () => {
+    await pv.waitForSelector('.www-page.www-person #note', { timeout: 10000 })
+    const hooks = await pv.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
+    for (const f of ['heroEyebrow', 'companyLogo', 'noteBody', 'scorecard', 'provenance', 'solutions', 'peerProof', 'team', 'ctaTitle', 'footerLine'])
+      expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
+    await pv.locator('#cta-connect-btn').click()
+    await pv.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+    await pv.keyboard.press('Escape')
+    expect(!(await pingsOf(pv)).length, 'the preview pinged the team')
+  })
+  await shot(pv, 'cms-preview-person')
   await test('no errors, and nothing reached the real webhooks', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))
     expect(!watch.escaped.length, watch.escaped.join(', '))

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PreviewComponent } from '@optimizely/cms-sdk/react/client';
 import { usePreviewContent } from '../hooks/usePreviewContent';
 import { useHeadMeta } from '../hooks/useHeadMeta';
-import type { CompetitorComparisonPage, PreviewBlock } from '../lib/graph-types';
+import type { CompetitorComparisonPage, PersonPage as PersonPageData, PreviewBlock } from '../lib/graph-types';
 import { agentPlatformHead } from '../www/agent-platform/content';
 import { accountTemplateOf } from '../www/account-template';
 import { CmsEditProvider } from '../www/cms-edit';
@@ -16,6 +16,7 @@ import type { Experience } from './VisualBuilderPage';
  *
  * It draws what the live address draws, from the same content (/api/preview):
  *   - an account page: the template its pitch calls for (src/www/account-template.ts)
+ *   - a person page: the www person page (src/www/PersonPage.tsx)
  *   - an offer page: the www offer design; any other experience: its composition (ExperienceBody)
  *   - one of the few legacy blocks still in the CMS: BlockPreview
  *
@@ -38,6 +39,7 @@ const CMS_URL = (() => {
 const INJECTOR_ID = 'opti-cms-injector';
 
 const AccountRoute = lazy(() => import('../www/AccountRoute'));
+const PersonPage = lazy(() => import('../www/PersonPage'));
 const ExperienceBody = lazy(() => import('./VisualBuilderPage').then((m) => ({ default: m.ExperienceBody })));
 const BlockPreview = lazy(() => import('./BlockPreview'));
 
@@ -119,6 +121,8 @@ export default function CmsPreview() {
         );
     } else if (isAccountPage) {
         body = <AccountRoute page={data as CompetitorComparisonPage} search={searchParams.toString()} />;
+    } else if ((data.__typename as string) === 'PersonPage') {
+        body = <PersonPage page={data as unknown as PersonPageData} />;
     } else if (EXPERIENCE_TYPES.has(String(data.__typename))) {
         body = <ExperienceBody experience={data as unknown as Experience} preview={editing} />;
     } else {

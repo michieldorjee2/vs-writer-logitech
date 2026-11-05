@@ -22,11 +22,14 @@
  *      every stored field is either used or deliberately not shown
  *   7. the CMS preview: /api/preview serves a draft as the live address would, and in the CMS
  *      editor the pages carry the SDK's on-page editing hooks (and nowhere else)
+ *   8. the person page (src/www/PersonPage.tsx): every stored field shown or deliberately not,
+ *      nothing from Salesforce on the page, one ask, its X-ray and Edit hooks, its CMS preview
+ *   9. the CTA ping: the browser sends only the page and button, the server reads the team itself
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { renderToString } from 'react-dom/server'
-import type { CompetitorComparisonPage } from '../../lib/graph-types'
+import type { CompetitorComparisonPage, PersonPage as PersonPageData } from '../../lib/graph-types'
 import AccountPage, { connectProps } from '../AccountPage'
 import OfferPage from '../OfferPage'
 import { ACCOUNT_FIELDS, ACCOUNT_PAGE_PROPERTIES } from '../account-fields'
@@ -38,7 +41,7 @@ import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from 
 import { forgetParentAccounts, parentAccountsOf, parentKey, withParentAccount } from '../../../api/_lib/parent-account'
 import { forgetOfferPages, offerPagesByOffer } from '../../../api/_lib/offer-pages'
 import { withPages } from '../../../api/_lib/offers'
-import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, TAKEOUT_EDIT } from '../../lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, PERSON_EDIT, PERSON_XRAY_DEFAULTS, TAKEOUT_EDIT } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
 import { applyLiveField, changedLiveFields, getLivePatch, LIVE_FIELDS, liveFieldValue, liveValue, mergeLive, resetLive } from '../live-edit'
 import { COPY_KEYS, COPY_THEMES, copyEdits, copyKey, copyValue, expandFields, readCopy } from '../../lib/page-copy'
@@ -53,8 +56,10 @@ import { CmsEditProvider } from '../cms-edit'
 import { inCmsPreview } from '../../lib/cms-preview'
 import { postSignup } from '../../lib/offer-signup'
 import { sendCtaPing } from '../../lib/cta-ping'
+import PersonPage, { personConnectProps } from '../PersonPage'
+import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, measuresOf, peerProofOf, TIER_LABEL } from '../person-content'
 import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
-import ctaPingHandler, { accountSegmentOf, buildPing, canonicalJson, checkOf, type CtaPing } from '../../../api/cta-ping'
+import ctaPingHandler, { accountSource, buildPing, canonicalJson, checkOf, personSource, pingRouteOf, type CtaPing } from '../../../api/cta-ping'
 import previewHandler, { concreteType } from '../../../api/preview'
 import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
 import { readStack, stackTiles } from '../agent-platform/stack'
@@ -1478,7 +1483,10 @@ test('a live edit re-renders the takeout page from Mark\'s value: text and lists
 
 test('Edit mode runs the takeout page the way it runs the agent platform page', () => {
   const src = readFileSync('src/components/EditMode.tsx', 'utf8')
-  assert.match(src, /template === 'takeout' \? TAKEOUT_EDIT/)
+  assert.match(src, /template === 'takeout'\s*\?\s*TAKEOUT_EDIT/)
+  assert.match(src, /template === 'person'\s*\?\s*PERSON_EDIT/)
+  // Live re-render reads account page fields: the person page is not live.
+  assert.match(src, /const live = template === 'agent-platform' \|\| template === 'takeout'/)
   assert.match(src, /if \(live && ev\.field !== undefined && ev\.value !== undefined && applyLiveField/)
   assert.match(accountHtml, /class="www-page[^"]*\bwww-takeout\b/)
 })
@@ -1824,7 +1832,7 @@ const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJlZGl0b3IifQ.c2lnbmF0dXJl'
  * What Graph really answers for a key through `_Content` (measured on the live instance): the BASE
  * type as `__typename`, the concrete one first in `_metadata.types`.
  */
-const BASE_TYPE: Record<string, string> = { CompetitorComparisonPage: '_Page', ABMExperience: '_Experience', HeroSectionBlock: '_Component' }
+const BASE_TYPE: Record<string, string> = { CompetitorComparisonPage: '_Page', PersonPage: '_Page', ABMExperience: '_Experience', HeroSectionBlock: '_Component' }
 const typed = (type: string) => ({
   data: { _Content: { items: [{ __typename: BASE_TYPE[type], _metadata: { types: [type, ...(BASE_TYPE[type] === '_Experience' ? ['_Experience', '_Page'] : [BASE_TYPE[type]]), '_Content', '_Item'] } }] } },
 })
@@ -1956,6 +1964,199 @@ test('the CMS preview loads the editor script from the CMS and refreshes through
   assert.ok(!/addEventListener\(/.test(hook), 'a second save listener beside the SDK')
 })
 
+console.log('\nthe person page: the 1:1 buyer page in the www design')
+
+/** A person page with every stored field filled, each with a value that can only come from that field. */
+function fullPersonPage(over: Partial<PersonPageData> = {}): PersonPageData {
+  return {
+    _metadata: { key: 'p0000000000000000000000000000001', url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } },
+    template: 'person',
+    companySlug: 'logitech',
+    companyName: 'Logitech G',
+    personSlug: 'ben-yu',
+    crmContactId: 'CRM-0035e00001XyZ',
+    PageTitle: 'P-title',
+    MetaDescription: 'P-meta',
+    noIndex: true,
+    personName: 'Ben Yu',
+    personTitle: 'P-title-of-person',
+    personInitials: 'P-INI',
+    personLinkedIn: { default: 'https://www.linkedin.com/in/p-linkedin' },
+    personAvatarColor: '#ff00aa',
+    companyLogo: { default: 'https://example.test/p-logo.svg' },
+    brandAccentColor: '#00b8fc',
+    heroEyebrow: 'P-eyebrow',
+    heroHeadline: 'P-headline',
+    heroSubheadline: 'P-subheadline',
+    heroCtaText: 'P-hero-cta',
+    heroCtaUrl: { default: 'https://www.optimizely.com/contact/?p-hero-url' },
+    engagementTier: 'engaged',
+    engagementHeadline: 'P-SECRET-engagement-headline',
+    engagementSummary: 'P-SECRET-engagement-summary',
+    touchpoints: [{ Date: '2026-01-01', Kind: 'email', Summary: 'P-SECRET-touchpoint', OptimizelyPerson: 'P-SECRET-sender' } as never],
+    openOpportunityName: 'P-SECRET-opportunity',
+    openOpportunityStage: 'P-SECRET-stage',
+    openOpportunityDetail: 'P-SECRET-opportunity-detail',
+    remitHeadline: 'P-remit-headline',
+    remitIntro: 'P-SECRET-remit-intro',
+    remitPoints: [{ Title: 'P-remit-title', Description: 'P-remit-desc', Metric: 'P-remit-metric' }],
+    roleFrame: 'P-role-frame',
+    noteBody: 'P-note-body',
+    noteSignedBy: 'Caleb Ping',
+    noteSignedByRole: 'P-signed-role',
+    noteSignedByInitials: 'PQ',
+    noteDate: '2026-10-22',
+    researchHeadline: 'P-SECRET-research-headline',
+    researchClaim: 'P-SECRET-research-claim',
+    provenance: [
+      { Register: 'read', Text: 'P-read-fact', SourceLabel: 'P-read-source', SourceUrl: { default: 'https://example.test/p-read' } },
+      { Register: 'told', Text: 'P-told-words', SourceLabel: 'P-told-source', SourceUrl: null },
+      { Register: 'assumed', Text: 'P-assumed', SourceLabel: 'P-SECRET-assumed-source', SourceUrl: null },
+    ],
+    scorecardHeadline: 'P-scorecard-headline',
+    scorecardIntro: 'P-SECRET-scorecard-intro',
+    scorecard: [{ Measure: 'P-measure', WhyHard: 'P-why-hard', WhatChanges: 'P-what-changes', Metric: 'P-metric' }],
+    solutionsHeadline: 'P-solutions-headline',
+    solutionsIntro: 'P-solutions-intro',
+    solutions: [{ Product: 'opal', Headline: 'P-solution-headline', Body: 'P-solution-body', WhyFirst: 'P-why-first' }],
+    keyNumberValue: '4',
+    keyNumberPrefix: 'EUR',
+    keyNumberSuffix: 'M+',
+    keyNumberLabel: 'P-key-label',
+    keyNumberDetail: 'P-key-detail',
+    keyNumberCitationUrl: { default: 'https://example.test/p-cite' },
+    peerProofHeadline: 'P-peer-headline',
+    peerProof: [
+      { Quote: 'P-quote-1', PersonName: 'P-peer', PersonTitle: 'P-peer-title', Company: 'P-peer-co', SourceUrl: { default: 'https://example.test/p-story' } },
+      { Quote: 'P-quote-dup', PersonName: 'P-peer', PersonTitle: 'P-peer-title', Company: 'P-peer-co', SourceUrl: null },
+    ],
+    teamHeadline: 'P-team-headline',
+    team: [
+      { Initials: 'CP', Name: 'Caleb Ping', Role: 'Enterprise Account Executive', Email: 'caleb.ping@optimizely.com', AvatarColor: null, AlreadyMet: true },
+      { Initials: 'SA', Name: 'Solutions Architect', Role: 'Solutions Architect', Email: null, AvatarColor: null, AlreadyMet: false },
+      { Initials: 'AE', Name: 'Account Executive', Role: 'Account Executive', Email: null, AvatarColor: null, AlreadyMet: false },
+      { Initials: 'ZF', Name: 'Zac Fenn', Role: 'P-team-role', Email: null, AvatarColor: null, AlreadyMet: false },
+    ],
+    ctaTitle: 'P-cta-title',
+    ctaBody: 'P-cta-body',
+    ctaButtonText: 'P-cta-button',
+    meetingUrl: { default: 'https://scheduler.zoom.us/p-booking' },
+    footerLine: 'P-footer-line',
+    generatedAt: 'P-SECRET-generated-at',
+    generatedBy: 'P-SECRET-generated-by',
+    ...over,
+  } as PersonPageData
+}
+const personHtml = renderToString(<PersonPage page={fullPersonPage()} />)
+
+test('PERSON_FIELDS places every field the person page query reads, and nothing else', () => {
+  const src = readFileSync('src/lib/person-page-query.ts', 'utf8')
+  const list = src.slice(src.indexOf('const PERSON_PAGE_FIELDS = `') + 28, src.indexOf('`;', src.indexOf('const PERSON_PAGE_FIELDS')))
+  let flat = list
+  while (/\{[^{}]*\}/.test(flat)) flat = flat.replace(/\{[^{}]*\}/g, ' ')
+  const queried = flat.split(/\s+/).filter((w) => w && w !== '_metadata')
+  assert.deepEqual([...PERSON_FIELDS.map((f) => f.field)].sort(), [...queried].sort())
+})
+
+test('a person page shows every stored field it places, and nothing that is never shown', () => {
+  const text = textOf(personHtml)
+  const page = fullPersonPage() as unknown as Record<string, unknown>
+  const strings = (v: unknown): string[] =>
+    typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(strings) : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : []
+  for (const f of PERSON_FIELDS.filter((x) => x.use === 'text')) {
+    const values = strings(page[f.field]).filter((v) => v.startsWith('P-') && !v.startsWith('P-SECRET'))
+    for (const v of values) {
+      // Fields shown only when another is missing are checked below.
+      if (['P-remit-headline', 'P-remit-title', 'P-remit-desc', 'P-remit-metric', 'P-what-changes', 'P-quote-dup', 'P-title-of-person'].includes(v)) continue
+      assert.ok(text.includes(v), `${f.field}: "${v}" is not on the page`)
+    }
+  }
+  assert.ok(!/P-SECRET/.test(personHtml), `a never-shown field reached the page: ${personHtml.match(/P-SECRET[\w-]*/g)}`)
+  assert.ok(!personHtml.includes('CRM-0035e'), 'the Salesforce contact id is on the page')
+  assert.ok(!personHtml.includes('p-hero-url'), 'the hero links out to the stored contact form')
+  // The attr fields, in the markup.
+  for (const v of ['https://www.linkedin.com/in/p-linkedin', 'https://example.test/p-logo.svg', 'https://example.test/p-cite', 'https://example.test/p-read', '/logitech/']) {
+    assert.ok(personHtml.includes(v), v)
+  }
+  assert.match(personHtml, /--www-accent:#00b8fc/)
+  // The pairs: a headline replaces the name as the h1, a subheadline the title; the scorecard replaces remitPoints.
+  assert.match(personHtml, /<h1[^>]*>.*P-headline/s)
+  const bare = textOf(renderToString(<PersonPage page={fullPersonPage({ heroHeadline: null, heroSubheadline: null, scorecard: [] })} />))
+  for (const v of ['Ben Yu', 'P-title-of-person', 'P-remit-headline', 'P-remit-title', 'P-remit-desc', 'P-remit-metric']) assert.ok(bare.includes(v), v)
+})
+
+test('a person page keeps the rules: CRM never shown, the badge from the reader\'s side, the working visible', () => {
+  const text = textOf(personHtml)
+  assert.ok(text.includes(TIER_LABEL.engaged))
+  for (const tier of ['key', 'engaged', 'known'] as const) {
+    const t = textOf(renderToString(<PersonPage page={fullPersonPage({ engagementTier: tier })} />))
+    assert.ok(t.includes(TIER_LABEL[tier]), tier)
+    assert.ok(!/Active opportunity|opportunity|pipeline|stage/i.test(t.replace(/P-SECRET[\w-]*/g, '')), `${tier}: CRM language on the page`)
+  }
+  // Their words and our assumptions, with the invitation to correct them.
+  assert.match(text, /You said\s*P-told-words/)
+  assert.match(text, /We assumed\s*P-assumed/)
+  assert.match(text, /If any of that is wrong, tell Caleb Ping and we.ll rewrite it/)
+  // Placeholders are nobody; the account executive's "You have met" stays.
+  assert.ok(!text.includes('Solutions Architect') && !/Account Executive\b(?! )/.test(text.replace('Enterprise Account Executive', '')), 'a placeholder contact')
+  assert.ok(text.includes('You have met'))
+  // One voice per quote card; the one number with its symbol.
+  assert.equal(peerProofOf(fullPersonPage()).length, 1)
+  assert.equal(keyNumberText({ keyNumberPrefix: 'EUR', keyNumberValue: '4', keyNumberSuffix: 'M+' }), '€4M+')
+  assert.equal(keyNumberText({ keyNumberPrefix: null, keyNumberValue: '1500', keyNumberSuffix: null }), '1,500')
+  assert.equal(formatDate('2026-10-22'), '22 Oct 2026')
+  assert.deepEqual(measuresOf({ scorecard: [], remitPoints: null }), [])
+})
+
+test('a person page has one ask: the one-click button, with a booking link only when it is one', () => {
+  assert.equal((personHtml.match(/id="cta-connect-btn"/g) || []).length, 1)
+  assert.ok(!/<form\b|<input\b|<textarea\b/.test(personHtml), 'a form on the page')
+  assert.ok(!/<nav\b|<footer\b/.test(personHtml), 'navigation or a footer')
+  assert.match(textOf(personHtml), /P-cta-button/)
+  assert.deepEqual(personConnectProps(fullPersonPage()).people.map((p) => p.name), ['Caleb Ping', 'Zac Fenn'])
+  assert.equal(personConnectProps(fullPersonPage()).scheduleUrl, 'https://scheduler.zoom.us/p-booking')
+  // 21 of the 33 pages store optimizely.com/contact: a form, so no "Schedule a call", and no booking promise on the button.
+  const contact = fullPersonPage({ meetingUrl: { default: 'https://www.optimizely.com/contact/' } })
+  assert.equal(bookingUrlOf(contact), null)
+  assert.equal(askLabelOf(contact), 'Talk to your team')
+  assert.equal(bookingUrlOf({ meetingUrl: { default: '/bentley-systems/' } }), null)
+  assert.equal(bookingUrlOf({ meetingUrl: { default: 'http://calendly.com/x' } }), null)
+  assert.match(textOf(renderToString(<PersonPage page={contact} />)), /Talk to your team/)
+  // The hero's second button scrolls to the page's argument, never to the stored contact form.
+  assert.match(personHtml, /href="#practice"[^>]*>P-hero-cta/)
+})
+
+test('X-ray and Edit mode find every part of a person page, and Edit mode names its fields', () => {
+  for (const s of PERSON_XRAY_DEFAULTS) assert.ok(personHtml.includes(`data-xray="${s.id}"`), s.id)
+  for (const s of PERSON_EDIT) {
+    assert.equal(s.selector, `[data-xray="${s.id}"]`)
+    for (const f of s.fields) assert.ok(PERSON_FIELDS.some((p) => p.field === f), `${s.id}: ${f} is not a person page field`)
+  }
+  assert.match(personHtml, /class="www-page[^"]*\bwww-person\b/)
+  assert.equal(buildSuggestedEdit([{ title: 'The note', feedback: 'shorter', fields: ['noteBody'] }], 'person'), 'Section: The note\nFields: noteBody\nFeedback: shorter')
+})
+
+test('in the CMS editor a person page carries the on-page editing hooks, and nowhere else', () => {
+  assert.deepEqual(epi(personHtml), [])
+  const hooks = epi(renderToString(<CmsEditProvider editing><PersonPage page={fullPersonPage()} /></CmsEditProvider>))
+  for (const f of ['heroEyebrow', 'heroHeadline', 'noteBody', 'scorecard', 'solutions', 'keyNumberValue', 'peerProof', 'team', 'ctaTitle', 'ctaButtonText', 'footerLine']) {
+    assert.ok(hooks.includes(`edit:${f}`), f)
+  }
+  for (const h of hooks) assert.ok(PERSON_FIELDS.some((p) => `edit:${p.field}` === h), `${h} is not a person page field`)
+})
+
+testAsync('a person page draft comes back from /api/preview with the live fields, and draws the www person page', async () => {
+  const draft = fullPersonPage({ _metadata: { key: KEY, url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } } })
+  await withPreviewGraph({ GetPreviewType: typed('PersonPage'), GetPersonPagePreview: { data: { PersonPage: { items: [draft] } } } }, async (calls) => {
+    const r = await preview({ key: KEY, ver: '7', loc: 'en', ctx: 'edit', preview_token: TOKEN })
+    assert.equal(r.status, 200)
+    assert.deepEqual(calls.map((c) => c.op), ['GetPreviewType', 'GetPersonPagePreview'])
+    const page = r.body as PersonPageData & { __typename: string }
+    assert.equal(page.__typename, 'PersonPage')
+    assert.match(textOf(renderToString(<PersonPage page={page} />)), /P-note-body/)
+  })
+})
+
 console.log('\nthe CTA ping: the click reaches the account executive, or the follow-up sheet')
 
 /* The team a page stores, in the order the builder wrote it: an SDR first, a placeholder, then the AE. */
@@ -1977,6 +2178,7 @@ test('the account executive is found by role, never by position, and placeholder
   assert.equal(accountExecutiveOf([{ Initials: 'AE', Name: 'Your Account Executive', Role: 'Account Executive', Email: null }]), null, 'a role title is not a person')
   assert.equal(accountExecutiveOf([{ Initials: 'x', Name: ' ', Role: 'Account Executive', Email: 'a@optimizely.com' }]), null, 'an unnamed AE')
   assert.equal(accountExecutiveOf(null), null)
+  assert.equal(accountExecutiveOf([{ Name: 'Rob Janes', Role: 'Strategic Accounts Executive' }])?.Name, 'Rob Janes', 'a strategic accounts executive is one')
   // The panel says the person the ping told, so with no AE it names nobody ("your Optimizely team").
   const people = PING_TEAM.map((m) => ({ name: m.Name, role: m.Role, email: m.Email, initials: m.Initials }))
   assert.equal(toldFirstName(people), 'Alex')
@@ -1984,7 +2186,7 @@ test('the account executive is found by role, never by position, and placeholder
 })
 
 test('a ping names the page, its account executive and the rest of the team; the visitor only the button and campaign', () => {
-  const ping = buildPing(PING_PAGE as never, 'zurich-versicherung', 'sticky-connect-btn', { source: 'outreach', campaign: 'q4 <takeout>' }, new Date('2026-11-04T23:06:28.545Z'), '77dfb03f-a82d-4ee3-97a1-36b20f6f4043')
+  const ping = buildPing(accountSource(PING_PAGE as never), 'zurich-versicherung', 'sticky-connect-btn', { source: 'outreach', campaign: 'q4 <takeout>' }, new Date('2026-11-04T23:06:28.545Z'), '77dfb03f-a82d-4ee3-97a1-36b20f6f4043')
   assert.deepEqual(ping.rep, { name: 'Alex Exec', role: 'Enterprise Account Executive', email: 'alex.exec@optimizely.com' })
   assert.deepEqual(ping.team, [{ name: 'Sam Rep', role: 'Sales Development Representative' }], 'the AE twice, or the placeholder')
   assert.equal(ping.page, 'https://showcase.optimizely.com/zurich-versicherung/')
@@ -2000,19 +2202,42 @@ test('a ping names the page, its account executive and the rest of the team; the
   const changed = { ...rest, rep: { ...rest.rep!, email: 'someone.else@optimizely.com' } }
   assert.notEqual(checkOf(changed), check, 'a changed ping keeps its check')
   // No AE on the page: rep is null and everyone real is the team.
-  const none = buildPing({ ...PING_PAGE, teamMembers: PING_TEAM.slice(0, 2) } as never, 'zurich-versicherung', 'hero-connect-btn', {})
+  const none = buildPing(accountSource({ ...PING_PAGE, teamMembers: PING_TEAM.slice(0, 2) } as never), 'zurich-versicherung', 'hero-connect-btn', {})
   assert.equal(none.rep, null)
   assert.deepEqual(none.team.map((m) => m.name), ['Sam Rep'])
   assert.equal(none.campaign, '')
   assert.match(none.ping_id, /^[0-9a-f-]{36}$/)
 })
 
-test('a ping is only ever for an account page route', () => {
-  assert.equal(accountSegmentOf('/tungsten-automation/'), 'tungsten-automation')
-  assert.equal(accountSegmentOf('/Lenovo'), 'lenovo')
-  for (const bad of ['/', '/vb/offer', '/acme/jane-smith/', '/-acme/', '/acme-/', '/../x/', '/acme?x=1', 'acme', 42, null, `/${'a'.repeat(201)}/`]) {
-    assert.equal(accountSegmentOf(bad), null, String(bad))
+test('a ping is only ever for an account page or a person page route', () => {
+  assert.deepEqual(pingRouteOf('/tungsten-automation/'), { path: 'tungsten-automation', person: false })
+  assert.deepEqual(pingRouteOf('/Lenovo'), { path: 'lenovo', person: false })
+  assert.deepEqual(pingRouteOf('/logitech/ben-yu/'), { path: 'logitech/ben-yu', person: true })
+  for (const bad of ['/', '/a/b/c/', '/-acme/', '/acme-/', '/../x/', '/acme/../x/', '/acme?x=1', 'acme', 42, null, `/${'a'.repeat(201)}/`]) {
+    assert.equal(pingRouteOf(bad), null, String(bad))
   }
+})
+
+test("a person page's ping names whose page it is, its account, and its own team's account executive", () => {
+  const ping = buildPing(
+    personSource({
+      _metadata: { url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } },
+      companyName: 'Logitech G',
+      personName: 'Ben Yu',
+      team: [
+        { Initials: 'ZF', Name: 'Zac Fenn', Role: 'Global Head of Alliances', Email: 'zac@optimizely.com' },
+        { Initials: 'CP', Name: 'Caleb Ping', Role: 'Enterprise Account Executive', Email: 'caleb.ping@optimizely.com' },
+      ],
+    } as never),
+    'logitech/ben-yu',
+    'cta-connect-btn',
+    {},
+  )
+  assert.equal(ping.page, 'https://showcase.optimizely.com/logitech/ben-yu/')
+  assert.equal(ping.account, 'Logitech G')
+  assert.equal(ping.person, 'Ben Yu')
+  assert.deepEqual(ping.rep, { name: 'Caleb Ping', role: 'Enterprise Account Executive', email: 'caleb.ping@optimizely.com' })
+  assert.deepEqual(ping.team, [{ name: 'Zac Fenn', role: 'Global Head of Alliances' }])
 })
 
 type PingCall = { url: string; headers: Record<string, string>; body: string }
@@ -2020,7 +2245,7 @@ type PingCall = { url: string; headers: Record<string, string>; body: string }
 /** POST /api/cta-ping with Graph and Mark stood in. Nothing reaches the network; KV is off. */
 async function ping(
   input: { method?: string; headers?: Record<string, string>; body?: unknown },
-  stand: { page?: unknown; mark?: number; env?: Record<string, string | undefined> } = {},
+  stand: { page?: unknown; person?: unknown; mark?: number; env?: Record<string, string | undefined> } = {},
 ) {
   const env = { CTA_PING_WEBHOOK_URL: 'https://webhook.mark.optimizely.com/webhooks/inst/trigger', CTA_PING_WEBHOOK_KEY: 'k'.repeat(32), GRAPH_AUTH_KEY: 'graph-key', KV_REST_API_URL: undefined, KV_REST_API_TOKEN: undefined, ...stand.env }
   const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]))
@@ -2034,8 +2259,12 @@ async function ping(
   globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
     const u = String(url)
     if (u.startsWith('https://cg.optimizely.com/')) {
-      const { variables } = JSON.parse(String(init?.body)) as { variables: { slug: string } }
+      const { query, variables } = JSON.parse(String(init?.body)) as { query: string; variables: { slug: string } }
       graph.push(variables.slug)
+      if (/GetPersonPageTeam/.test(query)) {
+        const items = stand.person && variables.slug === '/logitech/ben-yu/' ? [stand.person] : []
+        return new Response(JSON.stringify({ data: { PersonPage: { items } } }), { status: 200 })
+      }
       const items = stand.page && variables.slug === '/en/zurich-versicherung/' ? [stand.page] : []
       return new Response(JSON.stringify({ data: { CompetitorComparisonPage: { items } } }), { status: 200 })
     }
@@ -2097,7 +2326,7 @@ testAsync('POST /api/cta-ping refuses anything but a same-site JSON click on an 
     ['a form post', { headers: { 'content-type': 'text/plain' }, body: JSON.stringify(CLICK) }, 415],
     ['another site', { headers: { 'sec-fetch-site': 'cross-site' }, body: CLICK }, 403],
     ['an offer page', { body: { ...CLICK, route: '/vb/zurich' } }, 400],
-    ['a person page', { body: { ...CLICK, route: '/zurich-versicherung/alex-exec/' } }, 400],
+    ['three levels deep', { body: { ...CLICK, route: '/zurich-versicherung/alex-exec/more/' } }, 400],
     ['an unknown button', { body: { ...CLICK, source: 'admin-btn' } }, 400],
     ['no body', { body: undefined }, 400],
     ['too large', { body: JSON.stringify({ ...CLICK, pad: 'x'.repeat(3000) }) }, 413],
@@ -2107,6 +2336,24 @@ testAsync('POST /api/cta-ping refuses anything but a same-site JSON click on an 
     assert.equal(r.status, status, name)
     assert.equal(r.mark.length + r.graph.length, 0, `${name} reached Graph or Mark`)
   }
+})
+
+testAsync("POST /api/cta-ping on a person page reads that page's own team", async () => {
+  const person = {
+    _metadata: { url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } },
+    companyName: 'Logitech G',
+    personName: 'Ben Yu',
+    team: [{ Initials: 'CP', Name: 'Caleb Ping', Role: 'Enterprise Account Executive', Email: 'caleb.ping@optimizely.com' }],
+  }
+  const r = await ping({ body: { ...CLICK, route: '/logitech/ben-yu/' } }, { page: PING_PAGE, person })
+  assert.equal(r.status, 202)
+  assert.deepEqual(r.graph, ['/logitech/ben-yu/'], 'looked the person page up as an account page')
+  const sent = JSON.parse(r.mark[0].body) as CtaPing
+  assert.equal(sent.person, 'Ben Yu')
+  assert.equal(sent.rep?.email, 'caleb.ping@optimizely.com')
+  const missing = await ping({ body: { ...CLICK, route: '/logitech/nobody/' } }, { page: PING_PAGE, person })
+  assert.equal(missing.status, 404)
+  assert.equal(missing.mark.length, 0)
 })
 
 testAsync('POST /api/cta-ping sends nothing when off, misconfigured, or the page is not there', async () => {
