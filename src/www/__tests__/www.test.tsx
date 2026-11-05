@@ -2049,13 +2049,18 @@ function fullPersonPage(over: Partial<PersonPageData> = {}): PersonPageData {
 }
 const personHtml = renderToString(<PersonPage page={fullPersonPage()} />)
 
-test('PERSON_FIELDS places every field the person page query reads, and nothing else', () => {
+test('PERSON_FIELDS places every PersonPage field, and the query fetches only the ones the page uses', () => {
   const src = readFileSync('src/lib/person-page-query.ts', 'utf8')
   const list = src.slice(src.indexOf('const PERSON_PAGE_FIELDS = `') + 28, src.indexOf('`;', src.indexOf('const PERSON_PAGE_FIELDS')))
   let flat = list
   while (/\{[^{}]*\}/.test(flat)) flat = flat.replace(/\{[^{}]*\}/g, ' ')
   const queried = flat.split(/\s+/).filter((w) => w && w !== '_metadata')
-  assert.deepEqual([...PERSON_FIELDS.map((f) => f.field)].sort(), [...queried].sort())
+  // The query fetches exactly what the page uses: a field it never shows never leaves the CMS.
+  assert.deepEqual([...PERSON_FIELDS.filter((f) => f.use !== 'never').map((f) => f.field)].sort(), [...queried].sort())
+  for (const f of ['crmContactId', 'openOpportunityName', 'openOpportunityStage', 'touchpoints', 'engagementSummary']) {
+    assert.ok(!queried.includes(f), `${f} is fetched`)
+    assert.equal(PERSON_FIELDS.find((p) => p.field === f)?.use, 'never', f)
+  }
 })
 
 test('a person page shows every stored field it places, and nothing that is never shown', () => {

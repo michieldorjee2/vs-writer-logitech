@@ -3,6 +3,10 @@
  * reads it: one field list for the live address (api/content.ts, server/ssr-handler.tsx) and the
  * CMS preview of a draft (api/preview.ts), so the preview never draws a page the address would not.
  *
+ * Only what the page shows (src/www/person-content.ts PERSON_FIELDS): the fields it never shows, the
+ * Salesforce ones above all (the contact id, the open opportunity, the touchpoint log), are not
+ * fetched, so they are in neither the page's source nor /api/content.
+ *
  * A selection on one field Graph does not know fails the WHOLE query and every person page 404s.
  * Check the registered type before adding a field, and run `npm run check:graph` (it reads this file).
  */
@@ -10,23 +14,19 @@ const PERSON_PAGE_FIELDS = `
     _metadata { key url { default hierarchical } published lastModified }
     template
     PageTitle MetaDescription noIndex
-    companySlug companyName personSlug crmContactId
-    personName personTitle personInitials
+    companySlug companyName personSlug
+    personName personTitle
     personLinkedIn { default }
-    personAvatarColor
     companyLogo { default }
     brandAccentColor
-    heroEyebrow heroHeadline heroSubheadline heroCtaText heroCtaUrl { default }
-    engagementTier engagementHeadline engagementSummary
-    touchpoints { Date Kind Summary OptimizelyPerson }
-    openOpportunityName openOpportunityStage openOpportunityDetail
-    remitHeadline remitIntro
+    heroEyebrow heroHeadline heroSubheadline heroCtaText
+    engagementTier
+    remitHeadline
     remitPoints { Title Description Metric }
     roleFrame
     noteBody noteSignedBy noteSignedByRole noteSignedByInitials noteDate
-    researchHeadline researchClaim
     provenance { Register Text SourceLabel SourceUrl { default } }
-    scorecardHeadline scorecardIntro
+    scorecardHeadline
     scorecard { Measure WhyHard WhatChanges Metric }
     solutionsHeadline solutionsIntro
     solutions { Product Headline Body WhyFirst }
@@ -37,7 +37,7 @@ const PERSON_PAGE_FIELDS = `
     teamHeadline
     team { Initials Name Role Email AvatarColor AlreadyMet }
     ctaTitle ctaBody ctaButtonText meetingUrl { default }
-    footerLine generatedAt generatedBy
+    footerLine
 `;
 
 /** The page at a route: `/logitech/ben-yu/`. */

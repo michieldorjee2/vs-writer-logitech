@@ -151,22 +151,24 @@ export function heroSecondHref(page: Pick<PersonPage, 'solutions'>): string {
 }
 
 /**
- * Where every PersonPage property lands (the 61 the page's query reads). `check:www` renders a
- * page with every field filled and fails if a `text` field's value is missing or a `never`
- * field's value is anywhere in the markup.
+ * Where every PersonPage property lands. `check:www` renders a page with every field filled and
+ * fails if a `text` field's value is missing or a `never` field's value is anywhere in the markup,
+ * and checks the page's query fetches exactly the fields that are not `never`.
  *
  *   text   on screen as text          attr   a link, image or colour
- *   head   the server's <head>        never  stored, deliberately not shown (the reason says why)
+ *   head   the server's <head>        meta   fetched to route and tag the page, not shown
+ *   never  stored, deliberately not shown and NOT FETCHED: in neither the page's source nor
+ *          /api/content (the reason says why)
  */
-export type PersonFieldUse = 'text' | 'attr' | 'head' | 'never'
+export type PersonFieldUse = 'text' | 'attr' | 'head' | 'meta' | 'never'
 export const PERSON_FIELDS: Array<{ field: keyof PersonPage; use: PersonFieldUse; where: string }> = [
   { field: 'PageTitle', use: 'head', where: '<title>' },
   { field: 'MetaDescription', use: 'head', where: '<meta name="description">' },
   { field: 'noIndex', use: 'head', where: 'robots noindex (person pages name a real person)' },
-  { field: 'template', use: 'never', where: 'the renderer tag' },
+  { field: 'template', use: 'meta', where: 'the renderer tag' },
   { field: 'companySlug', use: 'attr', where: 'the "Back to <company>" link in the small print' },
   { field: 'companyName', use: 'text', where: 'hero: the account mark; operation heading; small print' },
-  { field: 'personSlug', use: 'never', where: 'the route' },
+  { field: 'personSlug', use: 'meta', where: 'the route' },
   { field: 'crmContactId', use: 'never', where: 'Salesforce id: never on the page' },
   { field: 'personName', use: 'text', where: 'hero: h1 (without a stored headline); sticky bar' },
   { field: 'personTitle', use: 'text', where: 'hero: the lead (without a stored subheadline)' },
