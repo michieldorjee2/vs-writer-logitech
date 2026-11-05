@@ -2,6 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- A signed-in Optimizely person (the showcase_staff mark, src/lib/staff-marker.ts) is never
+         sent to ODP. The snippet below loads ODP's universal tag (oiq.min.js) itself, and turning
+         its tracking off does not stop that (it still posted to logx /v1/ingest, 4 Nov 2026), so
+         they are opted out of Optimizely altogether: nothing loads or sends after the snippet. -->
+    <script>
+      if (/(?:^|;\s*)showcase_staff=1(?:;|$)/.test(document.cookie)) {
+        window.optimizely = window.optimizely || [];
+        window.optimizely.push({ type: 'optOut', isOptOut: true });
+      }
+    </script>
     <!-- Optimizely Web Experimentation snippet — must load synchronously and
          as early as possible in <head> to avoid flicker. Do not add async/defer. -->
     <script src="https://cdn.optimizely.com/public/26942930964/s/infinite.js"></script>
@@ -46,9 +56,18 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Jost:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Jost:wght@300;400;500;600&display=swap" /></noscript>
 
-    <!-- ODP (Optimizely Data Platform) tracking SDK — async, non-blocking -->
-    <script>window.zaius=window.zaius||[];</script>
-    <script src="https://d1igp3oop3iho5.cloudfront.net/v2/8yoUTdBkNwpVOLCXeZpKdw/zaius-min.js" async></script>
+    <!-- ODP (Optimizely Data Platform) tracking SDK — async, non-blocking. Never loaded for a
+         signed-in Optimizely person: sign-in leaves the showcase_staff mark (src/lib/staff-marker.ts). -->
+    <script>
+      window.zaius = window.zaius || [];
+      (function () {
+        if (/(?:^|;\s*)showcase_staff=1(?:;|$)/.test(document.cookie)) return;
+        var sdk = document.createElement('script');
+        sdk.async = true;
+        sdk.src = 'https://d1igp3oop3iho5.cloudfront.net/v2/8yoUTdBkNwpVOLCXeZpKdw/zaius-min.js';
+        document.head.appendChild(sdk);
+      })();
+    </script>
 
     <!-- Inline critical CSS to prevent FOUC and speed up FCP -->
     <style>

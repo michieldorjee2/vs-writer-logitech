@@ -20,9 +20,12 @@
  *      visitors as team; page-activity needs sign-in, asks ODP only what ODP accepts (stand-in that
  *      refuses dashed ids, unknown fields and a bare `page`), and never returns a visitor id. The
  *      account's stage from ODP, which knows accounts by their 18-character id only.
- *   8. Wiring, read from the sources: the ODP key is read in one server file; the report API makes
- *      no Salesforce call; the hook skips the booth tools; the report loads as the rail mounts;
- *      the connect panel's tiles are named.
+ *   8. Only the page is tracked: a click counts only on the page itself or a named CTA (never the
+ *      rail, its modes or anything else over the page); a signed-in person's browser is marked
+ *      (set and cleared with the session, given to older sessions on use), index.html then never
+ *      loads ODP (its snippet run against a stand-in page), and the hook sends nothing.
+ *   9. Wiring, read from the sources: the ODP key is read in one server file; the report API makes
+ *      no Salesforce call; the report loads as the rail mounts; the connect panel's tiles are named.
  *
  * No network, no credentials.
  *
@@ -52,7 +55,9 @@ import {
   sourceOf,
   type ActivityEvent,
 } from '../src/lib/page-activity.js';
-import { resolveElement } from '../src/lib/activity-dom.js';
+import { isPageClick, resolveElement } from '../src/lib/activity-dom.js';
+import { isStaffBrowser, STAFF_COOKIE } from '../src/lib/staff-marker.js';
+import { clearSessionCookie, currentIdentity, setSessionCookie } from '../api/_lib/auth.js';
 import { fetchAccountStage, pathFilter, type OdpClient } from '../api/_lib/odp-events.js';
 import type { ActivityStore } from '../api/_lib/page-activity-store.js';
 import visitHandler, { setVisitStore } from '../api/page-visit.js';
@@ -243,6 +248,7 @@ function call(handler: (req: never, res: never) => unknown, req: Record<string, 
   const out: Res = { statusCode: 200, body: undefined, headers: {} };
   const res = {
     setHeader: (k: string, v: string) => (out.headers[k.toLowerCase()] = v),
+    getHeader: (k: string) => out.headers[k.toLowerCase()],
     status(c: number) { out.statusCode = c; return res; },
     json(b: unknown) { out.body = b; return res; },
     end() { return res; },
@@ -353,13 +359,97 @@ check('…ODP not answering is not "no account"', (await fetchAccountStage({ que
 const hist = historyOf({ created: '2026-10-29T20:44:07Z', published: null, lastModified: '2026-10-29T20:50:00Z', salesforceAccountID: null, brandDomain: null, eyebrow: null }, [{ at: '2026-11-02T10:00:10Z' }, { at: '2026-11-02T10:00:40Z' }]);
 check('history: built; a save minutes after the build is the build; one copy edit per minute', hist.map((h) => h.kind).join() === 'built,copy', hist);
 
-/* ---------- 8. Wiring ---------- */
+/* ---------- 8. Only the page is tracked ---------- */
+
+// A stand-in page: elements with classes and attributes, and closest() over simple selectors.
+type Node2 = { cls: string[]; attrs: string[]; parent: Node2 | null; closest: (sel: string) => Node2 | null };
+const node = (parent: Node2 | null, cls: string[] = [], attrs: string[] = []): Node2 => {
+  const n: Node2 = {
+    cls,
+    attrs,
+    parent,
+    closest(sel) {
+      const one = (x: Node2, s: string) => (s.startsWith('.') ? x.cls.includes(s.slice(1)) : /^\[([\w-]+)\]$/.test(s) ? x.attrs.includes(s.slice(1, -1)) : false);
+      for (let x: Node2 | null = n; x; x = x.parent) if (sel.split(',').some((s) => one(x!, s.trim()))) return x;
+      return null;
+    },
+  };
+  return n;
+};
+const docRoot = node(null);
+const page = node(node(docRoot, []), ['www-page', 'www-ap']);
+const heroBtn = node(node(page), ['www-btn']);
+const stickyBtn = node(node(page, ['www-sticky']), ['www-btn']);
+const rail = node(docRoot, ['booth-rail', 'is-open']);
+const railBtn = node(node(rail, ['booth-rail__items']), ['booth-rail__btn', 'booth-rail__btn--report']);
+const portal = node(docRoot, ['www-modal']);
+const tile = node(portal, ['www-modal__tile', 'www-btn'], ['data-cta']);
+const closeBtn = node(portal, ['www-modal__close', 'btn']);
+const xrayExit = node(node(docRoot, ['xray-fixed-layer']), ['xray-hud__close']);
+const pc = (n: Node2) => isPageClick(n as unknown as Element);
+check('a click on the page\'s buttons (hero, sticky bar) is the page\'s', pc(heroBtn) && pc(stickyBtn));
+check('…and the connect panel\'s named tiles, portaled out of the page', pc(tile));
+check('…never the rail, X-ray\'s bar, or anything else drawn over the page', !pc(railBtn) && !pc(xrayExit) && !pc(closeBtn));
+check('…control: the rail\'s button would count as a "btn" by its class alone', railBtn.closest('[data-cta], .booth-rail__btn') !== null);
+
+check('the staff mark is read from the cookie, exactly', isStaffBrowser('a=1; showcase_staff=1') && isStaffBrowser('showcase_staff=1') && !isStaffBrowser('showcase_staff=10') && !isStaffBrowser('xshowcase_staff=1') && !isStaffBrowser('showcase_staff=') && !isStaffBrowser(''));
+const cookieRes = () => {
+  const h: Record<string, unknown> = {};
+  return { h, res: { getHeader: (k: string) => h[k.toLowerCase()], setHeader: (k: string, v: unknown) => (h[k.toLowerCase()] = v) } as never };
+};
+const cookiesOf = (h: Record<string, unknown>) => ([] as string[]).concat((h['set-cookie'] as string[] | undefined) ?? []);
+const signin = cookieRes();
+process.env.SESSION_SECRET ??= 'y'.repeat(32);
+setSessionCookie(signin.res, { email: 'rep@optimizely.com', env: 'prod', sub: 'x' });
+const mark = cookiesOf(signin.h).find((c) => c.startsWith(`${STAFF_COOKIE}=1`));
+check('signing in marks the browser, readable by the page (not HttpOnly), as long as the session', !!mark && !/HttpOnly/i.test(mark) && /Max-Age=15552000/.test(mark), cookiesOf(signin.h));
+check('…the session itself stays HttpOnly', cookiesOf(signin.h).some((c) => c.startsWith('showcase_session=') && /HttpOnly/.test(c)));
+const signout = cookieRes();
+clearSessionCookie(signout.res);
+check('signing out clears the mark', cookiesOf(signout.h).some((c) => c.startsWith(`${STAFF_COOKIE}=;`) && /Max-Age=0/.test(c)));
+delete process.env.OPTIID_RELAY_SECRET;
+process.env.DEV_AUTH_EMAIL = 'rep@optimizely.com';
+const older = cookieRes();
+currentIdentity({ cookies: {} } as never, older.res);
+const marked = cookieRes();
+currentIdentity({ cookies: { [STAFF_COOKIE]: '1' } } as never, marked.res);
+delete process.env.DEV_AUTH_EMAIL;
+const anon = cookieRes();
+currentIdentity({ cookies: {} } as never, anon.res);
+check('a signed-in session without the mark gets it when used; a marked one is left alone', cookiesOf(older.h).some((c) => c.startsWith(`${STAFF_COOKIE}=1`)) && cookiesOf(marked.h).length === 0);
+check('…and nobody signed out is marked', cookiesOf(anon.h).length === 0);
+
+// index.html's own snippet, run against a stand-in page with and without the mark.
+const indexHtml = read('index.html');
+check('ODP\'s SDK is not a plain script tag (it would load before anyone could check)', !/<script[^>]*src="[^"]*zaius-min\.js"/.test(indexHtml));
+const snippet = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((x) => x.includes('zaius-min.js')) ?? '';
+const runSnippet = (cookie: string) => {
+  const added: string[] = [];
+  const fakeDoc = { cookie, createElement: () => ({}) as { src?: string }, head: { appendChild: (el: { src?: string }) => added.push(el.src ?? '') } };
+  new Function('window', 'document', snippet)({}, fakeDoc);
+  return added;
+};
+check('index.html loads ODP for a visitor', runSnippet('other=1').length === 1 && /zaius-min\.js$/.test(runSnippet('')[0] ?? ''));
+check('…and never for a marked (signed-in) browser', runSnippet(`a=b; ${STAFF_COOKIE}=1`).length === 0);
+check('…by the same mark the server sets', snippet.includes(`${STAFF_COOKIE}=1`));
+// Web Experimentation's snippet loads ODP's universal tag on its own; a marked browser opts out first.
+const optOutSnippet = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((x) => x.includes("type: 'optOut'")) ?? '';
+const runOptOut = (cookie: string) => {
+  const win: { optimizely?: unknown[] } = {};
+  new Function('window', 'document', optOutSnippet)(win, { cookie });
+  return win.optimizely ?? [];
+};
+check('a marked browser is opted out of Optimizely before its snippet loads (it would load ODP\'s universal tag)', JSON.stringify(runOptOut(`${STAFF_COOKIE}=1`)) === '[{"type":"optOut","isOptOut":true}]' && runOptOut('').length === 0 && indexHtml.indexOf("type: 'optOut'") < indexHtml.indexOf('infinite.js'));
+const hookSrc = read('src/hooks/useOdpTracking.ts');
+check('the tracking hook sends nothing for a marked browser, and only the page\'s clicks', /useEffect\(\(\) => \{\s*\/\/[^\n]*\n\s*if \(isStaffBrowser\(\)\) return;/.test(hookSrc) && /!isPageClick\(target\)\) return;/.test(hookSrc));
+
+/* ---------- 9. Wiring ---------- */
 
 const files = (dir: string): string[] => readdirSync(join(root, dir)).flatMap((f) => (statSync(join(root, dir, f)).isDirectory() ? (f === 'node_modules' || f === 'vendor' ? [] : files(join(dir, f))) : [join(dir, f)]));
 const keyReaders = [...files('src'), ...files('api'), ...files('server')].filter((f) => /\.(ts|tsx)$/.test(f) && read(f).includes('ODP_PRIVATE_KEY'));
 check('the ODP key is read in one server file and nowhere in the browser code', keyReaders.join() === 'api/_lib/odp-events.ts', keyReaders);
 const hook = read('src/hooks/useOdpTracking.ts');
-check('the tracking hook skips the booth tools', hook.includes('target.closest(BOOTH_CHROME)') && /\.booth-rail\b/.test(hook) && /\.activity-view/.test(hook));
+check('the booth tools are all named as chrome', /\.booth-rail\b/.test(read('src/lib/activity-dom.ts')) && /\.activity-view/.test(read('src/lib/activity-dom.ts')));
 check('the report API makes no Salesforce call (the stage is ODP\'s)', !/salesforce\.js/.test(read('api/page-activity.ts')));
 check('the hook records the visit, never in the CMS preview', /if \(!inCmsPreview\(\)\) recordVisit\(/.test(hook));
 check('the connect panel\'s tiles are named for tracking', /data-cta="schedule"/.test(read('src/www/ConnectModal.tsx')) && /data-cta="contact"/.test(read('src/www/ConnectModal.tsx')));

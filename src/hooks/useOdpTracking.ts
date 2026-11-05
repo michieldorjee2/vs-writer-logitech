@@ -1,12 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { inCmsPreview } from '../lib/cms-preview';
+import { isPageClick } from '../lib/activity-dom';
 import { ctaLabel, normalizeVuid } from '../lib/page-activity';
+import { isStaffBrowser } from '../lib/staff-marker';
 
 /**
  * ODP tracking for the account page (src/www/AgentPlatformPage.tsx).
  *
  * Uses the ODP client SDK (loaded in index.html as zaius-min.js).
  * Tracks: page view, section visibility, CTA clicks, engagement on exit.
+ *
+ * Never for a signed-in Optimizely person: their browser carries the staff mark
+ * (src/lib/staff-marker.ts), index.html does not load the SDK, and this hook sends nothing.
  */
 
 declare global {
@@ -29,10 +34,6 @@ const CONNECT_POSITIONS: Record<string, string> = {
   'sticky-connect-btn': 'sticky',
   'cta-connect-btn': 'close',
 };
-
-/** Everything the booth tools draw over the page (FloatingSidebar and its modes). */
-const BOOTH_CHROME =
-  '.booth-rail, .booth-rail-mini, .activity-view, .xray-fixed-layer, .xray-overlay, .edit-overlay, .edit-fixed-layer, .edit-popup, .edit-landed-toast, .edit-working-modal, .employee-link-alert';
 
 /** A button's words without its icon: Material icons render their name as text ("bolt"). */
 function visibleLabel(el: HTMLElement): string {
@@ -97,6 +98,8 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
   const engagementSent = useRef(false);
 
   useEffect(() => {
+    // A signed-in Optimizely person is never tracked: no events, no visit recorded.
+    if (isStaffBrowser()) return;
     // Reset on mount (SPA navigation)
     viewedSections.current.clear();
     startTime.current = Date.now();
@@ -141,11 +144,11 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
     // ── Click tracking (event delegation) ──────────────────────────
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
-      // The booth tools on `?search=1` (sidebar, X-ray, Edit, Activity) are not the page.
-      if (target.closest(BOOTH_CHROME)) return;
+      // Only the page's own clicks: not the booth rail or its modes, nor anything else over the page.
+      if (!(target instanceof Element) || !isPageClick(target)) return;
 
       // A CTA: the connect buttons and the connect panel's tiles by name (data-cta), any other
-      // button by its class. `cta_type` and `position` say which one; the Report counts them.
+      // button on the page by its class. `cta_type` and `position` say which one; the Report counts them.
       const btn = target.closest('[data-cta], a[class*="btn"], button[class*="btn"]') as HTMLElement | null;
       if (btn) {
         const type = btn.dataset.cta || (CONNECT_POSITIONS[btn.id] ? 'connect' : 'cta');

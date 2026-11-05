@@ -30,7 +30,7 @@
   --booth-plot: #202320;              /* the chart's bars */
   --booth-plot-empty: rgb(32 35 32 / 0.12);
   --booth-plot-now: rgb(32 35 32 / 0.45);
-  --booth-fir: #08251a;               /* the scene: the brand's, the same in both themes */
+  --booth-veil: rgb(249 252 248 / 0.28); /* over the blurred page, under the Report card */
   --booth-font: 'Die Grotesk B', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --booth-display: 'VC Nudge', 'Die Grotesk B', Arial, sans-serif;
 }
@@ -52,6 +52,7 @@
     --booth-plot: #ffffff;
     --booth-plot-empty: #3c3d40;
     --booth-plot-now: rgb(245 246 247 / 0.51);
+    --booth-veil: rgb(20 22 20 / 0.32);
   }
 }
 

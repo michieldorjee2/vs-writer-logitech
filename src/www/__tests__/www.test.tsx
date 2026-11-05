@@ -609,6 +609,8 @@ testAsync('the edit stream saves the copy edits Mark applied, as the signed-in e
   const res = {
     statusCode: 200,
     setHeader: () => {},
+    // A Vercel response has it: signing someone in may add a cookie beside another (the staff mark).
+    getHeader: () => undefined,
     status(c: number) { this.statusCode = c; return this },
     json(b: unknown) { written.push(JSON.stringify(b)); return this },
     write(chunk: string) { written.push(chunk); return true },

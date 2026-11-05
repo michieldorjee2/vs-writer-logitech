@@ -1,24 +1,25 @@
 /* ============================================================
    The booth's Report card (src/components/ActivityMode.tsx).
-   On the brand's scene, beside the rail, in the rail's surfaces
-   and type (booth-rail.css holds the tokens, light or dark with
-   the system). px only: the showcase's root font size is 10px.
+   Over the page, blurred, in the rail's surfaces and type
+   (booth-rail.css holds the tokens, light or dark with the
+   system). px only: the showcase's root font size is 10px.
    ============================================================ */
 
-/* The scene: where the page was, the page's corners kept by the rail. */
+/* Over everything, the rail included: the page behind, blurred, with a light veil for the card to
+ * stand on. The page is held still while the card is open (below), so the blur never chases a
+ * moving page, which is what made blur flicker on the www pages (floating-sidebar.css). */
 .activity-view {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 950;
+  inset: 0;
+  z-index: 970;
   display: grid;
   place-items: center;
   padding: 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--booth-fir);
+  background: var(--booth-veil);
+  -webkit-backdrop-filter: blur(22px) saturate(110%);
+  backdrop-filter: blur(22px) saturate(110%);
   color: var(--booth-fg);
   font-family: var(--booth-font);
   -webkit-font-smoothing: antialiased;
@@ -26,19 +27,14 @@
   visibility: hidden;
   transition:
     opacity 200ms ease,
-    visibility 0s linear 200ms,
-    left 520ms var(--booth-ease);
-}
-html.booth-page--rail .activity-view {
-  left: var(--booth-rail-w);
+    visibility 0s linear 200ms;
 }
 .activity-view.is-open {
   opacity: 1;
   visibility: visible;
   transition:
     opacity 260ms ease,
-    visibility 0s,
-    left 520ms var(--booth-ease);
+    visibility 0s;
 }
 /* The page under the report stays where it was. */
 html.activity-open {
@@ -374,9 +370,6 @@ html.activity-open {
 }
 
 @media (max-width: 640px) {
-  html.booth-page--rail .activity-view {
-    left: 0;
-  }
   .activity-view {
     padding: 12px;
     place-items: start center;

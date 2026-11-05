@@ -25,6 +25,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Redis } from '@upstash/redis';
+import { STAFF_COOKIE } from '../../src/lib/staff-marker.js';
 
 export const SESSION_COOKIE = 'showcase_session';
 /** The in-flight sign-in: state and where to land, for the callback. */
@@ -204,12 +205,24 @@ function appendCookie(res: VercelResponse, value: string): void {
   res.setHeader('Set-Cookie', [...list, value]);
 }
 
+/**
+ * The staff mark (src/lib/staff-marker.ts): readable by the page, which then never loads ODP. Not
+ * HttpOnly on purpose, and not a credential: the session above is what signs someone in.
+ */
+function staffCookie(maxAge: number): string {
+  const parts = [`${STAFF_COOKIE}=${maxAge ? '1' : ''}`, 'Path=/', `Max-Age=${maxAge}`, 'SameSite=Lax'];
+  if (process.env.NODE_ENV === 'production') parts.push('Secure');
+  return parts.join('; ');
+}
+
 export function setSessionCookie(res: VercelResponse, identity: Identity): void {
   appendCookie(res, cookie(SESSION_COOKIE, issueSession(identity), SESSION_MAX_AGE_S));
+  appendCookie(res, staffCookie(SESSION_MAX_AGE_S));
 }
 
 export function clearSessionCookie(res: VercelResponse): void {
   appendCookie(res, cookie(SESSION_COOKIE, '', 0));
+  appendCookie(res, staffCookie(0));
 }
 
 export interface SignInFlow {
@@ -248,10 +261,18 @@ function devIdentity(): Identity | null {
  * response that is never shared between people (no-store / private).
  */
 export function currentIdentity(req: VercelRequest, res: VercelResponse): Identity | null {
-  if (!authEnabled()) return devIdentity();
-  const session = readSession(req.cookies?.[SESSION_COOKIE]);
-  if (session.identity && session.refresh) setSessionCookie(res, session.identity);
-  return session.identity;
+  let identity: Identity | null;
+  if (!authEnabled()) {
+    identity = devIdentity();
+  } else {
+    const session = readSession(req.cookies?.[SESSION_COOKIE]);
+    if (session.identity && session.refresh) setSessionCookie(res, session.identity);
+    identity = session.identity;
+  }
+  // A session from before the staff mark gets it the next time it is used (the search page and
+  // the booth tools ask /api/auth/me), so the person drops out of ODP from then on.
+  if (identity && req.cookies?.[STAFF_COOKIE] !== '1') appendCookie(res, staffCookie(SESSION_MAX_AGE_S));
+  return identity;
 }
 
 /**

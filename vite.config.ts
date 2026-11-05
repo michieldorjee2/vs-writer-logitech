@@ -201,6 +201,8 @@ function devAuthProxy(devEmail: string | null): Plugin {
         const url = new URL(req.url || '', 'http://localhost')
         if (url.pathname !== '/api/auth/me') return next()
         if (!devEmail) return jsonResponse(res, 401, { error: 'signed_out' })
+        // As api/_lib/auth.ts: the signed-in person's browser is marked, and never loads ODP.
+        res.setHeader('Set-Cookie', 'showcase_staff=1; Path=/; Max-Age=15552000; SameSite=Lax')
         return jsonResponse(res, 200, { email: devEmail, name: null })
       })
     },
