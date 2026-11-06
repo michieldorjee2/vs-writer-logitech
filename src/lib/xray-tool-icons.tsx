@@ -1,14 +1,14 @@
 import { useState, type ReactElement } from 'react';
-import { brandLogoTypeUrl } from './brand-logo';
 
 /* ============================================================
    X-ray tool icons. XrayToolLogo is what the cards show: each
-   tool's own colour logo (Brandfetch's icon for the company,
-   Optimizely's mark for our own products, a lime spark on Dark
-   Fir for Mark). The small monochrome glyphs below are its
-   fallback when a logo does not load, and the icon for tools
-   that are not a company (Web browsing, Sitemap), drawn in a
-   colour of their own.
+   company's own favicon as SVG, kept in public/logos/tools/
+   (taken from the company's site, 6 Nov 2026: the file itself
+   where it publishes an SVG favicon, else its favicon redrawn
+   from its own SVG logo), and Mark's AI texture, animated. The
+   small monochrome glyphs below are the fallback if a file does
+   not load, and the icon for tools that are not a company (Web
+   browsing, Sitemap), drawn in a colour of their own.
 
    Names match the canonical strings in xray-defaults.ts:
      'Salesforce', 'BuiltWith', 'Mark', 'ODP', 'CMS',
@@ -157,45 +157,65 @@ export function XrayToolIcon({ name, size = 12 }: { name: string; size?: number 
   return <Icon size={size} />;
 }
 
-/** The company behind each tool, for its logo (Brandfetch's icon for the domain). */
-const TOOL_DOMAINS: Record<string, string> = {
-  'Salesforce': 'salesforce.com',
-  'BuiltWith': 'builtwith.com',
-  'LinkedIn': 'linkedin.com',
-  '6sense': '6sense.com',
-  'Gravatar': 'gravatar.com',
-  'Brandfetch': 'brandfetch.com',
+/**
+ * Each company's favicon, as SVG (public/logos/tools/):
+ *   LinkedIn, Brandfetch, Optimizely: the SVG favicon the site publishes.
+ *   Salesforce: its favicon is the cloud alone, Salesforce's own no-type SVG.
+ *   6sense: its new favicon (the 6 and its dot, on white), from its own SVG wordmark.
+ *   BuiltWith: the "b" of its own SVG wordmark, white on its favicon's green.
+ *   Gravatar: the symbol of its own SVG logo, on white, as its favicon.
+ * Brandfetch has one for light and one for dark; the cards follow the system theme too.
+ */
+const TOOL_LOGOS: Record<string, string | { light: string; dark: string }> = {
+  'Salesforce': '/logos/tools/salesforce.svg',
+  'BuiltWith': '/logos/tools/builtwith.svg',
+  'LinkedIn': '/logos/tools/linkedin.svg',
+  '6sense': '/logos/tools/6sense.svg',
+  'Gravatar': '/logos/tools/gravatar.svg',
+  'Brandfetch': { light: '/logos/tools/brandfetch-light.svg', dark: '/logos/tools/brandfetch-dark.svg' },
+  // Our own products: Optimizely's favicon.
+  'ODP': '/logos/tools/optimizely.svg',
+  'CMS': '/logos/tools/optimizely.svg',
 };
-/** Our own products: Optimizely's mark (public/favicon.svg). */
-const OPTIMIZELY_TOOLS = new Set(['ODP', 'CMS']);
 /** Tools that are not a company: their glyph, in a colour of its own. */
 const GLYPH_COLOURS: Record<string, string> = {
   'Web browsing': '#2f7de1',
   'Sitemap': '#e08a1e',
 };
 
-/** Mark: a lime spark on Dark Fir, the agent's colours. */
+/**
+ * Mark: the AI texture from the brand guidelines (the iridescent bubble; its video in Figma, a
+ * still here). Two copies turning against each other make it shimmer and shift, as the brand asks
+ * of the texture, with transforms only: no repaint, nothing for the main thread.
+ */
 function MarkLogo({ size }: { size: number }) {
   return (
-    <svg className="xray-tool-logo" viewBox="0 0 20 20" width={size} height={size} aria-hidden="true" focusable="false">
-      <rect width="20" height="20" rx="5" fill="#08251a" />
-      <path d="M9 3.5l1.6 4.4 4.4 1.6-4.4 1.6L9 15.5l-1.6-4.4L3 9.5l4.4-1.6z" fill="#abff44" />
-      <path d="M15.2 3v3M13.7 4.5h3" stroke="#abff44" strokeWidth="1.1" strokeLinecap="round" />
-    </svg>
+    <span className="xray-tool-logo xray-mark-texture" style={{ width: size, height: size }} aria-hidden="true">
+      <img src="/logos/tools/mark-texture.webp" width={size} height={size} alt="" decoding="async" />
+      <img src="/logos/tools/mark-texture.webp" width={size} height={size} alt="" decoding="async" />
+    </span>
   );
 }
 
 /**
- * A tool's colour logo for the X-ray cards. Falls back to its monochrome glyph when the logo does
- * not load (Brandfetch answers in a browser only, by the page's address), and to nothing for a
- * name it does not know.
+ * A tool's logo for the X-ray cards: the company's favicon, Mark's texture, or the glyph for
+ * anything else (and if a file does not load). Nothing for a name it does not know.
  */
 export function XrayToolLogo({ name, size = 18 }: { name: string; size?: number }) {
   const [failed, setFailed] = useState(false);
   if (name === 'Mark') return <MarkLogo size={size} />;
-  const src = OPTIMIZELY_TOOLS.has(name) ? '/favicon.svg' : TOOL_DOMAINS[name] ? brandLogoTypeUrl(TOOL_DOMAINS[name], 'icon') : null;
-  if (src && !failed) {
-    return <img className="xray-tool-logo" src={src} width={size} height={size} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />;
+  const logo = TOOL_LOGOS[name];
+  if (logo && !failed) {
+    const img = (src: string) => (
+      <img className="xray-tool-logo" src={src} width={size} height={size} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    );
+    if (typeof logo === 'string') return img(logo);
+    return (
+      <picture>
+        <source srcSet={logo.dark} media="(prefers-color-scheme: dark)" />
+        {img(logo.light)}
+      </picture>
+    );
   }
   if (!ICONS[name]) return null;
   return (

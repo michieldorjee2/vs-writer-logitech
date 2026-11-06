@@ -359,6 +359,35 @@ html.booth-page--rail .xray-overlay__scan-label {
   background: var(--booth-page);
 }
 
+/* Mark's texture: two copies of the bubble turning against each other, the top one half seen, so
+ * the colours shimmer and shift. Transforms only (the compositor runs them); still for anyone who
+ * asks for less motion. */
+.xray-mark-texture {
+  position: relative;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.xray-mark-texture img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: xray-mark-turn 14s linear infinite;
+}
+.xray-mark-texture img + img {
+  opacity: 0.5;
+  animation-duration: 9s;
+  animation-direction: reverse;
+}
+@keyframes xray-mark-turn {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xray-mark-texture img {
+    animation: none;
+  }
+}
+
 .xray-card__body {
   overflow: hidden;
   max-height: 0;
