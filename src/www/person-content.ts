@@ -203,7 +203,7 @@ export const PERSON_FIELDS: Array<{ field: keyof PersonPage; use: PersonFieldUse
   { field: 'personLinkedIn', use: 'attr', where: 'hero: their LinkedIn link' },
   { field: 'personAvatarColor', use: 'never', where: 'as personInitials' },
   { field: 'companyLogo', use: 'attr', where: 'hero: the account logo above the headline' },
-  { field: 'brandAccentColor', use: 'attr', where: '--www-accent: the stripe under the account logo' },
+  { field: 'brandAccentColor', use: 'never', where: 'the www design uses no account colours (the stripe under the logo went on 6 Nov 2026)' },
   { field: 'heroEyebrow', use: 'text', where: 'hero: the line beside the account logo ("Written for Ben")' },
   { field: 'heroHeadline', use: 'text', where: 'hero: h1 when stored (14 of 33)' },
   { field: 'heroSubheadline', use: 'text', where: 'hero: the lead when stored' },

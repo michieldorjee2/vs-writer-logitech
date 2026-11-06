@@ -10,7 +10,8 @@
  *   text  the value is on screen as text
  *   attr  the value is used as a link, image source or colour (asserted in the markup)
  *   head  rendered into <head> by the server (buildHeadHtml), unchanged by the new design
- *   none  identity metadata no renderer displays (also not fetched by PAGE_QUERY)
+ *   none  not displayed by any renderer, and not fetched by PAGE_QUERY (identity metadata, and the
+ *         account colour the design no longer uses)
  *
  * `legacy` marks the 16 fields the old ABMHyperPage stored but never showed.
  */
@@ -36,7 +37,7 @@ export const ACCOUNT_FIELDS: FieldPlacement[] = [
   { field: 'link', use: 'attr', section: 'Hero: second button href (#form maps to the ask)', legacy: true },
   { field: 'customerLogo', use: 'attr', section: 'Hero: the account logo above the headline; the account tile in the proof logo strip' },
   { field: 'brandDomain', use: 'text', section: 'Hero browser bar (fallback), signals: tool count' },
-  { field: 'brandAccentColor', use: 'attr', section: '--www-accent: the stripe under the account logo above the hero headline' },
+  { field: 'brandAccentColor', use: 'none', section: 'not shown: the www design uses no account colours (the stripe under the logo went on 6 Nov 2026)' },
   { field: 'challengeScreenshotUrl', use: 'attr', section: 'Challenge: browser frame image (shown at its own size)' },
   { field: 'challengeScreenshotAlt', use: 'attr', section: 'Challenge: browser frame alt text' },
   { field: 'challengeBrowserUrl', use: 'text', section: 'Challenge: browser frame address bar' },

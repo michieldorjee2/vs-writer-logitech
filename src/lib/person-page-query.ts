@@ -19,7 +19,6 @@ const PERSON_PAGE_FIELDS = `
     personName personTitle
     personLinkedIn { default }
     companyLogo { default }
-    brandAccentColor
     heroEyebrow heroHeadline heroSubheadline heroCtaText
     remitHeadline
     remitPoints { Title Description Metric }
