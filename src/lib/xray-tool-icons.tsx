@@ -1,9 +1,14 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
+import { brandLogoTypeUrl } from './brand-logo';
 
 /* ============================================================
-   X-ray tool icons — small monochrome glyphs rendered next to
-   each tool name in the annotation cards. All use currentColor
-   so they pick up the chip's text colour.
+   X-ray tool icons. XrayToolLogo is what the cards show: each
+   tool's own colour logo (Brandfetch's icon for the company,
+   Optimizely's mark for our own products, a lime spark on Dark
+   Fir for Mark). The small monochrome glyphs below are its
+   fallback when a logo does not load, and the icon for tools
+   that are not a company (Web browsing, Sitemap), drawn in a
+   colour of their own.
 
    Names match the canonical strings in xray-defaults.ts:
      'Salesforce', 'BuiltWith', 'Mark', 'ODP', 'CMS',
@@ -150,4 +155,52 @@ export function XrayToolIcon({ name, size = 12 }: { name: string; size?: number 
   const Icon = ICONS[name];
   if (!Icon) return null;
   return <Icon size={size} />;
+}
+
+/** The company behind each tool, for its logo (Brandfetch's icon for the domain). */
+const TOOL_DOMAINS: Record<string, string> = {
+  'Salesforce': 'salesforce.com',
+  'BuiltWith': 'builtwith.com',
+  'LinkedIn': 'linkedin.com',
+  '6sense': '6sense.com',
+  'Gravatar': 'gravatar.com',
+  'Brandfetch': 'brandfetch.com',
+};
+/** Our own products: Optimizely's mark (public/favicon.svg). */
+const OPTIMIZELY_TOOLS = new Set(['ODP', 'CMS']);
+/** Tools that are not a company: their glyph, in a colour of its own. */
+const GLYPH_COLOURS: Record<string, string> = {
+  'Web browsing': '#2f7de1',
+  'Sitemap': '#e08a1e',
+};
+
+/** Mark: a lime spark on Dark Fir, the agent's colours. */
+function MarkLogo({ size }: { size: number }) {
+  return (
+    <svg className="xray-tool-logo" viewBox="0 0 20 20" width={size} height={size} aria-hidden="true" focusable="false">
+      <rect width="20" height="20" rx="5" fill="#08251a" />
+      <path d="M9 3.5l1.6 4.4 4.4 1.6-4.4 1.6L9 15.5l-1.6-4.4L3 9.5l4.4-1.6z" fill="#abff44" />
+      <path d="M15.2 3v3M13.7 4.5h3" stroke="#abff44" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * A tool's colour logo for the X-ray cards. Falls back to its monochrome glyph when the logo does
+ * not load (Brandfetch answers in a browser only, by the page's address), and to nothing for a
+ * name it does not know.
+ */
+export function XrayToolLogo({ name, size = 18 }: { name: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (name === 'Mark') return <MarkLogo size={size} />;
+  const src = OPTIMIZELY_TOOLS.has(name) ? '/favicon.svg' : TOOL_DOMAINS[name] ? brandLogoTypeUrl(TOOL_DOMAINS[name], 'icon') : null;
+  if (src && !failed) {
+    return <img className="xray-tool-logo" src={src} width={size} height={size} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />;
+  }
+  if (!ICONS[name]) return null;
+  return (
+    <span className="xray-tool-logo xray-tool-logo--glyph" style={{ width: size, height: size, color: GLYPH_COLOURS[name] }} aria-hidden="true">
+      <XrayToolIcon name={name} size={Math.round(size * 0.78)} />
+    </span>
+  );
 }

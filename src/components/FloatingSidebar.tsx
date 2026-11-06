@@ -221,8 +221,8 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
  * The button at the foot folds the rail away; a single Report button stays at the bottom left to
  * bring it back. The rail slides, its buttons cascade in from the left. Edit and X-ray run in the
  * rail: the other tools fold out and Search turns into Close. Under Edit, Send slides in (with the
- * comment count), and "?" at the foot replays the tutorial shown on the first Edit; under X-ray,
- * its status (scanning, then the parts it traced). Close, the mode's button again, or Escape leaves.
+ * comment count), and "?" at the foot replays the tutorial shown on the first Edit; X-ray leaves
+ * the rail just Close. Close (or the Edit button again), or Escape, leaves.
  *
  * Rendered only for a signed-in employee (see FloatingSidebar above). The
  * routes behind the tools check the session themselves; mounting the
@@ -244,13 +244,13 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   /** The Edit tutorial (EditMode draws it): on the first Edit of this browser, and from "?". */
   const [tutorial, setTutorial] = useState(false);
   /** Edit or X-ray running. Each runs in the rail: it opens the rail even when folded, the other
-   *  tools fold out, the first button closes it, and its own controls sit under its button. */
+   *  tools fold out and the first button closes it. Edit keeps its button and Send under it;
+   *  X-ray leaves Close alone. */
   const mode: 'edit' | 'xray' | null = editActive ? 'edit' : xrayActive ? 'xray' : null;
   const railShown = entered && (!collapsed || mode !== null);
   const miniShown = entered && collapsed && mode === null;
-  /** Where each mode puts its controls: a slot in the rail under its button. */
+  /** Where Edit puts its controls (Send): a slot in the rail under the Edit button. */
   const [editSlot, setEditSlot] = useState<HTMLDivElement | null>(null);
-  const [xraySlot, setXraySlot] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
@@ -348,7 +348,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
             i={0}
             modifier={mode ? 'back is-close' : 'back'}
             onClick={mode === 'edit' ? closeEdit : mode === 'xray' ? closeXray : handleBack}
-            ariaLabel={mode === 'edit' ? 'Close edit mode' : mode === 'xray' ? 'Close X-ray mode' : 'Back to search'}
+            ariaLabel={mode === 'edit' ? 'Close edit mode' : mode === 'xray' ? 'Exit X-ray mode' : 'Back to search'}
             label={mode ? 'Close' : 'Search'}
             icon={
               mode ? (
@@ -385,12 +385,10 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           <div className="booth-rail__slot" ref={setEditSlot} />
           <RailButton
             i={2}
-            away={editActive}
+            away={mode !== null}
             modifier="xray"
             onClick={handleXrayClick}
-            pressed={xrayActive}
-            on={xrayActive}
-            ariaLabel={xrayActive ? 'Exit X-ray mode' : 'Enter X-ray mode'}
+            ariaLabel="Enter X-ray mode"
             label="X-ray"
             icon={
               <svg viewBox="27 111 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -402,8 +400,6 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
               </svg>
             }
           />
-          {/* X-ray's status (scanning, then the parts it found) lands here (XrayMode, `controls`). */}
-          <div className="booth-rail__slot" ref={setXraySlot} />
           <RailButton
             i={3}
             away={mode !== null}
@@ -487,7 +483,6 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
       <XrayMode
         active={xrayActive}
         onClose={closeXray}
-        controls={xraySlot}
         page={page}
         variant={variant}
       />

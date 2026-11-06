@@ -695,6 +695,14 @@ test('booth chrome on a www page is solid, with no backdrop blur (it flickered w
   assert.match(rail, /\.booth-rail \{[^}]*background: var\(--booth-page\)/)
 })
 
+test('every X-ray part says in one short line how it is made', () => {
+  // Michiel, 6 Nov: the card shows "what logic goes into that section vs just what data was used".
+  for (const part of [...ABM_XRAY_DEFAULTS, ...PERSON_XRAY_DEFAULTS]) {
+    assert.ok(part.logic && part.logic.length <= 120, `${part.id}: ${part.logic ?? 'no logic line'}`)
+    assert.notEqual(part.logic, part.sources.join(', '), `${part.id} repeats its data`)
+  }
+})
+
 test('a comment badge pops from its own centre and moves with its box', () => {
   // Michiel, 6 Nov: the little "1" "jumps all over". An SVG element scales from the document's
   // corner unless told otherwise, and the badge was placed once while its box kept moving.

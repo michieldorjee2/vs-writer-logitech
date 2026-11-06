@@ -7,7 +7,7 @@ import {
   resolveXraySections,
   type XraySectionInfo,
 } from '../lib/xray-defaults';
-import { XrayToolIcon } from '../lib/xray-tool-icons';
+import { XrayToolLogo } from '../lib/xray-tool-icons';
 import '../styles/xray-mode.css';
 
 interface Props {
@@ -15,12 +15,6 @@ interface Props {
   onClose: () => void;
   page: CompetitorComparisonPage;
   variant: 'abm' | 'person';
-  /**
-   * Where the mode's status goes: a slot in the booth rail under the X-ray button
-   * (FloatingSidebar.tsx). Scanning, then the number of parts traced; the mode has no bar of its
-   * own. Null until the rail has mounted.
-   */
-  controls: HTMLElement | null;
 }
 
 type CardSide = 'above' | 'below' | 'left' | 'right';
@@ -56,10 +50,19 @@ const OUTLINE_PADDING = 14;
 const CARD_GAP = 36;
 /** Visual width of an annotation card (matches CSS — keep in sync). */
 const CARD_WIDTH = 300;
-/** Approximate collapsed card height — used for placement maths. */
-const CARD_HEIGHT_COLLAPSED = 76;
+/** Approximate collapsed card height (title and its tools) — used for placement maths. */
+const CARD_HEIGHT_COLLAPSED = 96;
 /** Document-edge safety margin so cards don't bleed off the viewport. */
 const DOC_MARGIN = 16;
+
+/**
+ * The leftmost a card may sit: clear of the booth rail, which stays over the page's left edge
+ * while X-ray runs (FloatingSidebar.tsx). Read once per placement, before anything is written.
+ */
+function cardMinLeft(): number {
+  const rail = document.querySelector('nav.booth-rail.is-open');
+  return Math.max(0, rail ? rail.getBoundingClientRect().right : 0) + DOC_MARGIN;
+}
 /** Length the bob wave covers in seconds. */
 const BOB_PERIOD_S = 7;
 /** Peak ± displacement of the bob in pixels. */
@@ -80,13 +83,14 @@ function placeCard(
   outline: OutlineBox,
   others: OutlineBox[],
   doc: DocSize,
+  minLeft: number,
 ): { cardLeft: number; cardTop: number; cardSide: CardSide } {
   const cw = CARD_WIDTH;
   const ch = CARD_HEIGHT_COLLAPSED;
   const m = DOC_MARGIN;
 
-  const rightAlignedX = Math.max(m, Math.min(doc.w - cw - m, outline.left + outline.width - cw));
-  const leftAlignedX = Math.max(m, Math.min(doc.w - cw - m, outline.left));
+  const rightAlignedX = Math.max(minLeft, Math.min(doc.w - cw - m, outline.left + outline.width - cw));
+  const leftAlignedX = Math.max(minLeft, Math.min(doc.w - cw - m, outline.left));
 
   type Cand = { side: CardSide; x: number; y: number };
   const candidates: Cand[] = [
@@ -99,7 +103,7 @@ function placeCard(
   ];
 
   for (const c of candidates) {
-    if (c.x < m || c.x + cw > doc.w - m) continue;
+    if (c.x < minLeft || c.x + cw > doc.w - m) continue;
     if (c.y < m) continue;
     if (c.y + ch > doc.h - m) continue;
     const cardRect: Rect = { x: c.x, y: c.y, w: cw, h: ch };
@@ -129,6 +133,7 @@ function placeCardForSide(
   side: CardSide,
   doc: DocSize,
   cardH: number,
+  minLeft: number,
 ): { cardLeft: number; cardTop: number } {
   const cw = CARD_WIDTH;
   const m = DOC_MARGIN;
@@ -137,11 +142,11 @@ function placeCardForSide(
     return { cardLeft: outline.left + outline.width + 16, cardTop: outline.top + Math.max(0, (outline.height - cardH) / 2) };
   }
   if (side === 'left') {
-    return { cardLeft: Math.max(m, outline.left - cw - 16), cardTop: outline.top + Math.max(0, (outline.height - cardH) / 2) };
+    return { cardLeft: Math.max(minLeft, outline.left - cw - 16), cardTop: outline.top + Math.max(0, (outline.height - cardH) / 2) };
   }
   // above / below: right-align (with safety clamp) to keep connector short
   let cardLeft = outline.left + outline.width - cw;
-  if (cardLeft < m) cardLeft = m;
+  if (cardLeft < minLeft) cardLeft = minLeft;
   if (cardLeft + cw > doc.w - m) cardLeft = doc.w - cw - m;
   const cardTop = side === 'above'
     ? Math.max(m, outline.top - cardH - CARD_GAP)
@@ -255,18 +260,11 @@ function buildConnectorPath(
   return `M${sx},${sy} C${cx1},${cy1} ${cx2},${cy2} ${ex},${ey}`;
 }
 
-/** Where a part's number badge sits: just inside its box's top-left corner. */
-function numberAt(o: OutlineBox): string {
-  return `translate(${o.left + 18} ${o.top + 18})`;
-}
-
 /** All DOM nodes belonging to one section. Filled in via callback refs. */
 type AnchorDom = {
   maskRect: SVGRectElement | null;
   outlineRect: SVGRectElement | null;
   cornerPaths: (SVGPathElement | null)[]; // 4: tl, tr, br, bl
-  /** The part's number badge, placed with a transform on the box's top-left corner. */
-  numText: SVGGElement | null;
   card: HTMLDivElement | null;
   wirePath: SVGPathElement | null;
   pulsePath: SVGPathElement | null;
@@ -275,13 +273,12 @@ const emptyDom = (): AnchorDom => ({
   maskRect: null,
   outlineRect: null,
   cornerPaths: [null, null, null, null],
-  numText: null,
   card: null,
   wirePath: null,
   pulsePath: null,
 });
 
-function XrayMode({ active, onClose, page, variant, controls }: Props) {
+function XrayMode({ active, onClose, page, variant }: Props) {
   const defaults =
     variant === 'person' ? PERSON_XRAY_DEFAULTS : ABM_XRAY_DEFAULTS;
   const sections = resolveXraySections(defaults, page.xraySections);
@@ -372,9 +369,10 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
     setDocSize(ds);
     docSizeRef.current = ds;
 
+    const minLeft = cardMinLeft();
     elements.forEach((e, i) => {
       const others = outlines.filter((_, j) => j !== i);
-      const placement = placeCard(outlines[i], others, ds);
+      const placement = placeCard(outlines[i], others, ds, minLeft);
       e.cardSide = placement.cardSide;
       initial.push({
         section: e.section,
@@ -454,6 +452,7 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
       const t = performance.now();
       const ds = docSizeRef.current;
       const elems = elementsRef.current;
+      const minLeft = cardMinLeft();
 
       for (let i = 0; i < elems.length; i++) {
         const ae = elems[i];
@@ -464,7 +463,7 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
         if (!o) continue;
 
         const cardH = dom.card?.offsetHeight || CARD_HEIGHT_COLLAPSED;
-        const placement = placeCardForSide(o, ae.cardSide, ds, cardH);
+        const placement = placeCardForSide(o, ae.cardSide, ds, cardH, minLeft);
         const cardLeft = placement.cardLeft;
         const cardTop = placement.cardTop;
 
@@ -508,7 +507,6 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
           if (dom.cornerPaths[1]) dom.cornerPaths[1].setAttribute('d', buildCornerPath(o, 'tr'));
           if (dom.cornerPaths[2]) dom.cornerPaths[2].setAttribute('d', buildCornerPath(o, 'br'));
           if (dom.cornerPaths[3]) dom.cornerPaths[3].setAttribute('d', buildCornerPath(o, 'bl'));
-          if (dom.numText) dom.numText.setAttribute('transform', numberAt(o));
         }
 
         // Card position writes — only when the placement coords moved.
@@ -645,14 +643,6 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
               <path ref={setDomRef(a.section.id, 'cornerPaths', 2)} d={buildCornerPath(a, 'br')} />
               <path ref={setDomRef(a.section.id, 'cornerPaths', 3)} d={buildCornerPath(a, 'bl')} />
             </g>
-            <g ref={setDomRef(a.section.id, 'numText')} transform={numberAt(a)}>
-              <g className="xray-trace__num">
-                <circle cx={0} cy={0} r={12} className="xray-trace__num-bg" />
-                <text x={0} y={4} textAnchor="middle" className="xray-trace__num-text">
-                  {a.sectionNumber}
-                </text>
-              </g>
-            </g>
           </g>
         ))}
 
@@ -704,57 +694,50 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
             onBlur={() => setHoveredId((h) => h === a.section.id ? null : h)}
           >
             <div className="xray-card__inner">
+              {/* The whole card is the toggle: its title and tools, then (open) how it is made and from what. */}
               <button
                 type="button"
                 className="xray-card__header"
                 onClick={() => setExpanded(isOpen ? null : a.section.id)}
                 aria-expanded={isOpen}
               >
-                <div className="xray-card__badge">
-                  <span className="xray-card__badge-num">{a.sectionNumber}</span>
-                </div>
-                <div className="xray-card__heading">
-                  <div className="xray-card__title">{a.section.title}</div>
-                </div>
-                <svg
-                  className={'xray-card__chev' + (isOpen ? ' xray-card__chev--open' : '')}
-                  viewBox="0 0 24 24"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
+                <span className="xray-card__top">
+                  <span className="xray-card__title">{a.section.title}</span>
+                  <svg
+                    className={'xray-card__chev' + (isOpen ? ' xray-card__chev--open' : '')}
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+                {a.section.tools.length > 0 && (
+                  <span className="xray-card__tools">
+                    {a.section.tools.map((t) => (
+                      <span key={t} className="xray-card__tool">
+                        <XrayToolLogo name={t} size={18} />
+                        <span>{t}</span>
+                      </span>
+                    ))}
+                  </span>
+                )}
               </button>
 
               <div className="xray-card__body">
                 <div className="xray-card__body-inner">
-                  <div className="xray-card__group">
-                    <div className="xray-card__group-label">Tools</div>
-                    <div className="xray-card__chips">
-                      {a.section.tools.map((t) => (
-                        <span key={t} className="xray-card__chip xray-card__chip--tool">
-                          <XrayToolIcon name={t} />
-                          <span>{t}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="xray-card__group">
-                    <div className="xray-card__group-label">Data</div>
-                    <ul className="xray-card__list">
-                      {a.section.sources.map((s) => (
-                        <li key={s}>{s}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  {a.section.notes && (
-                    <p className="xray-card__notes">{a.section.notes}</p>
-                  )}
+                  {(a.section.logic ?? a.section.notes) && <p className="xray-card__logic">{a.section.logic ?? a.section.notes}</p>}
+                  <ul className="xray-card__list" aria-label="Made from">
+                    {a.section.sources.map((src) => (
+                      <li key={src}>{src}</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>
@@ -783,30 +766,7 @@ function XrayMode({ active, onClose, page, variant, controls }: Props) {
     </div>
   );
 
-  /** The mode's status in the rail, under the X-ray button: scanning, then the parts traced. */
-  const railStatus = controls
-    ? createPortal(
-        <div className={'booth-rail__stat' + (phase === 'revealed' ? ' is-done' : '')} role="status" aria-live="polite">
-          <span className="booth-rail__stat-value">
-            {phase === 'revealed' ? anchorsInit.length : <span className="booth-rail__stat-scan" aria-hidden="true" />}
-          </span>
-          <span className="booth-rail__label">{phase === 'revealed' ? (anchorsInit.length === 1 ? 'Part' : 'Parts') : 'Scanning'}</span>
-          {phase === 'revealed' && (
-            <span className="sr-only">
-              {anchorsInit.length} part{anchorsInit.length === 1 ? '' : 's'} traced
-            </span>
-          )}
-        </div>,
-        controls,
-      )
-    : null;
-
-  return (
-    <>
-      {createPortal(<>{docLayer}{viewportLayer}</>, document.body)}
-      {railStatus}
-    </>
-  );
+  return createPortal(<>{docLayer}{viewportLayer}</>, document.body);
 }
 
 export default XrayMode;

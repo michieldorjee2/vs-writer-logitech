@@ -288,47 +288,6 @@ html.booth-page--rail .www-page .www-sticky {
   from { opacity: 0; transform: scale(0.4); }
 }
 
-/* ------------ X-ray mode in the rail ------------
- * X-ray pressed shows its icon in the accent. Its status arrives in the slot under it (XrayMode
- * portals it there): a pulse while it scans, then the number of parts it traced. */
-
-.booth-rail__btn--xray.is-on .booth-rail__icon {
-  color: var(--booth-accent-text);
-}
-.booth-rail__stat {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 50px;
-  height: 46px;
-  color: var(--booth-fg);
-  font: 500 12px/1 var(--booth-font);
-  animation: booth-slot-in 560ms var(--booth-ease) 120ms backwards;
-}
-.booth-rail__stat-value {
-  display: grid;
-  place-items: center;
-  height: 20px;
-  font: 800 18px/1 var(--booth-display);
-  color: var(--booth-accent-text);
-}
-.booth-rail__stat.is-done .booth-rail__stat-value {
-  animation: booth-count-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.booth-rail__stat-scan {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--booth-bar);
-  animation: booth-stat-scan 0.8s ease-in-out infinite;
-}
-@keyframes booth-stat-scan {
-  50% { opacity: 0.35; transform: scale(0.7); }
-}
-
 /* X-ray: the scan line sweeps while the pointer is on it. */
 .booth-rail__scan {
   transform-box: fill-box;
@@ -497,10 +456,7 @@ html.booth-page--rail .www-page .www-sticky {
   .booth-rail__scan,
   .booth-rail__btn--send,
   .booth-rail__btn--send.is-hinted::after,
-  .booth-rail__count,
-  .booth-rail__stat,
-  .booth-rail__stat-value,
-  .booth-rail__stat-scan {
+  .booth-rail__count {
     animation: none !important;
   }
 }

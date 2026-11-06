@@ -9,8 +9,8 @@
                        scrolls it with the page (no React per frame).
    .xray-fixed-layer → fixed to the window: the grid, the vignette, and
                        while scanning, the scan line and its note.
-   Its status (scanning, then the parts traced) is in the booth rail,
-   under the X-ray button (booth-rail.css); it has no bar of its own.
+   It has no bar of its own: the booth rail leaves just Close while
+   it runs (booth-rail.css).
 
    The animations are X-ray's own (the scan, the trace drawing in,
    the pulse along each wire, the cards' float). The surfaces are
@@ -120,30 +120,6 @@
   opacity: 0;
   animation: xray-trace-fade 280ms ease-out forwards;
   animation-delay: calc(var(--reveal-index, 0) * 80ms + 220ms);
-}
-
-/* The part's number: a lime badge on its top-left corner, like Edit's comment badges. Popped
- * from its own centre (an SVG element otherwise scales from the document's corner). */
-.xray-trace__num {
-  transform-box: fill-box;
-  transform-origin: center;
-  opacity: 0;
-  animation: xray-num-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  animation-delay: calc(var(--reveal-index, 0) * 80ms + 320ms);
-}
-
-.xray-trace__num-bg {
-  fill: var(--booth-accent);
-}
-
-.xray-trace__num-text {
-  fill: #08251a;
-  font: 700 12px var(--booth-font);
-}
-
-@keyframes xray-num-pop {
-  from { opacity: 0; transform: scale(0.4); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes xray-trace-fade {
@@ -302,10 +278,11 @@ html.booth-page--rail .xray-overlay__scan-label {
 .xray-card__header {
   appearance: none;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   width: 100%;
-  padding: 12px 14px;
+  padding: 14px 14px 14px 16px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -326,29 +303,15 @@ html.booth-page--rail .xray-overlay__scan-label {
   outline-offset: -2px;
 }
 
-.xray-card__badge {
-  flex-shrink: 0;
+.xray-card__top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--booth-accent);
-  color: #08251a;
-}
-
-.xray-card__badge-num {
-  font: 700 12px/1 var(--booth-font);
-  font-variant-numeric: tabular-nums;
-}
-
-.xray-card__heading {
-  flex: 1;
-  min-width: 0;
+  gap: 12px;
 }
 
 .xray-card__title {
+  flex: 1;
+  min-width: 0;
   font: 800 17px/1.15 var(--booth-display);
   letter-spacing: 0;
   color: var(--booth-fg);
@@ -363,6 +326,37 @@ html.booth-page--rail .xray-overlay__scan-label {
 .xray-card__chev--open {
   transform: rotate(180deg);
   color: var(--booth-fg);
+}
+
+/* The tools that made the part, by their own logos: on the card open or not. */
+.xray-card__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.xray-card__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 6px;
+  border-radius: 999px;
+  background: var(--booth-raised);
+  color: var(--booth-fg);
+  font: 500 13px/18px var(--booth-font);
+}
+
+.xray-tool-logo {
+  flex: none;
+  display: block;
+  border-radius: 5px;
+  object-fit: contain;
+}
+
+.xray-tool-logo--glyph {
+  display: grid;
+  place-items: center;
+  background: var(--booth-page);
 }
 
 .xray-card__body {
@@ -380,41 +374,15 @@ html.booth-page--rail .xray-overlay__scan-label {
 }
 
 .xray-card__body-inner {
-  padding: 4px 14px 16px;
+  padding: 12px 16px 16px;
 }
 
-.xray-card__group {
-  margin-top: 12px;
-}
-
-.xray-card__group-label {
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--booth-fg-3);
-}
-
-.xray-card__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.xray-card__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px 4px 8px;
-  border-radius: 999px;
-  background: var(--booth-raised);
+/* How the part is made, in one line; then what it is made from. */
+.xray-card__logic {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.45;
   color: var(--booth-fg);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.xray-card__chip svg {
-  flex-shrink: 0;
-  color: var(--booth-accent-text);
 }
 
 .xray-card__list {
@@ -431,7 +399,7 @@ html.booth-page--rail .xray-overlay__scan-label {
   padding-left: 14px;
   font-size: 13px;
   line-height: 1.4;
-  color: var(--booth-fg-2);
+  color: var(--booth-fg-3);
 }
 
 .xray-card__list li::before {
@@ -445,16 +413,6 @@ html.booth-page--rail .xray-overlay__scan-label {
   background: var(--booth-bar);
 }
 
-.xray-card__notes {
-  margin: 12px 0 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--booth-raised);
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--booth-fg-3);
-}
-
 @media (max-width: 640px) {
   html.booth-page--rail .xray-overlay__scan-label {
     left: 50%;
@@ -466,8 +424,7 @@ html.booth-page--rail .xray-overlay__scan-label {
   .xray-overlay__scanline-glow {
     animation-duration: 400ms;
   }
-  .xray-card__inner,
-  .xray-trace__num {
+  .xray-card__inner {
     animation-duration: 160ms;
     animation-delay: 0ms !important;
   }

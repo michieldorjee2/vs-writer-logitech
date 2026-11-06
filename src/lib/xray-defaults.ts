@@ -29,7 +29,12 @@ export type XraySectionInfo = {
   tools: string[];
   /** Raw data inputs the component was built from. */
   sources: string[];
-  /** Optional short note shown in italics. */
+  /**
+   * How the part is made, in one line: the decision behind it, as against the data it is made from
+   * (`sources`). Shown when its X-ray card opens (Michiel, 6 Nov).
+   */
+  logic?: string;
+  /** A short note kept from the CMS overrides; shown when a part has no `logic`. */
   notes?: string;
 };
 
@@ -41,6 +46,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'hero-3d',
     selector: '[data-xray="hero-3d"]',
     title: 'Hero brand mark',
+    logic: "Brandfetch finds their logo and colours; the page extrudes the logo and takes its accent from the brand.",
     tools: ['Brandfetch'],
     sources: ['Brand logo', 'Brand colours', 'Brand description'],
     notes: 'Logo extruded in real-time from the brand SVG.',
@@ -49,6 +55,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'hero-title',
     selector: '[data-xray="hero-title"]',
     title: 'Hero headline',
+    logic: "Mark writes the pitch for this account's buyer and stage, in approved terms only.",
     tools: ['Mark'],
     sources: ['Custom pitch copy', 'Persona-targeted messaging', 'Approved terms'],
   },
@@ -56,6 +63,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'hero-subtitle',
     selector: '[data-xray="hero-subtitle"]',
     title: 'Hero subtitle',
+    logic: "Mark says what the pitch means for them, inside our approved messaging.",
     tools: ['Mark'],
     sources: ['Personalised supporting line', 'Approved messaging frameworks'],
   },
@@ -63,6 +71,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'intel-headline',
     selector: '[data-xray="intel-headline"]',
     title: 'Account intel headline',
+    logic: "Mark frames the research around their industry and where 6sense puts them in the funnel.",
     tools: ['Mark', '6sense'],
     sources: ['Account name', 'Industry', 'Funnel stage'],
   },
@@ -70,6 +79,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'intel-stats',
     selector: '[data-xray="intel-stats"]',
     title: 'Stat ribbon',
+    logic: "Their scale in a few numbers: people from LinkedIn, content and recent updates from their sitemap.",
     tools: ['Web browsing', 'LinkedIn', 'Sitemap'],
     sources: [
       'Investor reports',
@@ -82,6 +92,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'stakeholders',
     selector: '[data-xray="stakeholders"]',
     title: 'Key stakeholders',
+    logic: "The roles we most want to meet, matched from Salesforce and LinkedIn; photos from Gravatar.",
     tools: ['LinkedIn', 'Salesforce', 'Gravatar'],
     sources: [
       'Main contacts + roles',
@@ -94,6 +105,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'tech-stack',
     selector: '[data-xray="tech-stack"]',
     title: 'Current tech stack',
+    logic: "What their live site runs today; the platform we would replace is marked.",
     tools: ['BuiltWith'],
     sources: ['Detected vendors on the live site'],
   },
@@ -101,6 +113,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'investments',
     selector: '[data-xray="investments"]',
     title: 'Strategic investments',
+    logic: "Where they are putting money, from public reports; the one closest to our pitch leads.",
     tools: ['Web browsing', 'Salesforce'],
     sources: [
       'Investor reports',
@@ -112,6 +125,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'news',
     selector: '[data-xray="news"]',
     title: 'In the news',
+    logic: "Recent public news about them, newest first.",
     tools: ['Web browsing'],
     sources: [
       'Google News',
@@ -124,6 +138,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'challenge-headline',
     selector: '[data-xray="challenge-headline"]',
     title: 'Challenge headline',
+    logic: "Mark names the platform they are on and the problem it causes, from our positioning.",
     tools: ['Mark'],
     sources: [
       'Competitive positioning',
@@ -135,6 +150,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'challenge-screenshot',
     selector: '[data-xray="challenge-screenshot"]',
     title: 'Current website capture',
+    logic: "A live capture of their own site, so the problem is shown on their page, not stock imagery.",
     tools: ['Mark', 'Web browsing'],
     sources: ['Live screenshot of brand site', 'Customer website URL'],
     notes: 'Real capture, not stock imagery.',
@@ -143,6 +159,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'pain-points',
     selector: '[data-xray="pain-points"]',
     title: 'Pain points',
+    logic: "Mark reads their site and keeps the problems our positioning answers.",
     tools: ['Mark', 'Web browsing'],
     sources: [
       'Site-derived pain narrative',
@@ -154,6 +171,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'comparison-row',
     selector: '[data-xray="comparison-row"]',
     title: 'Comparison row',
+    logic: "Their platform against ours, capability by capability, in approved product language.",
     tools: ['CMS', 'Mark'],
     sources: [
       'Competitive pages',
@@ -165,6 +183,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'logo-wall',
     selector: '[data-xray="logo-wall"]',
     title: 'Reference customer',
+    logic: "Customer logos chosen to match their industry.",
     tools: ['CMS'],
     sources: ['Approved customer logos', 'Vertical-matched stories'],
   },
@@ -172,6 +191,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'testimonials',
     selector: '[data-xray="testimonials"]',
     title: 'Testimonial',
+    logic: "Approved customer quotes from our story library.",
     tools: ['CMS'],
     sources: ['Customer stories', 'Approved customer quotes'],
   },
@@ -179,6 +199,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'analysts',
     selector: '[data-xray="analysts"]',
     title: 'Analyst recognition',
+    logic: "The analyst reports behind the pitch, quoted as published.",
     tools: ['CMS'],
     sources: [
       'Forrester TEI report',
@@ -191,6 +212,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'roi-cards',
     selector: '[data-xray="roi-cards"]',
     title: 'ROI metric',
+    logic: "Forrester TEI results, scaled to their industry and funnel stage.",
     tools: ['CMS', '6sense'],
     sources: [
       'Forrester TEI report',
@@ -202,6 +224,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'roi-projection',
     selector: '[data-xray="roi-projection"]',
     title: 'Revenue projection',
+    logic: "TEI results carried over to their size with industry benchmarks: a projection, labelled so.",
     tools: ['CMS', '6sense'],
     sources: [
       'TEI extrapolation',
@@ -213,6 +236,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'timeline-phases',
     selector: '[data-xray="timeline-phases"]',
     title: 'Migration phase',
+    logic: "Mark fits our approved migration plan to their move, phase by phase.",
     tools: ['Mark'],
     sources: ['Phased rollout copy', 'Approved migration template'],
   },
@@ -220,6 +244,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'team-members',
     selector: '[data-xray="team-members"]',
     title: 'Account team',
+    logic: "The Optimizely people on the account in Salesforce, with Gravatar photos.",
     tools: ['Salesforce', 'Gravatar'],
     sources: [
       'Account owner',
@@ -232,6 +257,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'cta-title',
     selector: '[data-xray="cta-title"]',
     title: 'Closing CTA headline',
+    logic: "One approved ask: pressing it tells the account team, no form to fill in.",
     tools: ['Mark', 'ODP'],
     sources: [
       'Approved CTA copy',
@@ -243,6 +269,7 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'cta-description',
     selector: '[data-xray="cta-description"]',
     title: 'CTA description',
+    logic: "Mark's closing line, inside our approved messaging.",
     tools: ['Mark'],
     sources: ['Closing supporting line', 'Approved messaging'],
   },
@@ -257,6 +284,7 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
     id: 'agents-at-work',
     selector: '[data-xray="agents-at-work"]',
     title: 'Agents at work',
+    logic: "The use cases the page leads with, ranked from their stack and investments; illustrative, and labelled so.",
     tools: ['BuiltWith', 'CMS'],
     sources: ['Lead use cases, ranked from the stored stack and investments', 'Stack chips from the stored stack'],
     notes: 'Illustrative, and labelled so. Agent 1 ranks the use cases from 6sense, stage and opportunities.',
@@ -265,6 +293,7 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
     id: 'who-we-are',
     selector: '[data-xray="who-we-are"]',
     title: 'Who we are',
+    logic: "The same on every page: our positioning and the analyst recognition behind it.",
     tools: ['CMS'],
     sources: ['Approved positioning', 'Analyst recognitions', 'Platform usage figure (May 2026 release)'],
     notes: 'The same on every page.',
@@ -273,6 +302,7 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
     id: 'speaks-language',
     selector: '[data-xray="speaks-language"]',
     title: 'Speaks your language',
+    logic: "The lead use case asked in their terms, naming the tools they run.",
     tools: ['CMS', 'BuiltWith'],
     sources: ['Lead use case question', 'Tools named from the stored stack'],
     notes: "Generic question until the page agent writes one in the account's own terms.",
@@ -281,6 +311,7 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
     id: 'use-cases',
     selector: '[data-xray="use-cases"]',
     title: 'Use cases',
+    logic: "Five themes ranked by what their stack and investments show; an observed line only with a public source.",
     tools: ['CMS', 'BuiltWith'],
     sources: ['Five-theme library', 'Ranking from the stored stack and investments'],
     notes: 'Observed lines appear once the agent supplies a sourced public fact.',
@@ -289,6 +320,7 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
     id: 'proof-stories',
     selector: '[data-xray="proof-stories"]',
     title: 'Proof',
+    logic: "Verified results from agent platform customers, never invented.",
     tools: ['CMS'],
     sources: ['Verified agent platform customer stories', 'Educational assets for prospects'],
   },
@@ -296,6 +328,7 @@ export const AGENT_PLATFORM_XRAY: XraySectionInfo[] = [
     id: 'first-90-days',
     selector: '[data-xray="first-90-days"]',
     title: 'First 90 days',
+    logic: "Our adoption plan, grouped by the kinds of tools they already run.",
     tools: ['CMS', 'BuiltWith'],
     sources: ['Adoption plan', 'Stack categories from the stored stack', 'Trust Center'],
   },
@@ -536,6 +569,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-hero',
     selector: '',
     title: 'Who this is for',
+    logic: "Who the page is for, under their company's logo; the personalization is said once, here.",
     tools: ['Salesforce', 'CMS'],
     sources: ['Account logo from the parent account page', 'Contact record'],
     fields: ['heroEyebrow', 'companyLogo'],
@@ -545,6 +579,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-identity',
     selector: '',
     title: 'Headline',
+    logic: "Their name and role as they publish them; a headline, when there is one, makes the claim.",
     tools: ['Salesforce', 'LinkedIn'],
     sources: ['Contact record', 'Published profile as they wrote it'],
     fields: ['heroHeadline', 'heroSubheadline', 'personName', 'personTitle', 'roleFrame'],
@@ -554,6 +589,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-opening',
     selector: '',
     title: 'The note',
+    logic: "Mark opens on one specific thing they published; their account executive signs it.",
     tools: ['Mark', 'Web browsing'],
     sources: ['One specific published detail', 'Named account executive'],
     fields: ['noteBody', 'noteSignedBy', 'noteSignedByRole', 'noteSignedByInitials', 'noteDate'],
@@ -563,6 +599,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-measures',
     selector: '',
     title: 'What the job is scored on',
+    logic: "What a seat like theirs is measured on, inferred from title and department: a hypothesis, not a record.",
     tools: ['Mark'],
     sources: ['Seat inference from title and department', "The parent page's pain points"],
     notes: 'A hypothesis about the role, not a record about the person.',
@@ -573,6 +610,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-operation',
     selector: '',
     title: 'Your operation',
+    logic: "Public facts about their operation, each with its source.",
     tools: ['Web browsing', 'BuiltWith'],
     sources: ['Public site structure', 'Detected platform and stack', 'Filings and newsroom'],
     fields: ['provenance'],
@@ -582,6 +620,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-practice',
     selector: '',
     title: 'In practice',
+    logic: "The parent page's product claims, put in this seat's own vocabulary.",
     tools: ['Mark', 'CMS'],
     sources: ['Product claims from the parent page', 'Reframed to this seat’s vocabulary'],
     fields: ['solutionsHeadline', 'solutionsIntro', 'solutions'],
@@ -591,6 +630,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-how',
     selector: '',
     title: 'How it works',
+    logic: "The same on every person page: held in the page, not generated.",
     tools: ['CMS'],
     sources: ['Fixed platform description'],
     notes: 'Identical on every person page — held in the frontend, not generated.',
@@ -601,6 +641,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-number',
     selector: '',
     title: 'The one number',
+    logic: "One figure from a published customer story or third-party research: cited, never computed.",
     tools: ['Mark', 'Web browsing'],
     sources: ['Published customer story or third-party research', 'Cited, never computed'],
     fields: ['keyNumberPrefix', 'keyNumberValue', 'keyNumberSuffix', 'keyNumberLabel', 'keyNumberDetail', 'keyNumberCitationUrl'],
@@ -610,6 +651,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-proof',
     selector: '',
     title: 'Peer proof',
+    logic: "Quotes from people in a seat like theirs, matched on role first, industry second.",
     tools: ['CMS', 'Mark'],
     sources: ['optimizely.com customer stories', 'Matched on role first, industry second'],
     fields: ['peerProofHeadline', 'peerProof'],
@@ -619,6 +661,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-working',
     selector: '',
     title: 'Why you’re seeing this',
+    logic: "Why they are seeing this: their own public words and our labelled assumptions.",
     tools: ['Mark', 'Salesforce'],
     sources: ['Their own words', 'Our labelled assumption about the seat'],
     notes: 'The disclosure that earns the rest of the page.',
@@ -629,6 +672,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-cta',
     selector: '',
     title: 'The ask',
+    logic: "One click tells their account executive; no form.",
     tools: ['Mark'],
     sources: ['The one-click ask: it tells the account executive'],
     fields: ['ctaTitle', 'ctaBody', 'ctaButtonText', 'meetingUrl'],
@@ -638,6 +682,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-team',
     selector: '',
     title: 'Your team',
+    logic: "Their account team from the parent page, with placeholder contacts left out.",
     tools: ['Salesforce', 'Gravatar'],
     sources: ['Account team from the parent page', 'Placeholder contacts filtered out'],
     fields: ['teamHeadline', 'team'],
@@ -647,6 +692,7 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-small-print',
     selector: '',
     title: 'Small print',
+    logic: "One stored line at the foot of the ask.",
     tools: ['CMS'],
     sources: ['Stored footer line'],
     fields: ['footerLine'],
@@ -687,6 +733,8 @@ export function resolveXraySections(
       title: o.Title || d.title,
       tools: o.Tools && o.Tools.length ? o.Tools.map((t) => RENAMED_TOOLS[t] ?? t) : d.tools,
       sources: o.Sources && o.Sources.length ? o.Sources : d.sources,
+      // A page's own stored note is about that page: it says how the part was made there.
+      logic: o.Notes?.trim() ? o.Notes : d.logic,
       notes: o.Notes ?? d.notes,
     };
   });
