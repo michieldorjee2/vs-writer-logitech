@@ -112,9 +112,9 @@ function viewTransitionsBoot(): Plugin {
       order: 'pre',
       handler(html) {
         if (!html.includes(PLACEHOLDER)) return html;
-        const source = readFileSync(path.resolve(__dirname, 'src/lib/view-transitions-boot.js'), 'utf8')
+        const source = readFileSync(path.resolve(import.meta.dirname, 'src/lib/view-transitions-boot.js'), 'utf8')
           .replace(/^\/\*[\s\S]*?\*\/\s*/, '');
-        const optIn = readFileSync(path.resolve(__dirname, 'src/styles/view-transitions-opt-in.css'), 'utf8')
+        const optIn = readFileSync(path.resolve(import.meta.dirname, 'src/styles/view-transitions-opt-in.css'), 'utf8')
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\s+/g, ' ')
           .replace(/\s*([{};])\s*/g, '$1')
