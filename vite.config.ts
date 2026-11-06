@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 /*
  * The Visual Builder queries are IMPORTED rather than copied. Every other query in this file
@@ -121,6 +122,7 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
         const url = new URL(req.url || '', 'http://localhost')
         // The functions this serves, as Vercel routes them: [pattern, file, the path segment that is `id`].
         const routes: Array<[RegExp, string]> = [
+          [/^\/api\/badge-read$/, '/api/badge-read.ts'],
           [/^\/api\/page-builds$/, '/api/page-builds/index.ts'],
           // Before [id], as Vercel serves a file ahead of a dynamic segment.
           [/^\/api\/page-builds\/match$/, '/api/page-builds/match.ts'],
@@ -471,6 +473,50 @@ function graphDevProxy(authKey: string, devEmail: string | null, env: Record<str
   }
 }
 
+/*
+ * Tesseract's own files for reading badges in the browser (src/lib/badge-read-device.ts),
+ * served from this site at /ocr/<version>/ rather than a CDN: its worker, the three LSTM
+ * builds of the engine it picks between (relaxed SIMD, SIMD, plain), and the English
+ * model. Fixed names, because Tesseract asks for them by name, so they sit outside
+ * /assets; the version in the path lets vercel.json cache them for good. The dev server
+ * answers from node_modules; the build copies them into dist.
+ */
+const OCR_FILES: Record<string, string> = {
+  'worker.min.js': 'node_modules/tesseract.js/dist/worker.min.js',
+  'tesseract-core-relaxedsimd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
+  'tesseract-core-simd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js',
+  'tesseract-core-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js',
+  'eng.traineddata.gz': 'node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz',
+}
+function ocrFiles(): Plugin {
+  const version = (JSON.parse(readFileSync(path.resolve(__dirname, 'node_modules/tesseract.js/package.json'), 'utf-8')) as { version: string }).version
+  const base = `/ocr/${version}/`
+  let ssr = false
+  return {
+    name: 'ocr-files',
+    configResolved(config) {
+      ssr = !!config.build.ssr
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url || '').split('?')[0]
+        if (!url.startsWith(base)) return next()
+        const file = OCR_FILES[url.slice(base.length)]
+        if (!file) return next()
+        res.setHeader('Content-Type', url.endsWith('.js') ? 'text/javascript' : 'application/octet-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.end(readFileSync(path.resolve(__dirname, file)))
+      })
+    },
+    generateBundle() {
+      if (ssr) return
+      for (const [name, file] of Object.entries(OCR_FILES)) {
+        this.emitFile({ type: 'asset', fileName: `ocr/${version}/${name}`, source: readFileSync(path.resolve(__dirname, file)) })
+      }
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const authKey = env.GRAPH_AUTH_KEY || ''
@@ -486,6 +532,7 @@ export default defineConfig(({ mode }) => {
       opalCreatePageDevProxy(devEmail),
       homeEntryDev(),
       pageBuildsDev(env),
+      ocrFiles(),
     ],
     resolve: {
       alias: {

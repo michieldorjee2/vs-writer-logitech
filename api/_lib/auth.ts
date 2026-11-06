@@ -76,7 +76,7 @@ function hmac(key: string, data: string): string {
   return createHmac('sha256', key).update(data).digest('base64url');
 }
 
-function sessionKey(): string {
+export function sessionKey(): string {
   // SESSION_SECRET when set; otherwise derived from the relay secret, so a
   // deploy that only configures sign-in still signs with something secret.
   return process.env.SESSION_SECRET || `showcase-session:${process.env.OPTIID_RELAY_SECRET ?? ''}`;

@@ -17,6 +17,7 @@ import {
 import { usePageRequest } from '../hooks/usePageRequest';
 import { choiceMeta, domainOf } from '../lib/account-match';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
+import { imageFileOf, useBadgeReady } from '../lib/badge-scan';
 import { clearOfflineCopies, INDEX_URL, keepIndex, readKeptIndex } from '../lib/home-offline';
 import { fillOfferWords, OFFER_ASK_WORDS, offerAddShown } from '../lib/offer-from-search';
 import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from '../lib/home-scenes';
@@ -33,6 +34,9 @@ import {
   type RunningOffer,
   type ShownOffer,
 } from '../lib/offer-looks';
+import { bestMatches, type Suggestion } from '../lib/badge-suggest';
+import BadgeLanyard from './BadgeLanyard';
+import BadgeScanButton from './BadgeScanButton';
 import OptimizelyWordmark from './OptimizelyWordmark';
 import ProfileMenu from './ProfileMenu';
 import '../styles/search-home.css';
@@ -348,7 +352,16 @@ function LookCard({ job, title, onRetry }: { job: LookJob; title: string; onRetr
 /** Stagger slot for the rise and drop animations: rows down a column, columns slightly apart. */
 const slot = (row: number, col: number) => ({ '--i': row + col * 0.7 }) as CSSProperties;
 
-export default function SearchHome({ scene, offer: servedOffer = null }: { scene: Scene; offer?: ShownOffer | null }) {
+export default function SearchHome({
+  scene,
+  offer: servedOffer = null,
+  badgeReady = null,
+}: {
+  scene: Scene;
+  offer?: ShownOffer | null;
+  /** Whether Mark's badge reader is set up, as the server said (null: ask; the dev server). */
+  badgeReady?: boolean | null;
+}) {
   const heroRef = useRef<HTMLElement | null>(null);
   const liftRef = useRef<HTMLDivElement | null>(null);
   const listsRef = useRef<HTMLDivElement | null>(null);
@@ -642,7 +655,37 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
     },
     [companies],
   );
-  const req = usePageRequest({ findCompany, onStarted: addBuilds });
+  /* Mark reads the badges the browser can't, when its badge reader is set up (MARK_BADGE_AGENT_ID). */
+  const markReadsBadges = useBadgeReady(!!identity, badgeReady);
+  const req = usePageRequest({ findCompany, onStarted: addBuilds, markReadsBadges });
+  /* A camera in the bar on every device, for anyone signed in: the browser reads the badge itself. */
+  const scanReady = !!identity;
+  /* A badge photo dropped on the bar, or pasted into it, is read like one the camera took. */
+  const [dropping, setDropping] = useState(false);
+  const takesPhoto = scanReady && !req.phase;
+  /* The badge scanner: the lanyard is up while the rep scans, and while a badge is read or filled in
+     (a photo dropped on the bar opens it too). */
+  const [scanning, setScanning] = useState(false);
+  const lanyardUp = scanning || req.badge.active;
+  /* As a line on the badge is fixed: the people or companies in the index whose name matches what is typed. */
+  const suggestible = useMemo(
+    () => ({
+      person: people.map((p): Suggestion => ({ kind: 'person', route: p.slug, name: p.name, meta: p.company, title: p.title, logo: p.logoUrl })),
+      company: companies.map((e): Suggestion => ({ kind: 'company', route: e.slug, name: e.name, meta: '', logo: e.logoUrl })),
+    }),
+    [people, companies],
+  );
+  const suggest = useCallback((kind: 'person' | 'company', typed: string) => bestMatches(suggestible[kind], typed), [suggestible]);
+  /* A person page in the index, by name, under the company with this route (any company when null). */
+  const findPerson = useCallback(
+    (name: string, companyRoute: string | null) => {
+      const n = name.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!n) return null;
+      const hit = people.find((p) => p.name.trim().toLowerCase().replace(/\s+/g, ' ') === n && (!companyRoute || p.slug.startsWith(`${companyRoute}/`)));
+      return hit ? { route: hit.slug, name: hit.name } : null;
+    },
+    [people],
+  );
 
   /* `?q=`: the browser's "search Showcase" entry (public/opensearch.xml) lands here
      with the query. Filled in after the first render, so the server's HTML and the
@@ -1122,8 +1165,24 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
             </h1>
           )}
           <form
-            className={'sh-search' + (req.phase ? ' is-request' : '')}
+            className={'sh-search' + (req.phase ? ' is-request' : '') + (dropping ? ' is-drop' : '')}
             role="search"
+            onDragOver={(e) => {
+              if (!takesPhoto || !e.dataTransfer.types.includes('Files')) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+              setDropping(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+            }}
+            onDrop={(e) => {
+              setDropping(false);
+              const file = takesPhoto ? imageFileOf(e.dataTransfer.files) : null;
+              if (!file) return;
+              e.preventDefault();
+              void req.scan(file);
+            }}
             onSubmit={(e) => {
               e.preventDefault();
               if (req.phase) {
@@ -1169,6 +1228,12 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
                   }, 150);
                 }}
                 onKeyDown={onKeyDown}
+                onPaste={(e) => {
+                  const file = takesPhoto ? imageFileOf(e.clipboardData.files) : null;
+                  if (!file) return;
+                  e.preventDefault();
+                  void req.scan(file);
+                }}
               />
             )}
             {req.phase && req.phase !== 'sent' && (
@@ -1176,6 +1241,7 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
                 Cancel
               </button>
             )}
+            {takesPhoto && <BadgeScanButton onOpen={() => setScanning(true)} />}
             {req.phase !== 'sent' && (
               <button
                 type="submit"
@@ -1360,6 +1426,22 @@ export default function SearchHome({ scene, offer: servedOffer = null }: { scene
       <p className="sh-sr" role="status">
         {resultsNote}
       </p>
+      {lanyardUp && (
+        <BadgeLanyard
+          flow={req.badge}
+          submitting={req.submitting}
+          findPerson={findPerson}
+          logoFor={(route) => bySlug.get(route)?.logoUrl ?? null}
+          suggest={suggest}
+          onOpenPage={open}
+          // "+ Company" from the badge: the search bar's own Add company, as if it had been typed there.
+          onAddCompany={(text) => req.start('account', text)}
+          onClose={() => {
+            req.badge.stop();
+            setScanning(false);
+          }}
+        />
+      )}
     </main>
   );
 }
