@@ -6,7 +6,7 @@
  *
  * Order, as the August rebuild argued it, one idea per scene:
  *   1 hero       who it is for, once (their account's logo and the stored eyebrow), and the claim
- *   2 note       a note from their account executive, and where the conversation stands
+ *   2 note       a note from their account executive (never about our conversations with them)
  *   3 problem    what a seat like theirs is scored on
  *   4 operation  their business, as the reason the product matters
  *   5 practice   the product as a change to how their team works
@@ -35,7 +35,6 @@ import {
   HOW_IT_WORKS_TITLE,
   PRODUCT_HREF,
   PRODUCT_LABEL,
-  TIER_LABEL,
   askLabelOf,
   bookingUrlOf,
   formatDate,
@@ -159,16 +158,12 @@ function Hero({ page, company, person }: { page: PersonPageData; company: string
 
 function Note({ page }: { page: PersonPageData }) {
   const field = useShowsField()
-  const tier = page.engagementTier ?? 'known'
   if (!page.noteBody) return null
   return (
     <Scene id="note" tone="neutral" compact>
       <div className="mx-auto max-w-[860px]" data-xray="person-opening">
-        <Reveal i={0} className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Reveal i={0} className="mb-6">
           <Eyebrow>{page.noteSignedBy ? `A note from ${page.noteSignedBy.split(/\s+/)[0]}` : 'A note'}</Eyebrow>
-          <span data-xray="person-tier" {...field('engagementTier')}>
-            <Badge label={TIER_LABEL[tier]} color="darkgreen" filled={false} size="sm" />
-          </span>
         </Reveal>
         <Reveal i={1} as="p" className="www-letter" {...field('noteBody')}>
           {page.noteBody}
@@ -513,10 +508,7 @@ function Ask({ page, company }: { page: PersonPageData; company: string }) {
                       <GravatarAvatar email={m.Email} initials={m.Initials || initialsOf(m.Name as string)} className="www-avatar" />
                       <span className="min-w-0 flex-1">
                         <span className="font-nudge block text-2xl leading-tight font-extrabold">{m.Name}</span>
-                        <span className="www-small block text-white/70">
-                          {m.Role}
-                          {m.AlreadyMet && <span className="www-met"> · You have met</span>}
-                        </span>
+                        <span className="www-small block text-white/70">{m.Role}</span>
                       </span>
                       {m.Email && <MaterialIcon name="mail" size="24" color="var(--color-primary-lfgreen)" />}
                     </a>

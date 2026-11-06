@@ -57,7 +57,7 @@ import { inCmsPreview } from '../../lib/cms-preview'
 import { postSignup } from '../../lib/offer-signup'
 import { sendCtaPing } from '../../lib/cta-ping'
 import PersonPage, { personConnectProps } from '../PersonPage'
-import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, measuresOf, peerProofOf, TIER_LABEL } from '../person-content'
+import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, measuresOf, peerProofOf, publicPersonPage } from '../person-content'
 import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
 import ctaPingHandler, { accountSource, buildPing, canonicalJson, checkOf, personSource, pingRouteOf, type CtaPing } from '../../../api/cta-ping'
 import previewHandler, { concreteType } from '../../../api/preview'
@@ -466,7 +466,7 @@ for (const f of ACCOUNT_FIELDS.filter((x) => x.use === 'text')) {
   test(`text  ${f.field} → ${f.section}`, () => {
     let values = stringsOf(account[f.field]).filter((s) => !/^(https?:|var\(|Yes$|No$|Limited$|engaged$)/.test(s))
     if (f.field === 'teamMembers') values = ['F-team-name', 'F-team-role'] // the placeholder member is dropped on purpose
-    if (f.field === 'stakeholders') values = ['F-stakeholder-name', 'F-stakeholder-role', 'F-stakeholder-note', 'In conversation']
+    if (f.field === 'stakeholders') values = ['F-stakeholder-name', 'F-stakeholder-role'] // never the engagement badge or note: see below
     if (f.field === 'roiCards') values = ['F-metric-1', 'F-unit-1', 'F-roi-label-1', 'F-citation-1', 'F-metric-2', 'F-roi-label-2', 'F-citation-2']
     for (const raw of values) {
       // An extruded ##run## renders once per layer, so check the runs and the words between them.
@@ -2023,7 +2023,7 @@ function fullPersonPage(over: Partial<PersonPageData> = {}): PersonPageData {
     researchClaim: 'P-SECRET-research-claim',
     provenance: [
       { Register: 'read', Text: 'P-read-fact', SourceLabel: 'P-read-source', SourceUrl: { default: 'https://example.test/p-read' } },
-      { Register: 'told', Text: 'P-told-words', SourceLabel: 'P-told-source', SourceUrl: null },
+      { Register: 'told', Text: 'P-told-words', SourceLabel: 'P-told-source', SourceUrl: { default: 'https://example.test/p-told' } },
       { Register: 'assumed', Text: 'P-assumed', SourceLabel: 'P-SECRET-assumed-source', SourceUrl: null },
     ],
     scorecardHeadline: 'P-scorecard-headline',
@@ -2103,27 +2103,55 @@ test('a person page shows every stored field it places, and nothing that is neve
   for (const v of ['Ben Yu', 'P-title-of-person', 'P-remit-headline', 'P-remit-title', 'P-remit-desc', 'P-remit-metric']) assert.ok(bare.includes(v), v)
 })
 
-test('a person page keeps the rules: CRM never shown, the badge from the reader\'s side, the working visible', () => {
+test("a person page never shows our conversations with them: no badge, no 'You have met', no quote from an email or call", () => {
   const text = textOf(personHtml)
-  assert.ok(text.includes(TIER_LABEL.engaged))
   for (const tier of ['key', 'engaged', 'known'] as const) {
     const t = textOf(renderToString(<PersonPage page={fullPersonPage({ engagementTier: tier })} />))
-    assert.ok(t.includes(TIER_LABEL[tier]), tier)
-    assert.ok(!/Active opportunity|opportunity|pipeline|stage/i.test(t.replace(/P-SECRET[\w-]*/g, '')), `${tier}: CRM language on the page`)
+    assert.ok(!/conversation|In conversation|An introduction|Active opportunity|opportunity|pipeline|stage/i.test(t.replace(/P-SECRET[\w-]*/g, '')), `${tier}: relationship language on the page`)
   }
-  // Their words and our assumptions, with the invitation to correct them.
-  assert.match(text, /You said\s*P-told-words/)
+  assert.ok(!/You have met|have met/i.test(text), 'who they have met is on the page')
+  assert.ok(!/data-xray="person-tier"/.test(personHtml), 'the engagement badge is still drawn')
+  // Their published words stay, with the source; words from an email, a call or a meeting never reach the page.
+  const page = fullPersonPage({
+    provenance: [
+      { Register: 'told', Text: 'P-published-words', SourceLabel: 'Interview, 2026', SourceUrl: { default: 'https://example.test/interview' } },
+      { Register: 'told', Text: 'P-SECRET-email-words', SourceLabel: 'Your email to Optimizely, April 2026', SourceUrl: null },
+      { Register: 'told', Text: 'P-SECRET-call-words', SourceLabel: 'Call with Erlin Saenz', SourceUrl: { default: 'mailto:erlin@optimizely.com' } },
+      { Register: 'assumed', Text: 'P-assumed', SourceLabel: 'Assumption', SourceUrl: null },
+      { Register: 'read', Text: 'P-read-fact', SourceLabel: 'P-read-source', SourceUrl: { default: 'https://example.test/p-read' } },
+    ],
+  })
+  const html = renderToString(<PersonPage page={page} />)
+  assert.match(textOf(html), /You said\s*P-published-words/)
+  assert.ok(!/P-SECRET/.test(html), 'an unpublished quote is on the page')
+  assert.ok(!/Your email to Optimizely|Call with Erlin/.test(html), 'the source of an unpublished quote is on the page')
+  // ...and the server never sends them: what api/content.ts, the server render and the preview ship.
+  const shipped = JSON.stringify(publicPersonPage(page).provenance)
+  assert.ok(!/P-SECRET/.test(shipped), 'an unpublished quote leaves the server')
+  assert.ok(shipped.includes('P-published-words') && shipped.includes('P-assumed') && shipped.includes('P-read-fact'))
+  for (const f of ['api/content.ts', 'server/ssr-handler.tsx', 'api/preview.ts']) {
+    assert.match(readFileSync(f, 'utf8'), /publicPersonPage\(items\[0\]/, `${f} ships the page without publicPersonPage`)
+  }
+  // The rest of the rules.
   assert.match(text, /We assumed\s*P-assumed/)
   assert.match(text, /If any of that is wrong, tell Caleb Ping and we.ll rewrite it/)
-  // Placeholders are nobody; the account executive's "You have met" stays.
   assert.ok(!text.includes('Solutions Architect') && !/Account Executive\b(?! )/.test(text.replace('Enterprise Account Executive', '')), 'a placeholder contact')
-  assert.ok(text.includes('You have met'))
-  // One voice per quote card; the one number with its symbol.
   assert.equal(peerProofOf(fullPersonPage()).length, 1)
   assert.equal(keyNumberText({ keyNumberPrefix: 'EUR', keyNumberValue: '4', keyNumberSuffix: 'M+' }), '€4M+')
   assert.equal(keyNumberText({ keyNumberPrefix: null, keyNumberValue: '1500', keyNumberSuffix: null }), '1,500')
   assert.equal(formatDate('2026-10-22'), '22 Oct 2026')
   assert.deepEqual(measuresOf({ scorecard: [], remitPoints: null }), [])
+})
+
+test("the account page's stakeholder cards say who they are, never our conversations with them", () => {
+  const html = renderToString(<AccountPage page={{ ...account, stakeholders: [{ Initials: 'FS', Name: 'F-stakeholder-name', Role: 'F-stakeholder-role', LinkedInUrl: null, AvatarColor: null, EngagementTier: 'key', EngagementNote: 'Spoke with Jacob on 9 Sep 2026', PersonSlug: null, CrmContactId: '0038d000008yIznAAE' }] } as CompetitorComparisonPage} />)
+  const text = textOf(html)
+  assert.ok(text.includes('F-stakeholder-name'))
+  for (const leak of ['Active opportunity', 'In conversation', 'Spoke with Jacob', '0038d000008yIznAAE']) assert.ok(!html.includes(leak), `${leak} is on the account page`)
+  // Not fetched either, so not in the page's source: the account page and the experience queries.
+  for (const f of ['src/lib/account-page-query.ts', 'src/lib/experience-queries.ts']) {
+    assert.ok(!/EngagementTier|EngagementNote|CrmContactId/.test(readFileSync(f, 'utf8')), `${f} still fetches a stakeholder's CRM fields`)
+  }
 })
 
 test('a person page has one ask: the one-click button, with a booking link only when it is one', () => {
