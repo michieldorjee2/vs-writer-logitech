@@ -446,12 +446,15 @@ async function fetchPageContent(authKey: string, slug: string): Promise<FetchedP
     ...tries.map((s) => ({ kind: 'account' as const, slug: s })),
   ];
 
+  // No answer at all (Graph down, or the read timed out) fails the page here, as any Graph failure
+  // always has: asking eight more times would only wait eight times as long.
+  const { query, variables } = whichPageQuery(candidates);
+  const answer = await queryGraph(authKey, query, variables);
   let found: Candidate | null;
   try {
-    const { query, variables } = whichPageQuery(candidates);
-    found = firstCandidateFound(candidates, await queryGraph(authKey, query, variables));
+    found = firstCandidateFound(candidates, answer);
   } catch (err) {
-    // The question failed (Graph errors, or no answer): ask each candidate in turn, as before.
+    // Graph answered the question with errors: ask each candidate in turn, as before.
     console.error('[ssr] WhichPage failed, reading each candidate in turn:', err instanceof Error ? err.message : err);
     for (const c of candidates) {
       if (c.kind === 'account') {

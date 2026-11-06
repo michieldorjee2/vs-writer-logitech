@@ -91,7 +91,7 @@ await check('Graph errors or no data throw (the render then reads one by one), n
 });
 await check('the render asks once, then reads one page, and falls back to one by one', () => {
   const ssr = read('server/ssr-handler.tsx');
-  assert(/firstCandidateFound\(candidates, await queryGraph\(authKey, query, variables\)\)/.test(ssr), 'one question');
+  assert(/const answer = await queryGraph\(authKey, query, variables\);\s+let found: Candidate \| null;\s+try \{\s+found = firstCandidateFound\(candidates, answer\);/.test(ssr), 'one question; only its errors (not a network failure) fall back');
   assert(/return found \? readPage\(authKey, found, finservQuery\) : null;/.test(ssr), 'then the one page');
   assert(/for \(const c of candidates\) \{[\s\S]{0,300}await readPage\(authKey, c, finservQuery\)/.test(ssr), 'the fallback');
   assert(/signal: AbortSignal\.timeout\(GRAPH_TIMEOUT_MS\)/.test(ssr), 'Graph reads are bounded');
