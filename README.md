@@ -66,10 +66,10 @@ An account page's own pitch picks its template (`src/www/account-template.ts`), 
 The person page (`src/www/PersonPage.tsx`, the `PersonPage` type: 33 pages on 4 November) is the 1:1 buyer page one level in from an account page, on the same layout. It keeps the order the August rebuild argued for: the hero (their account's logo and the stored eyebrow, once, then the stored headline or their name), a note from their account executive, what a seat like theirs is scored on, their operation, the product in practice, the same four steps on every page, one cited number and peer quotes, why they are seeing the page (their words and our labelled assumptions, with an invitation to correct us), and the one-click ask. It keeps that rebuild's rules, and since 6 November one more: Salesforce decides what the page argues but never appears on it (the open opportunity, the touchpoint log, the engagement summary and the engagement tier are not even fetched); no conversation of ours appears on it (no engagement badge, no "You have met", and their words only when they published them: a quote must link a public source, and one from an email, call or meeting is dropped on the server by `publicPersonPage`); and the working stays visible. The `person_page` agent (v3.1.0) writes to the same rule: nothing from a call, demo, meeting or email, quoted, paraphrased or as a figure they gave us. The account page's stakeholder cards follow it too: name, role, LinkedIn and their page, never an engagement badge or activity note. `src/www/person-content.ts` says where every stored field goes or why not (`PERSON_FIELDS`), and `check:www` fails if a never-shown field reaches the page. Two stored links are treated with care: the "Schedule a call" fast track appears only when `meetingUrl` is a booking link (21 of the 33 pages store optimizely.com/contact, a form), and the closing button keeps its stored words ("Book 30 minutes") only when it does; otherwise it reads "Talk to your team". The hero's second button scrolls to the page's argument instead of the stored contact form. X-ray and Edit mode find its parts by `data-xray` (`PERSON_XRAY_DEFAULTS`, `PERSON_EDIT`, each part with its fields for Mark); the page is not re-rendered live, Mark's edits show after the save. The CMS preview draws it with the editing hooks, as it does account pages. The old renderer (the WebGL galaxy, the starfield, its own CSS) and three.js are gone.
 
 ```bash
-npm run check:www                              # 191 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules, the person page, the CMS preview, the CTA ping
+npm run check:www                              # 197 offline tests: helpers, field coverage, x-ray hooks, brand rules, Laura's rules, the person page, the CMS preview, the CTA ping
 WWW_UPSTREAM=~/Claude/OptimizelyHeadless npm run check:www   # + proves src/vendor/www still matches upstream
 npm run build && npx tsx scripts/serve-prod.ts &               # local production stand-in on :5199
-npm run e2e:www                                # 124 Playwright checks, desktop + phone: both account templates, the person page, the offer page, X-ray/Edit, the CMS preview, all network mocked
+npm run e2e:www                                # 131 Playwright checks, desktop + phone: both account templates, the person page, the offer page, X-ray/Edit, the CMS preview, the view transitions, all network mocked
 npx tsx scripts/smoke-live-pages.ts [base]     # every live account page in the www design: renders, 8 sections, title, one CTA, no competitor/stakeholder names
 ```
 
@@ -167,6 +167,18 @@ Two things to know before touching the queries:
 
 - **Adding a field to the account page query before it is registered in the CMS 404s every account page.** One unknown field fails the whole GraphQL query (commit `9091988`). Register in the CMS, run `npm run check:graph`, *then* add it to `src/lib/account-page-query.ts`: one field list that the live page (`api/content.ts`), the server render, the dev server and the CMS preview all read.
 - **`_json` is not an escape hatch for unregistered fields.** Graph rejects it on a page root (`The \`_json\` field is only supported within the \`item\` field`), so a field the content type does not register cannot be read at all — register it first.
+
+## View transitions: the search page and the pages it opens
+
+Opening an account or person page from the search page, and going back, animates instead of reloading: the row's logo and name fly into the hero's logo tile and the line beside it, the Optimizely wordmark moves to its place, and the search page's photograph shrinks into the hero's right half (and back, the other way). The search page now opens results in the same tab for this (Cmd/Ctrl/Shift or a middle click still opens a new one), and comes back from the browser's back/forward cache with its query and list as they were.
+
+They are cross-document view transitions (`@view-transition { navigation: auto }`), because the search page (home.html) and the pages (index.html) are separate documents:
+
+- `src/styles/view-transitions.css`: the opt-in, loaded by both documents, and the timing of each moving part. Reduced motion opts out.
+- The names: `www.css` names the hero's wordmark, photograph, logo tile and account line on every page; `search-home.css` names the search page's photograph, wordmark and its own layers above the photograph (top bar, headline and search box, lists), so they fade above it.
+- `src/lib/view-transitions-boot.js`, written into both `<head>`s by `vite.config.ts` (a classic inline script, so its listeners exist before the first paint): the search page names only the row you open (`pageswap`) and the row you come back from (`pagereveal`), then lets go; a page arriving by the morph skips its hero intro; a page scrolled past its hero morphs nothing.
+
+Chrome and Edge 126+ and Safari 18.2+ animate; any other browser just navigates. The search page's service worker serves its last copy first, so the first visit after a deploy shows the previous search page, and the next one animates. Locally, `SERVE_SIGNED_IN=<email> npx tsx scripts/serve-prod.ts` serves the search page signed in, with the search index read from Graph, to try it.
 
 ## The one-click ask: the CTA ping
 

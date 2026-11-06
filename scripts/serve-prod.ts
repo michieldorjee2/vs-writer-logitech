@@ -7,7 +7,7 @@
  *   npm run build && npx tsx scripts/serve-prod.ts [port]     # default 5199
  *
  * Reads GRAPH_AUTH_KEY from the environment or .env.local. Read-only against Graph; it never
- * writes anywhere. Not deployed.
+ * writes anywhere. Not deployed. SERVE_SIGNED_IN=<email> also serves the search page signed in.
  */
 import http from 'node:http'
 import fs from 'node:fs'
@@ -34,6 +34,32 @@ type Handler = (req: unknown, res: unknown) => Promise<unknown> | unknown
 const ssr: Handler = (await import(path.join(ROOT, 'api/ssr.ts'))).default
 const content: Handler = (await import(path.join(ROOT, 'api/content.ts'))).default
 const preview: Handler = (await import(path.join(ROOT, 'api/preview.ts'))).default
+
+/*
+ * SERVE_SIGNED_IN=<email>: the search page as that person sees it, for looking at it and for
+ * the browser checks (the view transitions to and from the pages it opens). Their sign-in, the
+ * search index read from Graph (read-only, as api/home-index.ts reads it), and no offers or
+ * builds. Unset, /api/auth/me is not served and the search page sends you to sign in.
+ */
+const SIGNED_IN = (process.env.SERVE_SIGNED_IN || '').trim().toLowerCase()
+let homeIndex: Promise<unknown> | null = null
+async function homeIndexBody(): Promise<unknown> {
+  const { loadHomeIndex, homeIndexFor } = await import(path.join(ROOT, 'src/lib/home-index.ts'))
+  const key = process.env.GRAPH_AUTH_KEY || ''
+  const run = async (query: string, variables: Record<string, unknown>) =>
+    (await fetch(`https://cg.optimizely.com/content/v2?auth=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    })).json()
+  homeIndex ??= loadHomeIndex(run)
+  return homeIndexFor((await homeIndex) as never, SIGNED_IN)
+}
+function json(res: http.ServerResponse, body: unknown) {
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Cache-Control', 'no-store')
+  res.end(JSON.stringify(body))
+}
 
 /** The parts of VercelRequest/VercelResponse the two handlers use. */
 function adapt(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
@@ -63,6 +89,12 @@ function adapt(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`)
   try {
+    if (SIGNED_IN) {
+      if (url.pathname === '/api/auth/me') return json(res, { email: SIGNED_IN, name: 'Local stand-in' })
+      if (url.pathname === '/api/home-index') return json(res, await homeIndexBody())
+      if (url.pathname === '/api/offers') return json(res, { offers: [] })
+      if (url.pathname === '/api/page-builds') return json(res, { builds: [] })
+    }
     if (url.pathname === '/api/content' || url.pathname === '/api/preview') {
       const [a, b] = adapt(req, res, url)
       return await (url.pathname === '/api/content' ? content : preview)(a, b)

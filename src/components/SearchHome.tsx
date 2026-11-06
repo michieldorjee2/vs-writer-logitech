@@ -851,12 +851,20 @@ export default function SearchHome({
   /* ---------- Actions ---------- */
 
   const open = useCallback(
-    (slug: string) => {
+    (slug: string, newTab = false) => {
       const next = [slug, ...recentSlugs.filter((s) => s !== slug)].slice(0, MAX_RECENT);
       setRecentSlugs(next);
       writeRecent(next);
-      // A new tab, so this page stays where it was; `?search=1` gives the page its "back to search" button.
-      window.open(`/${slug}?search=1`, '_blank', 'noopener,noreferrer');
+      // `?search=1` gives the page its "back to search" button.
+      const href = `/${slug}?search=1`;
+      if (newTab) {
+        window.open(href, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      // The same tab, so the row's logo and name, the photograph and the wordmark move into the
+      // page (src/styles/view-transitions.css), and back again; this page waits in the
+      // back/forward cache as it was. Cmd/Ctrl-click (or Enter) still opens a new tab.
+      window.location.assign(href);
     },
     [recentSlugs],
   );
@@ -971,7 +979,8 @@ export default function SearchHome({
   // Nothing to walk (or offer to add) until the lists are on screen.
   const navRows = ready ? columns.flatMap((c) => c.rows) : [];
 
-  const pick = (row: Row) => {
+  /** Open a row's page; `newTab` from Cmd/Ctrl/Shift or a middle click, as a link would. */
+  const pick = (row: Row, newTab = false) => {
     if (row.kind === 'add') {
       const offer = row.add === 'offer' && running && running.fromSearch !== 'off' ? { id: running.id, fromSearch: running.fromSearch } : undefined;
       req.start(row.add, query, offer);
@@ -987,7 +996,7 @@ export default function SearchHome({
       window.open(`/${row.page.route}`, '_blank', 'noopener,noreferrer');
       return;
     }
-    open(row.item.kind === 'company' ? row.item.entry.slug : row.item.person.slug);
+    open(row.item.kind === 'company' ? row.item.entry.slug : row.item.person.slug, newTab);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1008,7 +1017,7 @@ export default function SearchHome({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const row = navRows[activeIdx];
-      if (row) pick(row);
+      if (row) pick(row, e.metaKey || e.ctrlKey || e.shiftKey);
     } else if (e.key === 'Escape') {
       setQuery('');
       inputRef.current?.blur();
@@ -1336,7 +1345,10 @@ export default function SearchHome({
                       style: slot(r + 1, c),
                       onMouseDown: (e: React.MouseEvent) => e.preventDefault(),
                       onMouseEnter: () => setActiveIdx(idx),
-                      onClick: () => pick(row),
+                      onClick: (e: React.MouseEvent) => pick(row, e.metaKey || e.ctrlKey || e.shiftKey),
+                      onAuxClick: (e: React.MouseEvent) => {
+                        if (e.button === 1) pick(row, true);
+                      },
                     };
                     if (row.kind === 'add') {
                       return (
@@ -1402,6 +1414,8 @@ export default function SearchHome({
                       <button
                         key={row.key}
                         {...common}
+                        // The view transition's handle on this row (src/lib/view-transitions-boot.js).
+                        data-vt-slug={item.kind === 'company' ? item.entry.slug : item.person.slug}
                         className={'sh-row' + (row.meta ? '' : ' sh-row--plain') + (active ? ' is-active' : '')}
                       >
                         {item.kind === 'company' ? (

@@ -195,6 +195,35 @@ body:has(.www-page) {
   align-items: center;
   height: 72px;
 }
+/* The view transition's moving parts (src/styles/view-transitions.css): the wordmark, the
+   photograph, the account's logo and the line beside it morph to and from the search page. A page
+   scrolled past its hero (vt-far) morphs nothing. */
+.www-page .www-strip__logo {
+  view-transition-name: vt-wordmark;
+}
+.www-page .www-hero__visual {
+  view-transition-name: vt-scene;
+}
+.www-page .www-hero .www-account__logo {
+  view-transition-name: vt-logo;
+}
+.www-page .www-hero .www-account__label {
+  view-transition-name: vt-name;
+}
+.vt-far .www-page .www-strip__logo,
+.vt-far .www-page .www-hero__visual,
+.vt-far .www-page .www-hero .www-account__logo,
+.vt-far .www-page .www-hero .www-account__label {
+  view-transition-name: none;
+}
+/* Arriving by the morph, the hero is already where it belongs: no intro under it. */
+.vt-in .www-page .www-hero [data-reveal],
+.vt-in .www-page .www-hero .www-w,
+.vt-in .www-page .www-strip,
+.vt-in .www-page .www-hero__visual,
+.vt-in .www-page .www-hero__img {
+  animation: none;
+}
 /* The search page's outline wordmark, at its size there: white on the dark hero, Dark Fir on a light one. */
 .www-page .www-strip__logo {
   display: block;

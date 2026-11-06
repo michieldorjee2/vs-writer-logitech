@@ -1,0 +1,107 @@
+/*
+ * Cross-document view transitions between the search page (/search, home.html) and the pages it
+ * opens (account and person pages, index.html), both ways (Michiel, 6 Nov 2026: "not just fade,
+ * but actually moves and transforms the elements between").
+ *
+ * Both documents load this file and opt in. Elements with the same view-transition-name on the
+ * page you leave and the page you arrive on morph into each other; everything else cross-fades.
+ *
+ *   vt-wordmark  the Optimizely wordmark: the search page's top left, the hero's top left
+ *   vt-scene     the photograph: behind the whole search page, the hero's right half
+ *   vt-logo      the clicked row's logo tile, the hero's account logo tile
+ *   vt-name      the clicked row's name, the line beside the hero's logo ("Personalized for CDW")
+ *
+ * And three on the search page only, its layers above the photograph (the top bar, the headline
+ * with the search box, the lists): named so they stay above it while it moves, and fade.
+ *
+ * The page side names are static (www.css); the search page names only the row you open, and
+ * the row for the page you come back from (the script in both documents' <head>:
+ * src/lib/view-transitions-boot.js, written into index.html and home.html by vite.config.ts). A browser without
+ * cross-document view transitions, or a reader who asked for reduced motion, just navigates.
+ */
+@view-transition {
+  navigation: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}
+
+/* The page behind: a quick cross-fade, so the moving parts carry the transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* The moving parts: one easing, a little longer, with the account above the photograph it
+   crosses (the hero draws the photograph after the copy, so without this it would cover them). */
+::view-transition-group(vt-scene),
+::view-transition-group(vt-wordmark),
+::view-transition-group(vt-logo),
+::view-transition-group(vt-name) {
+  animation-duration: 620ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.2, 1);
+}
+::view-transition-group(vt-scene) {
+  z-index: 1;
+}
+::view-transition-group(vt-wordmark),
+::view-transition-group(vt-logo),
+::view-transition-group(vt-name) {
+  z-index: 3;
+}
+
+/* The search page's own layers: above the photograph, below the moving account. They have no
+   counterpart on the page, so they only fade: out quickly as the photograph starts to move, in
+   as it settles. */
+::view-transition-group(vt-search-top),
+::view-transition-group(vt-search-lift),
+::view-transition-group(vt-search-panel) {
+  z-index: 2;
+}
+::view-transition-old(vt-search-top),
+::view-transition-old(vt-search-lift),
+::view-transition-old(vt-search-panel) {
+  animation-duration: 260ms;
+}
+::view-transition-new(vt-search-top),
+::view-transition-new(vt-search-lift),
+::view-transition-new(vt-search-panel) {
+  animation-duration: 420ms;
+  animation-delay: 260ms;
+  animation-fill-mode: both;
+}
+::view-transition-old(vt-scene),
+::view-transition-new(vt-scene),
+::view-transition-old(vt-logo),
+::view-transition-new(vt-logo),
+::view-transition-old(vt-name),
+::view-transition-new(vt-name) {
+  animation-duration: 620ms;
+}
+
+/* The photograph is cropped, never stretched, as its frame changes shape. */
+::view-transition-old(vt-scene),
+::view-transition-new(vt-scene) {
+  height: 100%;
+  object-fit: cover;
+}
+::view-transition-image-pair(vt-scene) {
+  overflow: clip;
+}
+/* On the search page the photograph sits in a frame with rounded corners. */
+:root:active-view-transition-type(from-search)::view-transition-old(vt-scene),
+:root:active-view-transition-type(to-search)::view-transition-new(vt-scene) {
+  clip-path: inset(0 round 20px);
+}
+
+/* A name changes length ("CDW" becomes "Personalized for CDW"): scale it by its height only, so
+   the letters never stretch, and let the two cross-fade from the left. */
+::view-transition-old(vt-name),
+::view-transition-new(vt-name) {
+  width: auto;
+  height: 100%;
+  inset-inline-start: 0;
+}

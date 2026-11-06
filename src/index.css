@@ -63,6 +63,8 @@
 @import '../tokens/compiled/default.css';
 
 /* 3. The 21 hand-written stylesheets, unlayered, in exactly v3's order. */
+/* Cross-document view transitions to and from the search page (both documents load it). */
+@import './styles/view-transitions.css';
 @import './styles/abm-variables.css';
 @import './styles/abm-layout.css';
 @import './styles/abm-components.css';

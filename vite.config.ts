@@ -96,6 +96,28 @@ function stripHtmlComments(): Plugin {
   };
 }
 
+/**
+ * Write the view transitions boot script (src/lib/view-transitions-boot.js) into both documents'
+ * <head>, in place of their `<script data-view-transitions-boot></script>`: a classic inline
+ * script, so its pageswap / pagereveal listeners exist before the browser fires them (a module
+ * script would run too late). One source for index.html and home.html.
+ */
+function viewTransitionsBoot(): Plugin {
+  const PLACEHOLDER = '<script data-view-transitions-boot></script>';
+  return {
+    name: 'view-transitions-boot',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        if (!html.includes(PLACEHOLDER)) return html;
+        const source = readFileSync(path.resolve(__dirname, 'src/lib/view-transitions-boot.js'), 'utf8')
+          .replace(/^\/\*[\s\S]*?\*\/\s*/, '');
+        return html.replace(PLACEHOLDER, `<script>${source.trim()}</script>`);
+      },
+    },
+  };
+}
+
 /** Read the JSON body off a Node IncomingMessage (Vite dev middleware). */
 async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
@@ -538,6 +560,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      viewTransitionsBoot(),
       stripHtmlComments(),
       ...(authKey ? [graphDevProxy(authKey, devEmail, env)] : []),
       devAuthProxy(devEmail),
