@@ -5,6 +5,7 @@ import { askAnswerOf, askNote } from '../lib/offer-from-search';
 import type { FromSearch } from '../lib/offer-looks';
 import type { BuildSummary } from '../lib/page-builds';
 import { looksLikeWebsite } from '../lib/search-entries';
+import { useBadgeCard } from './useBadgeCard';
 
 /*
  * Asking Mark for a page that does not exist yet, from the search page, held
@@ -58,13 +59,33 @@ const linkTo = (route: string) => (
   </a>
 );
 
+/** The "sent" lines, for a company page and for a person's (asked for here or from a badge). */
+const accountNote = ({ build }: { build: BuildSummary }) => (
+  <>
+    Mark is building <b>{build.name}</b>. Follow along at {linkTo(build.route)}.
+  </>
+);
+const personNote = ({ build, company: first }: { build: BuildSummary; company?: BuildSummary }) =>
+  first ? (
+    <>
+      Mark builds <b>{first.name}</b>'s page first, then <b>{build.name}</b>'s at {linkTo(build.route)}.
+    </>
+  ) : (
+    <>
+      Mark is building <b>{build.name}</b>'s page. Follow along at {linkTo(build.route)}.
+    </>
+  );
+
 export function usePageRequest({
   findCompany,
   onStarted,
+  markReadsBadges = false,
 }: {
   /** A company the index has a page for, by name or website (and its domain, when the index has one). */
   findCompany: (text: string) => { route: string; name: string; domain?: string } | null;
   onStarted: (builds: BuildSummary[]) => void;
+  /** Whether Mark's badge reader is set up, for the badges the browser couldn't read. */
+  markReadsBadges?: boolean;
 }) {
   const [phase, setPhase] = useState<RequestPhase>(null);
   const [kind, setKind] = useState<RequestKind>('account');
@@ -141,6 +162,10 @@ export function usePageRequest({
     [findCompany, lookUp],
   );
 
+  /* A badge the rep scanned (useBadgeCard): it lives on the lanyard's badge (BadgeLanyard) until it is sent or put away. */
+  const badge = useBadgeCard({ findCompany, markReads: markReadsBadges });
+  const { submit: submitBadge, stop: stopBadge } = badge;
+
   const cancel = useCallback(() => {
     if (submitting) return;
     setPhase(null);
@@ -148,8 +173,11 @@ export function usePageRequest({
     setError(null);
   }, [submitting]);
 
+  /** Sends a page request; true once Mark has it (or already had it). */
   const send = useCallback(
-    async (body: Record<string, unknown>, note: (builds: { build: BuildSummary; company?: BuildSummary }) => ReactNode) => {
+    async (body: Record<string, unknown>, note: (builds: { build: BuildSummary; company?: BuildSummary }) => ReactNode): Promise<boolean> => {
+      /* Set only once it is sent: the panel's heading then names what was asked for (a badge asks for either). */
+      const sentKind: RequestKind = body.kind === 'account' ? 'account' : 'person';
       setSubmitting(true);
       setError(null);
       try {
@@ -165,7 +193,7 @@ export function usePageRequest({
           setMatches(null);
           setPhase('company');
           setError(answer?.message || 'That list is out of date. Search for the company again.');
-          return;
+          return false;
         }
         // Asked for minutes ago and still being built, or it has a page: say so instead of starting a second build.
         if (r.status === 409) {
@@ -174,17 +202,21 @@ export function usePageRequest({
             answer?.route ? <>{answer.message?.replace(/:.*$/, '')}: {linkTo(answer.route)}</> : answer?.message || 'This page was asked for a few minutes ago and is still being built.',
           );
           setSentStarted(!answer?.route);
+          setKind(sentKind);
           setPhase('sent');
-          return;
+          return true;
         }
         if (!r.ok) throw new Error(`${r.status}`);
         const started = (await r.json()) as { build: BuildSummary; company?: BuildSummary };
         onStarted([started.company, started.build].filter((b): b is BuildSummary => !!b));
         setSentNote(note(started));
         setSentStarted(true);
+        setKind(sentKind);
         setPhase('sent');
+        return true;
       } catch (err) {
         setError(sendErrorMessage(err));
+        return false;
       } finally {
         setSubmitting(false);
       }
@@ -239,11 +271,7 @@ export function usePageRequest({
         setPhase('sent');
         return;
       }
-      void send({ kind: 'account', lookup: matches.lookup, key: account.key }, ({ build }) => (
-        <>
-          Mark is building <b>{build.name}</b>. Follow along at {linkTo(build.route)}.
-        </>
-      ));
+      void send({ kind: 'account', lookup: matches.lookup, key: account.key }, accountNote);
     },
     [matches, kind, submitting, send],
   );
@@ -285,17 +313,7 @@ export function usePageRequest({
     if (phase === 'person' && companyRef) {
       const who = person.trim();
       if (!who) return setError("Enter the person's name");
-      return send({ kind: 'person', personName: who, company: companyRef }, ({ build, company: first }) =>
-        first ? (
-          <>
-            Mark builds <b>{first.name}</b>'s page first, then <b>{build.name}</b>'s at {linkTo(build.route)}.
-          </>
-        ) : (
-          <>
-            Mark is building <b>{build.name}</b>'s page. Follow along at {linkTo(build.route)}.
-          </>
-        ),
-      );
+      return send({ kind: 'person', personName: who, company: companyRef }, personNote);
     }
   }, [phase, kind, company, person, companyRef, findCompany, send, offerRef, askOffer, lookUp, choose, activePick]);
 
@@ -327,6 +345,16 @@ export function usePageRequest({
           ? 'Company domain, e.g. anaplan.com'
           : 'Company name or website, e.g. Lenovo';
 
+  /** The badge's send: the card goes to Mark; true once Mark has it (the bar then says what was sent). */
+  const sendCard = useCallback(async (): Promise<boolean> => {
+    setError(null);
+    const asked = submitBadge();
+    if (!asked) return false;
+    const sent = await send(asked.body, asked.body.kind === 'account' ? accountNote : personNote);
+    if (sent) stopBadge();
+    return sent;
+  }, [submitBadge, send, stopBadge]);
+
   return {
     phase,
     kind,
@@ -336,6 +364,14 @@ export function usePageRequest({
     error,
     submitting,
     sentNote,
+    /** A badge the rep scanned, for the lanyard (BadgeLanyard): the read, the card, its fixes and its send. */
+    badge: {
+      ...badge,
+      send: sendCard,
+      /** A send that didn't reach Mark says why (this hook's error, while no request of its own is open). */
+      sendError: phase ? null : error,
+    },
+    scan: badge.scan,
     sentStarted,
     /** While the rep picks: the accounts Salesforce matched, and the row the keyboard is on. */
     matches,

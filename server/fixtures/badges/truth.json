@@ -1,0 +1,85 @@
+{
+  "01-event-two-line-name": {
+    "name": "Thandiwe Okonkwo",
+    "title": "Head of Cold-Chain Pricing",
+    "company": "Quillmoor Freight"
+  },
+  "02-caps-name-legal-company": {
+    "name": "Priya Ramanathan",
+    "title": "VP, Digital Experience",
+    "company": "Northwind Traders Inc."
+  },
+  "03-business-card": {
+    "name": "Jonas Feldmann",
+    "title": "Director of Ecommerce",
+    "company": "Brightwater Outfitters",
+    "domain": "brightwater-outfitters.com"
+  },
+  "04-company-first-employee": {
+    "name": "Marisol Etxeberria",
+    "title": "Solutions Architect",
+    "company": "LUMENVALE",
+    "domain": "lumenvale.com"
+  },
+  "05-dark-badge": {
+    "name": "Kenji Watanabe",
+    "title": "Chief Marketing Officer",
+    "company": "Harbor & Pine"
+  },
+  "06-no-title-accents": {
+    "name": "Lars Østergaard",
+    "title": "",
+    "company": "Fjordline Shipping"
+  },
+  "07-two-line-title": {
+    "name": "Aurelia Montgomery",
+    "title": "Senior Director, Global E-commerce",
+    "company": "Calloway & Finch Co."
+  },
+  "08-speaker-qr-number": {
+    "name": "Rafael Quintero",
+    "title": "Principal Engineer",
+    "company": "Tidewell Analytics"
+  },
+  "09-hello-sticker": {
+    "name": "Dana Kim",
+    "title": "",
+    "company": ""
+  },
+  "10-photographed-badly": {
+    "name": "Ingrid Halvorsen",
+    "title": "Director of Product",
+    "company": "Kestrel Mobility"
+  },
+  "11-far-away": {
+    "name": "Oliver Brandt",
+    "title": "Head of Growth",
+    "company": "Acme Robotics GmbH"
+  },
+  "12-company-only-in-email": {
+    "name": "Sofia Marchetti",
+    "title": "Customer Success Manager",
+    "company": "Verdantia",
+    "domain": "verdantia.io"
+  },
+  "13-sponsor-company-above": {
+    "name": "Michael Osei",
+    "title": "Sales Engineer",
+    "company": "Halcyon Data"
+  },
+  "14-gold-sponsor-band": {
+    "name": "Grace Adeyemi",
+    "title": "Account Executive",
+    "company": "Cobalt Commerce"
+  },
+  "15-sponsor-strip-under-name": {
+    "name": "Yuki Tanaka",
+    "title": "Partner Manager",
+    "company": "Meridian Cloudworks"
+  },
+  "16-colour-print-sponsor": {
+    "name": "Noor Haddad",
+    "title": "Field Engineer",
+    "company": "Lumora"
+  }
+}

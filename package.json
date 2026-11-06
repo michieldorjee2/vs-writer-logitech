@@ -8,6 +8,8 @@
     "build": "npm run tokens:build && tsc -b && vite build && node scripts/build-ssr.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "check:badge": "node scripts/check-badge-read.mjs",
+    "check:badge-ocr": "node scripts/check-badge-ocr.mjs",
     "check:graph": "node scripts/check-graph-queries.mjs",
     "check:www": "node scripts/check-www.mjs",
     "e2e:www": "tsx scripts/e2e-www.ts",
@@ -25,7 +27,7 @@
     "check:cta-ping": "python3 mark/cta-ping/test_step.py",
     "check:share-links": "tsx scripts/check-share-links.ts",
     "check:share-teams": "python3 mark/share-teams/test_step.py",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:cta-ping && npm run check:share-links && npm run check:share-teams && npm run check:www"
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:badge && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:cta-ping && npm run check:share-links && npm run check:share-teams && npm run check:www"
   },
   "dependencies": {
     "@optimizely-opal/opal-agent-sdk": "0.11.0",
@@ -62,6 +64,7 @@
     "@radix-ui/react-toolbar": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@radix-ui/react-visually-hidden": "^1.2.11",
+    "@tesseract.js-data/eng": "1.0.0",
     "@upstash/redis": "^1.36.3",
     "@vercel/blob": "^2.8.2",
     "class-variance-authority": "^0.7.1",
@@ -78,7 +81,8 @@
     "react-use": "^17.6.0",
     "react-use-measure": "^2.1.7",
     "sharp": "^0.34.5",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -109,5 +113,8 @@
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
     "zod": "^3.25.76"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2"
   }
 }

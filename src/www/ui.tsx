@@ -15,6 +15,7 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { StackedHeading } from '../vendor/www/components/element/stacked-heading-element'
 import { Button } from '../vendor/www/components/_ui/button'
+import OptimizelyWordmark from '../components/OptimizelyWordmark'
 import { cn } from '../vendor/www/lib/utils'
 
 /* ------------------------------------------------------------------ page root */
@@ -27,11 +28,9 @@ const REVEAL_BOOT = "document.documentElement.classList.add('www-js')"
 
 export function WwwPage({
   children,
-  accent,
   className,
 }: {
   children: ReactNode
-  accent?: string | null
   className?: string
 }) {
   useScenes()
@@ -39,7 +38,6 @@ export function WwwPage({
   return (
     <div
       className={cn('www-page bg-primary-1 text-secondary-darkfir font-body flex min-h-screen w-full flex-col', className)}
-      style={accent ? ({ '--www-accent': accent } as CSSProperties) : undefined}
     >
       <script dangerouslySetInnerHTML={{ __html: REVEAL_BOOT }} />
       <ScrollProgress />
@@ -144,11 +142,15 @@ function ScrollProgress() {
  * The brand mark, anchored to the top-left corner of the hero (brand rule for a small logo).
  * Whose page this is is said once, by the AccountMark above the headline, not here as well.
  */
+/**
+ * The Optimizely wordmark above the hero: the search page's outline mark (src/components/
+ * OptimizelyWordmark.tsx), white on the dark hero and Dark Fir on a light one.
+ */
 export function TopStrip() {
   return (
     <div className="www-strip">
       <a href="https://www.optimizely.com/" aria-label="Optimizely" className="shrink-0">
-        <img src="/optimizely-logo-color.svg" alt="Optimizely" width={150} height={37} className="h-6 w-auto lg:h-7" />
+        <OptimizelyWordmark className="www-strip__logo" />
       </a>
     </div>
   )
@@ -156,23 +158,21 @@ export function TopStrip() {
 
 /**
  * The account's logo above the headline, with the page's one line of personalization beside it
- * ("Personalized for CDW"). Any logo sits on a white tile with room around it, so a transparent
- * mark, a square icon and a logo with its own white box all look deliberate.
+ * ("Personalized for CDW"). The logo fills its rounded tile edge to edge, like an app icon (the
+ * stored logos are square brand icons); a transparent one sits on the tile's white. No account
+ * colour around it (Michiel, 6 Nov 2026: the accent stripe is gone).
  */
 export function AccountMark({
   name,
   logo,
   label,
   xray,
-  accent = false,
   edit,
 }: {
   name: string
   logo?: string | null
   label: string
   xray?: string
-  /** The takeout page's one use of the account's own colour (brandAccentColor): a stripe under the logo. */
-  accent?: boolean
   /** The CMS editor's hooks on the logo and the label, in its preview (./cms-edit.tsx). */
   edit?: { logo?: Record<string, string>; label?: Record<string, string> }
 }) {
@@ -185,7 +185,7 @@ export function AccountMark({
     if (el && el.complete && el.naturalWidth === 0) el.parentElement?.setAttribute('data-broken', '')
   }, [])
   return (
-    <div className={cn('www-account', accent && 'www-account--accent')} data-xray={xray}>
+    <div className="www-account" data-xray={xray}>
       <span className="www-account__logo" {...edit?.logo}>
         {logo && (
           <img

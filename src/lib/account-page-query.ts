@@ -17,7 +17,7 @@ const ACCOUNT_PAGE_FIELDS = `
     endHeadline endSubheadline endCTA endCTALink { default }
     testimonial1 testimonial1JobTitle testimonial1Company
     testimonial2 testimonial2JobTitle testimonial2Company
-    customerLogo brandDomain brandAccentColor intelEyebrow intelHeadline competitorName
+    customerLogo brandDomain intelEyebrow intelHeadline competitorName
     challengeHeadline challengeScreenshotUrl { default } challengeScreenshotAlt challengeBrowserUrl
     comparisonDescription logoWallCustomerSlot
     roiTitle roiDescription roiProjectionValue roiProjectionLabel roiProjectionDetail

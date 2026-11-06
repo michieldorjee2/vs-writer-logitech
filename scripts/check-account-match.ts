@@ -256,5 +256,7 @@ const home = fold(read('src/components/SearchHome.tsx'));
 check('page: "+ Add company" hides only for a page named what was typed, or on that website', home.includes('companies.some((e) => named(e.name) || (!!typedSite && e.domain.toLowerCase() === typedSite))'));
 check('control: the address match that hid "lenovo" is gone', !home.includes('const companyHere = !!findCompany(q)'));
 
+check('build: a person build whose company page fails to start releases the lock, both ways in', (idx.match(/await releaseWebsite\(store, (pickedKey\(account\)|domain)\)\.catch/g) ?? []).length >= 3);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

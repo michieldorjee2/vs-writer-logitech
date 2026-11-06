@@ -2,7 +2,8 @@
  * The search page's offline copy (registered by src/lib/home-offline.ts, scope /search).
  *
  *   the /search document   the copy from last time at once; the network's answer replaces it behind
- *   /assets, /fonts        cache first: hashed or versioned names change when the bytes do
+ *   /assets, /fonts, /ocr  cache first: hashed or versioned names change when the bytes do
+ *                          (/ocr: the badge reader's Tesseract files, read in the browser)
  *   /home/scenes           cache first, and the other two photos at the same size as well,
  *                          so whichever one the next page picks is there offline
  *   /api/auth/me           network first; the last answer when offline, so the page stays signed in
@@ -49,7 +50,7 @@ self.addEventListener('fetch', (event) => {
     if (url.pathname === PAGE || url.pathname === `${PAGE}/`) event.respondWith(page(event));
     return;
   }
-  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/fonts/')) {
+  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/fonts/') || url.pathname.startsWith('/ocr/')) {
     event.respondWith(cacheFirst(event, request));
     return;
   }

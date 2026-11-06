@@ -79,7 +79,7 @@ export default function AccountPage({ page: stored }: Props) {
 
   return (
     <ConnectProvider {...connectProps(page)}>
-    <WwwPage accent={page.brandAccentColor} className="www-takeout">
+    <WwwPage className="www-takeout">
       <div id="main-content">
         <Hero page={page} company={company} />
         <Intel page={page} company={company} companySlug={companySlug} />
@@ -121,7 +121,6 @@ function Hero({ page, company }: { page: CompetitorComparisonPage; company: stri
               logo={page.customerLogo}
               label={page.eyebrow || `Personalized for ${company}`}
               xray="hero-3d"
-              accent={!!page.brandAccentColor}
               edit={{ logo: field('customerLogo'), label: field('eyebrow') }}
             />
           </Reveal>

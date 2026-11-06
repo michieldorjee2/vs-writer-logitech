@@ -195,6 +195,22 @@ body:has(.www-page) {
   align-items: center;
   height: 72px;
 }
+/* The search page's outline wordmark, at its size there: white on the dark hero, Dark Fir on a light one. */
+.www-page .www-strip__logo {
+  display: block;
+  width: 166px;
+  height: 40px;
+  color: var(--www-fir);
+}
+.www-page .www-hero__card--darkfir .www-strip__logo {
+  color: #fff;
+}
+@media (max-width: 640px) {
+  .www-page .www-strip__logo {
+    width: 128px;
+    height: 31px;
+  }
+}
 .www-page .www-sticky {
   position: fixed;
   left: 50%;
@@ -336,7 +352,7 @@ body:has(.www-page) {
   justify-content: center;
   width: clamp(48px, calc(6.4 * var(--www-vh, 1vh)), 60px);
   height: clamp(48px, calc(6.4 * var(--www-vh, 1vh)), 60px);
-  padding: 8px;
+  overflow: hidden;
   border-radius: 16px;
   background: #fff;
   color: var(--www-fir);
@@ -347,7 +363,7 @@ body:has(.www-page) {
 .www-page .www-account__logo img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 .www-page .www-account__logo img + .www-account__initials,
 .www-page .www-account__logo[data-broken] img {
@@ -406,10 +422,6 @@ body:has(.www-page) {
   background: #fff;
   color: var(--www-fir);
   font: 11px/1.4 var(--font-roboto), 'Roboto Mono', monospace;
-}
-/* The account's brand colour (brandAccentColor, takeout only): one stripe, theirs, under their logo. */
-.www-page .www-account--accent .www-account__logo {
-  box-shadow: inset 0 -4px 0 var(--www-accent);
 }
 /* The offer's facts on the landscape. */
 .www-page .www-facts {

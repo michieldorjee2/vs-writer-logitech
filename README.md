@@ -208,6 +208,27 @@ Until a webhook is set, nobody who signs up hears anything more: someone imports
 
 Never submit the form on a preview whose `ALDUS_UI_URL` is production Limitless: the sign-up lands in production's list. Locally, set `ALDUS_UI_URL` to a local aldus-ui.
 
+## Search page: badge scanning
+
+Every signed-in rep has a badge icon beside the go button, on any device; on their first visits "New: Scan a conference badge" hangs off it for a few seconds (`src/lib/seen-hints.ts`). It opens the badge scanner (`src/components/BadgeLanyard.tsx`): a badge on an Optimizely lanyard drops down asking the rep to "Hold up your badge", swings, and can be grabbed and flung (`src/lib/lanyard-physics.ts`, a few Verlet points and two springs; inspired by Vercel's 3D event badge, made of the page's own elements). Behind it is the camera's picture, blurred and mapped to dark greens (an SVG gradient-map filter), so it is plain the camera is on without showing what it sees; The camera watches for a badge lifted into view and held still and sharp (`src/lib/badge-detect.ts`); when it sees one the badge flashes green and fills in. "Detect badges automatically", a switch in the window's bottom right corner (under its button on a phone), is on unless turned off (kept per browser, `src/lib/scan-prefs.ts`); off, the badge's ribbon becomes Scan and a photo is taken only when it is pressed. "Type manually", the window's quieter button, fills one in by hand, and a badge photo dropped on the search bar or pasted into it opens the scanner with that photo. A badge that couldn't be read says so and the camera keeps watching.
+
+The filled-in badge shows the name, the title when one was read, and the company by its name alone (its logo when it has a page; never initials or a domain). Selecting a line fixes it on the badge; the name and the company suggest the index's people and companies as they are typed (`src/lib/badge-suggest.ts`), and picking a person brings their company. Leaving a field keeps what was typed. The badge always has two buttons, Company and Person: dark green with an arrow to open the page the index has, a ghost "+" to have it made. "+ Company" closes the scanner and starts the search bar's own Add company for it (the Salesforce account picker and all); "+ Person" sends the person to Mark through the person-page flow (their company's page first when it has none), and the search page shows it being made. "Scan new badge", the window's own button at the bottom, starts again. The camera runs only while the badge waits for one. On a short window (a phone on its side) the badge takes the height and the window's button moves to the corner.
+
+The browser reads the badge itself. Tesseract (WebAssembly, `src/lib/badge-read-device.ts`) finds the lines of text, and `src/lib/badge-ocr.ts` sorts them into name, title, company and email: the biggest name-like words, the line with a title's words, the line the email's domain spells (or a legal name's ending, or the line under the name), with the event's own lines left out. No photo and no text leaves the device until the rep sends the card. Tesseract's files are this site's own, at `/ocr/<version>/` (vite.config.ts `ocrFiles` serves and builds them from node_modules; about 7 MB the first time, cached for good after), and load while the camera is open. A warm read takes about 0.3 s on a laptop.
+
+Mark reads a badge only when the browser read nothing usable and `MARK_BADGE_AGENT_ID` names Mark's badge-reader agent with `OPAL_PAT` set (`api/badge-read.ts`, `api/_lib/badge-mode.ts`; spec in the Notion-sweep notes, `badge-agent-spec.md`). Unset, such a badge says it couldn't be read and the rep types the company. `BADGE_READ_STUB` is a local stand-in for Mark that always reads the same made-up badge, refused whenever `VERCEL_ENV` or `NODE_ENV` is production.
+
+```bash
+MARK_BADGE_AGENT_ID=   # optional: Mark reads what the browser couldn't
+BADGE_READ_STUB=       # local preview only
+```
+
+```bash
+npm run check:badge                    # the flow, the detector, the sorting rules, nothing kept
+npm run check:badge-ocr                # Tesseract on 16 made-up badges (server/fixtures/badges)
+python3 scripts/make-badge-fixtures.py # redraw those badges
+```
+
 ## Related
 
 - [[_MOCs/Web Apps]]

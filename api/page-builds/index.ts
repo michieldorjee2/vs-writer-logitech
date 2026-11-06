@@ -116,7 +116,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!companyBuild) {
           const claimed = await claimKey(store, pickedKey(account), account.domain ?? account.name, identity.email);
           if (claimed) return res.status(409).json(claimed);
-          companyBuild = await startPickedAccount(store, account, identity.email);
+          try {
+            companyBuild = await startPickedAccount(store, account, identity.email);
+          } catch (err) {
+            // A start that failed holds nothing: the next ask goes straight through.
+            await releaseWebsite(store, pickedKey(account)).catch(() => {});
+            throw err;
+          }
         }
         const build = await startPersonBuild(store, { ...personInput, companyName: companyBuild.name, companyRoute: companyBuild.route, after: companyBuild.id });
         return res.status(200).json({ build: summarize(build, null), company: summarize(companyBuild, null) });
@@ -143,7 +149,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const name = typed(company.name) ?? nameFromWebsite(website.value);
         const claimed = await claim(store, website.value, identity.email);
         if (claimed) return res.status(409).json(claimed);
-        companyBuild = await startAccountBuild(store, { website: website.value, domain, name, email: identity.email });
+        try {
+          companyBuild = await startAccountBuild(store, { website: website.value, domain, name, email: identity.email });
+        } catch (err) {
+          await releaseWebsite(store, domain).catch(() => {});
+          throw err;
+        }
       }
       const build = await startPersonBuild(store, {
         personName: person.value,
