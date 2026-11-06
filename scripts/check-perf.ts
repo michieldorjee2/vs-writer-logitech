@@ -9,7 +9,7 @@
  *      open()), and what getting it ready does: a Speculation Rules list of at most two pages,
  *      replaced as the rep moves on, or one request per page where the browser has no rules.
  *   3. Wiring, read from the sources: SearchHome calls the hook with its active row and opens
- *      rows at the address the hook prerenders; the server render preloads each renderer's chunks.
+ *      rows at the address the hook prerenders; the server render preloads no renderer chunk.
  *
  * No network, no credentials.
  *
@@ -184,19 +184,10 @@ await check("SearchHome calls the hook with its active row, and open() goes wher
   assert(/useWarmPage\(navRows\[activeIdx\]\)/.test(src), 'useWarmPage(navRows[activeIdx]) not found');
   assert(src.includes('const href = `/${slug}?search=1`;'), "open()'s address changed: update pageHrefOf in src/lib/warm-pages.ts to match");
 });
-await check('the server render preloads each renderer, low priority, and the booth rail from /search', () => {
+await check('the server render preloads no renderer chunk (it pushed the hero paint behind hydration)', () => {
   const ssr = read('server/ssr-handler.tsx');
-  assert(/routePreloadLinks\('experience'\)/.test(ssr), 'experience');
-  assert(/routePreloadLinks\(renderer, \.\.\.\(booth/.test(ssr), 'page renderers');
-  assert(/fetchpriority="low"/.test(ssr), 'priority');
-  const build = read('scripts/build-ssr.mjs');
-  for (const key of ['src/www/AccountRoute.tsx', 'src/www/PersonPage.tsx', 'src/components/VisualBuilderPage.tsx', 'src/components/FloatingSidebar.tsx']) {
-    assert(build.includes(`'${key}'`), key);
-  }
-  const app = read('src/App.tsx');
-  for (const lazyImport of ["import('./www/AccountRoute')", "import('./www/PersonPage')", "import('./components/VisualBuilderPage')", "import('./components/FloatingSidebar')"]) {
-    assert(app.includes(lazyImport), `App.tsx no longer lazy-loads ${lazyImport}: update routePreloads() in scripts/build-ssr.mjs`);
-  }
+  assert(!/rel="modulepreload"/.test(ssr), 'server/ssr-handler.tsx writes a modulepreload link');
+  assert(!/__ROUTE_PRELOADS__|manifest: true/.test(ssr + read('scripts/build-ssr.mjs') + read('vite.config.ts')), 'route preloads are wired back in');
 });
 await check('the icon font: the subset in, the package font out', () => {
   const vite = read('vite.config.ts');

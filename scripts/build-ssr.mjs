@@ -43,47 +43,6 @@ function ownDocument(file, entry) {
 const homeTemplate = ownDocument('home.html', 'home');
 const buildTemplate = ownDocument('build.html', 'build');
 
-/*
- * Each page renderer's own chunks, for the server render to preload (server/ssr-handler.tsx,
- * routePreloadLinks). The renderers are lazy chunks of the main entry (src/App.tsx), so without
- * this the browser learns of them only once main.js has run, and hydration waits a round trip
- * longer. From Vite's manifest: the renderer's static imports, less what index.html already loads.
- */
-function routePreloads() {
-  let manifest;
-  try {
-    manifest = JSON.parse(readFileSync('dist/.vite/manifest.json', 'utf-8'));
-  } catch {
-    console.warn('⚠ dist/.vite/manifest.json not found, pages render without route preloads');
-    return {};
-  }
-  const closure = (key, seen = new Set()) => {
-    if (seen.has(key) || !manifest[key]) return seen;
-    seen.add(key);
-    for (const dep of manifest[key].imports ?? []) closure(dep, seen);
-    return seen;
-  };
-  const inShell = closure('index.html');
-  const of = (key) => {
-    if (!manifest[key]) throw new Error(`build-ssr: ${key} is not in Vite's manifest — renamed? Update routePreloads().`);
-    const own = [...closure(key)].filter((k) => !inShell.has(k)).map((k) => manifest[k]);
-    return {
-      js: own.map((c) => `/${c.file}`),
-      css: own.flatMap((c) => (c.css ?? []).map((f) => `/${f}`)),
-    };
-  };
-  return {
-    account: of('src/www/AccountRoute.tsx'),
-    person: of('src/www/PersonPage.tsx'),
-    retail: of('src/components/RetailCustomerPage.tsx'),
-    finserv: of('src/components/FinServPage.tsx'),
-    experience: of('src/components/VisualBuilderPage.tsx'),
-    // The booth rail (?search=1), drawn once the page has hydrated.
-    booth: of('src/components/FloatingSidebar.tsx'),
-  };
-}
-const preloads = routePreloads();
-
 await esbuild.build({
   entryPoints: ['server/ssr-handler.tsx'],
   outfile: 'api/_ssr-bundle.mjs',
@@ -128,7 +87,6 @@ await esbuild.build({
     '__HTML_TEMPLATE__': JSON.stringify(htmlTemplate),
     '__HOME_TEMPLATE__': JSON.stringify(homeTemplate),
     '__BUILD_TEMPLATE__': JSON.stringify(buildTemplate),
-    '__ROUTE_PRELOADS__': JSON.stringify(preloads),
   },
 
   // Source maps for Vercel runtime error traces

@@ -1295,15 +1295,13 @@ await test('an offer page is the www offer page, with or without ?design=classic
   }
 })
 
-console.log('\nspeed: preloads, the icon subset, the page made ready from the search page')
+console.log('\nspeed: the icon subset, no renderer preloads, the page made ready from the search page')
 {
-  await test("each renderer's chunks are preloaded at low priority, and the booth rail's from /search", async () => {
-    const preloads = (html: string) => [...html.matchAll(/<link rel="modulepreload" crossorigin href="\/assets\/([A-Za-z]+)-[^"]+\.js" fetchpriority="low" \/>/g)].map((m) => m[1])
-    const account = preloads(await fetchHtml(url(ACCOUNT)))
-    expect(account.includes('AccountRoute') && !account.includes('FloatingSidebar'), `${ACCOUNT}: ${account.join(', ')}`)
-    expect(preloads(await fetchHtml(url(ACCOUNT, 'search=1'))).includes('FloatingSidebar'), `${ACCOUNT}?search=1: no booth rail preload`)
-    expect(preloads(await fetchHtml(url(PERSON))).includes('PersonPage'), `${PERSON}: no PersonPage preload`)
-    expect(preloads(await fetchHtml(url(OFFER))).includes('VisualBuilderPage'), `${OFFER}: no VisualBuilderPage preload`)
+  await test('no renderer chunk is preloaded: the hero paints before hydration starts', async () => {
+    for (const href of [url(ACCOUNT), url(ACCOUNT, 'search=1'), url(PERSON), url(OFFER)]) {
+      const lazy = [...(await fetchHtml(href)).matchAll(/<link rel="modulepreload"[^>]*href="\/assets\/(AccountRoute|PersonPage|VisualBuilderPage|FloatingSidebar)-/g)].map((m) => m[1])
+      expect(!lazy.length, `${href} preloads ${lazy.join(', ')}`)
+    }
   })
 
   const { ctx, watch } = await newContext(browser, 'desktop')

@@ -606,8 +606,6 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       cssCodeSplit: true,
-      /* dist/.vite/manifest.json: scripts/build-ssr.mjs reads each page renderer's chunks off it, for the server render's preload links. */
-      manifest: true,
       /*
        * /search is the fast-path entry; it doesn't need framer-motion
        * or the shared content-mappers chunk. Filter those out of the

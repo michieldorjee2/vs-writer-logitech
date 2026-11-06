@@ -845,31 +845,6 @@ const homeTemplate: string = __HOME_TEMPLATE__;
 declare const __BUILD_TEMPLATE__: string;
 const buildTemplate: string = __BUILD_TEMPLATE__;
 
-/** Each page renderer's lazy chunks, off Vite's manifest (scripts/build-ssr.mjs); empty without one. */
-type RoutePreloads = Partial<Record<'account' | 'person' | 'retail' | 'finserv' | 'experience' | 'booth', { js: string[]; css: string[] }>>;
-declare const __ROUTE_PRELOADS__: RoutePreloads;
-const routePreloads: RoutePreloads = __ROUTE_PRELOADS__;
-
-/**
- * <link>s that fetch a page renderer's chunks beside main.js instead of after it. src/App.tsx
- * lazy-loads every renderer, so the browser otherwise learns of them only when main.js runs, and
- * hydration waits one round trip more. Low priority: the stylesheet and the hero image come
- * first; these only need to be there when main.js asks for them. `crossorigin` as Vite's own
- * preload helper requests them, so the browser reuses these rather than fetching twice.
- */
-function routePreloadLinks(...routes: Array<keyof RoutePreloads>): string {
-  const js = new Set<string>();
-  const css = new Set<string>();
-  for (const route of routes) {
-    for (const href of routePreloads[route]?.js ?? []) js.add(href);
-    for (const href of routePreloads[route]?.css ?? []) css.add(href);
-  }
-  return [
-    ...[...js].map((href) => `<link rel="modulepreload" crossorigin href="${escapeHtml(href)}" fetchpriority="low" />`),
-    ...[...css].map((href) => `<link rel="preload" as="style" crossorigin href="${escapeHtml(href)}" fetchpriority="low" />`),
-  ].join('\n    ');
-}
-
 /* A build owns its address for this long after it finishes, so a reload that beats
    Graph's indexing of the new page still finds the build, not "not found". */
 const BUILD_GRACE_MS = 10 * 60 * 1000;
@@ -1119,7 +1094,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             </div>,
           );
 
-      const headHtml = [buildExperienceHeadHtml(item), routePreloadLinks('experience')].filter(Boolean).join('\n    ');
+      const headHtml = buildExperienceHeadHtml(item);
       const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`;
 
       let html = template;
@@ -1187,12 +1162,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (accountTemplateOf(page) === 'agent-platform') headSource = agentPlatformHead(page);
     }
 
-    // ---- Build SEO head tags, then the renderer's chunks (and the booth rail's, from /search) ----
-    const renderer = page.__template ?? 'account';
-    const booth = url.searchParams.has('search') && (renderer === 'account' || renderer === 'person');
-    const headHtml = [buildHeadHtml(headSource), routePreloadLinks(renderer, ...(booth ? (['booth'] as const) : []))]
-      .filter(Boolean)
-      .join('\n    ');
+    // ---- Build SEO head tags ----
+    // No preload of the renderer's lazy chunk: measured 6 Nov 2026, it let hydration start before
+    // the hero image painted and moved mobile LCP from 3.6 s to 5.9 s (Lighthouse, median of 3).
+    const headHtml = buildHeadHtml(headSource);
 
     // ---- Embed page data for client hydration (avoids double-fetch) ----
     const ssrDataScript = `<script>window.__SSR_DATA__=${JSON.stringify(page).replace(/</g, '\\u003c')}</script>`;
