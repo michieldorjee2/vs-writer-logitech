@@ -118,7 +118,10 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
     name: 'page-builds-dev',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url || '', 'http://localhost')
+        let url = new URL(req.url || '', 'http://localhost')
+        // A personal link, as vercel.json rewrites it.
+        const short = /^\/s\/([^/]+)$/.exec(url.pathname)
+        if (short) url = new URL(`/api/share-go?code=${encodeURIComponent(short[1])}`, 'http://localhost')
         // The functions this serves, as Vercel routes them: [pattern, file, the path segment that is `id`].
         const routes: Array<[RegExp, string]> = [
           [/^\/api\/page-builds$/, '/api/page-builds/index.ts'],
@@ -136,6 +139,11 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           // Activity mode: the visitor index write and the report, both straight from their files.
           [/^\/api\/page-visit$/, '/api/page-visit.ts'],
           [/^\/api\/page-activity$/, '/api/page-activity.ts'],
+          // Personal links: make and list, the recipient's note, the short link, Teams and email.
+          [/^\/api\/share-links$/, '/api/share-links.ts'],
+          [/^\/api\/share-note$/, '/api/share-note.ts'],
+          [/^\/api\/share-go$/, '/api/share-go.ts'],
+          [/^\/api\/share-send$/, '/api/share-send.ts'],
         ]
         let file: string | null = null
         let id: string | null = null

@@ -192,3 +192,38 @@ export async function fetchAccountStage(odp: OdpClient, ids: string[]): Promise<
     return undefined;
   }
 }
+
+/** A server-side event: only fields ODP's Event type already has survive (see above). */
+export interface OdpEventIn {
+  type: string;
+  action: string;
+  identifiers: { vuid?: string; email?: string };
+  data: Record<string, string | number>;
+}
+
+/**
+ * Writes one event to ODP (REST /v3/events), for what happens on the server: a personal link
+ * opened (api/share-note.ts), a CTA after one (api/cta-ping.ts). False when ODP is not configured
+ * or did not take it; never throws, because tracking never breaks the visit.
+ */
+export async function sendOdpEvent(event: OdpEventIn): Promise<boolean> {
+  const key = process.env.ODP_PRIVATE_KEY;
+  const identifiers: Record<string, string> = {};
+  if (event.identifiers.vuid && /^[0-9a-f]{32}$/.test(event.identifiers.vuid)) identifiers.vuid = event.identifiers.vuid;
+  if (event.identifiers.email) identifiers.email = event.identifiers.email;
+  if (!key || !Object.keys(identifiers).length) return false;
+  const base = (process.env.ODP_API_BASE || 'https://api.zaius.com').replace(/\/+$/, '');
+  try {
+    const r = await fetch(`${base}/v3/events`, {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'content-type': 'application/json' },
+      body: JSON.stringify([{ type: event.type, action: event.action, identifiers, data: { hostname: HOST, ...event.data } }]),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) console.warn(`[odp] event ${event.action} refused: ${r.status}`);
+    return r.ok;
+  } catch (error) {
+    console.warn(`[odp] event ${event.action} not sent:`, error instanceof Error ? error.message : 'error');
+    return false;
+  }
+}

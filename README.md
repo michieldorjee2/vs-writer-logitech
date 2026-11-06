@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-04
+updated: 2026-11-06
 ---
 
 # vs-writer-logitech
@@ -41,7 +41,7 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:www
+npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:www
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
@@ -55,6 +55,7 @@ Four things it covers that the build does not:
 - **`check:page-activity`** holds the Report (below): keys, element paths, who counts as a visitor, the report and what its card shows, the account stage from ODP, and both endpoints against stand-ins for ODP and Redis that refuse what the real ones refuse.
 - **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
 - **`check:cta-ping`** runs Mark's code step for the one-click ask (`mark/cta-ping/test_step.py`, Python 3, no network) against stand-ins for Teams and Google Sheets.
+- **`check:share-links`** holds personal links (below): what a rep types, the codes, all four endpoints against stand-ins for Redis, ODP, Mark and the webhook, the CTA ping's personal-link part, and both Mark steps' fixtures. **`check:share-teams`** runs the Teams step (`mark/share-teams/test_step.py`).
 
 ## www design (live, the default)
 
@@ -114,7 +115,7 @@ Without `OPAL_PAT` the endpoint responds with a clean SSE error ("Server is miss
 
 ## The booth rail and the Report (preview)
 
-With `?search=1` and an Optimizely sign-in, a page gets the booth rail: a full-height column down the left (`src/components/FloatingSidebar.tsx`, `src/styles/booth-rail.css`) with the page set in beside it, rounded at the corners, in the search page's surfaces (Axiom tokens, light or dark with the system). Top to bottom: Search (back to `/search`), Edit (Edit mode runs in the rail, above), X-ray (also in the rail), Share (copies the page's public address, without `?search=1`) and, on account pages, Report. The button at its foot folds the rail away and leaves one button at the bottom left to bring it back; the choice is kept in this browser. The rail slides and its buttons cascade in from the left. X-ray runs in the rail too, which keeps just Close while it does. Its scan, traced outlines, wires and floating cards keep their animations in the rail's surfaces and type (`src/styles/xray-mode.css`). Each part's card shows the tools that made it by their own favicons, as SVG in `public/logos/tools/` (`XrayToolLogo`; Optimizely's for ODP and the CMS), and Mark by its AI texture from the brand guidelines, turning slowly (transforms only, still for reduced motion), and opens to one line on how the part is made (`logic` in `src/lib/xray-defaults.ts`; a page's own stored note wins) and the data it is made from.
+With `?search=1` and an Optimizely sign-in, a page gets the booth rail: a full-height column down the left (`src/components/FloatingSidebar.tsx`, `src/styles/booth-rail.css`) with the page set in beside it, rounded at the corners, in the search page's surfaces (Axiom tokens, light or dark with the system). Top to bottom: Search (back to `/search`), Edit (Edit mode runs in the rail, above), X-ray (also in the rail), Share (the Share card, below) and, on account pages, Report. The button at its foot folds the rail away and leaves one button at the bottom left to bring it back; the choice is kept in this browser. The rail slides and its buttons cascade in from the left. X-ray runs in the rail too, which keeps just Close while it does. Its scan, traced outlines, wires and floating cards keep their animations in the rail's surfaces and type (`src/styles/xray-mode.css`). Each part's card shows the tools that made it by their own favicons, as SVG in `public/logos/tools/` (`XrayToolLogo`; Optimizely's for ODP and the CMS), and Mark by its AI texture from the brand guidelines, turning slowly (transforms only, still for reduced motion), and opens to one line on how the part is made (`logic` in `src/lib/xray-defaults.ts`; a page's own stored note wins) and the data it is made from.
 
 **Report.** The page's story from ODP, prospects only, over its whole history, on a card over the page, which blurs behind it, the rail included (`src/components/ActivityMode.tsx`). Its data is asked for as the rail mounts (`src/hooks/usePageActivity.ts`): the Report icon waves while it loads and turns to bars when it is in (lime when the page has visits). Journey: when the page was built and last updated, first viewed, first engaged with (a visit of 30 s or more, scrolled past half, or with a click), and first had a CTA pressed; the step it is at opens to the visits behind it. Data: first and last seen, the longest visit, CTA clicks, the account's stage, the last visit's channel and the last country known. Activity: visits in seven slots up to today (days, weeks or 30-day months, by the page's age). "Open in Salesforce" links the page's Salesforce account.
 
@@ -128,6 +129,26 @@ Env:
 
 - `ODP_PRIVATE_KEY`: the ODP account's private API key (Production and this branch's previews). Read only in `api/_lib/odp-events.ts`, never sent to the browser. Unset, the report answers 503 and the pages still record visits.
 - `KV_REST_API_URL`, `KV_REST_API_TOKEN`: the visitor index, the report cache and the averages.
+
+## Sharing a page: personal links (preview)
+
+The rail's Share opens a card over the page, the way the Report does (`src/components/ShareSheet.tsx`, `src/styles/share-sheet.css`). It shows the page's public address. **Add a personal message** asks who it is for (name, title and, optionally, email; on a person page the name and title are filled in from the page) and the rep's note, and makes a short link, `/s/<code>` (`POST /api/share-links`, eight letters and digits). From then on everything on the card shares that link:
+
+- **Copy link.**
+- **Send on Teams**: Mark's **Showcase share to Teams** workflow messages the rep, and only the signed-in rep, the link (with their note), and what the page has seen: visits, last seen, CTA clicks, the account's stage, and the link's opens (`api/share-send.ts`, `mark/share-teams/`).
+- **New email**: Mark's **Showcase share email** agent (`showcase_share_email`, no tools, about two seconds and two credits) writes the email from the rep's note, or a short introduction when there is none. The rep reads and edits it on the card and opens it in Outlook on the web as a new message, addressed to the recipient. When Mark is slow or unavailable the card gets a plain template instead, never nothing.
+
+**The recipient.** `/s/<code>` sends them to the page with `?p=<code>` (`api/share-go.ts`; nothing is counted there, because mail scanners follow links too). On the page the rep's note floats down over it, on a card of paper with a strip of lime tape, before they open the page (`src/components/InviteNote.tsx`, `src/styles/invite-note.css`). Showing the note tells the site it was opened (`POST /api/share-note`): counted once per visitor per six hours, and sent to ODP as `personal_link_open` with the visitor's id and, when the rep gave one, the recipient's address, so ODP knows who read it. A CTA click later in that tab carries the code: the link counts it, ODP gets `personal_link_cta`, and the CTA ping tells the account executive whose link the visitor came by (below). Nobody signed in is ever counted or sent, so a rep can look at their own note.
+
+**In the Report.** "Shared links" lists the page's links, newest first: who each was for, who sent it and when, and what became of it (not opened yet, opened, a CTA clicked after); a row opens to the note. Person pages have no Report, so their Share card lists them.
+
+Links live in Upstash Redis for 400 days (`api/_lib/share-store.ts`): the link (`sl:<code>`), its counts (`sl:s:<code>`) and the page's list (`sl:p:<path>`). The note endpoint returns no addresses and only answers on the link's own page; the list returns no addresses at all. Limits: 40 links, 30 Teams messages and 40 drafts a day per rep, 30 note reads a minute per address.
+
+Env:
+
+- `SHARE_TEAMS_WEBHOOK_URL`, `SHARE_TEAMS_WEBHOOK_KEY`: the share workflow's webhook and its `x-showcase-key` (this branch's previews for now; Production when it ships). Unset, Send on Teams answers 503.
+- `OPAL_PAT`: Mark's API, for the email agent (Production, and this branch's previews). `SHARE_EMAIL_AGENT_ID` overrides the agent (default `73f146bc-a052-4d5f-be22-06fc36f010cd`).
+- `ODP_PRIVATE_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`: as for the Report.
 
 ## The CMS preview
 
@@ -154,6 +175,8 @@ Two things to know before touching the queries:
 1. The browser (`src/lib/cta-ping.ts`, from `src/www/ConnectModal.tsx`) posts only the page's route, which button, and the visit's `utm_*` values to `POST /api/cta-ping`. Nothing is sent from the CMS preview.
 2. `api/cta-ping.ts` takes a same-site JSON post for an account page or person page route and a known button, limits it (one per visitor per page an hour, ten per page a day, 300 a day, while the KV pair is set), reads the page's team from Graph itself, and posts the click to Mark's **Showcase CTA ping** workflow with the trigger's key. Nothing the visitor sends decides who is messaged.
 3. The workflow's one code step (`mark/cta-ping/step.py`) messages the page's account executive in Teams from Michiel's account. With no account executive on the page, or when the message fails, it adds a row to the **Showcase CTA follow-ups** Google Sheet instead. See [mark/cta-ping/README.md](mark/cta-ping/README.md).
+
+A visitor who came in by a personal link (above) also sends its code. When it is one of this page's links, the click Mark gets says who the link was for and who sent it (`shared`), and the message and the sheet row say "They came in by the personal link Michiel Dorjee sent to Ana Silva (CMO, ana@…)".
 
 The account executive is the first real contact on the page whose role is one of `AE_ROLE` (`src/lib/account-rep.ts`): the account page's `teamMembers`, a person page's `team`. On a person page the message says whose page it was. The panel names that person ("We've let Alex know"), or "your Optimizely team" when there is none, so it never names someone the ping didn't tell. On 4 Nov 2026, 1,169 of 2,812 account pages had one.
 

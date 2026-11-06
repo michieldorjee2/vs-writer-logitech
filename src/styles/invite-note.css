@@ -1,0 +1,217 @@
+/* ============================================================
+   A personal link's note (src/components/InviteNote.tsx): the
+   rep's words, on a card of paper that floats down over the
+   page before it is read. The www pages' type and colours
+   (www.css: Dark Fir on white, LFGreen for the one action),
+   with a little paper: grain, faint rules under the words, a
+   strip of lime tape, a tilt and a soft lift off the page.
+   px only: the root is 10px. Transform and opacity only move.
+   ============================================================ */
+
+/* The page waits under the note, blurred and held still (so the blur never chases it). */
+html.invite-open {
+  overflow: hidden;
+}
+
+.invite-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgb(255 255 255 / 0.32);
+  -webkit-backdrop-filter: blur(16px) saturate(105%);
+  backdrop-filter: blur(16px) saturate(105%);
+  color: #08251a;
+  font-family: var(--font-body, 'Die Grotesk B'), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  animation: invite-veil-in 480ms ease both;
+}
+.invite-view.is-out {
+  animation: invite-veil-out 460ms ease 100ms both;
+  pointer-events: none;
+}
+
+.invite-note {
+  position: relative;
+  box-sizing: border-box;
+  width: min(540px, 100%);
+  padding: 44px 40px 30px;
+  border-radius: 24px;
+  background-color: #fffdf7;
+  background-image:
+    radial-gradient(130% 90% at 0% 0%, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0) 60%),
+    radial-gradient(90% 70% at 100% 100%, rgb(228 240 218 / 0.55), rgb(228 240 218 / 0) 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .03 0 0 0 0 .15 0 0 0 0 .1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  box-shadow:
+    inset 0 0 0 1px rgb(8 37 26 / 0.06),
+    inset 0 -2px 0 rgb(8 37 26 / 0.03),
+    0 1px 1px rgb(8 37 26 / 0.05),
+    0 12px 22px -10px rgb(8 37 26 / 0.2),
+    0 44px 80px -28px rgb(8 37 26 / 0.42);
+  transform: rotate(-1.2deg);
+  animation:
+    invite-drop 1150ms cubic-bezier(0.22, 0.8, 0.3, 1) 140ms both,
+    invite-float 7s ease-in-out 1.5s infinite;
+}
+.invite-view.is-out .invite-note {
+  animation: invite-lift 480ms cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+/* A strip of lime tape holding the note to the page. */
+.invite-note__tape {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  width: 136px;
+  height: 32px;
+  margin-left: -68px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0) 55%),
+    rgb(171 255 68 / 0.8);
+  transform: rotate(-3deg);
+  clip-path: polygon(0 0, 4% 17%, 0 34%, 4% 50%, 0 67%, 4% 84%, 0 100%, 100% 100%, 96% 84%, 100% 67%, 96% 50%, 100% 34%, 96% 17%, 100% 0);
+}
+
+.invite-note__head {
+  display: grid;
+  gap: 18px;
+}
+.invite-note__logo {
+  display: block;
+  width: auto;
+  height: 22px;
+}
+.invite-note__for {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font: 500 12px/16px var(--font-roboto, 'Roboto Mono'), ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(8 37 26 / 0.62);
+}
+.invite-note__title::before {
+  content: '·';
+  margin-right: 10px;
+}
+
+/* The words, on faint rules a line apart. */
+.invite-note__msg {
+  margin: 20px 0 26px;
+  padding-bottom: 1px;
+  font-size: 20px;
+  line-height: 32px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  background: repeating-linear-gradient(180deg, transparent 0 31px, rgb(8 37 26 / 0.075) 31px 32px);
+}
+
+.invite-note__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 16px;
+}
+.invite-note__sign {
+  display: grid;
+  gap: 2px;
+}
+.invite-note__from {
+  font: 800 20px/1.1 var(--font-headline, 'VC Nudge'), Arial, sans-serif;
+}
+.invite-note__org {
+  font-size: 14px;
+  line-height: 18px;
+  color: rgb(8 37 26 / 0.62);
+}
+
+/* The one lime action. */
+.invite-note__open {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #abff44;
+  color: #08251a;
+  font: 600 16px/20px var(--font-body, 'Die Grotesk B'), Arial, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgb(8 37 26 / 0.12), 0 8px 18px -10px rgb(61 138 0 / 0.7);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease, background 160ms ease;
+}
+.invite-note__open:hover {
+  background: #b9ff63;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgb(8 37 26 / 0.12), 0 12px 22px -10px rgb(61 138 0 / 0.75);
+}
+.invite-note__open:active {
+  transform: translateY(0) scale(0.98);
+}
+.invite-note__open:focus-visible {
+  outline: 2px solid #08251a;
+  outline-offset: 3px;
+}
+.invite-note__open svg {
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.invite-note__open:hover svg {
+  transform: translateX(2px);
+}
+
+@keyframes invite-veil-in {
+  from { opacity: 0; }
+}
+@keyframes invite-veil-out {
+  to { opacity: 0; }
+}
+/* Down from above the page, a little past, and settling on its tilt. */
+@keyframes invite-drop {
+  0% { opacity: 0; transform: translateY(-64vh) rotate(-7deg); }
+  14% { opacity: 1; }
+  66% { transform: translateY(10px) rotate(0.3deg); }
+  84% { transform: translateY(-3px) rotate(-1.5deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(-1.2deg); }
+}
+@keyframes invite-float {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50% { transform: translateY(-4px) rotate(-0.9deg); }
+}
+@keyframes invite-lift {
+  from { opacity: 1; transform: translateY(0) rotate(-1.2deg); }
+  to { opacity: 0; transform: translateY(-56px) rotate(-3deg) scale(0.96); }
+}
+
+@media (max-width: 640px) {
+  .invite-view {
+    padding: 32px 16px;
+  }
+  .invite-note {
+    padding: 36px 22px 24px;
+  }
+  .invite-note__msg {
+    font-size: 18px;
+    line-height: 28px;
+    background: repeating-linear-gradient(180deg, transparent 0 27px, rgb(8 37 26 / 0.075) 27px 28px);
+  }
+  .invite-note__open {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-note,
+  .invite-view.is-out .invite-note {
+    animation: invite-veil-in 200ms ease both;
+  }
+  .invite-view.is-out .invite-note {
+    animation-name: invite-veil-out;
+  }
+}

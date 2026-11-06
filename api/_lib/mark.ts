@@ -113,3 +113,24 @@ export function markFileHeaders(): Record<string, string> {
   const pat = process.env.OPAL_PAT;
   return pat ? { Authorization: `Bearer ${pat}` } : {};
 }
+
+const runDone = (s: string) => /^(completed|success|succeeded)$/i.test(s);
+const runFailed = (s: string) => /^(failed|error|cancelled|canceled|timed_out|timeout|paused)$/i.test(s);
+
+/**
+ * Runs a quick agent (no tools, a few seconds) and returns what it answered: started in the
+ * background and read back until done, so a slow run gives up at `timeoutMs` instead of holding
+ * the request open.
+ */
+export async function runAgent(agentId: string, parameters: Record<string, unknown>, timeoutMs = 40_000): Promise<string> {
+  const id = await startAgent(agentId, parameters);
+  const until = Date.now() + timeoutMs;
+  for (let wait = 1200; Date.now() < until; wait = Math.min(2500, wait + 300)) {
+    await new Promise((r) => setTimeout(r, wait));
+    const ex = await getAgentExecution(id);
+    const status = String(ex.status_code || ex.status || '');
+    if (runFailed(status)) throw new MarkError(`Mark run ${status}`, 502);
+    if (runDone(status)) return typeof ex.result === 'string' ? ex.result : (ex.result?.response ?? '');
+  }
+  throw new MarkError('Mark took too long', 504);
+}

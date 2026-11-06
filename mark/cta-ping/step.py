@@ -11,6 +11,9 @@ the trigger's key. This step:
   3. otherwise, or when the message fails, adds a row to the follow-up sheet so Michiel can
      follow up
 
+A visitor who came in by a personal link (the Share card's note to one person) carries `shared`:
+who the link was for and who sent it. The message and the row say so.
+
 Mark retries a step that raises (four attempts). Each side effect leaves a marker in /workspace
 BEFORE it happens, so a retry never messages a rep or adds a row twice. A retry that finds the
 Teams marker without a result can't know whether the message went, so it logs the row instead
@@ -40,6 +43,7 @@ MARKERS = "/workspace/cta-ping"
 PAGE = re.compile(r"^https://showcase\.optimizely\.com/[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/(?:[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/)?$")
 PING_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 OPTIMIZELY_EMAIL = re.compile(r"^[a-z0-9._%+'-]{1,64}@optimizely\.com$")
+SHARE_CODE = re.compile(r"^[A-Za-z0-9]{8}$")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 
 
@@ -148,6 +152,17 @@ def open_chat(member):
     return (chat_id_of(body) if body else None), err
 
 
+def shared_line(shared):
+    """'the personal link Michiel Dorjee sent to Ben Yu (VP Digital, ben@logitech.com)', as text."""
+    to = shared["recipient"]
+    about = ", ".join(v for v in (to["title"], to["email"]) if v)
+    return "the personal link %s sent to %s%s" % (
+        shared["sender"]["name"] or "a colleague",
+        to["name"],
+        " (%s)" % about if about else "",
+    )
+
+
 def message(ping):
     rep_first = text(ping["rep"]["name"], 120).split(" ")[0] or "there"
     where = (
@@ -160,6 +175,10 @@ def message(ping):
         % (html.escape(rep_first), where),
         "<p>They clicked %s. The page lists you as the account executive, and it told them"
         " we've let you know.</p>" % html.escape(ping["button"]),
+    ]
+    if ping["shared"]:
+        lines.append("<p><b>They came in by %s.</b></p>" % html.escape(shared_line(ping["shared"])))
+    lines += [
         '<p><a href="%s">%s</a><br>%s%s</p>'
         % (
             html.escape(ping["page"], quote=True),
@@ -193,6 +212,21 @@ def read_ping(raw):
         rest = {k: v for k, v in p.items() if k != "check"}
         intact = hashlib.sha256(canonical(rest).encode("utf-8")).hexdigest() == given
     rep = p.get("rep") if isinstance(p.get("rep"), dict) else None
+    shared = None
+    s = p.get("shared") if isinstance(p.get("shared"), dict) else None
+    if s and SHARE_CODE.match(text(s.get("code"), 8)):
+        to = s.get("recipient") if isinstance(s.get("recipient"), dict) else {}
+        by = s.get("sender") if isinstance(s.get("sender"), dict) else {}
+        if text(to.get("name"), 120):
+            shared = {
+                "code": text(s.get("code"), 8),
+                "recipient": {
+                    "name": text(to.get("name"), 120),
+                    "title": text(to.get("title"), 120),
+                    "email": text(to.get("email"), 254).lower(),
+                },
+                "sender": {"name": text(by.get("name"), 120), "email": text(by.get("email"), 254).lower()},
+            }
     team = []
     for member in (p.get("team") if isinstance(p.get("team"), list) else [])[:5]:
         if isinstance(member, dict) and text(member.get("name"), 120):
@@ -213,6 +247,7 @@ def read_ping(raw):
         if rep and text(rep.get("name"), 120)
         else None,
         "team": team,
+        "shared": shared,
     }
     return ping, intact
 
@@ -265,7 +300,7 @@ def add_row(ping, why):
         ping["button"],
         why,
         "; ".join("%s (%s)" % (m["name"], m["role"]) if m["role"] else m["name"] for m in team) or "Nobody listed",
-        ping["campaign"],
+        "; ".join(v for v in (ping["campaign"], ("Came in by " + shared_line(ping["shared"])) if ping["shared"] else "") if v),
         ping["ping_id"],
         "",
     ]

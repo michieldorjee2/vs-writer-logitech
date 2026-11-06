@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { useAuth, type Identity } from '../lib/auth';
 import { pageKey } from '../lib/page-activity';
 import { usePageActivity, type ActivityLoad } from '../hooks/usePageActivity';
+import { useShareLinks } from '../hooks/useShareLinks';
 import XrayMode from './XrayMode';
 import ActivityMode from './ActivityMode';
 import EditMode from './EditMode';
+import ShareSheet from './ShareSheet';
 import '../styles/floating-sidebar.css';
 import '../styles/booth-rail.css';
 
@@ -119,25 +121,6 @@ function writeRailCollapsed(collapsed: boolean): void {
   }
 }
 
-/** Puts the public address on the clipboard, with the old copy route for browsers that refuse. */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', '');
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    document.body.appendChild(area);
-    area.select();
-    const ok = document.execCommand('copy');
-    area.remove();
-    return ok;
-  }
-}
-
 type ReportState = 'loading' | 'ready' | 'empty' | 'error';
 function reportState(load: ActivityLoad): ReportState {
   if (load.state !== 'ready') return load.state;
@@ -215,7 +198,8 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
  *   • Search: back to /search.
  *   • Edit: feedback mode, routed to Mark, who edits the page live and reloads it when done.
  *   • X-ray: the per-section data overlay.
- *   • Share: copies the page's public address (without ?search=1).
+ *   • Share: the Share card (ShareSheet.tsx): the page's link, or a personal one with the rep's
+ *     note to one person; copy it, have Mark send it to you on Teams, or have Mark write the email.
  *   • Report (account pages): the page's story from ODP. Its data loads as the rail mounts; the
  *     icon waves until it is in, then turns to bars.
  * The button at the foot folds the rail away; a single Report button stays at the bottom left to
@@ -232,14 +216,16 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   const [xrayActive, setXrayActive] = useState(false);
   const [editActive, setEditActive] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => readRailCollapsed());
   /** False for the first frame, so the rail slides in and its buttons cascade on arrival. */
   const [entered, setEntered] = useState(false);
-  const [shared, setShared] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const sharedTimer = useRef<number | undefined>(undefined);
   const hasReport = variant === 'abm';
   const reportPage = useMemo(() => (typeof window === 'undefined' ? '' : pageKey(window.location.pathname)), []);
   const { load, retry } = usePageActivity(reportPage, hasReport);
+  /** The page's personal links: the Report lists them (the Share card, on person pages). */
+  const route = useMemo(() => (typeof window === 'undefined' ? '' : window.location.pathname), []);
+  const { load: links, reload: reloadLinks } = useShareLinks(route, true);
   const report = reportState(load);
   /** The Edit tutorial (EditMode draws it): on the first Edit of this browser, and from "?". */
   const [tutorial, setTutorial] = useState(false);
@@ -266,8 +252,6 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
     return () => root.classList.remove('booth-page', 'booth-page--rail');
   }, [railShown]);
 
-  useEffect(() => () => window.clearTimeout(sharedTimer.current), []);
-
   /* Strip the `?refresh=…` cache-buster the toast Refresh button
    * appends so the address bar doesn't keep the timestamp once the
    * visitor has landed. By the time React mounts, the response is
@@ -293,20 +277,26 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
 
   const handleXrayClick = useCallback(() => {
     setReportOpen(false);
+    setShareOpen(false);
     setXrayActive((v) => !v);
   }, []);
   const closeXray = useCallback(() => setXrayActive(false), []);
 
-  const handleReportClick = useCallback(() => setReportOpen((v) => !v), []);
+  const handleReportClick = useCallback(() => {
+    setShareOpen(false);
+    setReportOpen((v) => {
+      // Opening: the links again, so an open from a minute ago shows.
+      if (!v) reloadLinks();
+      return !v;
+    });
+  }, [reloadLinks]);
   const closeReport = useCallback(() => setReportOpen(false), []);
 
   const handleShareClick = useCallback(() => {
-    void copyText(window.location.origin + livePageHref()).then((ok) => {
-      setShared(ok ? 'copied' : 'failed');
-      window.clearTimeout(sharedTimer.current);
-      sharedTimer.current = window.setTimeout(() => setShared('idle'), 1800);
-    });
+    setReportOpen(false);
+    setShareOpen((v) => !v);
   }, []);
+  const closeShare = useCallback(() => setShareOpen(false), []);
 
   const collapseRail = useCallback(() => {
     setCollapsed(true);
@@ -323,6 +313,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   }, []);
   const handleEditClick = useCallback(() => {
     setReportOpen(false);
+    setShareOpen(false);
     if (editActive) return closeEdit();
     setEditActive(true);
     // Opening Edit for the first time in this browser: the tutorial first.
@@ -403,25 +394,21 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           <RailButton
             i={3}
             away={mode !== null}
-            modifier={'share' + (shared !== 'idle' ? ` is-${shared}` : '')}
+            modifier="share"
             onClick={handleShareClick}
-            ariaLabel={shared === 'copied' ? 'Public link copied' : shared === 'failed' ? 'Could not copy the link' : 'Copy the public link'}
-            label={shared === 'copied' ? 'Copied' : shared === 'failed' ? 'No access' : 'Share'}
+            pressed={shareOpen}
+            on={shareOpen}
+            ariaLabel={shareOpen ? 'Close share' : 'Share this page'}
+            label="Share"
             icon={
-              shared === 'copied' ? (
-                <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4.5 10.5l3.5 3.5 7.5-8" />
-                </svg>
-              ) : (
-                <svg viewBox="27 157.5 20 20" width="20" height="20" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M36.249 162.236L33.7746 164.667C33.4793 164.957 33.004 164.953 32.7143 164.657C32.4239 164.362 32.4281 163.887 32.7234 163.597L35.9481 160.43C36.5317 159.857 37.4676 159.857 38.0513 160.43L41.2759 163.597C41.5712 163.887 41.5755 164.362 41.285 164.657C40.9946 164.953 40.5193 164.957 40.2247 164.667L37.7503 162.236V169.753C37.7503 170.167 37.4142 170.503 37 170.503C36.5859 170.503 36.2498 170.167 36.2498 169.753V162.236H36.249ZM34.7492 166.759C34.7492 166.958 34.6697 167.149 34.5284 167.29C34.387 167.43 34.1951 167.509 33.9961 167.508L33.2494 167.505C33.0504 167.505 32.8598 167.584 32.7192 167.724C32.5786 167.865 32.4998 168.056 32.4998 168.254V172.751C32.4998 173.165 32.8352 173.5 33.2501 173.5H40.7506C41.1648 173.5 41.5002 173.165 41.5002 172.751V168.254C41.5002 168.055 41.4214 167.865 41.2808 167.724C41.1401 167.584 40.9489 167.505 40.7506 167.505H40.0053C39.8056 167.505 39.6136 167.425 39.473 167.284C39.3323 167.142 39.2536 166.95 39.255 166.75C39.2578 166.338 39.5925 166.005 40.0046 166.005H40.7499C41.3469 166.005 41.9193 166.242 42.3411 166.664C42.763 167.085 43 167.657 43 168.254V172.751C43 173.993 41.9924 175 40.7499 175H33.2501C32.0076 175 31 173.993 31 172.751V168.254C31 167.657 31.237 167.085 31.6589 166.664C32.0808 166.242 32.6531 166.005 33.2501 166.005L34.0018 166.007C34.4152 166.007 34.7499 166.343 34.7499 166.756V166.758L34.7492 166.759Z"
-                  />
-                </svg>
-              )
+            <svg viewBox="27 157.5 20 20" width="20" height="20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M36.249 162.236L33.7746 164.667C33.4793 164.957 33.004 164.953 32.7143 164.657C32.4239 164.362 32.4281 163.887 32.7234 163.597L35.9481 160.43C36.5317 159.857 37.4676 159.857 38.0513 160.43L41.2759 163.597C41.5712 163.887 41.5755 164.362 41.285 164.657C40.9946 164.953 40.5193 164.957 40.2247 164.667L37.7503 162.236V169.753C37.7503 170.167 37.4142 170.503 37 170.503C36.5859 170.503 36.2498 170.167 36.2498 169.753V162.236H36.249ZM34.7492 166.759C34.7492 166.958 34.6697 167.149 34.5284 167.29C34.387 167.43 34.1951 167.509 33.9961 167.508L33.2494 167.505C33.0504 167.505 32.8598 167.584 32.7192 167.724C32.5786 167.865 32.4998 168.056 32.4998 168.254V172.751C32.4998 173.165 32.8352 173.5 33.2501 173.5H40.7506C41.1648 173.5 41.5002 173.165 41.5002 172.751V168.254C41.5002 168.055 41.4214 167.865 41.2808 167.724C41.1401 167.584 40.9489 167.505 40.7506 167.505H40.0053C39.8056 167.505 39.6136 167.425 39.473 167.284C39.3323 167.142 39.2536 166.95 39.255 166.75C39.2578 166.338 39.5925 166.005 40.0046 166.005H40.7499C41.3469 166.005 41.9193 166.242 42.3411 166.664C42.763 167.085 43 167.657 43 168.254V172.751C43 173.993 41.9924 175 40.7499 175H33.2501C32.0076 175 31 173.993 31 172.751V168.254C31 167.657 31.237 167.085 31.6589 166.664C32.0808 166.242 32.6531 166.005 33.2501 166.005L34.0018 166.007C34.4152 166.007 34.7499 166.343 34.7499 166.756V166.758L34.7492 166.759Z"
+              />
+            </svg>
             }
           />
           {hasReport && (
@@ -487,7 +474,9 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         variant={variant}
       />
 
-      {hasReport && <ActivityMode open={reportOpen} onClose={closeReport} load={load} retry={retry} />}
+      {hasReport && <ActivityMode open={reportOpen} onClose={closeReport} load={load} retry={retry} links={links} />}
+
+      <ShareSheet open={shareOpen} onClose={closeShare} page={page} variant={variant} links={links} onLinkMade={reloadLinks} />
 
       <EditMode
         active={editActive}

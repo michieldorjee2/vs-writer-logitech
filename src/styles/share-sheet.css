@@ -1,0 +1,524 @@
+/* ============================================================
+   The rail's Share card (src/components/ShareSheet.tsx) and the
+   page's personal links (src/components/SharedLinks.tsx), which
+   the Report lists too. Over the page like the Report: the view,
+   its blur and its motion are .activity-view's (activity-mode.css).
+   Booth tokens (booth-rail.css). px only: the root is 10px.
+   ============================================================ */
+
+.share-card {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  padding: 32px 32px 28px;
+  border-radius: 20px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  box-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.55);
+  outline: none;
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  transition:
+    transform 220ms var(--booth-ease-out),
+    opacity 160ms ease;
+}
+.activity-view.is-open .share-card {
+  opacity: 1;
+  transform: none;
+  transition:
+    transform 640ms var(--booth-ease) 60ms,
+    opacity 360ms ease 60ms;
+}
+
+.share-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.share-card__title {
+  margin: 0;
+  font: 800 32px/1 var(--booth-display);
+  color: var(--booth-fg);
+}
+.share-card__close {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -8px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--booth-fg-2);
+  cursor: pointer;
+}
+.share-card__close:hover {
+  background: var(--booth-hover);
+  color: var(--booth-fg);
+}
+
+/* ------------ The link ------------ */
+
+.share-link {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--booth-raised);
+}
+.share-link__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 12px/14px var(--booth-font);
+  color: var(--booth-fg-3);
+}
+.share-link.is-personal .share-link__kind {
+  color: var(--booth-accent-text);
+}
+.share-link.is-personal .share-link__kind::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--booth-accent);
+  box-shadow: 0 0 0 3px rgb(171 255 68 / 0.25);
+}
+.share-link__url {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--booth-fg);
+  font: 400 15px/20px var(--booth-font);
+  text-overflow: ellipsis;
+  outline: none;
+}
+
+/* ------------ Add a personal message ------------ */
+
+.share-add {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1.5px dashed var(--booth-quiet);
+  border-radius: 12px;
+  background: none;
+  color: var(--booth-fg);
+  font: 500 15px/20px var(--booth-font);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.share-add:hover {
+  border-color: var(--booth-bar);
+  background: var(--booth-hover);
+}
+.share-add__hint {
+  grid-column: 2;
+  font: 400 13px/16px var(--booth-font);
+  color: var(--booth-fg-3);
+}
+
+.share-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  animation: share-in 420ms var(--booth-ease) both;
+}
+.share-form__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.share-field {
+  display: grid;
+  gap: 6px;
+}
+.share-field__label {
+  font: 500 13px/16px var(--booth-font);
+  color: var(--booth-fg-2);
+}
+.share-field__opt {
+  font-weight: 400;
+  color: var(--booth-fg-3);
+}
+.share-field__input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--booth-raised);
+  color: var(--booth-fg);
+  font: 400 15px/20px var(--booth-font);
+  outline: none;
+  transition: border-color 160ms ease;
+}
+.share-field__input::placeholder {
+  color: var(--booth-fg-3);
+}
+.share-field__input:focus {
+  border-color: var(--booth-bar);
+}
+.share-field.is-invalid .share-field__input {
+  border-color: var(--booth-error);
+}
+.share-field__input--note {
+  min-height: 104px;
+  resize: vertical;
+}
+.share-form__error {
+  margin: 0;
+  font: 400 13px/16px var(--booth-font);
+  color: var(--booth-error);
+}
+.share-form__actions,
+.share-personal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.share-personal {
+  margin-top: 12px;
+  padding: 14px 14px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--booth-hover);
+  animation: share-in 420ms var(--booth-ease) both;
+}
+.share-personal__note {
+  margin: 0 0 8px;
+  font: 400 14px/20px var(--booth-font);
+  color: var(--booth-fg-2);
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.share-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 10px;
+  font: 500 14px/18px var(--booth-font);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 140ms ease, opacity 140ms ease;
+}
+.share-btn:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+.share-btn--ghost {
+  background: transparent;
+  color: var(--booth-fg);
+}
+.share-btn--ghost:hover {
+  background: var(--booth-hover);
+}
+/* The one lime thing on the card at a time. */
+.share-btn--primary {
+  background: var(--booth-accent);
+  color: #08251a;
+}
+.share-btn--primary:hover:not(:disabled) {
+  background: #c5ff7e;
+}
+
+/* ------------ The ways out ------------ */
+
+.share-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+.share-action {
+  appearance: none;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 8px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--booth-raised);
+  color: var(--booth-fg);
+  font: 500 14px/18px var(--booth-font);
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms var(--booth-ease);
+}
+.share-action:hover:not(:disabled) {
+  background: var(--booth-hover);
+}
+.share-action:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.share-action:disabled {
+  cursor: default;
+}
+.share-action__icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+.share-action__icon img {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+.share-action.is-copied {
+  color: var(--booth-accent-text);
+}
+.share-action.is-failed {
+  color: var(--booth-error);
+}
+.share-action.is-busy .share-action__icon {
+  animation: share-breathe 1.4s ease-in-out infinite;
+}
+.share-status {
+  min-height: 16px;
+  margin: 10px 0 0;
+  font: 400 13px/16px var(--booth-font);
+  color: var(--booth-fg-3);
+  text-align: center;
+}
+
+.share-draft {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--booth-hover);
+  animation: share-in 460ms var(--booth-ease) both;
+}
+.share-draft__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 500 13px/16px var(--booth-font);
+  color: var(--booth-fg-2);
+}
+.share-draft__to {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--booth-fg-3);
+  font-weight: 400;
+}
+.share-draft__subject {
+  font-weight: 500;
+}
+.share-draft__body {
+  min-height: 170px;
+  resize: vertical;
+  font-size: 14px;
+}
+
+.share-history {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--booth-hover);
+}
+.share-history__h {
+  margin: 0 0 14px;
+  font: 800 18px/1 var(--booth-display);
+  color: var(--booth-fg);
+}
+
+.share-card__close:focus-visible,
+.share-add:focus-visible,
+.share-btn:focus-visible,
+.share-action:focus-visible,
+.booth-links__toggle:focus-visible,
+.booth-links__more button:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 2px;
+}
+
+@keyframes share-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes share-breathe {
+  50% { opacity: 0.45; transform: scale(0.92); }
+}
+
+/* ------------ The page's personal links (the Report, and Share on person pages) ------------ */
+
+.booth-links {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.booth-links__row {
+  border-radius: 12px;
+  animation: share-in 480ms var(--booth-ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.booth-links.is-loading .booth-links__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+}
+.booth-links__toggle {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--booth-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.booth-links__toggle:hover,
+.booth-links__toggle[aria-expanded='true'] {
+  background: var(--booth-hover);
+}
+.booth-links__avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--booth-raised);
+  color: var(--booth-fg-2);
+  font: 600 12px/1 var(--booth-font);
+  letter-spacing: 0.02em;
+}
+.booth-links__row.is-cta .booth-links__avatar {
+  background: var(--booth-accent);
+  color: #08251a;
+}
+.booth-links__who {
+  display: grid;
+  min-width: 0;
+}
+.booth-links__name {
+  overflow: hidden;
+  font: 500 15px/20px var(--booth-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.booth-links__meta {
+  overflow: hidden;
+  font: 400 13px/16px var(--booth-font);
+  color: var(--booth-fg-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.booth-links__status {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+.booth-links__pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--booth-raised);
+  font: 500 12px/16px var(--booth-font);
+  color: var(--booth-fg-3);
+  white-space: nowrap;
+}
+.booth-links__row.is-opened .booth-links__pill {
+  color: var(--booth-accent-text);
+}
+.booth-links__row.is-cta .booth-links__pill {
+  background: var(--booth-accent);
+  color: #08251a;
+}
+.booth-links__sub {
+  font: 400 12px/14px var(--booth-font);
+  color: var(--booth-fg-3);
+  white-space: nowrap;
+}
+.booth-links__note {
+  margin: 2px 10px 10px 56px;
+  padding-left: 12px;
+  border-left: 2px solid var(--booth-quiet);
+  font: 400 14px/20px var(--booth-font);
+  color: var(--booth-fg-2);
+  white-space: pre-line;
+  animation: share-in 360ms var(--booth-ease) both;
+}
+.booth-links__empty {
+  margin: 0;
+  font: 400 14px/20px var(--booth-font);
+  color: var(--booth-fg-3);
+}
+.booth-links__more button {
+  appearance: none;
+  margin: 4px 0 0 56px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--booth-accent-text);
+  font: 500 13px/16px var(--booth-font);
+  cursor: pointer;
+}
+.booth-links--compact .booth-links__toggle {
+  padding: 6px 8px;
+}
+
+/* The Report's row of links, under its two columns. */
+.activity-card__links {
+  margin-top: 40px;
+}
+
+@media (max-width: 640px) {
+  .share-card {
+    padding: 24px 20px 20px;
+  }
+  .share-form__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .share-actions {
+    gap: 8px;
+  }
+  .booth-links__toggle {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+  .booth-links__status {
+    grid-column: 2;
+    justify-items: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .share-card,
+  .activity-view.is-open .share-card {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+  .share-form,
+  .share-personal,
+  .share-draft,
+  .booth-links__row,
+  .booth-links__note,
+  .share-action.is-busy .share-action__icon {
+    animation: none !important;
+  }
+}

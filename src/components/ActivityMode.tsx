@@ -14,13 +14,16 @@ import {
   type VisitRow,
 } from '../lib/page-activity';
 import type { ActivityLoad } from '../hooks/usePageActivity';
+import type { ShareLinksLoad } from '../hooks/useShareLinks';
+import SharedLinks from './SharedLinks';
 import '../styles/activity-mode.css';
 
 /**
  * The booth's Report: one page's story from ODP, on a card over the page (the rail's Report
  * button, FloatingSidebar.tsx). Journey: when the page was built, first viewed, first engaged
  * with, first had a CTA pressed; the step it is at opens to the visits behind it. Data: the
- * facts a rep asks for first. Activity: visits in seven slots up to today.
+ * facts a rep asks for first. Activity: visits in seven slots up to today. Shared links: the
+ * page's personal links (ShareSheet.tsx), and whether each was opened and a CTA clicked after.
  *
  * Prospects only (Optimizely people and machines are left out by the API), over the page's whole
  * history. The data is asked for when the booth tools mount (usePageActivity), not on open.
@@ -31,6 +34,7 @@ interface Props {
   onClose: () => void;
   load: ActivityLoad;
   retry: () => void;
+  links?: ShareLinksLoad;
 }
 
 // ─── Formatting ──────────────────────────────────────────────────────────────
@@ -65,7 +69,7 @@ const SLOT_NOW: Record<SlotUnit, string> = { day: 'Today', week: 'This week', mo
 
 // ─── The card ────────────────────────────────────────────────────────────────
 
-export default function ActivityMode({ open, onClose, load, retry }: Props) {
+export default function ActivityMode({ open, onClose, load, retry, links }: Props) {
   const card = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -125,6 +129,14 @@ export default function ActivityMode({ open, onClose, load, retry }: Props) {
             <Facts data={data} />
           </div>
         </div>
+        {links && (
+          <section className="activity-card__links" aria-labelledby="activity-links-title">
+            <h3 id="activity-links-title" className="activity-card__h">
+              Shared links
+            </h3>
+            <SharedLinks load={links} />
+          </section>
+        )}
       </section>
     </div>,
     document.body,
