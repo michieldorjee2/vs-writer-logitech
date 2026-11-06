@@ -5,6 +5,7 @@
  *
  * Env: OPAL_PAT (required), OPAL_BASE_URL, OPAL_INSTANCE_ID.
  */
+import { OpalClient, PatAuth } from '@optimizely-opal/opal-agent-sdk';
 import type { MarkChunk, MarkExecution } from '../../src/lib/page-builds.js';
 
 const BASE_URL = (process.env.OPAL_BASE_URL || 'https://opal.optimizely.com').replace(/\/+$/, '');
@@ -115,4 +116,58 @@ export const isMarkFile = (url: string) => /^https:\/\/opal-backend\.optimizely\
 export function markFileHeaders(): Record<string, string> {
   const pat = process.env.OPAL_PAT;
   return pat ? { Authorization: `Bearer ${pat}` } : {};
+}
+
+const runDone = (s: string) => /^(completed|success|succeeded)$/i.test(s);
+const runFailed = (s: string) => /^(failed|error|cancelled|canceled|timed_out|timeout|paused)$/i.test(s);
+
+/**
+ * Runs a quick agent (no tools, a few seconds) and returns what it answered: started in the
+ * background and read back until done, so a slow run gives up at `timeoutMs` instead of holding
+ * the request open.
+ */
+export async function runAgent(agentId: string, parameters: Record<string, unknown>, timeoutMs = 40_000): Promise<string> {
+  const id = await startAgent(agentId, parameters);
+  const until = Date.now() + timeoutMs;
+  for (let wait = 1200; Date.now() < until; wait = Math.min(2500, wait + 300)) {
+    await new Promise((r) => setTimeout(r, wait));
+    const ex = await getAgentExecution(id);
+    const status = String(ex.status_code || ex.status || '');
+    if (runFailed(status)) throw new MarkError(`Mark run ${status}`, 502);
+    if (runDone(status)) return typeof ex.result === 'string' ? ex.result : (ex.result?.response ?? '');
+  }
+  throw new MarkError('Mark took too long', 504);
+}
+
+/**
+ * A quick agent's answer as Mark writes it, chunk by chunk, through the official Agent SDK
+ * (`@optimizely-opal/opal-agent-sdk`, stream-execute): the Share card shows the email being
+ * written. Ends when the run completes; throws when it fails, stalls (20 s without a byte) or
+ * `signal` aborts.
+ */
+export async function* streamAgentText(agentId: string, parameters: Record<string, string>, signal?: AbortSignal): AsyncGenerator<string> {
+  const pat = process.env.OPAL_PAT?.trim();
+  if (!pat) throw new MarkError('OPAL_PAT is not set', 503);
+  const client = new OpalClient({
+    auth: new PatAuth(pat),
+    config: { baseUrl: BASE_URL, instanceId: INSTANCE_ID, timeoutMs: 15_000, streamIdleTimeoutMs: 20_000 },
+  });
+  try {
+    for await (const ev of client.agents.specialized.stream(agentId, { parameters })) {
+      if (signal?.aborted) throw new MarkError('Mark took too long', 504);
+      const p = ev.payload as Record<string, unknown>;
+      if (ev.eventType === 'response_chunk') {
+        const t = typeof p.content === 'string' ? p.content : typeof p.chunk === 'string' ? p.chunk : '';
+        if (t) yield t;
+      } else if (ev.eventType === 'error') {
+        throw new MarkError(`Mark run failed: ${String(p.error_message ?? p.message ?? 'error').slice(0, 200)}`, 502);
+      } else if (ev.eventType === 'execution_complete') {
+        const status = String(p.status ?? 'COMPLETED');
+        if (status.toUpperCase() !== 'COMPLETED') throw new MarkError(`Mark run ${status}`, 502);
+        return;
+      }
+    }
+  } finally {
+    await client.close();
+  }
 }

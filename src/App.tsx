@@ -5,6 +5,7 @@ import { useHeadMeta } from './hooks/useHeadMeta';
 import type { CompetitorComparisonPage } from './lib/graph-types';
 import { agentPlatformHead } from './www/agent-platform/content';
 import { accountTemplateOf } from './www/account-template';
+import { SHARE_PARAM, shareCodeOf } from './lib/share-links';
 import type {
     FinServPage as FinServPageData,
     PersonPage as PersonPageData,
@@ -25,6 +26,8 @@ const PersonPage = lazy(() => import('./www/PersonPage'));
  * this lazy boundary).
  */
 const FloatingSidebar = lazy(() => import('./components/FloatingSidebar'));
+/* A personal link's note (?p=<code>), over the page before it is read. Its own chunk: most visits never load it. */
+const InviteNote = lazy(() => import('./components/InviteNote'));
 /*
  * Visual Builder experiences — /vb/:slug. Lazy for the same reason as the renderers above:
  * it pulls the whole vendored opticom render chain plus one chunk per component renderer,
@@ -171,15 +174,22 @@ function PageLoader() {
     // hydration: the server never renders it, so drawing it in the hydration pass put a
     // node where the server HTML had none and failed hydration for every booth visit.
     const fromSearch = hydrated && searchParams.has('search');
+    // A personal link (src/lib/share-links.ts): never with the booth tools, never on retail or fin-serv.
+    const shareCode = hydrated && !fromSearch && !isRetailPage(data) && !isFinServPage(data) ? shareCodeOf(searchParams.get(SHARE_PARAM)) : null;
 
     return (
         // server/ssr-handler.tsx's renderPageRoute() reproduces this exact shape — including
         // the second slot — because useId() counts a children array. Change one, change both.
         <Suspense fallback={<RouteSpinner />}>
             {renderPageBody(data, searchParams.toString())}
-            {fromSearch && !isRetailPage(data) && !isFinServPage(data) && (
+            {fromSearch && !isRetailPage(data) && !isFinServPage(data) ? (
                 <FloatingSidebar page={data} variant={isPersonPage(data) ? 'person' : 'abm'} />
-            )}
+            ) : shareCode ? (
+                // Its own boundary: loading the note never swaps the page for the spinner.
+                <Suspense fallback={null}>
+                    <InviteNote code={shareCode} />
+                </Suspense>
+            ) : null}
         </Suspense>
     );
 }

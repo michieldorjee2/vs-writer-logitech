@@ -1,0 +1,482 @@
+/* ============================================================
+   The booth rail (FloatingSidebar.tsx) and the tokens its Report
+   card shares (activity-mode.css).
+   The search page's surfaces and type: Axiom v3 tokens, light or
+   dark with the system (search-home.css), Die Grotesk B for words,
+   VC Nudge for headings. The page sits in beside the rail with
+   rounded corners, as the search page's scene sits in its frame.
+   px only: the showcase's root font size is 10px.
+   ============================================================ */
+
+:root {
+  /* Spaced and coloured as Mark's own sidebar, collapsed (mark.optimizely.com, measured 6 Nov
+   * 2026: 8 px in, tiles 4 px apart, rounded 8, icons in fg.secondary, the current one on a soft
+   * wash), with each tool's name kept under its icon, so the tiles are 48 px and the rail 64. */
+  --booth-rail-w: 64px;
+  --booth-rail-on: rgb(32 35 32 / 0.07);
+  --booth-rail-rule: rgb(32 35 32 / 0.12);
+  --booth-corner: 20px;
+  --booth-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --booth-ease-out: cubic-bezier(0.5, 0, 0.75, 0);
+
+  --booth-page: #f9fcf8;              /* bg.page */
+  --booth-raised: #eff5eb;            /* bg.secondary: the chart's tile */
+  --booth-tile: #eff5eb;              /* a rail button's tile */
+  --booth-hover: #5f931f14;           /* bg.default.hovered */
+  --booth-fg: #202320;                /* fg.default */
+  --booth-fg-2: #484e46;              /* fg.secondary */
+  --booth-fg-3: #616755;              /* fg.tertiary */
+  --booth-quiet: rgb(32 35 32 / 0.28); /* a step not reached; the fold button */
+  --booth-focus: #197a94;             /* border.focus */
+  --booth-error: #cc1616;             /* fg.error */
+  --booth-warn: #8a5a00;              /* a skipped edit */
+  --booth-accent: #abff44;            /* LFGreen, the same in both themes */
+  --booth-accent-text: #3d8a00;       /* LFGreen deepened to read on the light page */
+  --booth-bar: #3d8b14;               /* the Report glyph's bars, the journey line */
+  --booth-bar-rest: rgb(32 35 32 / 0.14);
+  --booth-plot: #202320;              /* the chart's bars */
+  --booth-plot-empty: rgb(32 35 32 / 0.12);
+  --booth-plot-now: rgb(32 35 32 / 0.45);
+  --booth-veil: rgb(249 252 248 / 0.28); /* over the blurred page, under the Report card */
+  --booth-scrim: rgb(20 22 20 / 0.8);  /* X-ray's veil over the page, the same in both themes */
+  --booth-font: 'Die Grotesk B', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --booth-display: 'VC Nudge', 'Die Grotesk B', Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --booth-page: #252825;
+    --booth-raised: #2b2e2b;
+    --booth-tile: rgb(57 62 50 / 0.32);
+    --booth-hover: rgb(57 62 50 / 0.32);
+    --booth-fg: #ffffff;
+    --booth-fg-2: #b2bd9e;
+    --booth-fg-3: #a1ac8d;
+    --booth-quiet: #484e46;
+    --booth-focus: #409aab;
+    --booth-error: #fc8b8b;
+    --booth-warn: #f0b75e;
+    --booth-accent-text: #abff44;
+    --booth-bar: #abff44;
+    --booth-bar-rest: rgb(57 62 50 / 0.32);
+    --booth-plot: #ffffff;
+    --booth-plot-empty: #3c3d40;
+    --booth-plot-now: rgb(245 246 247 / 0.51);
+    --booth-veil: rgb(20 22 20 / 0.32);
+    --booth-rail-on: rgb(221 233 210 / 0.14);
+    --booth-rail-rule: rgb(221 233 210 / 0.16);
+  }
+}
+
+/* ------------ The page beside the rail ------------
+ * The page moves over rather than under: a full-height rail would cover its logo. Fixed parts of
+ * the page stay on the window; the sticky ask is re-centred on the page. Phones keep the page
+ * full width and lay the rail over it. */
+
+html.booth-page body {
+  transition: padding-left 520ms var(--booth-ease);
+}
+html.booth-page--rail body {
+  padding-left: var(--booth-rail-w);
+}
+html.booth-page--rail .www-page .www-sticky {
+  left: calc(50% + var(--booth-rail-w) / 2);
+}
+
+/* ------------ The rail ------------ */
+
+.booth-rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 960;
+  width: var(--booth-rail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  /* Closed: just off the window. It travels exactly as far as the page moves over (the rail's
+   * width, on the same timing), so no strip of the page's white shows between them as it slides
+   * in; its corners fade with it (below). Closing waits for the buttons to leave. */
+  transform: translateX(-100%);
+  transition: transform 360ms var(--booth-ease-out) 140ms;
+}
+.booth-rail.is-open {
+  transform: none;
+  transition: transform 520ms var(--booth-ease);
+}
+
+/* The page's two left corners, cut from the rail's colour. */
+.booth-rail::before,
+.booth-rail::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  width: var(--booth-corner);
+  height: var(--booth-corner);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.booth-rail.is-open::before,
+.booth-rail.is-open::after {
+  opacity: 1;
+  transition: opacity 320ms ease 120ms;
+}
+.booth-rail::before {
+  top: 0;
+  background: radial-gradient(circle at 100% 100%, transparent calc(var(--booth-corner) - 0.5px), var(--booth-page) var(--booth-corner));
+}
+.booth-rail::after {
+  bottom: 0;
+  background: radial-gradient(circle at 100% 0, transparent calc(var(--booth-corner) - 0.5px), var(--booth-page) var(--booth-corner));
+}
+
+.booth-rail__items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* 4 px between tiles; one folded away (below) gives its gap back. */
+.booth-rail__items > * + * {
+  margin-top: 4px;
+}
+.booth-rail__slot:empty {
+  display: none;
+}
+/* Between getting around and the page's tools, as Mark's sidebar divides its groups. */
+.booth-rail__divider {
+  width: 16px;
+  height: 1px;
+  margin-block: 8px 4px !important;
+  background: var(--booth-rail-rule);
+}
+
+.booth-rail__btn,
+.booth-rail__fold {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  /* The cascade: each button slides in from the left after the one above it, and leaves the
+   * other way round (--i is its place, --n the rail's count). */
+  opacity: 0;
+  transform: translateX(-24px);
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 200ms var(--booth-ease-out) calc((var(--n, 6) - var(--i, 0)) * 25ms),
+    opacity 160ms ease calc((var(--n, 6) - var(--i, 0)) * 25ms);
+}
+.booth-rail.is-open .booth-rail__btn,
+.booth-rail.is-open .booth-rail__fold {
+  opacity: 1;
+  transform: none;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    height 420ms var(--booth-ease),
+    margin 420ms var(--booth-ease),
+    transform 560ms var(--booth-ease) calc(120ms + var(--i, 0) * 55ms),
+    opacity 360ms ease calc(120ms + var(--i, 0) * 55ms);
+}
+
+/* Folded out of the rail while Edit runs (FloatingSidebar: `away`): they slide out to the left and
+ * the rail closes up behind them; leaving Edit brings them back in the same cascade. */
+.booth-rail.is-open .booth-rail__btn.is-away,
+.booth-rail.is-open .booth-rail__fold.is-away {
+  height: 0;
+  margin-top: 0;
+  opacity: 0;
+  transform: translateX(-24px);
+  pointer-events: none;
+  transition:
+    height 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
+    margin 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
+    opacity 160ms ease calc(var(--i, 0) * 30ms),
+    transform 220ms var(--booth-ease-out) calc(var(--i, 0) * 30ms);
+}
+
+.booth-rail__btn {
+  position: relative;
+  width: 48px;
+  height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--booth-fg-2);
+  font: 500 11px/1 var(--booth-font);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.booth-rail__btn:hover,
+.booth-rail__btn.is-on {
+  background: var(--booth-rail-on);
+  color: var(--booth-fg);
+}
+.booth-rail__btn:focus-visible,
+.booth-rail__fold:focus-visible,
+.booth-rail-mini:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 2px;
+}
+
+.booth-rail__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.booth-rail__icon svg {
+  display: block;
+  overflow: visible;
+}
+.booth-rail__label {
+  display: block;
+}
+
+/* ------------ Edit mode in the rail ------------
+ * Edit pressed shows its pencil in the accent. Its controls arrive in the slot under it (EditMode
+ * portals them there): Send, with the number of comments waiting. */
+
+.booth-rail__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.booth-rail__btn--edit.is-on .booth-rail__icon {
+  color: var(--booth-accent-text);
+}
+.booth-rail__btn--send {
+  position: relative;
+  animation: booth-slot-in 560ms var(--booth-ease) 120ms backwards;
+}
+/* Clipped only while it grows in, so the count badge on its corner is never cut off after. */
+@keyframes booth-slot-in {
+  from { height: 0; opacity: 0; transform: translateX(-24px); overflow: hidden; }
+  to { overflow: hidden; }
+}
+.booth-rail__btn--send:disabled {
+  cursor: default;
+  color: var(--booth-quiet);
+}
+.booth-rail__btn--send:disabled:hover {
+  background: transparent;
+}
+.booth-rail__btn--send.has-comments .booth-rail__icon {
+  color: var(--booth-accent-text);
+}
+/* While the tutorial is up, Send pulses: the step people forget. */
+.booth-rail__btn--send.is-hinted::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px var(--booth-bar);
+  pointer-events: none;
+  animation: booth-hint-pulse 1.6s ease-in-out infinite;
+}
+@keyframes booth-hint-pulse {
+  50% { opacity: 0.25; }
+}
+.booth-rail__btn--send.is-working {
+  cursor: progress;
+  color: var(--booth-fg);
+}
+.booth-rail__count {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--booth-accent);
+  color: #08251a;
+  font: 700 10px/16px var(--booth-font);
+  text-align: center;
+  animation: booth-count-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes booth-count-pop {
+  from { opacity: 0; transform: scale(0.4); }
+}
+
+/* X-ray: the scan line sweeps while the pointer is on it. */
+.booth-rail__scan {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.booth-rail__btn--xray:hover .booth-rail__scan,
+.booth-rail__btn--xray.is-on .booth-rail__scan {
+  animation: booth-scan 1.4s ease-in-out infinite;
+}
+@keyframes booth-scan {
+  0%, 100% { transform: translateY(-3px); }
+  50% { transform: translateY(3px); }
+}
+
+
+/* The foot: the fold button, or "?" (the Edit tutorial again) while Edit runs. */
+.booth-rail__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The fold button at the foot of the rail. */
+.booth-rail__fold {
+  width: 48px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--booth-fg-2);
+}
+.booth-rail__fold:hover {
+  background: var(--booth-rail-on);
+  color: var(--booth-fg);
+}
+.booth-rail__fold svg {
+  display: block;
+}
+
+/* ------------ Folded: one button at the bottom left ------------ */
+
+.booth-rail-mini {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 960;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  box-shadow: 0 10px 30px -8px rgb(8 37 26 / 0.45);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(-16px) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 200ms var(--booth-ease-out);
+}
+.booth-rail-mini.is-shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  /* After the rail has gone. */
+  transition:
+    opacity 300ms ease 420ms,
+    transform 560ms var(--booth-ease) 420ms;
+}
+.booth-rail-mini:hover {
+  color: var(--booth-accent-text);
+}
+
+/* ------------ The Report glyph ------------
+ * A wave that keeps moving while the report loads; when it is in, the wave settles and four bars
+ * rise one after another. */
+
+.booth-report-icon__wave {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 220ms ease,
+    transform 320ms var(--booth-ease);
+}
+.booth-report-icon.is-loading .booth-report-icon__wave {
+  animation: booth-wave 0.9s ease-in-out infinite alternate;
+}
+@keyframes booth-wave {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(-1); }
+}
+.booth-report-icon.is-error .booth-report-icon__wave {
+  opacity: 0.45;
+}
+.booth-report-icon.is-ready .booth-report-icon__wave,
+.booth-report-icon.is-empty .booth-report-icon__wave {
+  opacity: 0;
+  transform: scaleX(0.3);
+}
+
+.booth-report-icon__bar {
+  stroke: var(--booth-bar);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0);
+  opacity: 0;
+  transition:
+    transform 520ms var(--booth-ease) calc(160ms + var(--b, 0) * 80ms),
+    opacity 120ms ease calc(160ms + var(--b, 0) * 80ms);
+}
+.booth-report-icon__bar--rest {
+  stroke: var(--booth-bar-rest);
+}
+.booth-report-icon.is-ready .booth-report-icon__bar,
+.booth-report-icon.is-empty .booth-report-icon__bar {
+  transform: none;
+  opacity: 1;
+}
+/* In, but no visits yet: the bars without the green. */
+.booth-report-icon.is-empty .booth-report-icon__bar {
+  stroke: var(--booth-quiet);
+}
+
+/* ------------ Phones ------------ */
+
+@media (max-width: 640px) {
+  html.booth-page--rail body {
+    padding-left: 0;
+  }
+  html.booth-page--rail .www-page .www-sticky {
+    left: 50%;
+  }
+  .booth-rail::before,
+  .booth-rail::after {
+    display: none;
+  }
+  .booth-rail.is-open {
+    box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.booth-page body,
+  .booth-rail,
+  .booth-rail.is-open,
+  .booth-rail__btn,
+  .booth-rail__fold,
+  .booth-rail-mini,
+  .booth-report-icon__bar {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+  .booth-report-icon.is-loading .booth-report-icon__wave,
+  .booth-rail__scan,
+  .booth-rail__btn--send,
+  .booth-rail__btn--send.is-hinted::after,
+  .booth-rail__count {
+    animation: none !important;
+  }
+}

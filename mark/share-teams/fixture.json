@@ -1,0 +1,31 @@
+{
+  "event": "share_teams",
+  "ping_id": "9c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f",
+  "requested_at": "2026-11-06T10:00:00.000Z",
+  "to": {
+    "name": "Michiel Dorjee",
+    "email": "michiel@optimizely.com"
+  },
+  "page": {
+    "url": "https://showcase.optimizely.com/zurich-versicherung/",
+    "title": "Zürich Versicherung – “Group” | AG",
+    "person": false
+  },
+  "link": {
+    "url": "https://showcase.optimizely.com/s/Ab3dE9xY",
+    "recipient": "Lena Brunner, Head of Digital",
+    "message": "Hi Lena,\n\nGreat to meet you at <Opticon>. Here is the page we made.\n\nMichiel",
+    "opens": 2,
+    "last_open": "7 Nov 2026",
+    "ctas": 1
+  },
+  "analytics": {
+    "visits": 12,
+    "visitors": 4,
+    "last_seen": "7 Nov 2026",
+    "cta_clicks": 1,
+    "stage": "Prospect",
+    "last_channel": "Email"
+  },
+  "check": "6d51af3c85cbe942cc81c1859d2bfcc658069e312b0398420d00b15f74c5f72c"
+}

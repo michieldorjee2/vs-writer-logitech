@@ -11,6 +11,8 @@
  */
 import { inCmsPreview } from './cms-preview.js'
 import { utmOf } from './offer-signup.js'
+import { normalizeVuid } from './page-activity.js'
+import { SHARE_SESSION_KEY, shareCodeOf } from './share-links.js'
 
 export const CTA_PING_ENDPOINT = '/api/cta-ping'
 
@@ -24,12 +26,27 @@ type Where = Pick<Location, 'pathname' | 'search'>
 export function sendCtaPing(source: CtaSource, location: Where | null = typeof window !== 'undefined' ? window.location : null): void {
   if (!location || inCmsPreview(location)) return
   try {
-    const body = JSON.stringify({ route: location.pathname, source, utm: utmOf(location.search) })
+    const body = JSON.stringify({ route: location.pathname, source, utm: utmOf(location.search), ...sharedOf() })
     // keepalive: the ping survives the visitor following the panel's "Schedule a call" link at once.
     void fetch(CTA_PING_ENDPOINT, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body }).catch(() => {
       /* fire-and-forget */
     })
   } catch {
     /* never let the ping break the click */
+  }
+}
+
+/**
+ * The personal link this tab came in by (src/components/InviteNote.tsx keeps its code for the
+ * session), with the visitor's ODP id: the server adds who the link was for to the ping.
+ */
+function sharedOf(): { share?: string; vuid?: string } {
+  try {
+    const share = shareCodeOf(sessionStorage.getItem(SHARE_SESSION_KEY))
+    if (!share) return {}
+    const vuid = normalizeVuid((window as unknown as { zaius?: { VUID?: string } }).zaius?.VUID)
+    return vuid ? { share, vuid } : { share }
+  } catch {
+    return {}
   }
 }

@@ -119,7 +119,10 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
     name: 'page-builds-dev',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url || '', 'http://localhost')
+        let url = new URL(req.url || '', 'http://localhost')
+        // A personal link, as vercel.json rewrites it.
+        const short = /^\/s\/([^/]+)$/.exec(url.pathname)
+        if (short) url = new URL(`/api/share-go?code=${encodeURIComponent(short[1])}`, 'http://localhost')
         // The functions this serves, as Vercel routes them: [pattern, file, the path segment that is `id`].
         const routes: Array<[RegExp, string]> = [
           [/^\/api\/badge-read$/, '/api/badge-read.ts'],
@@ -135,6 +138,14 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],
           // The CMS preview's draft: the function itself, so dev reads it exactly as production does.
           [/^\/api\/preview$/, '/api/preview.ts'],
+          // Activity mode: the visitor index write and the report, both straight from their files.
+          [/^\/api\/page-visit$/, '/api/page-visit.ts'],
+          [/^\/api\/page-activity$/, '/api/page-activity.ts'],
+          // Personal links: make and list, the recipient's note, the short link, Teams and email.
+          [/^\/api\/share-links$/, '/api/share-links.ts'],
+          [/^\/api\/share-note$/, '/api/share-note.ts'],
+          [/^\/api\/share-go$/, '/api/share-go.ts'],
+          [/^\/api\/share-send$/, '/api/share-send.ts'],
         ]
         let file: string | null = null
         let id: string | null = null
@@ -202,6 +213,8 @@ function devAuthProxy(devEmail: string | null): Plugin {
         const url = new URL(req.url || '', 'http://localhost')
         if (url.pathname !== '/api/auth/me') return next()
         if (!devEmail) return jsonResponse(res, 401, { error: 'signed_out' })
+        // As api/_lib/auth.ts: the signed-in person's browser is marked, and never loads ODP.
+        res.setHeader('Set-Cookie', 'showcase_staff=1; Path=/; Max-Age=15552000; SameSite=Lax')
         return jsonResponse(res, 200, { email: devEmail, name: null })
       })
     },

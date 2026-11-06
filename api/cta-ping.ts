@@ -17,6 +17,11 @@
  *      executive in Teams from Michiel's account, or adds a row to the follow-up sheet when the
  *      page has none. 202 once Mark has it, 502 when Mark refused it (the panel opens either way)
  *
+ * A visitor who came in by a personal link (src/lib/share-links.ts) sends its code: when it is one
+ * of this page's links, the ping says who it was for and who sent it (`shared`), the link counts the
+ * click, and ODP gets `personal_link_cta` with the recipient's address. That part runs before the
+ * webhook check, so previews count it too; nobody signed in is counted.
+ *
  * `check` is the SHA-256 of the rest of the payload as canonical JSON (keys sorted, no spaces).
  * The workflow recomputes it and messages nobody when the click changed on its way.
  */
@@ -31,6 +36,12 @@ import { CTA_SOURCES, type CtaSource } from '../src/lib/cta-ping.js';
 import type { CompetitorComparisonPage, PersonPage } from '../src/lib/graph-types.js';
 import { UTM_KEYS } from '../src/lib/offer-signup.js';
 import { deriveCustomerName } from '../src/lib/page-identity.js';
+import { currentIdentity } from './_lib/auth.js';
+import { sendOdpEvent } from './_lib/odp-events.js';
+import { visitorHash } from './_lib/share-http.js';
+import { getLink, recordCta, shareStore, type ShareStore } from './_lib/share-store.js';
+import { normalizeVuid } from '../src/lib/page-activity.js';
+import { shareCodeOf } from '../src/lib/share-links.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 const SITE = 'https://showcase.optimizely.com';
@@ -59,7 +70,16 @@ export interface CtaPing {
   campaign: string;
   rep: { name: string; role: string; email: string } | null;
   team: Array<{ name: string; role: string }>;
+  /** Only when the visitor came in by one of this page's personal links. */
+  shared?: CtaShared;
   check: string;
+}
+
+/** The personal link a click came by: who it was for, and who sent it. */
+export interface CtaShared {
+  code: string;
+  recipient: { name: string; title: string; email: string };
+  sender: { name: string; email: string };
 }
 
 type TeamPage = Pick<CompetitorComparisonPage, '_metadata' | 'eyebrow' | 'intelHeadline' | 'teamMembers'>;
@@ -128,6 +148,7 @@ export function buildPing(
   utm: Record<string, string>,
   now = new Date(),
   pingId: string = randomUUID(),
+  shared: CtaShared | null = null,
 ): CtaPing {
   const ae = accountExecutiveOf(page.team);
   const rep = ae
@@ -151,6 +172,15 @@ export function buildPing(
     campaign: clean(campaign, 600),
     rep,
     team,
+    ...(shared
+      ? {
+          shared: {
+            code: shared.code,
+            recipient: { name: clean(shared.recipient.name, 120), title: clean(shared.recipient.title, 120), email: clean(shared.recipient.email, 254).toLowerCase() },
+            sender: { name: clean(shared.sender.name, 120), email: clean(shared.sender.email, 254).toLowerCase() },
+          },
+        }
+      : {}),
   };
   return { ...body, check: checkOf(body) };
 }
@@ -219,6 +249,42 @@ async function overLimit(ip: string, path: string, now: Date): Promise<boolean> 
   }
 }
 
+let shareOverride: { store?: ShareStore | null; odp?: typeof sendOdpEvent } = {};
+/** For the checks: stand-ins for the link store and ODP. */
+export function setCtaShareSources(o: typeof shareOverride): void {
+  shareOverride = o;
+}
+
+/**
+ * The personal link this click came by, when the visitor sent one of this page's codes: counted on
+ * the link and sent to ODP (once per visitor an hour), unless an Optimizely person is signed in.
+ * Never fails the ping: a link that can't be read is a ping without it.
+ */
+async function sharedLink(req: VercelRequest, res: VercelResponse, b: Record<string, unknown>, path: string, now: Date): Promise<CtaShared | null> {
+  const code = shareCodeOf(b.share);
+  const store = 'store' in shareOverride ? shareOverride.store : shareStore();
+  if (!code || !store) return null;
+  try {
+    const link = await getLink(store, code);
+    if (!link || link.path !== path) return null;
+    if (!currentIdentity(req, res)) {
+      const vuid = normalizeVuid(b.vuid);
+      if (await recordCta(store, code, vuid ?? visitorHash(req), Math.floor(now.getTime() / 1000))) {
+        await (shareOverride.odp ?? sendOdpEvent)({
+          type: 'engagement',
+          action: 'personal_link_cta',
+          identifiers: { vuid: vuid ?? undefined, email: link.recipient.email || undefined },
+          data: { page: `/${path}/`, element: 'personal_link', label: code },
+        });
+      }
+    }
+    return { code, recipient: link.recipient, sender: link.sender };
+  } catch (err) {
+    console.warn('[cta-ping] personal link not read:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -259,10 +325,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (value && value.length <= 200) utm[key] = value;
   }
 
+  const now = new Date();
+  const shared = await sharedLink(req, res, b, route.path, now);
+
   const hook = webhook();
   if (!hook) return res.status(202).json({ ok: true });
 
-  const now = new Date();
   if (await overLimit(clientIp(req), route.path, now)) return res.status(202).json({ ok: true });
 
   const authKey = process.env.GRAPH_AUTH_KEY;
@@ -279,7 +347,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!page) return res.status(404).json({ error: 'Not found' });
 
-  const ping = buildPing(page, route.path, source, utm, now);
+  const ping = buildPing(page, route.path, source, utm, now, randomUUID(), shared);
   try {
     const r = await fetch(hook.url, {
       method: 'POST',

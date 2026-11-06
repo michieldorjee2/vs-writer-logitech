@@ -22,13 +22,6 @@ import '../styles/edit-mode.css';
 interface Props {
   active: boolean;
   onClose: () => void;
-  /**
-   * Fired exactly once after the feedback webhook resolves (success or
-   * failure — the user has already let go of the page either way).
-   * The parent uses this to start the "Working…" countdown on the
-   * Edit sidebar button.
-   */
-  onSent?: () => void;
   page: CompetitorComparisonPage;
   variant: 'abm' | 'person';
   /**
@@ -37,6 +30,18 @@ interface Props {
    * address whatever the browser says.
    */
   editorEmail: string;
+  /**
+   * Where the mode's controls go: a slot in the booth rail under the Edit button
+   * (FloatingSidebar.tsx). Send, with the comment count, is drawn there; the mode has no bar of
+   * its own. Null until the rail has mounted.
+   */
+  controls: HTMLElement | null;
+  /**
+   * The tutorial card is up (the first Edit in this browser, or "?" in the rail). Done with it
+   * ("Got it", Escape, or clicking a part of the page) calls onTutorialDone.
+   */
+  tutorial: boolean;
+  onTutorialDone: () => void;
 }
 
 type DocSize = { w: number; h: number };
@@ -171,6 +176,11 @@ function placePopup(
   return { left, top: Math.max(m, aboveTop) };
 }
 
+/** Where a part's comment badge sits: just inside its box's top-right corner. */
+function badgeAt(box: OutlineBox): string {
+  return `translate(${box.left + box.width - 18} ${box.top + 18})`;
+}
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -214,7 +224,7 @@ function copyNow(fields: string[], shown: Record<string, string | string[]>): Re
   return out;
 }
 
-function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props) {
+function EditMode({ active, onClose, page, variant, editorEmail, controls, tutorial, onTutorialDone }: Props) {
   // On either account template Edit mode offers each part with the fields it shows, tells Mark
   // which fields, and shows Mark's edits by re-rendering the page from the values he streams. The
   // agent platform page is mostly template copy: its parts are the ones a field drives.
@@ -252,6 +262,8 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
   // Refs the rAF loop reads + writes
   const elementsRef = useRef<Array<{ section: XraySectionInfo; els: Element[] }>>([]);
   const rectRefs = useRef<Map<string, SVGRectElement | null>>(new Map());
+  /** Each commented part's badge, moved with its box by the rAF loop (as the rect is). */
+  const badgeRefs = useRef<Map<string, SVGGElement | null>>(new Map());
   const docSizeRef = useRef<DocSize>({ w: 0, h: 0 });
 
   const sendError = useRef<string | null>(null);
@@ -388,6 +400,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           rect.setAttribute('width', String(o.width));
           rect.setAttribute('height', String(o.height));
           lastBox.set(e.section.id, { l: o.left, t: o.top, w: o.width, h: o.height });
+          badgeRefs.current.get(e.section.id)?.setAttribute('transform', badgeAt(o));
         }
         if (e.section.id === focusRef.current && spotRef.current) {
           spotRef.current.setAttribute('x', String(o.left));
@@ -417,7 +430,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
   useEffect(() => {
     if (!activeSection || !popupRef.current) return;
     const r = popupRef.current.getBoundingClientRect();
-    const margin = 80; // keep clear of the top hud
+    const margin = 80; // keep clear of the hint at the top
     const belowFold = r.bottom > window.innerHeight - 24;
     const aboveFold = r.top < margin;
     if (belowFold || aboveFold) {
@@ -431,6 +444,12 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // The Report card open over Edit mode takes this Escape; the comments stay.
+      if (document.documentElement.classList.contains('activity-open')) return;
+      if (tutorial) {
+        onTutorialDone();
+        return;
+      }
       if (activeSection) {
         setActiveSection(null);
         return;
@@ -439,13 +458,15 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, activeSection, onClose]);
+  }, [active, activeSection, onClose, tutorial, onTutorialDone]);
 
   /* ---- Comment popup handlers ---- */
   const openCommentForSection = useCallback((sectionId: string) => {
+    // Clicking a part of the page is the tutorial's first step: it has done its job.
+    if (tutorial) onTutorialDone();
     setDraftComment(comments[sectionId] || '');
     setActiveSection(sectionId);
-  }, [comments]);
+  }, [comments, tutorial, onTutorialDone]);
 
   const saveComment = useCallback(() => {
     if (!activeSection) return;
@@ -682,9 +703,6 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       }
     }
 
-    // Notify the parent (sidebar countdown) regardless of outcome.
-    onSent?.();
-
     // If the agent committed, WAIT for the republish to actually land —
     // poll the Graph `published` ping — then cache-bust reload so the
     // visitor sees the real, freshly-published change (not just our
@@ -735,7 +753,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       }
     }
     liveAbort.current = null;
-  }, [comments, page, sections, onSent, matchSectionId, scrollToSection, agentPlatform, template, live]);
+  }, [comments, page, sections, matchSectionId, scrollToSection, agentPlatform, template, live]);
 
   /** Dismiss the live overlay without reloading (Close on the live HUD). */
   const dismissLive = useCallback(() => {
@@ -822,21 +840,23 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
                 className="edit-box__rect"
               />
               {hasComment && (
-                <g className="edit-box__badge">
-                  <circle
-                    cx={box.left + box.width - 18}
-                    cy={box.top + 18}
-                    r={12}
-                    className="edit-box__badge-bg"
-                  />
-                  <text
-                    x={box.left + box.width - 18}
-                    y={box.top + 22}
-                    textAnchor="middle"
-                    className="edit-box__badge-text"
-                  >
-                    1
-                  </text>
+                /* Placed with a transform the rAF loop keeps on the box's corner; the inner group pops in
+                 * from its own centre (edit-mode.css), not the document's. */
+                <g
+                  ref={(el) => {
+                    badgeRefs.current.set(section.id, el);
+                    // Placed at once on its box as it is now: the loop moves it only when the box moves.
+                    const o = rectRefs.current.get(section.id);
+                    if (el && o) el.setAttribute('transform', badgeAt({ left: +o.getAttribute('x')!, top: +o.getAttribute('y')!, width: +o.getAttribute('width')!, height: 0 }));
+                  }}
+                  transform={badgeAt(box)}
+                >
+                  <g className="edit-box__badge">
+                    <circle cx={0} cy={0} r={12} className="edit-box__badge-bg" />
+                    <text x={0} y={4} textAnchor="middle" className="edit-box__badge-text">
+                      1
+                    </text>
+                  </g>
                 </g>
               )}
             </g>
@@ -868,7 +888,6 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         >
           <div className="edit-popup__head">
             <div>
-              <div className="edit-popup__eyebrow">Section</div>
               <div className="edit-popup__title">{entry.section.title}</div>
               {(entry.section as EditSectionInfo).hint && <div className="edit-popup__hint">{(entry.section as EditSectionInfo).hint}</div>}
             </div>
@@ -898,7 +917,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
             }}
           />
           <div className="edit-popup__actions">
-            {existing && (
+            {existing ? (
               <button
                 type="button"
                 className="edit-popup__btn edit-popup__btn--delete"
@@ -906,7 +925,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
               >
                 Delete
               </button>
-            )}
+            ) : null}
             <div style={{ flex: 1 }} />
             <button
               type="button"
@@ -929,67 +948,104 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     }
   }
 
-  /** Viewport-fixed HUD: title, email pill, send button, exit. */
-  const hudLayer = (
-    <div className={'edit-fixed-layer edit-fixed-layer--' + phase}>
-      <div className="edit-hud" role="toolbar" aria-label="Edit toolbar">
-        <div className="edit-hud__brand">
-          <span className="edit-hud__dot" />
-          <span className="edit-hud__title">Edit Mode</span>
-          <span className="edit-hud__hint">
-            Click any section to leave feedback for Mark
-          </span>
-        </div>
-        <div className="edit-hud__right">
-          <span className="edit-hud__email" title={`Edits are sent as ${editorEmail}, the account you signed in with`}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <polyline points="22,6 12,13 2,6" />
-            </svg>
-            <span>{editorEmail}</span>
-          </span>
-          <button
-            type="button"
-            className={'edit-hud__send' + (canSend ? '' : ' edit-hud__send--disabled')}
-            onClick={canSend ? send : undefined}
-            disabled={!canSend}
-            aria-label="Send feedback"
-          >
+  /**
+   * The mode's controls, in the booth rail under the Edit button (the `controls` slot): Send, with
+   * the number of comments waiting. Leaving is the Edit button again, or Escape.
+   */
+  const railControls = controls
+    ? createPortal(
+        <button
+          type="button"
+          className={'booth-rail__btn booth-rail__btn--send' + (commentCount ? ' has-comments' : '') + (phase === 'working' ? ' is-working' : '') + (tutorial ? ' is-hinted' : '')}
+          onClick={canSend ? send : undefined}
+          disabled={!canSend}
+          aria-label="Send feedback"
+          title={
+            phase === 'working'
+              ? 'Mark is making your edits'
+              : commentCount
+                ? `Send ${commentCount} comment${commentCount === 1 ? '' : 's'} to Mark, as ${editorEmail}`
+                : 'Leave a comment on the page first'
+          }
+        >
+          <span className="booth-rail__icon">
             {phase === 'working' ? (
-              <>
-                <span className="edit-hud__spinner" aria-hidden="true" />
-                <span>Editing live…</span>
-              </>
+              <span className="edit-spinner" aria-hidden="true" />
             ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 2L11 13" />
-                  <path d="M22 2l-7 20-4-9-9-4 20-7z" />
-                </svg>
-                <span>
-                  Send feedback
-                  {commentCount > 0 && (
-                    <span className="edit-hud__count">{commentCount}</span>
-                  )}
-                </span>
-              </>
+              <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M17.5 2.5L9.17 10.83" />
+                <path d="M17.5 2.5l-5.83 15-3.34-7.5-7.5-3.33 16.67-4.17z" />
+              </svg>
             )}
-          </button>
-          <button
-            type="button"
-            className="edit-hud__close"
-            onClick={onClose}
-            aria-label="Exit edit mode"
-            title="Exit edit mode"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            {commentCount > 0 && phase !== 'working' && (
+              <span key={commentCount} className="booth-rail__count">
+                {commentCount}
+              </span>
+            )}
+          </span>
+          <span className="booth-rail__label">{phase === 'working' ? 'Editing' : 'Send'}</span>
+        </button>,
+        controls,
+      )
+    : null;
+
+  /** What to do, until the first comment: a small note at the top of the page. */
+  const hint =
+    phase === 'editing' && commentCount === 0 && !activeSection && !tutorial ? (
+      <div className="edit-hint" role="status">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3.33 16.67h3.34l8.75-8.75a2.36 2.36 0 0 0-3.34-3.34L3.33 13.33v3.34z" />
+        </svg>
+        Click any part of the page to leave feedback for Mark
+      </div>
+    ) : null;
+
+  /**
+   * The tutorial: what Edit mode is for, in three steps, beside the rail. On the first Edit in this
+   * browser and from "?" at the foot of the rail. Send pulses in the rail while it is up.
+   */
+  const tutorialCard =
+    tutorial && phase === 'editing' ? (
+      <div className="edit-tutorial" role="dialog" aria-labelledby="edit-tutorial-title">
+        <h2 id="edit-tutorial-title" className="edit-tutorial__title">
+          Edit with Mark
+        </h2>
+        <ol className="edit-tutorial__steps">
+          <li style={{ '--i': 0 } as CSSProperties}>
+            <span className="edit-tutorial__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4.17 2.5l11.66 5.83-5 1.67-1.66 5z" />
+                <path d="M10.83 10l4.17 4.17" />
+              </svg>
+            </span>
+            <span>Click on an element you’d like to change</span>
+          </li>
+          <li style={{ '--i': 1 } as CSSProperties}>
+            <span className="edit-tutorial__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.5 12.5a1.67 1.67 0 0 1-1.67 1.67h-10L2.5 17.5V4.17A1.67 1.67 0 0 1 4.17 2.5h11.66a1.67 1.67 0 0 1 1.67 1.67z" />
+              </svg>
+            </span>
+            <span>Tell Mark what you’d like to change</span>
+          </li>
+          <li style={{ '--i': 2 } as CSSProperties}>
+            <span className="edit-tutorial__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.5 2.5L9.17 10.83" />
+                <path d="M17.5 2.5l-5.83 15-3.34-7.5-7.5-3.33 16.67-4.17z" />
+              </svg>
+            </span>
+            <span>Send all your comments to Mark for updates</span>
+          </li>
+        </ol>
+        <div className="edit-tutorial__foot">
+          <span className="edit-tutorial__note">Don’t forget to send!</span>
+          <button type="button" className="edit-tutorial__ok" onClick={onTutorialDone} autoFocus>
+            Got it
           </button>
         </div>
       </div>
-    </div>
-  );
+    ) : null;
 
   /** Thanks splash that animates in, holds, then animates out. */
   const thanksSplash = phase === 'thanks' ? (
@@ -1044,7 +1100,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         ) : liveError ? (
           <span className="live-hud__bang" aria-hidden="true">!</span>
         ) : (
-          <span className="edit-hud__spinner" aria-hidden="true" />
+          <span className="edit-spinner" aria-hidden="true" />
         )}
         <span className="live-hud__status">{liveStatus}</span>
         <button
@@ -1090,16 +1146,22 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     </div>
   ) : null;
 
-  return createPortal(
+  return (
     <>
-      {docLayer}
-      {commentPopup}
-      {hudLayer}
-      {thanksSplash}
-      {liveCard}
-      {liveHud}
-    </>,
-    document.body,
+      {createPortal(
+        <>
+          {docLayer}
+          {commentPopup}
+          {hint}
+          {tutorialCard}
+          {thanksSplash}
+          {liveCard}
+          {liveHud}
+        </>,
+        document.body,
+      )}
+      {railControls}
+    </>
   );
 }
 

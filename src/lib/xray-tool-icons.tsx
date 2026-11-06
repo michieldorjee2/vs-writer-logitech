@@ -1,9 +1,14 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 
 /* ============================================================
-   X-ray tool icons — small monochrome glyphs rendered next to
-   each tool name in the annotation cards. All use currentColor
-   so they pick up the chip's text colour.
+   X-ray tool icons. XrayToolLogo is what the cards show: each
+   company's own favicon as SVG, kept in public/logos/tools/
+   (taken from the company's site, 6 Nov 2026: the file itself
+   where it publishes an SVG favicon, else its favicon redrawn
+   from its own SVG logo), and Mark's AI texture, animated. The
+   small monochrome glyphs below are the fallback if a file does
+   not load, and the icon for tools that are not a company (Web
+   browsing, Sitemap), drawn in a colour of their own.
 
    Names match the canonical strings in xray-defaults.ts:
      'Salesforce', 'BuiltWith', 'Mark', 'ODP', 'CMS',
@@ -150,4 +155,85 @@ export function XrayToolIcon({ name, size = 12 }: { name: string; size?: number 
   const Icon = ICONS[name];
   if (!Icon) return null;
   return <Icon size={size} />;
+}
+
+/**
+ * Each company's favicon, as SVG (public/logos/tools/):
+ *   LinkedIn, Brandfetch, Optimizely: the SVG favicon the site publishes.
+ *   Salesforce: its favicon is the cloud alone, Salesforce's own no-type SVG.
+ *   6sense: its new favicon (the 6 and its dot, on white), from its own SVG wordmark.
+ *   BuiltWith: the "b" of its own SVG wordmark, white on its favicon's green.
+ *   Gravatar: the symbol of its own SVG logo, on white, as its favicon.
+ *   ZoomInfo: its favicon, the Z on red, as in its own SVG logo.
+ *   CaliberMind: the mark of its new SVG logo, white on its favicon's navy.
+ *   Outreach: the mark of its own SVG logo, as its favicon.
+ *   Clay: a 3D render with no vector version anywhere on its site, so its favicon as a small WebP.
+ *   Google Search: its 2025 favicon (the gradient G), which Google serves only as .ico; the SVG
+ *     Wikimedia Commons keeps of it (Google_Favicon_2025.svg).
+ *   Conductor: its favicon, white dots on its green, from the shape of its own SVG mask icon.
+ * Brandfetch has one for light and one for dark; the cards follow the system theme too.
+ */
+const TOOL_LOGOS: Record<string, string | { light: string; dark: string }> = {
+  'Salesforce': '/logos/tools/salesforce.svg',
+  'BuiltWith': '/logos/tools/builtwith.svg',
+  'LinkedIn': '/logos/tools/linkedin.svg',
+  '6sense': '/logos/tools/6sense.svg',
+  'Gravatar': '/logos/tools/gravatar.svg',
+  'Brandfetch': { light: '/logos/tools/brandfetch-light.svg', dark: '/logos/tools/brandfetch-dark.svg' },
+  'ZoomInfo': '/logos/tools/zoominfo.svg',
+  'CaliberMind': '/logos/tools/calibermind.svg',
+  'Outreach': '/logos/tools/outreach.svg',
+  'Clay': '/logos/tools/clay.webp',
+  'Google Search': '/logos/tools/google.svg',
+  'Conductor': '/logos/tools/conductor.svg',
+  // Our own products: Optimizely's favicon.
+  'ODP': '/logos/tools/optimizely.svg',
+  'CMS': '/logos/tools/optimizely.svg',
+};
+/** Tools that are not a company: their glyph, in a colour of its own. */
+const GLYPH_COLOURS: Record<string, string> = {
+  'Web browsing': '#2f7de1',
+  'Sitemap': '#e08a1e',
+};
+
+/**
+ * Mark: the AI texture from the brand guidelines (the iridescent bubble; its video in Figma, a
+ * still here). Two copies turning against each other make it shimmer and shift, as the brand asks
+ * of the texture, with transforms only: no repaint, nothing for the main thread.
+ */
+function MarkLogo({ size }: { size: number }) {
+  return (
+    <span className="xray-tool-logo xray-mark-texture" style={{ width: size, height: size }} aria-hidden="true">
+      <img src="/logos/tools/mark-texture.webp" width={size} height={size} alt="" decoding="async" />
+      <img src="/logos/tools/mark-texture.webp" width={size} height={size} alt="" decoding="async" />
+    </span>
+  );
+}
+
+/**
+ * A tool's logo for the X-ray cards: the company's favicon, Mark's texture, or the glyph for
+ * anything else (and if a file does not load). Nothing for a name it does not know.
+ */
+export function XrayToolLogo({ name, size = 18 }: { name: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (name === 'Mark') return <MarkLogo size={size} />;
+  const logo = TOOL_LOGOS[name];
+  if (logo && !failed) {
+    const img = (src: string) => (
+      <img className="xray-tool-logo" src={src} width={size} height={size} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    );
+    if (typeof logo === 'string') return img(logo);
+    return (
+      <picture>
+        <source srcSet={logo.dark} media="(prefers-color-scheme: dark)" />
+        {img(logo.light)}
+      </picture>
+    );
+  }
+  if (!ICONS[name]) return null;
+  return (
+    <span className="xray-tool-logo xray-tool-logo--glyph" style={{ width: size, height: size, color: GLYPH_COLOURS[name] }} aria-hidden="true">
+      <XrayToolIcon name={name} size={Math.round(size * 0.78)} />
+    </span>
+  );
 }

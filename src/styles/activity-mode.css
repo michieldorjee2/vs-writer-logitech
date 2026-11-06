@@ -1,0 +1,421 @@
+/* ============================================================
+   The booth's Report card (src/components/ActivityMode.tsx).
+   Over the page, blurred, in the rail's surfaces and type
+   (booth-rail.css holds the tokens, light or dark with the
+   system). px only: the showcase's root font size is 10px.
+   ============================================================ */
+
+/* Over everything, the rail included: the page behind, blurred, with a light veil for the card to
+ * stand on. The page is held still while the card is open (below), so the blur never chases a
+ * moving page, which is what made blur flicker on the www pages (floating-sidebar.css). */
+.activity-view {
+  position: fixed;
+  inset: 0;
+  z-index: 970;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--booth-veil);
+  -webkit-backdrop-filter: blur(22px) saturate(110%);
+  backdrop-filter: blur(22px) saturate(110%);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 200ms ease,
+    visibility 0s linear 200ms;
+}
+.activity-view.is-open {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 260ms ease,
+    visibility 0s;
+}
+/* The page under the report (or the Share card) stays where it was: no scrolling, and padded by
+ * the scrollbar it lost, so it doesn't widen under the card (src/lib/scroll-lock.ts). */
+html.activity-open {
+  overflow: hidden;
+}
+html.activity-open body {
+  padding-right: var(--scroll-lock-gap, 0px);
+}
+
+.activity-card {
+  box-sizing: border-box;
+  width: min(800px, 100%);
+  padding: 37px 39px 36px;
+  border-radius: 20px;
+  background: var(--booth-page);
+  box-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.55);
+  outline: none;
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  transition:
+    transform 220ms var(--booth-ease-out),
+    opacity 160ms ease;
+}
+.activity-view.is-open .activity-card {
+  opacity: 1;
+  transform: none;
+  transition:
+    transform 640ms var(--booth-ease) 60ms,
+    opacity 360ms ease 60ms;
+}
+
+.activity-card__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 34px;
+}
+/* The title on the left; Salesforce, a retry and the close button pushed to the right. */
+.activity-card__title {
+  margin-right: auto !important;
+}
+/* Close, top right, as on the Share card. */
+.activity-card__close {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -10px 0 -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--booth-fg-2);
+  cursor: pointer;
+}
+.activity-card__close:hover {
+  background: var(--booth-hover);
+  color: var(--booth-fg);
+}
+.activity-card__title {
+  margin: 0;
+  font: 800 32px/1 var(--booth-display);
+  letter-spacing: 0;
+  color: var(--booth-fg);
+}
+.activity-card__sf {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--booth-accent-text);
+  font: 400 16px/1 var(--booth-font);
+  text-decoration: none;
+}
+.activity-card__sf:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.activity-card__retry {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--booth-fg-3);
+  font: 400 14px/1 var(--booth-font);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.activity-card__sf:focus-visible,
+.activity-card__retry:focus-visible,
+.activity-card__close:focus-visible,
+.activity-step__toggle:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.activity-card__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 335px) minmax(0, 270px);
+  justify-content: space-between;
+  column-gap: 40px;
+  row-gap: 40px;
+}
+.activity-card__col {
+  min-width: 0;
+}
+.activity-card__h {
+  margin: 0 0 30px;
+  font: 800 22px/1 var(--booth-display);
+  letter-spacing: 0;
+  color: var(--booth-fg);
+}
+
+/* Rows rise in, one after another, each time the card opens. */
+@keyframes activity-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+.activity-view.is-open .activity-step,
+.activity-view.is-open .activity-data__row {
+  animation: activity-rise 560ms var(--booth-ease) both;
+  animation-delay: calc(180ms + var(--i, 0) * 55ms);
+}
+
+/* ------------ Journey ------------ */
+
+.activity-journey {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.activity-step {
+  position: relative;
+  padding: 0 0 28px 17px;
+  font: 400 16px/20px var(--booth-font);
+  color: var(--booth-fg);
+}
+.activity-step:last-child {
+  padding-bottom: 0;
+}
+/* The line down the steps: green up to the step the page is at. */
+.activity-step::before,
+.activity-step.is-current::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: -2px;
+  width: 1.67px;
+  border-radius: 1px;
+  background: var(--booth-quiet);
+}
+.activity-step:last-child::before {
+  bottom: 2px;
+}
+.activity-step.is-past::before {
+  background: var(--booth-bar);
+}
+.activity-step.is-current::after {
+  bottom: 26px;
+  background: var(--booth-bar);
+}
+.activity-step.is-current:last-child::after {
+  bottom: 2px;
+}
+.activity-step b {
+  font-weight: 700;
+}
+.activity-step.is-current {
+  color: var(--booth-accent-text);
+}
+.activity-step.is-next {
+  color: var(--booth-quiet);
+}
+
+.activity-step__toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: min(243px, 100%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.activity-step__chev {
+  flex: none;
+  transition: transform 260ms var(--booth-ease);
+}
+.activity-step__toggle[aria-expanded='true'] .activity-step__chev {
+  transform: rotate(180deg);
+}
+
+/* The visits behind the step the page is at. */
+.activity-visits {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 400 13px/16px var(--booth-font);
+  color: var(--booth-fg-3);
+}
+.activity-visit {
+  display: grid;
+  grid-template-columns: 72px 56px 40px minmax(0, 1fr);
+  gap: 8px;
+  animation: activity-rise 420ms var(--booth-ease) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.activity-visit--cta {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+.activity-visit--more {
+  display: block;
+}
+.activity-visit__day {
+  color: var(--booth-fg);
+}
+.activity-visit__what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------ Data ------------ */
+
+.activity-data {
+  display: grid;
+  row-gap: 16px;
+  margin: 0;
+}
+.activity-data__row {
+  display: grid;
+  grid-template-columns: 124px minmax(0, 1fr);
+  align-items: baseline;
+  font: 400 16px/20px var(--booth-font);
+}
+.activity-data dt {
+  font-weight: 700;
+  color: var(--booth-fg);
+}
+.activity-data dd {
+  margin: 0;
+  color: var(--booth-fg);
+  overflow-wrap: anywhere;
+}
+
+/* ------------ Activity ------------ */
+
+.activity-chart {
+  margin-top: 52px;
+  padding: 27px 29px 20px;
+  border-radius: 10px;
+  background: var(--booth-raised);
+}
+.activity-chart__title {
+  margin: 0 0 22px;
+  font: 800 18px/1 var(--booth-display);
+  letter-spacing: 0;
+  color: var(--booth-fg);
+}
+.activity-chart__plot {
+  display: grid;
+  grid-template-columns: repeat(7, 20px);
+  justify-content: space-between;
+}
+.activity-chart__slot {
+  display: grid;
+  grid-template-rows: 102px 12px;
+  justify-items: center;
+  row-gap: 14px;
+}
+.activity-chart__bar {
+  position: relative;
+  align-self: end;
+  width: 20px;
+  height: calc(var(--h, 0) * 102px);
+  min-height: 4px;
+  border-radius: 5px;
+  background: var(--booth-plot);
+  transform-origin: bottom;
+}
+.activity-view.is-open .activity-chart__bar {
+  animation: activity-grow 720ms var(--booth-ease) both;
+  animation-delay: calc(320ms + var(--i, 0) * 50ms);
+}
+@keyframes activity-grow {
+  from { transform: scaleY(0); }
+}
+.activity-chart__bar.is-empty {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--booth-plot-empty);
+}
+.activity-chart__bar.is-empty.is-now {
+  background: var(--booth-plot-now);
+}
+.activity-chart__bar.is-latest {
+  background: var(--booth-accent);
+}
+/* "Latest", up the lime bar, a star at its foot. */
+.activity-chart__latest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font: 500 10px/20px var(--booth-font);
+  color: rgb(8 37 26 / 0.42);
+  white-space: nowrap;
+}
+.activity-chart__latest svg {
+  transform: rotate(90deg);
+}
+.activity-chart__label {
+  font: 400 12px/12px var(--booth-font);
+  color: var(--booth-fg);
+  white-space: nowrap;
+}
+.activity-chart.is-pending .activity-chart__bar {
+  animation: activity-breathe 1.6s ease-in-out infinite;
+}
+
+/* Loading: the shapes of what is coming, breathing like the search page's loading line. */
+.activity-skel {
+  display: inline-block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--booth-hover);
+  vertical-align: middle;
+  animation: activity-breathe 1.6s ease-in-out infinite;
+}
+@keyframes activity-breathe {
+  50% { opacity: 0.45; }
+}
+
+@media (max-width: 860px) {
+  .activity-card {
+    padding: 28px 24px;
+  }
+  .activity-card__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-chart {
+    margin-top: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .activity-view {
+    padding: 12px;
+    place-items: start center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-view,
+  .activity-card,
+  .activity-view.is-open .activity-card {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+  .activity-view.is-open .activity-step,
+  .activity-view.is-open .activity-data__row,
+  .activity-view.is-open .activity-chart__bar,
+  .activity-visit,
+  .activity-skel {
+    animation: none !important;
+  }
+}

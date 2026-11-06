@@ -80,6 +80,7 @@
     { "source": "/preview", "destination": "/index.html" },
     { "source": "/assets/:path*", "destination": "/assets/:path*" },
     { "source": "/opensearch.xml", "destination": "/opensearch.xml" },
+    { "source": "/s/:code", "destination": "/api/share-go?code=:code" },
     { "source": "/((?!api/|_vercel/).*)", "destination": "/api/ssr" }
   ]
 }

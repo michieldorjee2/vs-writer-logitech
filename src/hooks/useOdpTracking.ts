@@ -1,20 +1,72 @@
 import { useEffect, useRef } from 'react';
 import { inCmsPreview } from '../lib/cms-preview';
+import { isPageClick } from '../lib/activity-dom';
+import { ctaLabel, normalizeVuid } from '../lib/page-activity';
+import { isStaffBrowser } from '../lib/staff-marker';
 
 /**
  * ODP tracking for the account page, either template.
  *
  * Uses the ODP client SDK (loaded in index.html as zaius-min.js).
  * Tracks: page view, section visibility, CTA clicks, engagement on exit.
+ *
+ * Never for a signed-in Optimizely person: their browser carries the staff mark
+ * (src/lib/staff-marker.ts), index.html does not load the SDK, and this hook sends nothing.
  */
 
 declare global {
   interface Window {
     zaius: {
       event: (name: string, props?: Record<string, string | number>) => void;
+      /** The visitor id, once the SDK has loaded. */
+      VUID?: string;
       [key: string]: unknown;
     };
   }
+}
+
+/**
+ * The connect buttons ("Arrange a session"), by id, and where each sits on the page. The ids are
+ * set in src/www/AgentPlatformPage.tsx and src/www/ui.tsx (StickyCta).
+ */
+const CONNECT_POSITIONS: Record<string, string> = {
+  'hero-connect-btn': 'hero',
+  'sticky-connect-btn': 'sticky',
+  'cta-connect-btn': 'close',
+};
+
+/** A button's words without its icon: Material icons render their name as text ("bolt"). */
+function visibleLabel(el: HTMLElement): string {
+  const aria = el.getAttribute('aria-label');
+  if (aria) return ctaLabel(aria);
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('[aria-hidden="true"], .material-symbols-outlined, .material-icons, .sr-only, svg').forEach((n) => n.remove());
+  return ctaLabel(clone.textContent);
+}
+
+/**
+ * Tells the site which ODP visitor opened this page (api/page-visit.ts), so the booth's Report can ask
+ * ODP for their events: ODP cannot list a page's visitors itself. Waits for the SDK to assign the
+ * visitor id, up to ten seconds; a visit without one is simply not indexed.
+ */
+function recordVisit(page: string, signal: { cancelled: boolean }) {
+  let tries = 0;
+  const attempt = () => {
+    if (signal.cancelled) return;
+    const vuid = normalizeVuid(window.zaius?.VUID);
+    if (!vuid) {
+      if (++tries < 20) window.setTimeout(attempt, 500);
+      return;
+    }
+    fetch('/api/page-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page, vuid }),
+      keepalive: true,
+      credentials: 'same-origin',
+    }).catch(() => {});
+  };
+  attempt();
 }
 
 /**
@@ -47,6 +99,8 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
   const engagementSent = useRef(false);
 
   useEffect(() => {
+    // A signed-in Optimizely person is never tracked: no events, no visit recorded.
+    if (isStaffBrowser()) return;
     // Reset on mount (SPA navigation)
     viewedSections.current.clear();
     startTime.current = Date.now();
@@ -60,6 +114,8 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
       page_type: pageType,
       slug: pageSlug,
     });
+    const visit = { cancelled: false };
+    if (!inCmsPreview()) recordVisit(pageSlug, visit);
 
     // ── Section visibility ─────────────────────────────────────────
     const sectionIds = ABM_SECTIONS;
@@ -89,13 +145,26 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
     // ── Click tracking (event delegation) ──────────────────────────
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
+      // Only the page's own clicks: not the booth rail or its modes, nor anything else over the page.
+      if (!(target instanceof Element) || !isPageClick(target)) return;
 
-      // Any CTA button (primary, secondary, emphasized)
-      const btn = target.closest('a[class*="btn"], button[class*="btn"]') as HTMLElement | null;
+      // A CTA: the connect buttons and the connect panel's tiles by name (data-cta), any other
+      // button on the page by its class. `cta_type` and `position` say which one; the Report counts them.
+      const btn = target.closest('[data-cta], a[class*="btn"], button[class*="btn"]') as HTMLElement | null;
       if (btn) {
-        const label = btn.textContent?.trim() || '';
+        const type = btn.dataset.cta || (CONNECT_POSITIONS[btn.id] ? 'connect' : 'cta');
+        const position = btn.dataset.ctaPosition || CONNECT_POSITIONS[btn.id] || '';
+        const section = btn.closest('section[id]')?.id || '';
         const href = (btn as HTMLAnchorElement).href || '';
-        odpEvent('click', 'cta_click', { element: 'cta', label, href });
+        odpEvent('click', 'cta_click', {
+          element: type,
+          cta_type: type,
+          // A contact tile holds a person's name and address; the click is enough.
+          label: type === 'contact' ? 'Contact' : visibleLabel(btn),
+          href,
+          ...(position ? { position } : {}),
+          ...(section ? { section } : {}),
+        });
         return;
       }
 
@@ -162,6 +231,7 @@ export function useOdpTracking(pageType: 'abm', slug?: string) {
 
     // ── Cleanup ────────────────────────────────────────────────────
     return () => {
+      visit.cancelled = true;
       cancelAnimationFrame(raf);
       observer.disconnect();
       document.removeEventListener('click', handleClick);

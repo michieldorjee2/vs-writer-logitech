@@ -677,11 +677,39 @@ test('offer page: scenes on the same background share it instead of each padding
 
 test('booth chrome on a www page is solid, with no backdrop blur (it flickered while scrolling)', () => {
   // Michiel, 3 Nov: "flickering for the admin sidebar when scrolling".
-  const css = readFileSync('src/styles/floating-sidebar.css', 'utf8')
-  const rule = css.match(/body:has\(\.www-page\) \.xray-sidebar,[\s\S]*?\{([^}]*)\}/)?.[1] ?? ''
-  assert.match(rule, /backdrop-filter: none/)
-  assert.match(rule, /background: #08251a/)
-  for (const sel of ['.xray-hud', '.edit-hud']) assert.ok(css.includes(`body:has(.www-page) ${sel}`), sel)
+  // X-ray has no bar since 6 Nov (its status is in the rail); its cards and note are solid.
+  const xray = readFileSync('src/styles/xray-mode.css', 'utf8')
+  assert.ok(!/\.xray-hud\b/.test(xray), 'X-ray has a bar again')
+  assert.ok(!/backdrop-filter/.test(xray), 'X-ray blurs what is behind it')
+  // Edit mode has no bar since 6 Nov (its controls are in the rail); its hint, popup and status are solid.
+  const edit = readFileSync('src/styles/edit-mode.css', 'utf8')
+  assert.ok(!/\.edit-hud\b/.test(edit), 'Edit mode has a bar again')
+  for (const sel of ['.edit-hint', '.edit-popup', '.live-hud']) {
+    const body = edit.match(new RegExp(`\\${sel} \\{([^}]*)\\}`))?.[1] ?? ''
+    assert.ok(body && !/backdrop-filter/.test(body), `${sel} blurs what is behind it`)
+  }
+  // The rail (4 Nov) is an opaque surface from the start: no blur anywhere in it.
+  const rail = readFileSync('src/styles/booth-rail.css', 'utf8')
+  assert.ok(!/backdrop-filter/.test(rail), 'the rail blurs what is behind it')
+  assert.match(rail, /\.booth-rail \{[^}]*background: var\(--booth-page\)/)
+})
+
+test('every X-ray part says in one short line how it is made', () => {
+  // Michiel, 6 Nov: the card shows "what logic goes into that section vs just what data was used".
+  for (const part of [...ABM_XRAY_DEFAULTS, ...PERSON_XRAY_DEFAULTS]) {
+    assert.ok(part.logic && part.logic.length <= 120, `${part.id}: ${part.logic ?? 'no logic line'}`)
+    assert.notEqual(part.logic, part.sources.join(', '), `${part.id} repeats its data`)
+  }
+})
+
+test('a comment badge pops from its own centre and moves with its box', () => {
+  // Michiel, 6 Nov: the little "1" "jumps all over". An SVG element scales from the document's
+  // corner unless told otherwise, and the badge was placed once while its box kept moving.
+  const css = readFileSync('src/styles/edit-mode.css', 'utf8')
+  const badge = css.match(/\.edit-box__badge \{([^}]*)\}/)?.[1] ?? ''
+  assert.match(badge, /transform-box: fill-box/)
+  const src = readFileSync('src/components/EditMode.tsx', 'utf8')
+  assert.match(src, /badgeRefs\.current\.get\(e\.section\.id\)\?\.setAttribute\('transform', badgeAt\(o\)\)/)
 })
 
 test('every FAQ question and answer is in the server HTML as FAQPage data (answers open on click)', () => {
@@ -771,6 +799,8 @@ testAsync('the edit stream saves the copy edits Mark applied, as the signed-in e
   const res = {
     statusCode: 200,
     setHeader: () => {},
+    // A Vercel response has it: signing someone in may add a cookie beside another (the staff mark).
+    getHeader: () => undefined,
     status(c: number) { this.statusCode = c; return this },
     json(b: unknown) { written.push(JSON.stringify(b)); return this },
     write(chunk: string) { written.push(chunk); return true },

@@ -1,16 +1,19 @@
 /* ============================================================
    Edit mode — feedback collection overlay.
 
-   Layered architecture mirrors X-ray mode:
-   .edit-overlay     → absolute, document-sized; holds the SVG with
-                       the per-section outline boxes and badges.
-   .edit-fixed-layer → fixed, viewport-pinned; holds the top HUD.
-   .edit-popup       → absolute, anchored to a section; holds the
-                       comment textarea.
-   .edit-thanks      → fixed splash that animates in, holds, exits.
+   .edit-overlay  → absolute, document-sized; the SVG with the
+                    per-section outline boxes and badges.
+   .edit-popup    → absolute, anchored to a section; the comment.
+   .edit-hint     → fixed note at the top until the first comment.
+   .edit-thanks   → fixed splash that animates in, holds, exits.
+   The controls (Send) live in the booth rail (booth-rail.css).
 
-   Visual language is Optimizely-blue first, no scrim — the page
-   stays readable so the visitor can see what they're commenting on.
+   On the page the outlines are the brand's lime; everything Edit
+   draws as a surface (popup, hint, live card and status, the
+   splash, the toast and the still-working popup) is the rail's:
+   its tokens (booth-rail.css), light or dark with the system,
+   Die Grotesk for words and VC Nudge for titles. No scrim: the
+   page stays readable while you comment on it.
    ============================================================ */
 
 :root {
@@ -18,112 +21,6 @@
   --edit-blue-soft: rgba(171, 255, 68, 0.18);
   --edit-blue-strong: rgba(171, 255, 68, 0.55);
   --edit-blue-glow: rgba(171, 255, 68, 0.45);
-  --edit-card-bg: rgba(13, 58, 41, 0.96);
-  --edit-card-border: rgba(255, 255, 255, 0.1);
-}
-
-/* ------------ Sidebar Edit button ------------ */
-
-.xray-sidebar__btn--edit:hover {
-  color: var(--edit-blue);
-  border-color: rgba(171, 255, 68, 0.35);
-  background: rgba(171, 255, 68, 0.08);
-}
-
-.xray-sidebar__btn--edit.xray-sidebar__btn--active {
-  color: #ffffff !important;
-  background: var(--edit-blue) !important;
-  border-color: var(--edit-blue) !important;
-  box-shadow: 0 0 22px var(--edit-blue-glow);
-}
-
-/* Working state: dimmer chrome, gentle pulse, progress ring on top.
- * The button itself becomes a "do-not-touch" indicator — clicking it
- * routes the user to the still-working modal instead of toggling the
- * mode. Cursor stays default-ish (help) so it doesn't pretend to be
- * inactive — a click *will* still do something, just not what they
- * expected.
- *
- * Foreground stays white — the optimizely-blue chrome looks great as
- * the progress ring but is hard to read at the small label size. */
-.xray-sidebar__btn--edit.xray-sidebar__btn--working {
-  color: #ffffff !important;
-  background: rgba(171, 255, 68, 0.08) !important;
-  border-color: rgba(171, 255, 68, 0.28) !important;
-  cursor: help;
-  position: relative;
-  animation: edit-working-breathe 2.4s ease-in-out infinite;
-}
-
-@keyframes edit-working-breathe {
-  0%, 100% { box-shadow: 0 0 14px rgba(171, 255, 68, 0.32); }
-  50%      { box-shadow: 0 0 22px rgba(171, 255, 68, 0.55); }
-}
-
-/* The ring + clock icon sit together in the icon-area of the flex
- * column; the regular `.xray-sidebar__label` flows below them showing
- * the countdown. Wrapping them in a sized box keeps the ring exactly
- * where the original pencil icon used to be. */
-.xray-sidebar__working-wrap {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.xray-sidebar__ring {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.xray-sidebar__ring-track {
-  fill: none;
-  stroke: rgba(171, 255, 68, 0.18);
-  stroke-width: 2.4;
-}
-
-.xray-sidebar__ring-fill {
-  fill: none;
-  stroke: var(--edit-blue);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-dasharray: 100;
-  /* `pathLength=100` is set inline so the offset always reads as a
-   * percentage. The transition keeps the ring sweeping smoothly
-   * even though React only updates `strokeDashoffset` once a second. */
-  transition: stroke-dashoffset 900ms linear;
-  transform: rotate(-90deg);
-  transform-origin: 50% 50%;
-  filter: drop-shadow(0 0 6px var(--edit-blue-glow));
-}
-
-.xray-sidebar__working-icon {
-  position: relative;
-  z-index: 1;
-  pointer-events: none;
-  /* White on the dark sidebar chip — the blue ring around it carries
-   * the brand colour, the inner glyph just needs to be legible. */
-  color: #ffffff;
-  animation: edit-working-tick 4s linear infinite;
-  transform-origin: 50% 50%;
-}
-
-@keyframes edit-working-tick {
-  from { transform: rotate(0); }
-  to   { transform: rotate(360deg); }
-}
-
-.xray-sidebar__btn--edit.xray-sidebar__btn--working .xray-sidebar__label {
-  position: relative;
-  z-index: 2;
-  color: #ffffff;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
 }
 
 /* While edit-mode is active, hide the sticky CTA so it doesn't fight
@@ -146,7 +43,7 @@ body.edit-active .sticky-cta {
   /* width / height are set inline to documentElement.scrollWidth/Height */
   z-index: 1000;
   pointer-events: none; /* per-rect handles clicks */
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--booth-font);
 }
 
 .edit-overlay__svg {
@@ -223,8 +120,11 @@ body.edit-active .sticky-cta {
 
 .edit-box__badge {
   pointer-events: none;
-  animation: edit-badge-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  /* From the badge's own centre: an SVG element's origin is otherwise the document's corner, and
+   * the badge flew in from across the page (Michiel, 6 Nov: "jumps all over"). */
+  transform-box: fill-box;
   transform-origin: center;
+  animation: edit-badge-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
 .edit-box__badge-bg {
@@ -233,8 +133,8 @@ body.edit-active .sticky-cta {
 }
 
 .edit-box__badge-text {
-  fill: #ffffff;
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  fill: #08251a;
+  font-family: var(--booth-font);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -245,191 +145,14 @@ body.edit-active .sticky-cta {
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* ------------ Top HUD ------------ */
+/* ------------ Spinner (Send while Mark works, the live status) ------------ */
 
-.edit-fixed-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 1001;
-  pointer-events: none;
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-}
-
-.edit-hud {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 9px 9px 9px 18px;
-  border-radius: 999px;
-  background: var(--edit-card-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  pointer-events: auto;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  color: #eff6e9;
-  animation: edit-hud-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  max-width: calc(100vw - 32px);
-}
-
-.edit-fixed-layer--thanks .edit-hud {
-  opacity: 0;
-  transform: translate(-50%, -10px);
-  transition: opacity 240ms ease, transform 240ms ease;
-}
-
-@keyframes edit-hud-in {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
-}
-
-.edit-hud__brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.edit-hud__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--edit-blue);
-  box-shadow: 0 0 10px var(--edit-blue-glow);
-  animation: edit-dot-pulse 1.4s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-@keyframes edit-dot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.5; transform: scale(0.75); }
-}
-
-.edit-hud__title {
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #ffffff;
-  flex-shrink: 0;
-}
-
-.edit-hud__hint {
-  font-size: 12px;
-  color: #a1ac8d;
-  padding-left: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 720px) {
-  .edit-hud__hint { display: none; }
-}
-
-.edit-hud__right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.edit-hud__email {
-  appearance: none;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #d8e4cb;
-  padding: 6px 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  max-width: 240px;
-}
-
-.edit-hud__email span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 720px) {
-  .edit-hud__email { max-width: 140px; }
-}
-
-.edit-hud__send {
-  appearance: none;
-  background: var(--edit-blue);
-  border: 1px solid var(--edit-blue);
-  color: #08251a;
-  padding: 9px 18px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  letter-spacing: 0.01em;
-  box-shadow:
-    0 6px 22px var(--edit-blue-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
-  white-space: nowrap;
-}
-
-.edit-hud__send:hover:not(:disabled) {
-  background: #7ddd3d;
-  transform: translateY(-1px);
-  box-shadow:
-    0 10px 30px var(--edit-blue-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
-}
-
-.edit-hud__send:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.edit-hud__send--disabled,
-.edit-hud__send:disabled {
-  background: rgba(171, 255, 68, 0.35);
-  border-color: rgba(171, 255, 68, 0.35);
-  color: rgba(255, 255, 255, 0.65);
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.edit-hud__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  margin-left: 6px;
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.edit-hud__spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #ffffff;
+.edit-spinner {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--booth-hover);
+  border-top-color: var(--booth-bar);
   border-radius: 50%;
   animation: edit-spin 700ms linear infinite;
 }
@@ -438,25 +161,154 @@ body.edit-active .sticky-cta {
   to { transform: rotate(360deg); }
 }
 
-.edit-hud__close {
-  appearance: none;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d8e4cb;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+/* ------------ The hint, until the first comment ------------
+ * Over the page beside the rail, solid (blur flickers over the moving www page). */
+
+.edit-hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 1001;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  gap: 8px;
+  padding: 10px 16px 10px 14px;
+  border-radius: 12px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font: 500 14px/18px var(--booth-font);
+  white-space: nowrap;
+  box-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.45);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: edit-hint-in 520ms var(--booth-ease) 300ms backwards;
+}
+html.booth-page--rail .edit-hint {
+  left: calc(50% + var(--booth-rail-w) / 2);
+}
+.edit-hint svg {
+  flex: none;
+  color: var(--booth-accent-text);
 }
 
-.edit-hud__close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
+@keyframes edit-hint-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+@media (max-width: 640px) {
+  .edit-hint,
+  html.booth-page--rail .edit-hint {
+    left: 50%;
+    white-space: normal;
+    width: calc(100vw - 32px);
+  }
+}
+
+/* ------------ The tutorial ------------
+ * Beside the rail, under Edit and Send: what Edit mode is for, in three steps. Solid, like the
+ * rest (blur flickers over the moving www page). */
+
+.edit-tutorial {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1003;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  padding: 22px 22px 18px;
+  border-radius: 20px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 0 24px 60px -18px rgb(0 0 0 / 0.55);
+  animation: edit-tutorial-in 560ms var(--booth-ease) 200ms backwards;
+}
+html.booth-page--rail .edit-tutorial {
+  left: calc(var(--booth-rail-w) + 16px);
+}
+@keyframes edit-tutorial-in {
+  from { opacity: 0; transform: translateX(-16px); }
+}
+.edit-tutorial__title {
+  margin: 0 0 18px;
+  font: 800 22px/1.1 var(--booth-display);
+  letter-spacing: 0;
+}
+.edit-tutorial__steps {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: edit-step;
+}
+.edit-tutorial__steps li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  font: 400 15px/20px var(--booth-font);
+  animation: edit-tutorial-step 520ms var(--booth-ease) backwards;
+  animation-delay: calc(320ms + var(--i, 0) * 90ms);
+}
+@keyframes edit-tutorial-step {
+  from { opacity: 0; transform: translateX(-10px); }
+}
+.edit-tutorial__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--booth-raised);
+  color: var(--booth-accent-text);
+}
+/* The step's number on its tile. */
+.edit-tutorial__icon::after {
+  counter-increment: edit-step;
+  content: counter(edit-step);
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--booth-fg);
+  color: var(--booth-page);
+  font: 700 10px/16px var(--booth-font);
+  text-align: center;
+}
+.edit-tutorial__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+.edit-tutorial__note {
+  font: 500 14px/18px var(--booth-font);
+  color: var(--booth-accent-text);
+}
+.edit-tutorial__ok {
+  appearance: none;
+  flex: none;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--booth-accent);
+  color: #08251a;
+  font: 500 14px/18px var(--booth-font);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.edit-tutorial__ok:hover {
+  background: #c5ff7e;
+}
+.edit-tutorial__ok:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 2px;
 }
 
 /* ------------ Comment popup ------------ */
@@ -464,32 +316,28 @@ body.edit-active .sticky-cta {
 .edit-popup {
   position: absolute;
   z-index: 1002;
-  background: var(--edit-card-bg);
-  border: 1px solid rgba(171, 255, 68, 0.4);
-  border-radius: 14px;
-  padding: 14px;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(171, 255, 68, 0.15),
-    0 0 32px rgba(171, 255, 68, 0.18);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  color: #eff6e9;
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  box-sizing: border-box;
+  padding: 20px 20px 18px;
+  border-radius: 20px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 0 24px 60px -18px rgb(0 0 0 / 0.55);
   pointer-events: auto;
-  animation: edit-popup-in 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: edit-popup-in 420ms var(--booth-ease) backwards;
 }
 
 @keyframes edit-popup-in {
-  from { opacity: 0; transform: translateY(6px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
 }
 
 .edit-popup__head {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .edit-popup__head > div:first-child {
@@ -497,130 +345,123 @@ body.edit-active .sticky-cta {
   min-width: 0;
 }
 
-.edit-popup__eyebrow {
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #abff44;
-  font-weight: 600;
-  opacity: 0.85;
-  margin-bottom: 2px;
+.edit-popup__title {
+  font: 800 20px/1.1 var(--booth-display);
+  letter-spacing: 0;
+  color: var(--booth-fg);
 }
 
-.edit-popup__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #eff6e9;
-  line-height: 1.25;
+.edit-popup__hint {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--booth-fg-3);
 }
 
 .edit-popup__close {
   appearance: none;
-  background: transparent;
-  border: 0;
-  color: #a1ac8d;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--booth-quiet);
+  cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
 }
 
 .edit-popup__close:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  background: var(--booth-hover);
+  color: var(--booth-fg);
 }
 
 .edit-popup__textarea {
-  width: 100%;
-  min-height: 92px;
-  resize: vertical;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #eff6e9;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.45;
-  padding: 10px 12px;
-  outline: none;
-  transition: border-color 160ms ease, background 160ms ease;
   box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--booth-raised);
+  color: var(--booth-fg);
+  font: 400 15px/20px var(--booth-font);
+  outline: none;
+  transition: border-color 160ms ease;
 }
 
 .edit-popup__textarea::placeholder {
-  color: #717863;
+  color: var(--booth-fg-3);
 }
 
 .edit-popup__textarea:focus {
-  border-color: var(--edit-blue);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(171, 255, 68, 0.18);
+  border-color: var(--booth-bar);
 }
 
 .edit-popup__actions {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
   align-items: center;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .edit-popup__btn {
   appearance: none;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 7px 14px;
+  flex: none;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 10px;
+  font: 500 14px/18px var(--booth-font);
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+}
+
+.edit-popup__btn:focus-visible,
+.edit-popup__close:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 2px;
 }
 
 .edit-popup__btn:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 .edit-popup__btn--ghost {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #c3ceaf;
+  color: var(--booth-fg);
 }
 
 .edit-popup__btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: var(--booth-hover);
 }
 
+/* The one lime thing on the card. */
 .edit-popup__btn--primary {
-  background: var(--edit-blue);
-  border: 1px solid var(--edit-blue);
+  background: var(--booth-accent);
   color: #08251a;
-  box-shadow: 0 4px 14px var(--edit-blue-glow);
 }
 
 .edit-popup__btn--primary:hover:not(:disabled) {
-  background: #7ddd3d;
-  transform: translateY(-1px);
-}
-
-.edit-popup__btn--primary:disabled {
-  background: rgba(171, 255, 68, 0.35);
-  border-color: rgba(171, 255, 68, 0.35);
-  box-shadow: none;
+  background: #c5ff7e;
 }
 
 .edit-popup__btn--delete {
+  padding-left: 10px;
+  padding-right: 10px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #ff7b7b;
+  color: var(--booth-error);
 }
 
 .edit-popup__btn--delete:hover {
-  background: rgba(255, 60, 60, 0.08);
-  border-color: rgba(255, 90, 90, 0.4);
+  background: var(--booth-hover);
 }
 
 /* ------------ Shared modal motion ------------ */
@@ -645,7 +486,8 @@ body.edit-active .sticky-cta {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
   animation: edit-thanks-fade 2.6s ease-out forwards;
 }
 
@@ -658,20 +500,17 @@ body.edit-active .sticky-cta {
 
 .edit-thanks__panel {
   position: relative;
-  background: linear-gradient(180deg, rgba(13, 58, 41, 0.96), rgba(13, 58, 41, 0.96));
-  border: 1px solid rgba(171, 255, 68, 0.45);
-  border-radius: 22px;
-  padding: 36px 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  color: #ffffff;
-  box-shadow:
-    0 30px 90px rgba(0, 0, 0, 0.55),
-    0 0 60px rgba(171, 255, 68, 0.45);
+  padding: 36px 48px;
+  border-radius: 20px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.55);
   animation:
-    edit-thanks-panel-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+    edit-thanks-panel-in 420ms var(--booth-ease) backwards,
     edit-thanks-panel-out 380ms ease-in 2200ms forwards;
 }
 
@@ -685,17 +524,14 @@ body.edit-active .sticky-cta {
 }
 
 .edit-thanks__check {
-  width: 78px;
-  height: 78px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--edit-blue), #abff44);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
-  box-shadow:
-    0 8px 28px rgba(171, 255, 68, 0.6),
-    inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  background: var(--booth-accent);
+  color: #08251a;
   animation: edit-check-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms backwards;
 }
 
@@ -705,19 +541,14 @@ body.edit-active .sticky-cta {
 }
 
 .edit-thanks__title {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font: 800 24px/1.15 var(--booth-display);
+  letter-spacing: 0;
   text-align: center;
-  line-height: 1.25;
 }
 
 .edit-thanks__sig {
-  font-size: 14px;
-  color: #abff44;
-  font-style: italic;
-  letter-spacing: 0.04em;
-  font-weight: 500;
+  font-size: 15px;
+  color: var(--booth-fg-3);
 }
 
 /* Confetti burst — particles fly out from the center */
@@ -756,269 +587,6 @@ body.edit-active .sticky-cta {
   }
 }
 
-/* ------------ "Edits landed" toast ------------
- * Drops in below the top-of-page when polling detects that Opal
- * republished the page. Two-action affordance: Refresh (the obvious
- * follow-up) and dismiss. Hangs on screen until the user does either. */
-
-.edit-landed-toast {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1004;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px 12px 14px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(13, 58, 41, 0.98), rgba(13, 58, 41, 0.98));
-  border: 1px solid rgba(171, 255, 68, 0.45);
-  color: #ffffff;
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  box-shadow:
-    0 18px 50px rgba(0, 0, 0, 0.45),
-    0 0 40px rgba(171, 255, 68, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  animation: edit-landed-in 380ms cubic-bezier(0.16, 1, 0.3, 1);
-  max-width: calc(100vw - 32px);
-}
-
-@keyframes edit-landed-in {
-  from { opacity: 0; transform: translate(-50%, -10px) scale(0.96); }
-  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
-}
-
-.edit-landed-toast__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--edit-blue), #abff44);
-  color: #ffffff;
-  box-shadow: 0 0 20px rgba(171, 255, 68, 0.55);
-  flex-shrink: 0;
-  animation: edit-landed-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms backwards;
-}
-
-@keyframes edit-landed-pop {
-  from { opacity: 0; transform: scale(0.4) rotate(-8deg); }
-  to   { opacity: 1; transform: scale(1) rotate(0); }
-}
-
-.edit-landed-toast__copy {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-  min-width: 0;
-}
-
-.edit-landed-toast__copy strong {
-  font-size: 13.5px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.edit-landed-toast__copy span {
-  font-size: 12px;
-  color: #a1ac8d;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 640px) {
-  .edit-landed-toast__copy span { white-space: normal; }
-}
-
-.edit-landed-toast__actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.edit-landed-toast__btn {
-  appearance: none;
-  background: var(--edit-blue);
-  border: 1px solid var(--edit-blue);
-  color: #ffffff;
-  padding: 7px 14px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px var(--edit-blue-glow);
-  transition: background 140ms ease, transform 140ms ease;
-}
-
-.edit-landed-toast__btn:hover {
-  background: #7ddd3d;
-  transform: translateY(-1px);
-}
-
-.edit-landed-toast__close {
-  appearance: none;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #c3ceaf;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.edit-landed-toast__close:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-}
-
-/* ------------ "Still working" popup ------------
- * Reuses the email-modal visual language for consistency, but warmer:
- * the user has already done the right thing — we're just steering
- * them away from a duplicate submit. */
-
-.edit-working-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1005;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(8, 37, 26, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  font-family: 'Figtree', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  animation: edit-fade-in 220ms ease-out;
-  padding: 16px;
-}
-
-.edit-working-modal__card {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  background: linear-gradient(180deg, rgba(13, 58, 41, 0.98), rgba(13, 58, 41, 0.98));
-  border: 1px solid rgba(171, 255, 68, 0.35);
-  border-radius: 18px;
-  padding: 26px 26px 22px;
-  color: #eff6e9;
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.55),
-    0 0 50px rgba(171, 255, 68, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  animation: edit-modal-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.edit-working-modal__close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: #a1ac8d;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-}
-
-.edit-working-modal__close:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-}
-
-.edit-working-modal__icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(171, 255, 68, 0.4), rgba(171, 255, 68, 0.15));
-  border: 1px solid rgba(171, 255, 68, 0.5);
-  color: #d8e4cb;
-  margin-bottom: 14px;
-  box-shadow: 0 0 24px var(--edit-blue-glow);
-  animation: edit-working-icon-tick 3.6s linear infinite;
-}
-
-@keyframes edit-working-icon-tick {
-  from { box-shadow: 0 0 24px rgba(171, 255, 68, 0.35); }
-  50%  { box-shadow: 0 0 32px rgba(171, 255, 68, 0.6); }
-  to   { box-shadow: 0 0 24px rgba(171, 255, 68, 0.35); }
-}
-
-.edit-working-modal__title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 6px;
-  color: #ffffff;
-}
-
-.edit-working-modal__sub {
-  font-size: 13.5px;
-  color: #a1ac8d;
-  margin: 0 0 18px;
-  line-height: 1.55;
-}
-
-.edit-working-modal__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(171, 255, 68, 0.12);
-  border: 1px solid rgba(171, 255, 68, 0.32);
-  color: #d8e4cb;
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-
-.edit-working-modal__chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--edit-blue);
-  box-shadow: 0 0 8px var(--edit-blue-glow);
-  animation: edit-dot-pulse 1.4s ease-in-out infinite;
-}
-
-.edit-working-modal__actions {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.edit-working-modal__btn {
-  appearance: none;
-  border-radius: 10px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 10px 18px;
-  cursor: pointer;
-  background: var(--edit-blue);
-  border: 1px solid var(--edit-blue);
-  color: #ffffff;
-  box-shadow: 0 6px 22px var(--edit-blue-glow);
-  transition: background 140ms ease, transform 140ms ease;
-}
-
-.edit-working-modal__btn:hover {
-  background: #7ddd3d;
-  transform: translateY(-1px);
-}
-
 /* Reduced-motion guards */
 @media (prefers-reduced-motion: reduce) {
   .edit-box__rect,
@@ -1032,16 +600,12 @@ body.edit-active .sticky-cta {
   .edit-thanks__particle {
     display: none;
   }
-  .edit-hud__spinner,
-  .edit-hud__dot {
+  .edit-spinner,
+  .edit-hint {
     animation: none;
   }
-  .xray-sidebar__btn--working,
-  .xray-sidebar__working-icon,
-  .edit-working-modal__icon,
-  .edit-working-modal__chip-dot,
-  .edit-landed-toast,
-  .edit-landed-toast__icon {
+  .edit-tutorial,
+  .edit-tutorial__steps li {
     animation: none !important;
   }
 }
@@ -1070,18 +634,19 @@ body.edit-active .sticky-cta {
 /* Anchored diff card for the current edit */
 .live-card {
   z-index: 1003;
-  background: var(--edit-card-bg);
-  border: 1px solid var(--edit-blue-strong);
-  border-radius: 12px;
-  padding: 12px 14px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--edit-blue-soft);
-  color: #eafff0;
-  font-size: 13px;
-  animation: liveCardIn 0.28s ease;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font: 400 14px/1.45 var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 0 18px 48px -16px rgb(0 0 0 / 0.5);
+  animation: liveCardIn 0.36s var(--booth-ease);
 }
 @keyframes liveCardIn {
   from { opacity: 0; transform: translateY(6px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 1; transform: none; }
 }
 .live-card__head {
   display: flex;
@@ -1089,123 +654,134 @@ body.edit-active .sticky-cta {
   gap: 8px;
   margin-bottom: 8px;
 }
-.live-card__badge {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 5px;
-  font-weight: 700;
+/* Kinds of change: one quiet tag each, the accent kept for the new text. */
+.live-card__badge,
+.live-hud__tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--booth-raised);
+  color: var(--booth-fg-2);
+  font: 500 11px/16px var(--booth-font);
 }
-.live-card__badge--replace { background: var(--edit-blue-soft); color: var(--edit-blue); }
-.live-card__badge--add { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
-.live-card__badge--remove { background: rgba(255, 107, 129, 0.16); color: #ff8a9c; }
+.live-card__badge--remove,
+.live-hud__tag--remove { color: var(--booth-error); }
+.live-hud__tag--skipped { color: var(--booth-warn); }
 .live-card__target {
-  font-size: 11px;
-  color: rgba(234, 255, 240, 0.65);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: 13px;
+  color: var(--booth-fg-3);
 }
 .live-card__diff {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.5;
   word-break: break-word;
 }
 .live-card__old {
-  color: #ff8a9c;
   position: relative;
   display: inline;
+  color: var(--booth-fg-3);
   background-image: linear-gradient(currentColor, currentColor);
   background-repeat: no-repeat;
   background-position: 0 60%;
   background-size: 0% 1.5px;
   transition: background-size 0.5s ease, opacity 0.5s ease;
 }
-.live-card__old.is-struck { background-size: 100% 1.5px; opacity: 0.5; }
-.live-card__arrow { color: rgba(234, 255, 240, 0.4); margin: 0 6px; }
-.live-card__new { color: var(--edit-blue); }
+.live-card__old.is-struck { background-size: 100% 1.5px; opacity: 0.6; }
+.live-card__arrow { margin: 0 6px; color: var(--booth-quiet); }
+.live-card__new { color: var(--booth-accent-text); }
 .live-card__caret {
   display: inline-block;
   width: 7px;
-  background: var(--edit-blue);
   margin-left: 1px;
+  background: var(--booth-bar);
   animation: liveCaret 1s steps(2) infinite;
 }
 @keyframes liveCaret { 50% { opacity: 0; } }
 
-/* Bottom status HUD */
+/* Mark at work: a status card at the bottom of the page, beside the rail. */
 .live-hud {
   position: fixed;
   left: 50%;
   bottom: 24px;
-  transform: translateX(-50%);
   z-index: 1004;
+  box-sizing: border-box;
   width: min(560px, calc(100vw - 32px));
-  background: var(--edit-card-bg);
-  border: 1px solid var(--edit-blue-strong);
-  border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-  color: #eafff0;
-  animation: liveCardIn 0.3s ease;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 0 18px 48px -14px rgb(0 0 0 / 0.5);
+  transform: translateX(-50%);
+  animation: liveHudIn 0.42s var(--booth-ease);
+}
+html.booth-page--rail .live-hud {
+  left: calc(50% + var(--booth-rail-w) / 2);
+}
+@keyframes liveHudIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+}
+@media (max-width: 640px) {
+  html.booth-page--rail .live-hud { left: 50%; }
 }
 .live-hud__bar { display: flex; align-items: center; gap: 10px; }
-.live-hud__status { font-size: 13.5px; font-weight: 600; flex: 1; }
-.live-hud__check {
-  width: 18px; height: 18px; flex: none;
-  display: grid; place-items: center;
-  border-radius: 50%; background: var(--edit-blue); color: #062a17;
-  font-size: 12px; font-weight: 800;
-}
+.live-hud__status { flex: 1; font-size: 15px; font-weight: 500; }
+.live-hud__check,
 .live-hud__bang {
-  width: 18px; height: 18px; flex: none;
-  display: grid; place-items: center;
-  border-radius: 50%; background: #ff6b81; color: #2a0d13;
-  font-size: 12px; font-weight: 800;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
 }
+.live-hud__check { background: var(--booth-accent); color: #08251a; }
+.live-hud__bang { background: var(--booth-error); color: var(--booth-page); }
 .live-hud__close {
-  background: transparent; border: none; color: rgba(234, 255, 240, 0.6);
-  cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--booth-quiet);
+  cursor: pointer;
 }
-.live-hud__close:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.live-hud__close:hover { background: var(--booth-hover); color: var(--booth-fg); }
 .live-hud__summary {
-  margin-top: 8px; font-size: 12.5px; line-height: 1.5;
-  color: rgba(234, 255, 240, 0.8);
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--booth-fg-2);
 }
 .live-hud__applied {
-  margin: 10px 0 0; padding: 0; list-style: none;
-  display: flex; flex-direction: column; gap: 5px;
-  max-height: 132px; overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 140px;
+  margin: 10px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--booth-quiet) transparent;
 }
 .live-hud__applied li {
-  font-size: 12px; color: rgba(234, 255, 240, 0.85);
-  display: flex; align-items: center; gap: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--booth-fg);
 }
-.live-hud__tag {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.03em;
-  padding: 1px 6px; border-radius: 4px; font-weight: 700;
-}
-.live-hud__tag--replace,
-.live-hud__tag--text { background: var(--edit-blue-soft); color: var(--edit-blue); }
-.live-hud__tag--add,
-.live-hud__tag--image { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
-.live-hud__tag--remove { background: rgba(255, 107, 129, 0.16); color: #ff8a9c; }
-.live-hud__tag--color { background: rgba(160, 140, 255, 0.18); color: #c3b6ff; }
-.live-hud__tag--skipped { background: rgba(240, 183, 94, 0.18); color: var(--warn, #f0b75e); }
-.live-hud__applied li.is-skipped { color: rgba(234, 255, 240, 0.55); }
-.live-hud__reason { color: rgba(240, 183, 94, 0.9); font-style: normal; }
-.live-hud__skip { font-size: 12.5px; color: var(--warn, #f0b75e); }
-.live-card__badge--image { background: rgba(58, 210, 159, 0.16); color: #5ff0c0; }
-.live-card__badge--edit { background: var(--edit-blue-soft); color: var(--edit-blue); }
-.live-hud__done { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
-.live-hud__change { font-size: 12.5px; color: var(--edit-blue); }
-.live-hud__reload {
-  margin-top: 6px; font-size: 11.5px; color: rgba(234, 255, 240, 0.55); font-style: italic;
-}
-.live-hud__errbox {
-  margin-top: 8px; font-size: 12.5px; color: #ff8a9c;
-}
+.live-hud__applied li.is-skipped { color: var(--booth-fg-3); }
+.live-hud__reason { font-style: normal; color: var(--booth-warn); }
+.live-hud__skip { font-size: 13px; color: var(--booth-warn); }
+.live-hud__done { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.live-hud__change { font-size: 13px; color: var(--booth-accent-text); }
+.live-hud__reload { margin-top: 6px; font-size: 12px; color: var(--booth-fg-3); }
+.live-hud__errbox { margin-top: 8px; font-size: 13px; color: var(--booth-error); }
 
 /* In-place edits on the real page elements (the H1 actually changes) */
 .live-inplace {

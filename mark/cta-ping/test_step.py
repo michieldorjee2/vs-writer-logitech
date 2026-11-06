@@ -43,6 +43,8 @@ sys.path.insert(0, HERE)
 import step  # noqa: E402
 
 FIXTURE = json.load(open(os.path.join(HERE, "fixture.json"), encoding="utf-8"))
+# The same page's ping from a visitor who came in by a personal link (`shared`).
+SHARED = json.load(open(os.path.join(HERE, "fixture-shared.json"), encoding="utf-8"))
 OK = {"response_type": "application/json"}
 
 
@@ -98,7 +100,13 @@ class Teams(Base):
         self.assertIn("Sam Rep (Sales Development Representative)", body)
         self.assertIn('href="https://showcase.optimizely.com/zurich-versicherung/"', body)
         self.assertIn("4 Nov 2026, 23:06 UTC", body)
-        self.assertIn("Michiel's account", body)
+        # Mark's animated emoji and "Mark here!" open the message; the link names the company, not the URL.
+        self.assertTrue(body.startswith("<p>" + step.MARK_EMOJI + " Mark here! Hi Alex,"), body[:200])
+        self.assertIn('alt="mark-party"', step.MARK_EMOJI)
+        self.assertIn(">Open Zürich Versicherung – “Group” | AG page</a>", body)
+        self.assertNotIn(">https://showcase.optimizely.com/zurich-versicherung/<", body, "the raw URL is no longer the link text")
+        self.assertNotIn("Sent automatically", body, "the sign-off line is gone")
+        self.assertNotIn("Michiel's account", body)
 
     def test_a_person_page_says_whose_page_it_was(self):
         ping = copy.deepcopy(FIXTURE)
@@ -107,6 +115,7 @@ class Teams(Base):
         body = FAKE.calls[1][1]["body"]
         self.assertIn("the Showcase page we wrote for Ben &lt;Yu&gt; at Logitech G", body)
         self.assertIn('href="https://showcase.optimizely.com/logitech/ben-yu/"', body)
+        self.assertIn(">Open Ben &lt;Yu&gt;&#x27;s page</a>", body, "a person page's link names the person")
 
     def test_a_person_page_row_names_the_person(self):
         ping = copy.deepcopy(FIXTURE)
@@ -162,6 +171,50 @@ class Teams(Base):
         self.assertNotIn("teams_chat_send_message", FAKE.names())
         _, cells = self.row()
         self.assertIn("couldn't tell whether the Teams message to Alex Exec went", cells[4])
+
+
+class Shared(Base):
+    """A visitor who came in by a personal link: the message and the row say whose link it was."""
+
+    def test_the_shared_fixture_check_matches_the_server(self):
+        self.assertEqual(step.read_ping(copy.deepcopy(SHARED))[1], True)
+
+    def test_the_message_says_who_the_link_was_for_and_who_sent_it(self):
+        self.assertEqual(self.run_step(copy.deepcopy(SHARED))["done"], "teams")
+        body = FAKE.calls[1][1]["body"]
+        self.assertIn(
+            "They came in by the personal link Michiel Dorjee sent to Lena Brunner"
+            " (Head of Digital &lt;Experience&gt;, lena.brunner@zurich.example).",
+            body,
+        )
+        self.assertNotIn("<Experience>", body, "what the rep typed is escaped")
+
+    def test_the_row_says_it_too(self):
+        ping = copy.deepcopy(SHARED)
+        ping["rep"] = None
+        self.assertEqual(self.run_step(resign(ping))["done"], "sheet")
+        _, cells = self.row()
+        self.assertEqual(len(cells), 9)
+        self.assertEqual(
+            cells[6],
+            "Came in by the personal link Michiel Dorjee sent to Lena Brunner (Head of Digital <Experience>, lena.brunner@zurich.example)",
+        )
+
+    def test_a_changed_link_messages_nobody(self):
+        ping = copy.deepcopy(SHARED)
+        ping["shared"]["recipient"]["email"] = "someone.else@example.com"
+        self.assertEqual(self.run_step(ping)["done"], "sheet")
+        self.assertNotIn("teams_chat_send_message", FAKE.names())
+
+    def test_a_click_without_a_link_says_nothing_about_one(self):
+        self.run_step(copy.deepcopy(FIXTURE))
+        self.assertNotIn("personal link", FAKE.calls[1][1]["body"])
+
+    def test_a_malformed_link_is_left_out(self):
+        ping = copy.deepcopy(SHARED)
+        ping["shared"]["code"] = "../../x"
+        self.assertEqual(self.run_step(resign(ping))["done"], "teams")
+        self.assertNotIn("personal link", FAKE.calls[1][1]["body"])
 
 
 class Sheet(Base):

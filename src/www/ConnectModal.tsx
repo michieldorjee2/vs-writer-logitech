@@ -80,7 +80,7 @@ export function ConnectProvider({
                 </Dialog.Description>
               </div>
               {scheduleUrl && (
-                <a className="www-modal__tile www-modal__tile--fast www-btn" href={scheduleUrl} target="_blank" rel="noopener noreferrer">
+                <a className="www-modal__tile www-modal__tile--fast www-btn" href={scheduleUrl} target="_blank" rel="noopener noreferrer" data-cta="schedule" data-cta-position="panel" aria-label="Schedule a call (opens in new tab)">
                   <MaterialIcon name="calendar_month" size="28" />
                   <span className="www-modal__label">Fast track</span>
                   <strong className="www-modal__cta">Schedule a call</strong>
@@ -89,7 +89,7 @@ export function ConnectProvider({
                 </a>
               )}
               {people.map((p) => (
-                <a key={p.name} className="www-modal__tile www-modal__tile--person" href={p.email ? `mailto:${p.email}` : undefined}>
+                <a key={p.name} className="www-modal__tile www-modal__tile--person" href={p.email ? `mailto:${p.email}` : undefined} data-cta="contact" data-cta-position="panel">
                   <GravatarAvatar email={p.email} initials={p.initials} className="www-avatar" />
                   <strong>{p.name}</strong>
                   <span className="www-modal__hint">{p.role}</span>
