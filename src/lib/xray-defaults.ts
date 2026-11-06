@@ -8,7 +8,7 @@
 
      Salesforce, BuiltWith, Mark, ODP, CMS, Web browsing,
      Sitemap, LinkedIn, 6sense, Gravatar, Brandfetch, ZoomInfo,
-     Clay, CaliberMind, Outreach
+     Clay, CaliberMind, Outreach, Google Search, Conductor
 
    When the CMS supplies overrides via `xraySections`, those win
    for any matching `id` — see `resolveXraySections`.
@@ -80,8 +80,8 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'intel-stats',
     selector: '[data-xray="intel-stats"]',
     title: 'Stat ribbon',
-    logic: "Their scale in a few numbers: firmographics from ZoomInfo and LinkedIn, content and recent updates from their sitemap.",
-    tools: ['ZoomInfo', 'Web browsing', 'LinkedIn', 'Sitemap'],
+    logic: "Their scale in numbers: firmographics from ZoomInfo and LinkedIn, content and updates from Conductor and their sitemap.",
+    tools: ['ZoomInfo', 'Conductor', 'Web browsing', 'LinkedIn', 'Sitemap'],
     sources: [
       'Investor reports',
       'Employee count',
@@ -114,8 +114,8 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'investments',
     selector: '[data-xray="investments"]',
     title: 'Strategic investments',
-    logic: "Where they are putting money, from public reports; the one closest to our pitch leads.",
-    tools: ['Web browsing', 'Salesforce'],
+    logic: "Where they are putting money, found through Google Search and public reports; the one closest to our pitch leads.",
+    tools: ['Google Search', 'Web browsing', 'Salesforce'],
     sources: [
       'Investor reports',
       'Recent acquisition news',
@@ -126,8 +126,8 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'news',
     selector: '[data-xray="news"]',
     title: 'In the news',
-    logic: "Recent public news about them, newest first.",
-    tools: ['Web browsing'],
+    logic: "Recent public news about them from Google Search, newest first.",
+    tools: ['Google Search', 'Web browsing'],
     sources: [
       'Google News',
       'Newsroom feed',
@@ -139,8 +139,8 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'challenge-headline',
     selector: '[data-xray="challenge-headline"]',
     title: 'Challenge headline',
-    logic: "Mark names the platform they are on and the problem it causes, from our positioning.",
-    tools: ['Mark'],
+    logic: "Mark names the platform they are on and the problem it causes, backed by Conductor's read of their site.",
+    tools: ['Mark', 'Conductor'],
     sources: [
       'Competitive positioning',
       'Messaging frameworks',

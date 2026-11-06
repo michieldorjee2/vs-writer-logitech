@@ -168,6 +168,9 @@ export function XrayToolIcon({ name, size = 12 }: { name: string; size?: number 
  *   CaliberMind: the mark of its new SVG logo, white on its favicon's navy.
  *   Outreach: the mark of its own SVG logo, as its favicon.
  *   Clay: a 3D render with no vector version anywhere on its site, so its favicon as a small WebP.
+ *   Google Search: its 2025 favicon (the gradient G), which Google serves only as .ico; the SVG
+ *     Wikimedia Commons keeps of it (Google_Favicon_2025.svg).
+ *   Conductor: its favicon, white dots on its green, from the shape of its own SVG mask icon.
  * Brandfetch has one for light and one for dark; the cards follow the system theme too.
  */
 const TOOL_LOGOS: Record<string, string | { light: string; dark: string }> = {
@@ -181,6 +184,8 @@ const TOOL_LOGOS: Record<string, string | { light: string; dark: string }> = {
   'CaliberMind': '/logos/tools/calibermind.svg',
   'Outreach': '/logos/tools/outreach.svg',
   'Clay': '/logos/tools/clay.webp',
+  'Google Search': '/logos/tools/google.svg',
+  'Conductor': '/logos/tools/conductor.svg',
   // Our own products: Optimizely's favicon.
   'ODP': '/logos/tools/optimizely.svg',
   'CMS': '/logos/tools/optimizely.svg',
