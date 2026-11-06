@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { graphItems } from '../src/lib/graph-envelope.js';
 import { ACCOUNT_PAGE_PREVIEW_QUERY } from '../src/lib/account-page-query.js';
 import { PERSON_PAGE_PREVIEW_QUERY } from '../src/lib/person-page-query.js';
+import { publicPersonPage } from '../src/www/person-content.js';
 import { EXPERIENCE_PREVIEW_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
 import { withPageCopy } from './_lib/page-copy.js';
 import { withParentAccount } from './_lib/parent-account.js';
@@ -154,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (typeName === 'PersonPage') {
       const items = graphItems<Record<string, unknown>>(await queryGraph(auth, PERSON_PAGE_PREVIEW_QUERY, variables), typeName);
       if (!items?.length) return res.status(404).json({ error: 'Content not found' });
-      return res.status(200).json({ ...items[0], __typename: typeName, __template: 'person' });
+      return res.status(200).json({ ...publicPersonPage(items[0] as { provenance?: null }), __typename: typeName, __template: 'person' });
     }
 
     const experience = EXPERIENCE_PREVIEW_QUERIES[typeName];

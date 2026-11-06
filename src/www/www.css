@@ -121,9 +121,6 @@ body:has(.www-page) {
   font-size: clamp(20px, min(1.9vw, calc(3.1 * var(--www-vh, 1vh))), 30px);
   line-height: 1.42;
 }
-.www-page .www-met {
-  font-weight: 500;
-}
 .www-page .www-body {
   font-size: clamp(15px, min(1.1vw, calc(1.95 * var(--www-vh, 1vh))), 18px);
   line-height: 1.45;

@@ -49,7 +49,7 @@ fragment CompositionElement on _IComponent {
   ... on AbmNewsItemElement { NewsDate Headline Url { default } }
   ... on AbmRoiCardElement { Metric Unit Label CitationText }
   ... on AbmStakeholderElement {
-    Name Role Initials AvatarColor EngagementTier EngagementNote PersonSlug CrmContactId
+    Name Role Initials AvatarColor PersonSlug
     LinkedInUrl { default }
   }
   ... on AbmStickyCtaElement { Text Url { default } }
