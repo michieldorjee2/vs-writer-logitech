@@ -15,7 +15,7 @@ import { servedBadgeReady } from './lib/badge-scan';
  */
 const root = document.getElementById('root')!;
 const served = sceneById(root.dataset.scene);
-let offer: ShownOffer | null = null;
+let offer: ShownOffer | null;
 try {
   offer = root.dataset.offer ? (JSON.parse(root.dataset.offer) as ShownOffer) : null;
 } catch {

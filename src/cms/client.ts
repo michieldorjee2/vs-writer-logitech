@@ -264,7 +264,8 @@ export async function loadCredentials(): Promise<Credentials> {
         `Could not read CMS credentials from ${file} ` +
           `(${err instanceof Error ? err.message : String(err)}). ` +
           `Set OPTIMIZELY_CMS_ENV_FILE to point at a file holding ` +
-          `OPTIMIZELY_CMS_CLIENT_ID and OPTIMIZELY_CMS_CLIENT_SECRET.`
+          `OPTIMIZELY_CMS_CLIENT_ID and OPTIMIZELY_CMS_CLIENT_SECRET.`,
+        { cause: err },
       )
     }
     const parsed = parseDotEnv(text)
