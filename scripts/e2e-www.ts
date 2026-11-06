@@ -24,7 +24,8 @@
  * the review layer and state switch, the offer FAQ, X-ray mode outlining every section, Edit mode
  * rewriting the page in place from a (mocked) Mark stream, the old ?design=classic and
  * ?template=takeout switches changing nothing, and the CMS preview: both pages in the CMS editor
- * with its editing hooks, a save refreshing the draft in place, and nothing sent from it.
+ * with its editing hooks, a save refreshing the draft in place, and nothing sent from it; and the
+ * view transitions between the search page and the pages it opens, both ways.
  */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import fs from 'node:fs'
@@ -1005,6 +1006,186 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     expect(!watch.escaped.length, watch.escaped.join(', '))
   })
   await ctx.close()
+}
+
+console.log('\nview transitions: the search page and the pages it opens, both ways')
+{
+  // Its own browser: the back/forward cache is what brings the search page back as it was, and
+  // Playwright turns it off by default. No service worker, so the stand-ins below answer.
+  const vtBrowser = await chromium.launch({ channel: 'chrome', args: ['--disable-features=AsyncDns'], ignoreDefaultArgs: ['--disable-back-forward-cache'] })
+  const SEARCH_ME = 'e2e@optimizely.com'
+  const meta = (route: string) => ({ url: { default: route, hierarchical: route }, published: '2026-11-01T00:00:00Z' })
+  const index = {
+    companies: [{ _metadata: meta(ACCOUNT), headline: 'One platform', eyebrow: 'Personalized for CDW', competitorName: 'Adobe', brandDomain: 'cdw.com', brandAccentColor: null, customerLogo: null, intelHeadline: 'We know <em>CDW</em>' }],
+    total: 1,
+    people: [{ _metadata: meta(PERSON), personName: 'Ben Yu', personTitle: 'Head of Brand', personInitials: 'BY', companyName: 'Logitech G', companyLogo: null, brandAccentColor: null }],
+    mine: [],
+    viewer: SEARCH_ME,
+  }
+  const vtContext = async (opts: { reducedMotion?: 'reduce' } = {}) => {
+    const ctx = await vtBrowser.newContext({ ...VIEWPORTS.desktop, serviceWorkers: 'block', reducedMotion: opts.reducedMotion ?? 'no-preference', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
+    const watch: Watch = { errors: [], escaped: [] }
+    await ctx.route('**/api/auth/me', (route) => route.fulfill({ json: { email: SEARCH_ME, name: 'E2E' } }))
+    await ctx.route('**/api/home-index', (route) => route.fulfill({ json: index }))
+    await ctx.route('**/api/offers', (route) => route.fulfill({ json: { offers: [] } }))
+    await ctx.route('**/api/page-builds', (route) => route.fulfill({ json: { builds: [] } }))
+    await ctx.route('**/api/edit-status**', (route) => route.fulfill({ json: { changed: false, published: '2026-01-01T00:00:00.000Z' } }))
+    // The booth rail's own reads: no Report (it shows its error state), no shared links yet.
+    await ctx.route('**/api/page-activity**', (route) => route.fulfill({ status: 404, json: { error: 'not here' } }))
+    await ctx.route('**/api/share-links**', (route) => route.fulfill({ json: { links: [] } }))
+    await ctx.route('**/api/page-visit', (route) => route.fulfill({ status: 204, body: '' }))
+    for (const pattern of ['**/api/cta-ping', 'https://webhook.opal.optimizely.com/**', 'https://webhook.mark.optimizely.com/**']) {
+      await ctx.route(pattern, (route) => {
+        watch.escaped.push(route.request().url())
+        return route.fulfill({ status: 202, json: { ok: true } })
+      })
+    }
+    // What each document's view transition did, written down before the page's own scripts run.
+    await ctx.addInitScript(() => {
+      type VT = { ready: Promise<void>; finished: Promise<void>; types?: Set<string> }
+      const w = window as unknown as { __vt: Array<Record<string, unknown>> }
+      w.__vt = []
+      addEventListener('pageshow', (e) => w.__vt.push({ at: 'pageshow', persisted: (e as PageTransitionEvent).persisted }))
+      addEventListener('pagereveal', (e) => {
+        const vt = (e as Event & { viewTransition?: VT | null }).viewTransition
+        w.__vt.push({ at: 'reveal', vt: !!vt })
+        vt?.ready.then(() => {
+          // Every named part that animates: it moves (its group), or only fades in or out (its
+          // new or old image: the search page's own layers have no counterpart on the page).
+          const groups = document
+            .getAnimations()
+            .map((a) => (a.effect as KeyframeEffect | null)?.pseudoElement || '')
+            .map((p) => /^::view-transition-(?:group|old|new)\((.+)\)$/.exec(p)?.[1] ?? '')
+            .filter(Boolean)
+          // Where the hero's logo is as the morph sets off, and the rail's room under it.
+          const logo = document.querySelector('.www-hero .www-account__logo')
+          const railOut = document
+            .getAnimations()
+            .some((a) => (a.effect as KeyframeEffect | null)?.pseudoElement === '::view-transition-old(vt-rail)' && (a as CSSAnimation).animationName === 'vt-rail-out')
+          w.__vt.push({
+            at: 'ready',
+            groups: [...new Set(groups)],
+            types: vt.types ? [...vt.types] : [],
+            logoLeft: logo ? Math.round(logo.getBoundingClientRect().left) : null,
+            room: getComputedStyle(document.body).paddingLeft,
+            railOut,
+          })
+        })
+        // A tick later: the page's own clean-up runs on the same promise, after this one.
+        vt?.finished.then(() => setTimeout(() => w.__vt.push({ at: 'finished', named: document.querySelectorAll('[data-vt-named]').length }), 0))
+      })
+    })
+    return { ctx, watch }
+  }
+  const log = (page: Page) => page.evaluate(() => (window as unknown as { __vt: Array<Record<string, unknown>> }).__vt)
+  const lastReady = async (page: Page) => {
+    const t0 = Date.now()
+    while (Date.now() - t0 < 8000) {
+      const entries = await log(page).catch(() => [])
+      const ready = [...entries].reverse().find((x) => x.at === 'ready') as { groups: string[]; types: string[]; logoLeft: number | null; room: string; railOut: boolean } | undefined
+      if (ready && entries.some((x) => x.at === 'finished')) return ready
+      await page.waitForTimeout(100)
+    }
+    return null
+  }
+  const search = async (page: Page, q: string) => {
+    await page.goto(url('/search'), { waitUntil: 'domcontentloaded' })
+    await page.locator('.sh-search__input').waitFor({ timeout: 10000 })
+    await page.locator('.sh-search__input').fill(q)
+    await page.locator('[data-vt-slug]').first().waitFor({ timeout: 8000 })
+  }
+
+  const { ctx, watch } = await vtContext()
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => watch.errors.push(`pageerror: ${e.message}`))
+  const slug = ACCOUNT.replace(/^\/|\/$/g, '')
+  await test('both documents opt in, and the boot script is in both <head>s', async () => {
+    for (const path of ['/search', ACCOUNT]) {
+      const html = await (await fetch(url(path), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      const head = html.slice(0, html.indexOf('</head>'))
+      expect(/addEventListener\('pagereveal'/.test(head) && /addEventListener\('pageswap'/.test(head), `${path}: no boot script in <head>`)
+      expect(!html.includes('data-view-transitions-boot'), `${path}: the placeholder was not replaced`)
+      // The opt-in comes first, inline: before any script or stylesheet. In a stylesheet linked
+      // after the scripts, the page arrived on dropped about one transition in five.
+      const optIn = head.search(/<style>@view-transition\s*\{\s*navigation:\s*auto;?\s*\}/)
+      const firstOther = head.search(/<script|<link rel="stylesheet"/)
+      expect(optIn >= 0 && optIn < firstOther, `${path}: the opt-in is not inline ahead of the scripts and stylesheets (at ${optIn}, first script or stylesheet at ${firstOther})`)
+    }
+  })
+  await test('a search result opens its page in the same tab, and the row, the wordmark and the photograph move into it', async () => {
+    await search(page, 'cdw')
+    await page.locator(`[data-vt-slug="${slug}"]`).click()
+    await page.waitForURL(`**${ACCOUNT.replace(/\/$/, '')}?search=1`, { timeout: 10000 })
+    await page.locator('.www-page').waitFor({ timeout: 10000 })
+    const ready = await lastReady(page)
+    expect(ready, `no view transition on the account page: ${JSON.stringify(await log(page))}`)
+    for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
+    expect(ready.types.includes('from-search'), `types: ${ready.types}`)
+    expect(await page.evaluate(() => document.documentElement.classList.contains('vt-in')), 'the hero intro played under the morph')
+    expect(ctx.pages().length === 1, 'opened in a new tab')
+  })
+  await test("the booth rail's room is there from the first frame: the rail slides into it and the page holds still", async () => {
+    const ready = await lastReady(page)
+    expect(ready?.room === '64px', `no room for the rail as the morph set off (padding-left ${ready?.room})`)
+    await page.locator('.booth-rail.is-open').waitFor({ timeout: 10000 })
+    await page.waitForTimeout(900) // the rail's slide (520 ms) and the page's padding transition, if any
+    const after = await page.evaluate(() => ({
+      logoLeft: Math.round(document.querySelector('.www-hero .www-account__logo')!.getBoundingClientRect().left),
+      room: document.documentElement.classList.contains('vt-rail-room'),
+      rail: document.documentElement.classList.contains('booth-page--rail'),
+      railRight: Math.round(document.querySelector('.booth-rail')!.getBoundingClientRect().right),
+    }))
+    expect(ready?.logoLeft === after.logoLeft, `the hero's logo moved after the morph, from ${ready?.logoLeft} to ${after.logoLeft} px`)
+    expect(!after.room && after.rail, `the rail did not take its room over (vt-rail-room ${after.room}, booth-page--rail ${after.rail})`)
+    expect(after.railRight === 64, `the rail is not in place: its right edge at ${after.railRight} px`)
+  })
+  await test("back to search with the rail's Search button: the page comes back as it was (query, list), the logo flies back into its row, the rail slides away", async () => {
+    await page.locator('.booth-rail__btn--back').click()
+    await page.locator('.sh-search__input').waitFor({ timeout: 10000 })
+    const ready = await lastReady(page)
+    const entries = await log(page)
+    expect(entries.some((x) => x.at === 'pageshow' && x.persisted === true), `not from the back/forward cache: ${JSON.stringify(entries.slice(-4))}`)
+    expect((await page.locator('.sh-search__input').inputValue()) === 'cdw', 'the query is gone')
+    expect(ready, 'no view transition back to the search page')
+    for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name', 'vt-search-top', 'vt-search-lift', 'vt-search-panel', 'vt-rail']) expect(ready.groups.includes(g), `${g} did not animate: ${ready.groups.join(', ')}`)
+    expect(ready.railOut, 'the rail did not slide out (vt-rail-out)')
+    expect(ready.types.includes('to-search'), `types: ${ready.types}`)
+    const done = [...entries].reverse().find((x) => x.at === 'finished') as { named: number }
+    expect(done.named === 0, `${done.named} element(s) kept a transition name`)
+  })
+  await test('a person page morphs the same way (their company logo, their name)', async () => {
+    await search(page, 'ben')
+    await page.locator(`[data-vt-slug="${PERSON.replace(/^\/|\/$/g, '')}"]`).click()
+    await page.locator('.www-page.www-person').waitFor({ timeout: 10000 })
+    const ready = await lastReady(page)
+    expect(ready, 'no view transition on the person page')
+    for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
+  })
+  await test('Cmd/Ctrl-click still opens a new tab, and the search page stays', async () => {
+    await search(page, 'cdw')
+    const [popup] = await Promise.all([ctx.waitForEvent('page'), page.locator(`[data-vt-slug="${slug}"]`).click({ modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control'] })])
+    await popup.waitForURL((u) => u.pathname.startsWith(ACCOUNT.replace(/\/$/, '')), { timeout: 10000 })
+    expect(new URL(page.url()).pathname === '/search', `the search page went to ${page.url()}`)
+    await popup.close()
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+
+  const reduced = await vtContext({ reducedMotion: 'reduce' })
+  const calm = await reduced.ctx.newPage()
+  await test('a reader who asked for reduced motion just navigates', async () => {
+    await search(calm, 'cdw')
+    await calm.locator(`[data-vt-slug="${slug}"]`).click()
+    await calm.locator('.www-page').waitFor({ timeout: 10000 })
+    await calm.waitForTimeout(400)
+    const entries = await log(calm)
+    expect(entries.some((x) => x.at === 'reveal' && x.vt === false) && !entries.some((x) => x.at === 'ready'), JSON.stringify(entries))
+  })
+  await reduced.ctx.close()
+  await vtBrowser.close()
 }
 
 console.log('\neach account page follows its own pitch; no address switches it')

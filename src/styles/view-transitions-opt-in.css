@@ -1,0 +1,18 @@
+/*
+ * The opt-in to cross-document view transitions, inlined at the top of both documents' <head>
+ * (index.html, home.html) by vite.config.ts, next to the boot script. Not in a stylesheet: the
+ * page you arrive on settles whether it takes part before its stylesheets are in (the account
+ * page links its stylesheet after its scripts), and a page that hasn't opted in by then drops the
+ * transition ("ViewTransition opt-in disabled"), about one navigation in five. The rest of the
+ * transition is src/styles/view-transitions.css.
+ *
+ * A reader who asked for reduced motion just navigates.
+ */
+@view-transition {
+  navigation: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}

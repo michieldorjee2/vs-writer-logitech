@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { CompetitorComparisonPage } from '../lib/graph-types';
 import { useAuth, type Identity } from '../lib/auth';
 import { pageKey } from '../lib/page-activity';
+import { dropRailRoom, railRoomMade } from '../lib/rail-room';
 import { usePageActivity, type ActivityLoad } from '../hooks/usePageActivity';
 import { useShareLinks } from '../hooks/useShareLinks';
 import XrayMode from './XrayMode';
@@ -61,6 +62,10 @@ const REDIRECT_DELAY_MS = 5000;
  */
 function FloatingSidebar({ page, variant }: Props) {
   const auth = useAuth();
+  /* No rail for someone signed out: the room made for it on the way from the search page goes. */
+  useEffect(() => {
+    if (auth.status === 'signed-out') dropRailRoom();
+  }, [auth.status]);
   if (auth.status === 'signed-in') return <BoothTools page={page} variant={variant} identity={auth.identity} />;
   if (auth.status === 'signed-out') return <EmployeeLinkRedirect />;
   return null;
@@ -244,6 +249,11 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
    *  X-ray leaves Close alone. */
   const mode: 'edit' | 'xray' | null = editActive ? 'edit' : xrayActive ? 'xray' : null;
   const railShown = entered && (!collapsed || mode !== null);
+  /** Opened from the search page with the rail open, its room was made before the first paint
+   *  (src/lib/rail-room.ts), so the page held still through the view transition: keep it through
+   *  the first frame, while the rail is still off the window, and the rail slides into it. */
+  const [roomMade] = useState(railRoomMade);
+  const railRoom = railShown || (roomMade && !entered);
   const miniShown = entered && collapsed && mode === null;
   /** Where Edit puts its controls (Send): a slot in the rail under the Edit button. */
   const [editSlot, setEditSlot] = useState<HTMLDivElement | null>(null);
@@ -258,9 +268,10 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   useEffect(() => {
     const root = document.documentElement;
     root.classList.add('booth-page');
-    root.classList.toggle('booth-page--rail', railShown);
+    root.classList.toggle('booth-page--rail', railRoom);
+    dropRailRoom();
     return () => root.classList.remove('booth-page', 'booth-page--rail');
-  }, [railShown]);
+  }, [railRoom]);
 
   /* Strip the `?refresh=…` cache-buster the toast Refresh button
    * appends so the address bar doesn't keep the timestamp once the
