@@ -37,7 +37,7 @@ import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
 import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 import { withParentAccount } from '../api/_lib/parent-account';
 import { withPageCopy } from '../api/_lib/page-copy';
-import { firstFound, startRead } from './reads';
+import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from './reads';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -348,11 +348,19 @@ type FetchedPage =
   | (FinServPage & { __template: 'finserv' })
   | (CompetitorComparisonPage & { __template?: undefined });
 
+/*
+ * A Graph read that has not answered by now is not going to: one that stalled (6 Nov 2026, a
+ * connection that never sent headers) held the whole render until undici gave up at 300 s, the
+ * function's own limit. Failing it fails the page as any Graph error does (the shell, uncached).
+ */
+const GRAPH_TIMEOUT_MS = 8000;
+
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
   const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
   });
   const json = await res.json();
   // A selection on a field Graph does not know fails the WHOLE query: `data`
@@ -370,14 +378,44 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return json;
 }
 
+/** One candidate's whole page: the full query for its type at its address, or null. */
+async function readPage(authKey: string, c: Candidate, finservQuery: string | null): Promise<FetchedPage | null> {
+  switch (c.kind) {
+    case 'person': {
+      const items = graphItems<PersonPage>(await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: c.slug }), 'PersonPage');
+      // Their unpublished words never leave the server (src/www/person-content.ts).
+      return items?.length ? { ...publicPersonPage(items[0]), __template: 'person' as const } : null;
+    }
+    case 'retail': {
+      const items = graphItems<RetailPageData>(await queryGraph(authKey, await getRetailQuery(authKey), { slug: c.slug }), 'RetailCustomerPage');
+      return items?.length ? { ...items[0], __template: 'retail' as const } : null;
+    }
+    case 'finserv': {
+      if (!finservQuery) return null;
+      const items = graphItems<FinServPage>(await queryGraph(authKey, finservQuery, { slug: c.slug }), 'FinServPage');
+      return items?.length ? { ...items[0], __template: 'finserv' as const } : null;
+    }
+    case 'account': {
+      const items = graphItems<CompetitorComparisonPage>(await queryGraph(authKey, PAGE_QUERY, { slug: c.slug }), 'CompetitorComparisonPage');
+      // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
+      return items?.length ? withPageCopy(items[0]) : null;
+    }
+  }
+}
+
+/** A Meridian Bank demo slug, synthesized so the demo renders before the CMS type has content. */
+function finservDemo(slug: string): FetchedPage | null {
+  const synth = isFinServDemoSlug(slug) ? synthFinServPageFromDemo(slug) : null;
+  return synth ? { ...synth, __template: 'finserv' as const } : null;
+}
+
 // PersonPage (src/lib/person-page-query.ts) is the only nested route on the site
 // (/{company}/{person}). Probed first in fetchPageContent: a slug with two
 // segments cannot be any of the flat types.
 //
-// Every candidate below is asked for at once (firstFound), and the first in this order that
-// has the page wins: person, retail, fin-serv, the fin-serv demo, then the account page. One
-// after another, an account page waited on seven Graph round trips before its own (measured
-// 6 Nov 2026: 360-450 ms of a warm uncached response, over 1.4 s cold).
+// The order decides: person, retail, fin-serv, the fin-serv demo, then the account page. Graph
+// is asked once which of them has a page (server/reads.ts, whichPageQuery), then that page is
+// read: two requests, where asking each in turn cost an account page seven.
 async function fetchPageContent(authKey: string, slug: string): Promise<FetchedPage | null> {
   const normalizedSlug = `/${slug}/`;
   const tries = [normalizedSlug];
@@ -396,47 +434,41 @@ async function fetchPageContent(authKey: string, slug: string): Promise<FetchedP
     retailTries.push(`/en/${stripped}/`);
   }
 
-  // The two schema probes run once per instance; only their own queries wait on them.
-  const retailQuery = getRetailQuery(authKey);
-  const finservQuery = getFinServQuery(authKey);
+  // FinServ dispatch (Meridian Bank): asked only when the content type exists in Graph (probed
+  // once per instance), since a type Graph does not know fails the whole question.
+  const finservQuery = await getFinServQuery(authKey);
+  const candidates: Candidate[] = [
+    // Person pages are the only nested route, so they come before the flat
+    // types; a two-segment slug can only be one of these.
+    ...tries.map((s) => ({ kind: 'person' as const, slug: s })),
+    ...retailTries.map((s) => ({ kind: 'retail' as const, slug: s })),
+    ...(finservQuery ? tries.map((s) => ({ kind: 'finserv' as const, slug: s })) : []),
+    ...tries.map((s) => ({ kind: 'account' as const, slug: s })),
+  ];
 
-  // Person pages are the only nested route, so they come before the flat
-  // types; a two-segment slug can only be one of these.
-  const person = async (s: string): Promise<FetchedPage | null> => {
-    const items = graphItems<PersonPage>(await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s }), 'PersonPage');
-    // Their unpublished words never leave the server (src/www/person-content.ts).
-    return items?.length ? { ...publicPersonPage(items[0]), __template: 'person' as const } : null;
-  };
-  const retail = async (s: string): Promise<FetchedPage | null> => {
-    const items = graphItems<RetailPageData>(await queryGraph(authKey, await retailQuery, { slug: s }), 'RetailCustomerPage');
-    return items?.length ? { ...items[0], __template: 'retail' as const } : null;
-  };
-  // FinServ dispatch (Meridian Bank). Query Graph if the content type exists;
-  // otherwise (or on miss) synthesize from demo content for known FS slugs so
-  // the demo renders before the CMS content type is registered.
-  const finserv = async (s: string): Promise<FetchedPage | null> => {
-    const query = await finservQuery;
-    if (!query) return null;
-    const items = graphItems<FinServPage>(await queryGraph(authKey, query, { slug: s }), 'FinServPage');
-    return items?.length ? { ...items[0], __template: 'finserv' as const } : null;
-  };
-  const finservDemo = async (): Promise<FetchedPage | null> => {
-    const synth = isFinServDemoSlug(slug) ? synthFinServPageFromDemo(slug) : null;
-    return synth ? { ...synth, __template: 'finserv' as const } : null;
-  };
-  const account = async (s: string): Promise<FetchedPage | null> => {
-    const items = graphItems<CompetitorComparisonPage>(await queryGraph(authKey, PAGE_QUERY, { slug: s }), 'CompetitorComparisonPage');
-    // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
-    return items?.length ? withPageCopy(items[0]) : null;
-  };
-
-  return firstFound<FetchedPage>([
-    ...tries.map(person),
-    ...retailTries.map(retail),
-    ...tries.map(finserv),
-    finservDemo(),
-    ...tries.map(account),
-  ]);
+  let found: Candidate | null;
+  try {
+    const { query, variables } = whichPageQuery(candidates);
+    found = firstCandidateFound(candidates, await queryGraph(authKey, query, variables));
+  } catch (err) {
+    // The question failed (Graph errors, or no answer): ask each candidate in turn, as before.
+    console.error('[ssr] WhichPage failed, reading each candidate in turn:', err instanceof Error ? err.message : err);
+    for (const c of candidates) {
+      if (c.kind === 'account') {
+        const demo = finservDemo(slug);
+        if (demo) return demo;
+      }
+      const page = await readPage(authKey, c, finservQuery);
+      if (page) return page;
+    }
+    return null;
+  }
+  // The demo comes after the fin-serv pages and before the account pages.
+  if (!found || found.kind === 'account') {
+    const demo = finservDemo(slug);
+    if (demo) return demo;
+  }
+  return found ? readPage(authKey, found, finservQuery) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -636,17 +668,16 @@ async function fetchExperienceContent(authKey: string, expSlug: string): Promise
   const tries = [normalizedSlug];
   if (!expSlug.startsWith('en/')) tries.push(`/en/${expSlug}/`);
 
-  // All four reads at once, the first hit in the same order as api/content.ts's loop (firstFound).
-  const reads = tries.flatMap((s) =>
-    EXPERIENCE_QUERIES.map(async ({ typeName, query, template }) => {
+  for (const s of tries) {
+    for (const { typeName, query, template } of EXPERIENCE_QUERIES) {
       const json = await queryGraph(authKey, query, { slug: s });
       const items = (json as { data?: Record<string, { items?: unknown[] }> })?.data?.[typeName]?.items;
-      return items?.length ? { ...(items[0] as object), __typename: typeName, __template: template } : null;
-    }),
-  );
-  const found = await firstFound(reads);
-  if (!found) return null;
-  return (await withOfferSignup(await withParentAccount(normalizeExperienceItem(found)))) as ExperienceItem;
+      if (items && items.length > 0) {
+        return (await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...(items[0] as object), __typename: typeName, __template: template })))) as ExperienceItem;
+      }
+    }
+  }
+  return null;
 }
 
 interface VbLevelProps {

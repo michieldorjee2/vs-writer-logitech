@@ -1,10 +1,10 @@
 /**
  * check-perf — the detail pages' speed work, offline.
  *
- *   1. server/reads.ts: the server render's Graph reads run together but answer as they did one
- *      after another — the first hit in order wins, an earlier failure still fails, a later
- *      failure after an answer is dropped (never an unhandled rejection) — in the time of the
- *      slowest read, not the sum.
+ *   1. server/reads.ts: the server render asks Graph once which candidate has a page (every
+ *      field selecting only `_metadata { key }`), takes the first in order as the one-by-one reads
+ *      did, treats a Graph error as "ask one by one" rather than "no page", and a read started
+ *      early is never an unhandled rejection.
  *   2. src/lib/warm-pages.ts: the address a search page row opens (the same as SearchHome's
  *      open()), and what getting it ready does: a Speculation Rules list of at most two pages,
  *      replaced as the rep moves on, or one request per page where the browser has no rules.
@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { firstFound, startRead } from '../server/reads.js';
+import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from '../server/reads.js';
 import { KEEP, pageHrefOf, prerenderRules, resetWarmPages, warmPage } from '../src/lib/warm-pages.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,29 +46,55 @@ const failAfter = (ms: number, msg: string) => new Promise<never>((_, reject) =>
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 
 console.log('1. server reads');
-await check('the first hit in order wins, not the first to arrive', async () => {
-  const got = await firstFound([after(40, null), after(30, 'second'), after(5, 'third')]);
-  assert(got === 'second', `got ${got}`);
+const candidates: Candidate[] = [
+  { kind: 'person', slug: '/cdw/' },
+  { kind: 'person', slug: '/en/cdw/' },
+  { kind: 'retail', slug: '/cdw/' },
+  { kind: 'retail', slug: '/en/cdw/' },
+  { kind: 'finserv', slug: '/cdw/' },
+  { kind: 'finserv', slug: '/en/cdw/' },
+  { kind: 'account', slug: '/cdw/' },
+  { kind: 'account', slug: '/en/cdw/' },
+];
+const answer = (hits: number[]) => ({ data: Object.fromEntries(candidates.map((_, i) => [`c${i}`, { items: hits.includes(i) ? [{ _metadata: { key: 'k' } }] : [] }])) });
+await check('one question for every candidate: one aliased field each, the addresses as variables once', () => {
+  const { query, variables } = whichPageQuery(candidates);
+  assert(JSON.stringify(variables) === JSON.stringify({ s0: '/cdw/', s1: '/en/cdw/' }), JSON.stringify(variables));
+  assert(/^query WhichPage\(\$s0: String!, \$s1: String!\) \{/.test(query), query.split('\n')[0]);
+  for (const [i, c] of candidates.entries()) {
+    const type = { person: 'PersonPage', retail: 'RetailCustomerPage', finserv: 'FinServPage', account: 'CompetitorComparisonPage' }[c.kind];
+    const v = c.slug === '/cdw/' ? 's0' : 's1';
+    assert(query.includes(`c${i}: ${type}(where: { _metadata: { url: { hierarchical: { eq: $${v} } } } }, locale: en) { items { _metadata { key } } }`), `c${i}`);
+  }
 });
-await check('nothing found is null', async () => {
-  assert((await firstFound([after(5, null), Promise.resolve(null)])) === null, 'expected null');
+await check('every field selects only _metadata { key }: no page field the schema could drop', () => {
+  const { query } = whichPageQuery(candidates);
+  const selections = [...query.matchAll(/\{ items \{ ([^}]*\}) \} \}/g)].map((m) => m[1]);
+  assert(selections.length === candidates.length && selections.every((s) => s === '_metadata { key }'), selections.join(' | '));
 });
-await check('reads run together: the time of the slowest, not the sum', async () => {
-  const t = performance.now();
-  await firstFound([after(60, null), after(60, null), after(60, null), after(60, 'x')]);
-  const ms = performance.now() - t;
-  assert(ms < 150, `took ${Math.round(ms)} ms for four 60 ms reads`);
+await check('the first candidate in order with a page wins, as the one-by-one reads found it', () => {
+  assert(firstCandidateFound(candidates, answer([6]))?.kind === 'account', 'account only');
+  assert(firstCandidateFound(candidates, answer([7, 1]))?.slug === '/en/cdw/' && firstCandidateFound(candidates, answer([7, 1]))?.kind === 'person', 'person before account');
+  assert(firstCandidateFound(candidates, answer([3, 6])) === candidates[3], 'retail before account');
+  assert(firstCandidateFound(candidates, answer([])) === null, 'nothing');
 });
-await check('a failure before any hit fails the whole, as one after another did', async () => {
-  let thrown: unknown = null;
-  await firstFound([after(5, null), failAfter(10, 'graph down'), after(1, 'later')]).catch((e) => (thrown = e));
-  assert(thrown instanceof Error && thrown.message === 'graph down', `threw ${String(thrown)}`);
+await check('Graph errors or no data throw (the render then reads one by one), never "no such page"', () => {
+  for (const bad of [{ errors: [{ message: 'Unknown type' }], data: null }, { data: null }, null, { errors: [{ message: 'x' }], data: answer([6]).data }]) {
+    let threw = false;
+    try {
+      firstCandidateFound(candidates, bad);
+    } catch {
+      threw = true;
+    }
+    assert(threw, `did not throw for ${JSON.stringify(bad).slice(0, 80)}`);
+  }
 });
-await check('a later read failing after an earlier hit is dropped, never unhandled', async () => {
-  const got = await firstFound([after(5, 'hit'), failAfter(20, 'late failure')]);
-  await after(40, null);
-  assert(got === 'hit', `got ${got}`);
-  assert(unhandled.length === 0, `unhandled: ${unhandled.map(String).join(', ')}`);
+await check('the render asks once, then reads one page, and falls back to one by one', () => {
+  const ssr = read('server/ssr-handler.tsx');
+  assert(/firstCandidateFound\(candidates, await queryGraph\(authKey, query, variables\)\)/.test(ssr), 'one question');
+  assert(/return found \? readPage\(authKey, found, finservQuery\) : null;/.test(ssr), 'then the one page');
+  assert(/for \(const c of candidates\) \{[\s\S]{0,300}await readPage\(authKey, c, finservQuery\)/.test(ssr), 'the fallback');
+  assert(/signal: AbortSignal\.timeout\(GRAPH_TIMEOUT_MS\)/.test(ssr), 'Graph reads are bounded');
 });
 await check('a read started early fails only when awaited, never unhandled before', async () => {
   const read = startRead(failAfter(5, 'boom'));
