@@ -591,6 +591,12 @@ export default defineConfig(({ mode }) => {
          * and '@assets/…'. '@/' cannot.
          */
         '@/': path.resolve(import.meta.dirname, 'src/vendor/opticom') + '/',
+        /*
+         * The icon font's stylesheet, src/main.tsx's `import 'material-symbols/rounded.css'`: the
+         * same face and class with the icons this site draws (145 kB) in place of the package's
+         * every icon (5.4 MB). See src/styles/material-symbols/rounded.css.
+         */
+        'material-symbols/rounded.css': path.resolve(import.meta.dirname, 'src/styles/material-symbols/rounded.css'),
       },
     },
     css: {
@@ -600,6 +606,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       cssCodeSplit: true,
+      /* dist/.vite/manifest.json: scripts/build-ssr.mjs reads each page renderer's chunks off it, for the server render's preload links. */
+      manifest: true,
       /*
        * /search is the fast-path entry; it doesn't need framer-motion
        * or the shared content-mappers chunk. Filter those out of the
@@ -627,14 +635,20 @@ export default defineConfig(({ mode }) => {
            * left react/jsx-runtime to whichever chunk imported it first — framer-motion's — so every
            * page, the search page included, loaded vendor-motion to render JSX at all, and react-dom's
            * client fell into a shared chunk. The router has its own chunk: the search page does not route.
+           *
+           * Groups with priorities, not a `manualChunks` function: under Vite 8 (Rolldown) that
+           * function became groups taken in the order met, and a group takes its modules'
+           * dependencies with it, so vendor-motion took React itself. Every entry, the search page
+           * included, then imported vendor-motion (157 kB, the modulepreload list leaves it out) one
+           * request after its own script, before anything could run. React's group goes first.
            */
-          manualChunks(id) {
-            if (!id.includes('/node_modules/')) return undefined
-            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
-            if (/\/node_modules\/(react-router|react-router-dom|@remix-run\/router)\//.test(id)) return 'vendor-router'
-            if (/\/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'vendor-motion'
-            if (/\/node_modules\/(react-use|react-use-measure)\//.test(id)) return 'vendor-utils'
-            return undefined
+          codeSplitting: {
+            groups: [
+              { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|scheduler)\//, priority: 4 },
+              { name: 'vendor-router', test: /\/node_modules\/(react-router|react-router-dom|@remix-run\/router)\//, priority: 3 },
+              { name: 'vendor-motion', test: /\/node_modules\/(framer-motion|motion-dom|motion-utils)\//, priority: 2 },
+              { name: 'vendor-utils', test: /\/node_modules\/(react-use|react-use-measure)\//, priority: 1 },
+            ],
           },
         },
       },

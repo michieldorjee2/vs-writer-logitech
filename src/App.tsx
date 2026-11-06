@@ -6,6 +6,7 @@ import type { CompetitorComparisonPage } from './lib/graph-types';
 import { agentPlatformHead } from './www/agent-platform/content';
 import { accountTemplateOf } from './www/account-template';
 import { SHARE_PARAM, shareCodeOf } from './lib/share-links';
+import { watchIconFont } from './lib/icon-font';
 import type {
     FinServPage as FinServPageData,
     PersonPage as PersonPageData,
@@ -38,6 +39,9 @@ const VisualBuilderPage = lazy(() => import('./components/VisualBuilderPage'));
 const AccountRoute = lazy(() => import('./www/AccountRoute'));
 /* The CMS's preview of a page, an offer or a block (?key=…&ver=…&ctx=edit). See CmsPreview.tsx. */
 const CmsPreview = lazy(() => import('./components/CmsPreview'));
+
+/* Pages load the icon font's subset; an icon outside it (a CMS-only name) brings in the whole font. */
+watchIconFont();
 
 function RouteSpinner() {
     return (

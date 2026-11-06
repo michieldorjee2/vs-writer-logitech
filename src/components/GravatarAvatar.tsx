@@ -20,11 +20,15 @@ export default function GravatarAvatar({ email, initials, className, style, size
   if (url && !imgFailed) {
     return (
       <div className={className} style={style}>
+        {/* Lazy: the team rows sit far down the page, and an eager <img> in a server render becomes a
+            high-priority <link rel="preload"> (React 19) to a third origin, ahead of the hero image. */}
         <img
           src={url}
           alt=""
           width={size}
           height={size}
+          loading="lazy"
+          decoding="async"
           style={{ width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover' }}
           onError={() => setImgFailed(true)}
         />

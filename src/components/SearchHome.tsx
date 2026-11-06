@@ -35,6 +35,7 @@ import {
   type ShownOffer,
 } from '../lib/offer-looks';
 import { bestMatches, type Suggestion } from '../lib/badge-suggest';
+import { useWarmPage } from '../lib/warm-pages';
 import BadgeLanyard from './BadgeLanyard';
 import BadgeScanButton from './BadgeScanButton';
 import OptimizelyWordmark from './OptimizelyWordmark';
@@ -983,6 +984,7 @@ export default function SearchHome({
 
   // Nothing to walk (or offer to add) until the lists are on screen.
   const navRows = ready ? columns.flatMap((c) => c.rows) : [];
+  useWarmPage(navRows[activeIdx]); // the row the rep settles on: its page made ready (src/lib/warm-pages.ts)
 
   /** Open a row's page; `newTab` from Cmd/Ctrl/Shift or a middle click, as a link would. */
   const pick = (row: Row, newTab = false) => {
