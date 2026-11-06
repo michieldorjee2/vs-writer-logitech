@@ -110,9 +110,10 @@ await check('a read started early fails only when awaited, never unhandled befor
 });
 
 console.log('2. warming pages from the search page');
-await check('a company or person row opens /<slug>?search=1; others open nothing here', () => {
+await check('a company or person row opens /<slug>?search=1, an offer row its route; others nothing here', () => {
   assert(pageHrefOf({ kind: 'item', item: { kind: 'company', entry: { slug: 'cdw' } } }) === '/cdw?search=1', 'company');
   assert(pageHrefOf({ kind: 'item', item: { kind: 'person', person: { slug: 'logitech/ben-yu' } } }) === '/logitech/ben-yu?search=1', 'person');
+  assert(pageHrefOf({ kind: 'offer', page: { route: '/vb/vegas-dinner-d2l' } }) === '/vb/vegas-dinner-d2l', 'offer (same tab since #46)');
   for (const kind of ['build', 'offer', 'add']) assert(pageHrefOf({ kind }) === null, kind);
   assert(pageHrefOf(undefined) === null, 'no row');
 });
@@ -179,10 +180,11 @@ await check('no Speculation Rules: each page requested once, same-origin, low pr
 });
 
 console.log('3. wiring');
-await check("SearchHome calls the hook with its active row, and open() goes where the hook prerenders", () => {
+await check("SearchHome calls the hook with its active row, and its rows go where the hook prerenders", () => {
   const src = read('src/components/SearchHome.tsx');
   assert(/useWarmPage\(navRows\[activeIdx\]\)/.test(src), 'useWarmPage(navRows[activeIdx]) not found');
   assert(src.includes('const href = `/${slug}?search=1`;'), "open()'s address changed: update pageHrefOf in src/lib/warm-pages.ts to match");
+  assert(src.includes("const href = `/${row.page.route.replace(/^\\/+/, '')}`;"), "an offer row's address changed: update pageHrefOf in src/lib/warm-pages.ts to match");
 });
 await check('the server render preloads no renderer chunk (it pushed the hero paint behind hydration)', () => {
   const ssr = read('server/ssr-handler.tsx');

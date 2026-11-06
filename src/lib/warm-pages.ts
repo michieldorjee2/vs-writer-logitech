@@ -26,14 +26,17 @@ import { useEffect, useRef } from 'react';
 export type PageRow = {
   kind: string;
   item?: { kind: 'company'; entry: { slug: string } } | { kind: 'person'; person: { slug: string } };
+  page?: { route: string };
 };
 
 /**
- * The address SearchHome's `open()` sends a row to: `/${slug}?search=1`. Keep the two the same:
- * a prerendered page is shown only for exactly the address it was made for. Rows that open a new
- * tab (offers, builds) or ask Mark for a page have none.
+ * The address SearchHome sends a row to in the same tab: a company or person row to
+ * `/${slug}?search=1` (`open()`), an offer row to its own route (`pick()`). Keep them the same: a
+ * prerendered page is shown only for exactly the address it was made for. Rows that open a new
+ * tab (builds) or ask Mark for a page have none.
  */
 export function pageHrefOf(row: PageRow | null | undefined): string | null {
+  if (row?.kind === 'offer' && row.page?.route) return `/${row.page.route.replace(/^\/+/, '')}`;
   if (row?.kind !== 'item' || !row.item) return null;
   const slug = row.item.kind === 'company' ? row.item.entry.slug : row.item.person.slug;
   return slug ? `/${slug}?search=1` : null;
