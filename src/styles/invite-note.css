@@ -2,7 +2,7 @@
    A personal link's note (src/components/InviteNote.tsx): the
    rep's words, on a card of paper that floats down over the
    page before it is read. The www pages' type and colours
-   (www.css: Dark Fir on white, LFGreen for the one action),
+   (www.css: Dark Fir on white, the page's own primary CTA),
    with a little paper: grain, faint rules under the words, a
    strip of lime tape, a tilt and a soft lift off the page.
    px only: the root is 10px. Transform and opacity only move.
@@ -17,6 +17,9 @@ html.invite-open body {
 }
 
 .invite-view {
+  /* The page's primary CTA (the vendored optimizely.com Button) takes its border and hover green
+   * from this, which the page sets on .www-page; the note is drawn outside it. */
+  --color-lfgreen-100: hsl(92 82% 59%);
   position: fixed;
   inset: 0;
   z-index: 1100;
@@ -80,31 +83,17 @@ html.invite-open body {
 }
 
 .invite-note__head {
-  display: grid;
-  gap: 18px;
+  display: flex;
 }
 .invite-note__logo {
   display: block;
   width: auto;
-  height: 22px;
-}
-.invite-note__for {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  font: 500 12px/16px var(--font-roboto, 'Roboto Mono'), ui-monospace, monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgb(8 37 26 / 0.62);
-}
-.invite-note__title::before {
-  content: '·';
-  margin-right: 10px;
+  height: 30px;
 }
 
 /* The words, on faint rules a line apart. */
 .invite-note__msg {
-  margin: 20px 0 26px;
+  margin: 24px 0 26px;
   padding-bottom: 1px;
   font-size: 20px;
   line-height: 32px;
@@ -116,56 +105,21 @@ html.invite-open body {
 .invite-note__foot {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 18px 16px;
-}
-.invite-note__sign {
-  display: grid;
-  gap: 2px;
 }
 .invite-note__from {
   font: 800 20px/1.1 var(--font-headline, 'VC Nudge'), Arial, sans-serif;
 }
-.invite-note__org {
-  font-size: 14px;
-  line-height: 18px;
-  color: rgb(8 37 26 / 0.62);
-}
-
-/* The one lime action. */
-.invite-note__open {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 22px;
-  border: 0;
-  border-radius: 999px;
-  background: #abff44;
-  color: #08251a;
-  font: 600 16px/20px var(--font-body, 'Die Grotesk B'), Arial, sans-serif;
-  cursor: pointer;
-  box-shadow: 0 1px 0 rgb(8 37 26 / 0.12), 0 8px 18px -10px rgb(61 138 0 / 0.7);
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease, background 160ms ease;
-}
-.invite-note__open:hover {
-  background: #b9ff63;
-  transform: translateY(-1px);
-  box-shadow: 0 1px 0 rgb(8 37 26 / 0.12), 0 12px 22px -10px rgb(61 138 0 / 0.75);
-}
-.invite-note__open:active {
-  transform: translateY(0) scale(0.98);
-}
-.invite-note__open:focus-visible {
-  outline: 2px solid #08251a;
-  outline-offset: 3px;
-}
-.invite-note__open svg {
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.invite-note__open:hover svg {
-  transform: translateX(2px);
+/* Read out, not shown: the dialog is named "A note from <sender>". */
+.invite-note__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 @keyframes invite-veil-in {

@@ -4,12 +4,14 @@ import { normalizeVuid } from '../lib/page-activity';
 import { SHARE_PARAM, SHARE_SESSION_KEY, firstNameOf, type ShareNote } from '../lib/share-links';
 import { isStaffBrowser } from '../lib/staff-marker';
 import { lockScroll } from '../lib/scroll-lock';
+import { Button } from '../vendor/www/components/_ui/button';
 import '../styles/invite-note.css';
 
 /**
  * The recipient's side of a personal link (src/lib/share-links.ts): /s/<code> lands on the page
  * with ?p=<code>, and the rep's note floats down over the page before it is read. "Open your page"
- * puts the note away and takes the code out of the address, so a reload is just the page.
+ * (the page's own primary CTA) puts the note away and takes the code out of the address, so a
+ * reload is just the page.
  *
  * Shown, it tells the site the note was opened (api/share-note.ts), which counts it on the link
  * and sends ODP `personal_link_open`; never for a signed-in Optimizely person, who can look at
@@ -110,30 +112,23 @@ export default function InviteNote({ code }: Props) {
   const first = firstNameOf(note.to.name);
 
   return createPortal(
-    <div className={'invite-view is-' + phase} role="dialog" aria-modal="true" aria-labelledby={`${ids}-for`} aria-describedby={`${ids}-msg`}>
+    <div className={'invite-view is-' + phase} role="dialog" aria-modal="true" aria-labelledby={`${ids}-from`} aria-describedby={`${ids}-msg`}>
       <article className="invite-note">
         <span className="invite-note__tape" aria-hidden="true" />
         <header className="invite-note__head">
-          <img className="invite-note__logo" src="/optimizely-logo.svg" alt="Optimizely" width="98" height="24" />
-          <span id={`${ids}-for`} className="invite-note__for">
-            A note for {note.to.name}
-            {note.to.title ? <span className="invite-note__title">{note.to.title}</span> : null}
-          </span>
+          <img className="invite-note__logo" src="/optimizely-logo.svg" alt="Optimizely" width="131" height="32" />
         </header>
         <p id={`${ids}-msg`} className="invite-note__msg">
           {note.message}
         </p>
         <footer className="invite-note__foot">
-          <span className="invite-note__sign">
-            <span className="invite-note__from">{note.from.name}</span>
-            <span className="invite-note__org">Optimizely</span>
+          <span id={`${ids}-from`} className="invite-note__from">
+            <span className="invite-note__sr">A note from </span>
+            {note.from.name}
           </span>
-          <button ref={button} type="button" className="invite-note__open" onClick={openPage}>
+          <Button ref={button} variant="primary" className="www-btn invite-note__open" onClick={openPage}>
             {first ? `Open your page, ${first}` : 'Open your page'}
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4.17 10h11.66M10 4.17L15.83 10 10 15.83" />
-            </svg>
-          </button>
+          </Button>
         </footer>
       </article>
     </div>,
