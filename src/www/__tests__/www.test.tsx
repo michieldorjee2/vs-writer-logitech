@@ -2242,9 +2242,12 @@ testAsync('a person page draft comes back from /api/preview with the live fields
 console.log('\nview transitions: the search page and the pages it opens')
 
 test('both documents opt in to cross-document view transitions, and a reader asking for less motion is left out', () => {
-  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
-  assert.match(css, /@view-transition \{\s*navigation: auto;\s*\}/)
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*@view-transition \{\s*navigation: none;/)
+  const optIn = readFileSync('src/styles/view-transitions-opt-in.css', 'utf8')
+  assert.match(optIn, /@view-transition \{\s*navigation: auto;\s*\}/)
+  assert.match(optIn, /@media \(prefers-reduced-motion: reduce\) \{\s*@view-transition \{\s*navigation: none;/)
+  // One source: the opt-in is inlined at the top of both <head>s, never also in a stylesheet,
+  // which the page you arrive on can read too late (it then drops the transition).
+  assert.doesNotMatch(readFileSync('src/styles/view-transitions.css', 'utf8'), /@view-transition \{/)
   assert.match(readFileSync('src/index.css', 'utf8'), /@import '\.\/styles\/view-transitions\.css';/)
   assert.match(readFileSync('src/styles/search-home.css', 'utf8'), /@import '\.\/view-transitions\.css';/)
   // The boot script goes into both <head>s, before the stylesheets and any module, as a classic script.
@@ -2257,6 +2260,8 @@ test('both documents opt in to cross-document view transitions, and a reader ask
   const vite = readFileSync('vite.config.ts', 'utf8')
   assert.match(vite, /viewTransitionsBoot\(\),\s*stripHtmlComments\(\)/)
   assert.match(vite, /order: 'pre'/)
+  assert.match(vite, /src\/styles\/view-transitions-opt-in\.css/)
+  assert.match(vite, /`<style>\$\{optIn\}<\/style>\\n {4}<script>\$\{source\.trim\(\)\}<\/script>`/)
 })
 
 test('the parts that move carry one name each, on every page the search page opens and on the search page', () => {
@@ -2270,7 +2275,7 @@ test('the parts that move carry one name each, on every page the search page ope
     assert.match(www, new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{\\s*view-transition-name: ${name};`), `${sel} → ${name}`)
   }
   const home = readFileSync('src/styles/search-home.css', 'utf8')
-  for (const [sel, name] of [['.sh-scene', 'vt-scene'], ['.sh-top__logo', 'vt-wordmark'], ['.sh-top', 'vt-search-top'], ['.sh-lift', 'vt-search-lift'], ['.sh-panel', 'vt-search-panel']]) {
+  for (const [sel, name] of [['.sh-scene', 'vt-scene'], ['.sh-top__logo', 'vt-wordmark'], ['.sh-top', 'vt-search-top'], ['.sh-lift', 'vt-search-lift'], ['.sh-panel', 'vt-search-panel'], ['.lanyard', 'vt-search-lanyard']]) {
     assert.match(home, new RegExp(`\\${sel} \\{ view-transition-name: ${name}; \\}`), `${sel} → ${name}`)
   }
   // Two elements with one name cancel the whole transition: each named part is drawn once.
@@ -2302,7 +2307,7 @@ test("the search page opens a result in the same tab (Cmd/Ctrl/Shift or a middle
 })
 
 /** Runs the boot script against a stand-in page; returns what it did. */
-function bootOn(where: string, opts: { from?: string; heroBottom?: number } = {}) {
+function bootOn(where: string, opts: { from?: string; heroBottom?: number; phone?: boolean; rail?: string | null; storageThrows?: boolean } = {}) {
   type El = { attrs: Map<string, string>; style: { viewTransitionName: string }; children: Record<string, El> }
   const el = (attrs: Record<string, string> = {}, children: Record<string, El> = {}): El => ({ attrs: new Map(Object.entries(attrs)), style: { viewTransitionName: '' }, children })
   const rows = ['cdw', 'logitech/ben-yu'].map((slug) => el({ 'data-vt-slug': slug }, { '.sh-tile': el(), '.sh-row__name': el() }))
@@ -2321,7 +2326,14 @@ function bootOn(where: string, opts: { from?: string; heroBottom?: number } = {}
   const win = {
     onpagereveal: null,
     innerHeight: 900,
-    location: { href: `https://showcase.optimizely.com${where}` },
+    location: { href: `https://showcase.optimizely.com${where}`, search: new URL(`https://showcase.optimizely.com${where}`).search },
+    matchMedia: (q: string) => ({ matches: q === '(max-width: 640px)' && Boolean(opts.phone) }),
+    localStorage: {
+      getItem: (k: string) => {
+        if (opts.storageThrows) throw new Error('SecurityError')
+        return k === 'opti.booth.rail' ? (opts.rail ?? null) : null
+      },
+    },
     navigation: opts.from ? { activation: { from: { url: `https://showcase.optimizely.com${opts.from}` } } } : undefined,
     addEventListener: (type: string, fn: (e: unknown) => void) => void (handlers[type] = fn),
     URL,
@@ -2379,6 +2391,49 @@ test('the boot script on a page: from the search page it skips the hero intro; s
   // Restored later, the page morphs again.
   far.handlers.pagereveal({ viewTransition: null })
   assert.ok(!far.classes.has('vt-far'))
+})
+
+test('opened from the search page with the booth rail open, a page makes the rail its room before the first paint', () => {
+  const reveal = (where: string, opts: Parameters<typeof bootOn>[1] = {}, transition = true) => {
+    const page = bootOn(where, { from: '/search?q=cdw', ...opts })
+    page.handlers.pagereveal({ viewTransition: transition ? page.transition() : null })
+    return page.classes.has('vt-rail-room')
+  }
+  assert.ok(reveal('/cdw/?search=1'), 'a desktop, no choice made yet: the rail opens')
+  assert.ok(reveal('/logitech/ben-yu/?search=1', { rail: 'open' }), 'a person page, the rail left open')
+  assert.ok(reveal('/cdw/?search=1', { storageThrows: true }), 'a private window: the rail opens')
+  assert.ok(!reveal('/cdw/?search=1', { rail: 'collapsed' }), 'the rail folded away stays folded: no room')
+  assert.ok(!reveal('/cdw/?search=1', { phone: true }), 'a phone: the rail lies over the page')
+  assert.ok(!reveal('/cdw/', {}), 'no ?search: no rail')
+  assert.ok(!reveal('/cdw/?search=1', { from: '/smartsheet/?search=1' }), 'not from the search page')
+  assert.ok(!reveal('/cdw/?search=1', {}, false), 'no view transition (reduced motion): the rail slides in with the page as it always did')
+  // The boot script reads the rail's own setting: the same key, the same phone width.
+  const boot = readFileSync('src/lib/view-transitions-boot.js', 'utf8')
+  const rail = readFileSync('src/components/FloatingSidebar.tsx', 'utf8')
+  const key = rail.match(/const RAIL_KEY = '([^']+)'/)?.[1]
+  const phone = rail.match(/const PHONE = '([^']+)'/)?.[1]
+  assert.ok(key && boot.includes(`localStorage.getItem('${key}') !== 'collapsed'`), `the boot script reads ${key}`)
+  assert.ok(phone && boot.includes(`matchMedia('${phone}')`), `the boot script's phone is ${phone}`)
+})
+
+testAsync("the rail takes its room over as it mounts, gives it back when there's no rail, and slides out on the way back to Search", async () => {
+  const { RAIL_ROOM } = await import('../../lib/rail-room')
+  assert.equal(RAIL_ROOM, 'vt-rail-room')
+  const rail = readFileSync('src/components/FloatingSidebar.tsx', 'utf8')
+  assert.match(rail, /const \[roomMade\] = useState\(railRoomMade\);/)
+  assert.match(rail, /const railRoom = railShown \|\| \(roomMade && !entered\);/)
+  assert.match(rail, /root\.classList\.toggle\('booth-page--rail', railRoom\);\s*dropRailRoom\(\);/)
+  assert.match(rail, /if \(auth\.status === 'signed-out'\) dropRailRoom\(\);/)
+  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
+  // The room, at the rail's width (booth-rail.css), on www pages and not on a phone.
+  const width = readFileSync('src/styles/booth-rail.css', 'utf8').match(/--booth-rail-w: (\d+px);/)?.[1]
+  assert.match(css, new RegExp(`html\\.vt-rail-room body:has\\(\\.www-page\\) \\{\\s*padding-left: ${width};`))
+  assert.match(css, /@media \(max-width: 640px\) \{\s*html\.vt-rail-room body:has\(\.www-page\) \{\s*padding-left: 0;/)
+  // The rail and its folded button: named, and slid only when the other page has none.
+  assert.match(css, /\.booth-rail \{\s*view-transition-name: vt-rail;/)
+  assert.match(css, /\.booth-rail-mini \{\s*view-transition-name: vt-rail-mini;/)
+  assert.match(css, /::view-transition-old\(vt-rail\):only-child \{\s*animation: vt-rail-out /)
+  assert.match(css, /::view-transition-new\(vt-rail\):only-child \{\s*animation: vt-rail-in /)
 })
 
 console.log('\nthe CTA ping: the click reaches the account executive, or the follow-up sheet')

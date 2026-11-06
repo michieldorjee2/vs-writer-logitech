@@ -97,10 +97,12 @@ function stripHtmlComments(): Plugin {
 }
 
 /**
- * Write the view transitions boot script (src/lib/view-transitions-boot.js) into both documents'
- * <head>, in place of their `<script data-view-transitions-boot></script>`: a classic inline
- * script, so its pageswap / pagereveal listeners exist before the browser fires them (a module
- * script would run too late). One source for index.html and home.html.
+ * Write the view transitions opt-in (src/styles/view-transitions-opt-in.css) and boot script
+ * (src/lib/view-transitions-boot.js) into both documents' <head>, in place of their
+ * `<script data-view-transitions-boot></script>`. The opt-in as an inline <style>, so the page
+ * you arrive on has opted in before anything else in its <head> runs or loads; the script as a
+ * classic inline script, so its pageswap / pagereveal listeners exist before the browser fires
+ * them (a module script would run too late). One source for index.html and home.html.
  */
 function viewTransitionsBoot(): Plugin {
   const PLACEHOLDER = '<script data-view-transitions-boot></script>';
@@ -112,7 +114,12 @@ function viewTransitionsBoot(): Plugin {
         if (!html.includes(PLACEHOLDER)) return html;
         const source = readFileSync(path.resolve(__dirname, 'src/lib/view-transitions-boot.js'), 'utf8')
           .replace(/^\/\*[\s\S]*?\*\/\s*/, '');
-        return html.replace(PLACEHOLDER, `<script>${source.trim()}</script>`);
+        const optIn = readFileSync(path.resolve(__dirname, 'src/styles/view-transitions-opt-in.css'), 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\s+/g, ' ')
+          .replace(/\s*([{};])\s*/g, '$1')
+          .trim();
+        return html.replace(PLACEHOLDER, `<style>${optIn}</style>\n    <script>${source.trim()}</script>`);
       },
     },
   };

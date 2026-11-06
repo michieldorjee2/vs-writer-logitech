@@ -10,6 +10,9 @@
  *   - marks the transition `from-search` or `to-search` (the photograph's rounded frame)
  *   - the search page names the row for the page you came back from
  *   - an account or person page skips its hero intro (`vt-in`): the hero arrives by the morph
+ *   - and, opened from the search page with the booth rail open, makes the rail's room before the
+ *     first paint (`vt-rail-room`, view-transitions.css), so the hero lands where it stays; the
+ *     rail (FloatingSidebar.tsx, mounted later) slides into that room and takes it over
  *
  * Plain JavaScript, no imports: it runs as written. Does nothing in a browser without
  * cross-document view transitions.
@@ -30,6 +33,17 @@
   }
   function onSearchPage() {
     return isSearchPath(pathOf(location.href));
+  }
+  /* Whether the booth rail will open: FloatingSidebar.tsx's readRailCollapsed() (its RAIL_KEY and
+     PHONE), and only on a desktop, where the page moves over for it (booth-rail.css). */
+  function railOpens() {
+    if (!/[?&]search(=|&|$)/.test(location.search)) return false;
+    if (window.matchMedia && matchMedia('(max-width: 640px)').matches) return false;
+    try {
+      return localStorage.getItem('opti.booth.rail') !== 'collapsed';
+    } catch (e) {
+      return true;
+    }
   }
   /* The search page's rows carry their page's route in data-vt-slug ("cdw", "logitech/ben-yu"). */
   function clearRow() {
@@ -82,7 +96,10 @@
       e.viewTransition.finished.then(clearRow, clearRow);
       return;
     }
-    if (types && isSearchPath(from)) types.add('from-search');
+    if (isSearchPath(from)) {
+      if (types) types.add('from-search');
+      if (railOpens()) root.classList.add('vt-rail-room');
+    }
     root.classList.add('vt-in');
   });
 })();
