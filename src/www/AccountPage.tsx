@@ -191,12 +191,8 @@ function Intel({ page, company, companySlug }: { page: CompetitorComparisonPage;
                   <div className="min-w-0 flex-1">
                     <p className="font-nudge text-2xl leading-tight font-extrabold">{p.Name}</p>
                     <p className="www-small">{p.Role}</p>
+                    {/* Who they are, never our conversations with them: no engagement badge, no activity note (Michiel, 6 Nov 2026). */}
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                      {p.EngagementTier && p.EngagementTier !== 'known' && (
-                        <span title={p.EngagementNote || undefined}>
-                          <Badge label={p.EngagementTier === 'key' ? 'Active opportunity' : 'In conversation'} color="darkgreen" filled={false} size="sm" />
-                        </span>
-                      )}
                       {p.LinkedInUrl?.default && (
                         <a href={p.LinkedInUrl.default} target="_blank" rel="noopener noreferrer" className="www-link">
                           LinkedIn<span className="sr-only"> profile of {p.Name} (opens in new tab)</span>
@@ -208,7 +204,6 @@ function Intel({ page, company, companySlug }: { page: CompetitorComparisonPage;
                         </a>
                       )}
                     </div>
-                    {p.EngagementNote && <p className="www-small mt-2 opacity-75">{p.EngagementNote}</p>}
                   </div>
                 </Card>
               </li>

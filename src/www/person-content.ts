@@ -5,9 +5,14 @@
  * The rules come from the page it replaces (rebuilt 2026-08-25) and still hold:
  *
  *   SALESFORCE IS AN INPUT TO REASONING, NEVER AN OUTPUT TO THE PAGE. The open opportunity, the
- *   touchpoint log and the engagement summary are stored and never shown. The only CRM-driven
- *   thing on the page is the engagement badge, phrased from the reader's side ("In conversation"),
- *   never as a pipeline stage.
+ *   touchpoint log and the engagement summary are stored and never fetched.
+ *
+ *   NO CONVERSATION OF OURS ON THE PAGE (Michiel, 6 Nov 2026: "I don't like that we put
+ *   conversations on the page. The main account page also doesn't do that."). Nothing says we
+ *   have talked: no engagement badge, no "You have met", and their words only when they
+ *   published them (a quote must link a public source; one from an email, call or meeting is
+ *   dropped on the server, before the page is drawn). The agent writing these pages has the
+ *   same rule (person_page v3.1.0).
  *
  *   THE WORKING STAYS VISIBLE, JUST QUIETLY. The page names a real person, so what we assumed
  *   about the role, and their own words, stay on the page with an invitation to correct us.
@@ -16,16 +21,9 @@
  * stored eyebrow above the headline), one closing call to action, the one-click ask (it tells the
  * account executive, src/lib/cta-ping.ts), no navigation, no footer.
  */
-import type { EngagementTier, PersonPage } from '../lib/graph-types'
-import { resolveUrl } from '../lib/graph-types'
-import { realContacts } from '../lib/account-rep'
-
-/** The badge, phrased from the reader's side: what the conversation is, not what the CRM says. */
-export const TIER_LABEL: Record<EngagementTier, string> = {
-  key: 'Continuing our conversation',
-  engaged: 'In conversation',
-  known: 'An introduction',
-}
+import type { PersonPage } from '../lib/graph-types.js'
+import { resolveUrl } from '../lib/graph-types.js'
+import { realContacts } from '../lib/account-rep.js'
 
 /** Full product names, never acronyms: these are read outside the building. */
 export const PRODUCT_LABEL: Record<string, string> = {
@@ -100,11 +98,40 @@ export function measuresOf(page: Pick<PersonPage, 'scorecard' | 'remitPoints'>) 
     : (page.remitPoints ?? []).map((r) => ({ title: r.Title ?? '', note: r.Description, metric: r.Metric }))
 }
 
-/** `read` is public fact about their business; `told` and `assumed` are the honesty register. */
+/** A source anyone can open: an http(s) link. An email, a call or a meeting has none. */
+export function isPublicSource(url: string | null | undefined): boolean {
+  if (!url) return false
+  try {
+    return /^https?:$/.test(new URL(url).protocol)
+  } catch {
+    return false
+  }
+}
+
+type Provenance = NonNullable<PersonPage['provenance']>[number]
+const registerOf = (p: Provenance) => p.Register ?? 'assumed'
+
+/**
+ * Their words (`told`) only when they published them: the quote links a public source. Words from
+ * an email, a call or a meeting have no link, and are dropped. `read` (public facts) and
+ * `assumed` (our labelled inference about the seat) stay.
+ */
+export function publicProvenance(items: PersonPage['provenance']): Provenance[] {
+  return (items ?? []).filter((p) => registerOf(p) !== 'told' || isPublicSource(resolveUrl(p.SourceUrl)))
+}
+
+/** `read` is public fact about their business; `told` (published) and `assumed` are the honesty register. */
 export function provenanceOf(page: Pick<PersonPage, 'provenance'>) {
-  const all = page.provenance ?? []
-  const register = (p: (typeof all)[number]) => p.Register ?? 'assumed'
-  return { operation: all.filter((p) => register(p) === 'read'), working: all.filter((p) => register(p) !== 'read') }
+  const all = publicProvenance(page.provenance)
+  return { operation: all.filter((p) => registerOf(p) === 'read'), working: all.filter((p) => registerOf(p) !== 'read') }
+}
+
+/**
+ * The person page as it may leave the server (api/content.ts, server/ssr-handler.tsx, the CMS
+ * preview): their unpublished words are not in the page's source either, not just off the screen.
+ */
+export function publicPersonPage<T extends Pick<PersonPage, 'provenance'>>(page: T): T {
+  return { ...page, provenance: publicProvenance(page.provenance) }
 }
 
 /** One voice per card: two quotes from the same person read as a mistake, not as weight. */
@@ -182,7 +209,7 @@ export const PERSON_FIELDS: Array<{ field: keyof PersonPage; use: PersonFieldUse
   { field: 'heroSubheadline', use: 'text', where: 'hero: the lead when stored' },
   { field: 'heroCtaText', use: 'text', where: "hero: second button, to the page's own argument" },
   { field: 'heroCtaUrl', use: 'never', where: 'mostly optimizely.com/contact, a form: the second button scrolls to the argument instead' },
-  { field: 'engagementTier', use: 'text', where: 'the note: the badge, phrased from the reader\'s side (TIER_LABEL)' },
+  { field: 'engagementTier', use: 'never', where: 'CRM state: the page never says whether we have talked' },
   { field: 'engagementHeadline', use: 'never', where: 'CRM output: never on the page' },
   { field: 'engagementSummary', use: 'never', where: 'CRM output: never on the page' },
   { field: 'touchpoints', use: 'never', where: 'our outreach log: never on the page' },
@@ -200,7 +227,7 @@ export const PERSON_FIELDS: Array<{ field: keyof PersonPage; use: PersonFieldUse
   { field: 'noteDate', use: 'text', where: 'the note: date ("22 Oct 2026")' },
   { field: 'researchHeadline', use: 'never', where: '"What we looked at before writing this": the dossier voice' },
   { field: 'researchClaim', use: 'never', where: 'as researchHeadline' },
-  { field: 'provenance', use: 'text', where: '`read`: the operation scene; `told` and `assumed`: why you\'re seeing this' },
+  { field: 'provenance', use: 'text', where: '`read`: the operation scene; `told` (only with a public source) and `assumed`: why you\'re seeing this' },
   { field: 'scorecardHeadline', use: 'text', where: 'the problem: heading' },
   { field: 'scorecardIntro', use: 'never', where: '"our hypothesis about your scorecard": the dossier voice' },
   { field: 'scorecard', use: 'text', where: 'the problem: each measure, why it is hard, its metric (WhatChanges is the practice scene\'s job)' },
@@ -216,7 +243,7 @@ export const PERSON_FIELDS: Array<{ field: keyof PersonPage; use: PersonFieldUse
   { field: 'peerProofHeadline', use: 'text', where: 'proof: the quotes\' heading' },
   { field: 'peerProof', use: 'text', where: 'proof: one quote card per person' },
   { field: 'teamHeadline', use: 'text', where: 'the ask: above the team' },
-  { field: 'team', use: 'text', where: 'the ask: the team; the account executive gets the ping' },
+  { field: 'team', use: 'text', where: 'the ask: the team (names and roles, never who has met them); the account executive gets the ping' },
   { field: 'ctaTitle', use: 'text', where: 'the ask: heading; sticky bar' },
   { field: 'ctaBody', use: 'text', where: 'the ask: lead' },
   { field: 'ctaButtonText', use: 'text', where: 'the ask: the button, when the page has a booking link (askLabelOf)' },

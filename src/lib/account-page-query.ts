@@ -25,7 +25,7 @@ const ACCOUNT_PAGE_FIELDS = `
     ctaTitle ctaDescription ctaButtonText modalScheduleUrl { default }
     footerTagline footerLegal
     intelStats { Value Label }
-    stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor EngagementTier EngagementNote PersonSlug CrmContactId }
+    stakeholders { Initials Name Role LinkedInUrl { default } AvatarColor PersonSlug }
     techStack { Name ColorTag }
     investments { Name IsPrimary }
     newsItems { Date Headline Url { default } }

@@ -4,6 +4,7 @@ import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experien
 import { graphItems } from '../src/lib/graph-envelope.js';
 import { ACCOUNT_PAGE_QUERY } from '../src/lib/account-page-query.js';
 import { PERSON_PAGE_QUERY } from '../src/lib/person-page-query.js';
+import { publicPersonPage } from '../src/www/person-content.js';
 import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
 import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
 import { withParentAccount } from './_lib/parent-account.js';
@@ -184,7 +185,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (items && items.length > 0) {
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-        return res.status(200).json({ ...items[0], __template: 'person' });
+        // Their unpublished words never leave the server (src/www/person-content.ts).
+        return res.status(200).json({ ...publicPersonPage(items[0]), __template: 'person' });
       }
     }
 

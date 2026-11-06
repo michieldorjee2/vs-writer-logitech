@@ -4,8 +4,9 @@
  * CMS preview of a draft (api/preview.ts), so the preview never draws a page the address would not.
  *
  * Only what the page shows (src/www/person-content.ts PERSON_FIELDS): the fields it never shows, the
- * Salesforce ones above all (the contact id, the open opportunity, the touchpoint log), are not
- * fetched, so they are in neither the page's source nor /api/content.
+ * Salesforce ones above all (the contact id, the open opportunity, the touchpoint log, the
+ * engagement tier, who has met them), are not fetched, so they are in neither the page's source
+ * nor /api/content. Quotes from our own conversations are dropped on the server (publicPersonPage).
  *
  * A selection on one field Graph does not know fails the WHOLE query and every person page 404s.
  * Check the registered type before adding a field, and run `npm run check:graph` (it reads this file).
@@ -20,7 +21,6 @@ const PERSON_PAGE_FIELDS = `
     companyLogo { default }
     brandAccentColor
     heroEyebrow heroHeadline heroSubheadline heroCtaText
-    engagementTier
     remitHeadline
     remitPoints { Title Description Metric }
     roleFrame
@@ -35,7 +35,7 @@ const PERSON_PAGE_FIELDS = `
     peerProofHeadline
     peerProof { Quote PersonName PersonTitle Company SourceUrl { default } }
     teamHeadline
-    team { Initials Name Role Email AvatarColor AlreadyMet }
+    team { Initials Name Role Email AvatarColor }
     ctaTitle ctaBody ctaButtonText meetingUrl { default }
     footerLine
 `;

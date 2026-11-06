@@ -528,7 +528,7 @@ export const ABM_XRAY_LEGACY_IDS = ACCOUNT_XRAY_SHARED.map((s) => s.id);
 /* ── 1:1 person page ──────────────────────────────────────────────────────
    The person page (src/www/PersonPage.tsx) is written by a different agent from a different
    mix of sources, so it has its own registry: the operation facts come from web research, and
-   the engagement badge is the only thing on the page Salesforce touches directly. Each part is
+   nothing on the page comes from Salesforce or from our conversations with them. Each part is
    found by its `data-xray` hook; Edit mode names the stored fields each part shows
    (PERSON_EDIT), so Mark changes exactly those. */
 const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> = [
@@ -549,16 +549,6 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     sources: ['Contact record', 'Published profile as they wrote it'],
     fields: ['heroHeadline', 'heroSubheadline', 'personName', 'personTitle', 'roleFrame'],
     hint: 'With a headline the h1 is the claim; without one it is their name and title.',
-  },
-  {
-    id: 'person-tier',
-    selector: '',
-    title: 'Engagement badge',
-    tools: ['Salesforce'],
-    sources: ['Logged activity in the last 6 months', 'Open opportunity membership'],
-    notes: 'The only element on the page driven straight from CRM state, phrased from the reader’s side.',
-    fields: ['engagementTier'],
-    hint: 'key, engaged or known. Never write a pipeline stage on the page.',
   },
   {
     id: 'person-opening',

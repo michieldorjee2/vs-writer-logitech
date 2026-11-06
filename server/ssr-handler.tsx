@@ -14,6 +14,7 @@ import { resolveUrl } from '../src/lib/graph-types';
 import { graphItems } from '../src/lib/graph-envelope';
 import { ACCOUNT_PAGE_QUERY } from '../src/lib/account-page-query';
 import { PERSON_PAGE_QUERY } from '../src/lib/person-page-query';
+import { publicPersonPage } from '../src/www/person-content';
 import type {
   AtelierNoteBlock,
   CompetitorComparisonPage,
@@ -393,7 +394,8 @@ async function fetchPageContent(authKey: string, slug: string): Promise<FetchedP
     const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
     const items = graphItems<PersonPage>(pJson, 'PersonPage');
     if (items && items.length > 0) {
-      return { ...items[0], __template: 'person' as const };
+      // Their unpublished words never leave the server (src/www/person-content.ts).
+      return { ...publicPersonPage(items[0]), __template: 'person' as const };
     }
   }
 
