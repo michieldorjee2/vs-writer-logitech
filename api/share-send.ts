@@ -9,8 +9,10 @@
  *     `check` is the SHA-256 of the rest as canonical JSON, recomputed by the workflow.
  *   channel "email": Mark's "Showcase share email" agent writes the email (to the recipient, from
  *     their note when there is one; without a link, to `recipient`, the person a person page is
- *     for); answers { to, subject, body, by }. A template when Mark is
- *     unavailable or slow, so the rep always gets a draft to open in Outlook.
+ *     for), streamed through the official Agent SDK so the card shows it being written. Answers
+ *     server-sent events: { k: "text", t } as Mark writes, then { k: "done", draft: { to, subject,
+ *     body, by } }. The draft is a template when Mark is unavailable or slow, so the rep always
+ *     gets one to open in Outlook.
  *
  * The page's title and summary come from the page the rep is on (they only shape a message to
  * the rep, or a draft the rep reads before sending). 30 Teams messages and 40 drafts a day each.
@@ -19,14 +21,16 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireIdentity, type Identity } from './_lib/auth.js';
 import { canonicalJson } from './cta-ping.js';
-import { MarkError, markConfigured, runAgent } from './_lib/mark.js';
+import { MarkError, markConfigured, streamAgentText } from './_lib/mark.js';
 import { activityStore, cached } from './_lib/page-activity-store.js';
 import { isJson, jsonBody, linkOrigin, sameSite } from './_lib/share-http.js';
 import { getLink, SHARE_LIMITS_PER, shareStore, statsOf, underLimit, type ShareStore } from './_lib/share-store.js';
 import { channelName, factsOf, type ActivityResponse } from '../src/lib/page-activity.js';
-import { firstNameOf, nameFromEmail, noteText, oneLine, shareCodeOf, sharePathOf, shareUrl, type ShareLink, type ShareStats } from '../src/lib/share-links.js';
+import { firstNameOf, nameFromEmail, noteText, oneLine, shareCodeOf, sharePathOf, shareUrl, splitDraft, type ShareLink, type ShareStats } from '../src/lib/share-links.js';
 
 export const config = { maxDuration: 60 };
+/** Mark gets this long to write the email before the card gets the template. */
+const EMAIL_TIMEOUT_MS = 30_000;
 
 const WEBHOOK_HOSTS = new Set(['webhook.mark.optimizely.com', 'webhook.opal.optimizely.com']);
 /** Mark's "Showcase share email" agent (showcase_share_email): no tools, about two seconds and two credits a draft. */
@@ -119,21 +123,14 @@ export function templateDraft(input: { to: string; recipientName: string; accoun
   return { to: input.to, subject: first ? `${first}, a page we made for ${account}` : `A page we made for ${account}`, body, by: 'template' };
 }
 
-/** Mark's answer as a draft: a JSON object with a subject and a body, the link in the body. */
+/** Mark's answer as a draft ("Subject: …", a blank line, the body), the link in the body. */
 export function parseDraft(text: string, to: string, url: string): EmailDraft | null {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) return null;
-  try {
-    const j = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
-    const subject = oneLine(j.subject, 200);
-    let body = noteText(j.body, 3000);
-    if (!subject || !body) return null;
-    if (!body.includes(url)) body = `${body}\n\n${url}`;
-    return { to, subject, body, by: 'mark' };
-  } catch {
-    return null;
-  }
+  const { subject: s, body: b } = splitDraft(text);
+  const subject = oneLine(s, 200);
+  let body = noteText(b, 3000);
+  if (!subject || !body) return null;
+  if (!body.includes(url)) body = `${body}\n\n${url}`;
+  return { to, subject, body, by: 'mark' };
 }
 
 function webhook(): { url: string; key: string } | null {
@@ -150,7 +147,7 @@ function webhook(): { url: string; key: string } | null {
   return null;
 }
 
-let override: { store?: ShareStore | null; post?: typeof fetch; agent?: typeof runAgent } = {};
+let override: { store?: ShareStore | null; post?: typeof fetch; agent?: typeof streamAgentText } = {};
 /** For the checks: stand-ins for Redis, the webhook post and Mark. */
 export function setShareSendSources(o: typeof override): void {
   override = o;
@@ -218,9 +215,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const recipientTitle = link?.recipient.title ?? oneLine(hint.title, 120);
     const fallback = templateDraft({ to, recipientName, account: title, message: link?.message ?? '', url, sender: identity.name || nameFromEmail(who) });
     const agentId = EMAIL_AGENT_ID();
-    if (!agentId || (!override.agent && !markConfigured())) return res.status(200).json(fallback);
+
+    // From here the answer is a stream: Mark's words as they come, then the draft.
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.status(200);
+    const send = (msg: Record<string, unknown>) => res.write(`data: ${JSON.stringify(msg)}\n\n`);
+    if (!agentId || (!override.agent && !markConfigured())) {
+      send({ k: 'done', draft: fallback });
+      return res.end();
+    }
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), EMAIL_TIMEOUT_MS);
+    // The rep closed the card (or the tab): stop Mark. Not req's close, which can fire once the body is read.
+    res.on?.('close', () => ac.abort());
+    let text = '';
     try {
-      const text = await (override.agent ?? runAgent)(
+      const words = (override.agent ?? streamAgentText)(
         agentId,
         {
           recipient_name: recipientName,
@@ -232,13 +244,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           page_url: url,
           sender_name: identity.name || nameFromEmail(who),
         },
-        25_000,
+        ac.signal,
       );
-      return res.status(200).json(parseDraft(text, to, url) ?? fallback);
+      for await (const t of words) {
+        text += t;
+        send({ k: 'text', t });
+      }
+      const draft = parseDraft(text, to, url);
+      if (!draft) console.warn("[share-send] Mark's answer was not a draft: the template instead");
+      send({ k: 'done', draft: draft ?? fallback });
     } catch (error) {
       console.warn('[share-send] Mark wrote no draft:', error instanceof MarkError || error instanceof Error ? error.message : 'error');
-      return res.status(200).json(fallback);
+      send({ k: 'done', draft: fallback });
+    } finally {
+      clearTimeout(timer);
+      res.end();
     }
+    return;
   } catch (error) {
     console.error(`[share-send] ${channel} failed:`, error instanceof Error ? error.message : 'error');
     return res.status(502).json({ error: channel === 'teams' ? 'Mark didn’t take the message. Try again' : 'Could not write the email' });

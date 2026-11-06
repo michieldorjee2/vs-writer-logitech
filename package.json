@@ -28,6 +28,7 @@
     "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:cta-ping && npm run check:share-links && npm run check:share-teams && npm run check:www"
   },
   "dependencies": {
+    "@optimizely-opal/opal-agent-sdk": "0.11.0",
     "@optimizely/cms-sdk": "3.1.0",
     "@radix-ui/react-accordion": "^1.2.20",
     "@radix-ui/react-alert-dialog": "^1.1.23",

@@ -148,13 +148,16 @@ function ReportIcon({ state }: { state: ReportState }) {
   );
 }
 
-/** The folded-rail glyph (the rail's own collapse button). */
-function PanelIcon() {
+/**
+ * Mark's sidebar arrow (Material's chevron, as mark.optimizely.com draws it): pointing left on
+ * the rail, to fold it away; right on the folded button, to bring it back.
+ */
+function ChevronIcon({ dir }: { dir: 'left' | 'right' }) {
   return (
-    <svg viewBox="26 978 20 20" width="20" height="20" aria-hidden="true">
+    <svg viewBox="0 -960 960 960" width="20" height="20" aria-hidden="true" style={dir === 'left' ? { transform: 'scaleX(-1)' } : undefined}>
       <path
         fill="currentColor"
-        d="M28.2113 998C27.6113 998 27.0927 997.781 26.6556 997.344C26.2185 996.907 26 996.389 26 995.789V980.211C26 979.611 26.2185 979.093 26.6556 978.656C27.0927 978.219 27.6113 978 28.2113 978H43.7887C44.3887 978 44.9073 978.219 45.3444 978.656C45.7815 979.093 46 979.611 46 980.211V995.789C46 996.389 45.7815 996.907 45.3444 997.344C44.9073 997.781 44.3887 998 43.7887 998H28.2113ZM36 996.129H43.7887C43.874 996.129 43.9521 996.094 44.0231 996.023C44.094 995.952 44.1294 995.874 44.1294 995.789V980.211C44.1294 980.126 44.094 980.048 44.0231 979.977C43.9521 979.906 43.874 979.871 43.7887 979.871H36V996.129Z"
+        d="M519.9-481.41 351.82-649.74q-10.15-9.9-10.01-23.5.14-13.61 10.09-23.76 9.95-10.15 23.89-10.15 13.95 0 24.24 10.28L587.9-509q5.61 5.62 8.84 12.56 3.23 6.95 3.23 15.23 0 8.29-3.23 15.36-3.23 7.08-8.84 12.7L399.61-264.87q-9.89 9.89-23.83 9.88-13.93-.01-23.88-10.29t-9.95-23.9q0-13.61 10.28-23.9L519.9-481.41Z"
       />
     </svg>
   );
@@ -194,7 +197,8 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
 /**
  * The booth rail: a full-height column down the left, the page set in beside it with rounded
  * corners, in the search page's surfaces (search-home.css: Axiom tokens, light or dark with the
- * system). Top to bottom:
+ * system), spaced and coloured as Mark's own sidebar is when collapsed (rounded tiles 4 px apart,
+ * the one in use on a soft wash), each tool's name under its icon. Top to bottom:
  *   • Search: back to /search.
  *   • Edit: feedback mode, routed to Mark, who edits the page live and reloads it when done.
  *   • X-ray: the per-section data overlay.
@@ -354,6 +358,8 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
               )
             }
           />
+          {/* Getting around above, the page's tools below, as Mark's sidebar divides its groups. */}
+          <span className="booth-rail__divider" aria-hidden="true" />
           <RailButton
             i={1}
             away={mode === 'xray'}
@@ -436,7 +442,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
             aria-label="Hide the tools"
             title="Hide the tools"
           >
-            <PanelIcon />
+            <ChevronIcon dir="left" />
           </button>
           <button
             type="button"
@@ -464,7 +470,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         aria-label="Show the tools"
         title="Show the tools"
       >
-        {hasReport ? <ReportIcon state={report} /> : <PanelIcon />}
+        {hasReport ? <ReportIcon state={report} /> : <ChevronIcon dir="right" />}
       </button>
 
       <XrayMode

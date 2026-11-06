@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { CompetitorComparisonPage, PersonPage } from '../lib/graph-types';
 import { deriveCustomerName } from '../lib/page-identity';
 import { copyText } from '../lib/clipboard';
-import { checkShareInput, SHARE_LIMITS, type ShareRecipient } from '../lib/share-links';
+import { checkShareInput, SHARE_LIMITS, splitDraft, type ShareRecipient } from '../lib/share-links';
 import type { ShareLinksLoad } from '../hooks/useShareLinks';
 import SharedLinks from './SharedLinks';
 import '../styles/activity-mode.css';
@@ -16,10 +16,11 @@ import '../styles/share-sheet.css';
  *     (/s/<code>, api/share-links.ts) that opens on their note to that person (InviteNote.tsx).
  *     Every way out below then shares the personal link.
  *   • Copy link.
- *   • Send on Teams: Mark messages the rep (only them) the link with what the page has seen
- *     (api/share-send.ts, mark/share-teams/).
- *   • New email: Mark writes the email, from the rep's note when there is one; the rep reads it
- *     here and opens it in Outlook as a new message.
+ *   • Send to me: Mark messages the rep (only them) in Teams the link with what the page has
+ *     seen (api/share-send.ts, mark/share-teams/).
+ *   • New email: Mark writes the email, from the rep's note when there is one, and the card shows
+ *     it being written (streamed through the Agent SDK); the rep edits it here and opens it in
+ *     Outlook as a new message.
  *
  * On a person page the recipient's name and title are filled in from the page, and the page's
  * links are listed here (person pages have no Report).
@@ -49,6 +50,8 @@ interface Draft {
 }
 
 type Step<T = undefined> = { s: 'idle' } | { s: 'busy' } | { s: 'done'; value: T } | { s: 'error'; message: string };
+/** The email: Mark's words so far while he writes, then the draft to edit. */
+type EmailStep = { s: 'idle' } | { s: 'writing'; text: string } | { s: 'done'; value: Draft } | { s: 'error'; message: string };
 
 const stripTags = (html: string | null | undefined): string => (html ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
@@ -105,7 +108,9 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
   const [making, setMaking] = useState(false);
   const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [teams, setTeams] = useState<Step>({ s: 'idle' });
-  const [email, setEmail] = useState<Step<Draft>>({ s: 'idle' });
+  const [email, setEmail] = useState<EmailStep>({ s: 'idle' });
+  const [draftCopied, setDraftCopied] = useState(false);
+  const writing = useRef<AbortController | null>(null);
   const copyTimer = useRef<number | undefined>(undefined);
 
   const link = personal?.url ?? publicUrl;
@@ -128,6 +133,7 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
 
   /** A new link (or none): what was sent or drafted for the old one no longer applies. */
   const switchLink = useCallback((next: Personal | null) => {
+    writing.current?.abort();
     setPersonal(next);
     setTeams({ s: 'idle' });
     setEmail({ s: 'idle' });
@@ -176,19 +182,61 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
     }
   }, [route, personal, about]);
 
+  /** Mark writes the email; his words land on the card as they come (api/share-send.ts streams them). */
   const onEmail = useCallback(async () => {
-    setEmail({ s: 'busy' });
+    writing.current?.abort();
+    const ctrl = new AbortController();
+    writing.current = ctrl;
+    setEmail({ s: 'writing', text: '' });
+    setDraftCopied(false);
     try {
       // Without a personal link, a person page's email is still to its person.
       const recipient = !personal && prefill.name ? { name: prefill.name, title: prefill.title } : undefined;
-      const draft = await postJson<Draft>('/api/share-send', { channel: 'email', route, code: personal?.code ?? null, title: about.title, summary: about.summary, recipient });
-      setEmail({ s: 'done', value: draft });
+      const res = await fetch('/api/share-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        signal: ctrl.signal,
+        body: JSON.stringify({ channel: 'email', route, code: personal?.code ?? null, title: about.title, summary: about.summary, recipient }),
+      });
+      if (!res.ok || !res.body) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || 'Could not write the email');
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let i: number;
+        while ((i = buf.indexOf('\n\n')) !== -1) {
+          const frame = buf.slice(0, i).replace(/^data: ?/, '');
+          buf = buf.slice(i + 2);
+          const msg = JSON.parse(frame) as { k: 'text'; t: string } | { k: 'done'; draft: Draft };
+          if (msg.k === 'text') setEmail((prev) => ({ s: 'writing', text: (prev.s === 'writing' ? prev.text : '') + msg.t }));
+          else return setEmail({ s: 'done', value: msg.draft });
+        }
+      }
+      throw new Error('Mark stopped before the email was done');
     } catch (err) {
-      setEmail({ s: 'error', message: err instanceof Error ? err.message : 'No draft' });
+      if (!ctrl.signal.aborted) setEmail({ s: 'error', message: err instanceof Error ? err.message : 'No draft' });
     }
   }, [route, personal, about, prefill]);
 
+  // Closing the card stops Mark mid-sentence.
+  useEffect(() => {
+    if (!open) writing.current?.abort();
+  }, [open]);
+  useEffect(() => () => writing.current?.abort(), []);
+
   const setDraft = (patch: Partial<Draft>) => setEmail((prev) => (prev.s === 'done' ? { s: 'done', value: { ...prev.value, ...patch } } : prev));
+  const copyDraft = (d: Draft) =>
+    void copyText(`${d.subject}\n\n${d.body}`).then((ok) => {
+      setDraftCopied(ok);
+      if (ok) window.setTimeout(() => setDraftCopied(false), 1800);
+    });
 
   const field = (name: 'name' | 'title' | 'email', label: string, opts: { type?: string; required?: boolean; max: number; auto?: string }) => (
     <label className={'share-field' + (fieldError?.field === name ? ' is-invalid' : '')}>
@@ -212,8 +260,9 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
   );
 
   if (typeof document === 'undefined') return null;
-  const teamsLabel = teams.s === 'busy' ? 'Sending…' : teams.s === 'done' ? 'Sent to your Teams' : 'Send on Teams';
-  const emailLabel = email.s === 'busy' ? 'Mark is writing…' : 'New email';
+  const teamsLabel = teams.s === 'busy' ? 'Sending…' : teams.s === 'done' ? 'Sent to you' : 'Send to me';
+  const emailLabel = email.s === 'writing' ? 'Mark is writing…' : 'New email';
+  const live = email.s === 'writing' ? splitDraft(email.text) : null;
 
   return createPortal(
     <div
@@ -312,7 +361,6 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
               <path d="M10 4.5v11M4.5 10h11" />
             </svg>
             Add a personal message
-            <span className="share-add__hint">They read it before the page, and you see when they do</span>
           </button>
         )}
 
@@ -332,13 +380,19 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
             </span>
             <span className="share-action__label">{copied === 'copied' ? 'Copied' : copied === 'failed' ? 'Couldn’t copy' : 'Copy link'}</span>
           </button>
-          <button type="button" className={'share-action' + (teams.s === 'done' ? ' is-copied' : '')} onClick={onTeams} disabled={teams.s === 'busy' || teams.s === 'done'}>
+          <button
+            type="button"
+            className={'share-action' + (teams.s === 'done' ? ' is-copied' : '')}
+            onClick={onTeams}
+            disabled={teams.s === 'busy' || teams.s === 'done'}
+            title="Mark messages you the link in Teams, with what the page has seen"
+          >
             <span className="share-action__icon" aria-hidden="true">
               <img src="/logos/tools/teams.svg" alt="" width="26" height="26" />
             </span>
             <span className="share-action__label">{teamsLabel}</span>
           </button>
-          <button type="button" className={'share-action' + (email.s === 'busy' ? ' is-busy' : '')} onClick={onEmail} disabled={email.s === 'busy'}>
+          <button type="button" className={'share-action' + (email.s === 'writing' ? ' is-busy' : '')} onClick={onEmail} disabled={email.s === 'writing'}>
             <span className="share-action__icon" aria-hidden="true">
               <img src="/logos/tools/outlook.svg" alt="" width="26" height="26" />
             </span>
@@ -349,6 +403,19 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
           {teams.s === 'error' ? teams.message : email.s === 'error' ? email.message : teams.s === 'done' ? 'Mark is messaging you the link with what the page has seen.' : ''}
         </p>
 
+        {live && (
+          <div className="share-draft is-writing" aria-live="polite" aria-busy="true">
+            <div className="share-draft__head">
+              <span className="share-draft__writing">Mark is writing</span>
+            </div>
+            <div className="share-field__input share-draft__subject">{live.subject || <span className="share-draft__caret" />}</div>
+            <div className="share-field__input share-draft__body share-draft__body--live">
+              {live.body}
+              {live.subject && <span className="share-draft__caret" />}
+            </div>
+          </div>
+        )}
+
         {email.s === 'done' && (
           <div className="share-draft">
             <div className="share-draft__head">
@@ -356,10 +423,25 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
               {email.value.to ? <span className="share-draft__to">To {email.value.to}</span> : null}
             </div>
             <input className="share-field__input share-draft__subject" value={email.value.subject} aria-label="Subject" onChange={(e) => setDraft({ subject: e.target.value })} />
-            <textarea className="share-field__input share-draft__body" value={email.value.body} aria-label="Email" rows={8} onChange={(e) => setDraft({ body: e.target.value })} />
+            <textarea className="share-field__input share-draft__body" value={email.value.body} aria-label="Email" onChange={(e) => setDraft({ body: e.target.value })} />
             <div className="share-form__actions">
-              <button type="button" className="share-btn share-btn--ghost" onClick={() => void copyText(`${email.value.subject}\n\n${email.value.body}`)}>
-                Copy text
+              <button
+                type="button"
+                className={'share-icon-btn' + (draftCopied ? ' is-copied' : '')}
+                onClick={() => copyDraft(email.value)}
+                aria-label={draftCopied ? 'Email copied' : 'Copy the email'}
+                title={draftCopied ? 'Copied' : 'Copy the email'}
+              >
+                {draftCopied ? (
+                  <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4.5 10.5l3.5 3.5 7.5-8" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="7" y="7" width="10" height="10" rx="2" />
+                    <path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+                  </svg>
+                )}
               </button>
               <a className="share-btn share-btn--primary" href={outlookHref(email.value)} target="_blank" rel="noopener noreferrer">
                 Open in Outlook
@@ -368,7 +450,8 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
           </div>
         )}
 
-        {variant === 'person' && (
+        {/* Person pages have no Report: their links are listed here, once there are any. */}
+        {variant === 'person' && links.state === 'ready' && links.links.length > 0 && (
           <section className="share-history" aria-label="Links from this page">
             <h3 className="share-history__h">Sent from this page</h3>
             <SharedLinks load={links} compact />

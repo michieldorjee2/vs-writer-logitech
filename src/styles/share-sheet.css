@@ -102,11 +102,9 @@
 
 .share-add {
   appearance: none;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  column-gap: 10px;
-  row-gap: 2px;
+  gap: 10px;
   width: 100%;
   margin-top: 12px;
   padding: 14px;
@@ -122,11 +120,6 @@
 .share-add:hover {
   border-color: var(--booth-bar);
   background: var(--booth-hover);
-}
-.share-add__hint {
-  grid-column: 2;
-  font: 400 13px/16px var(--booth-font);
-  color: var(--booth-fg-3);
 }
 
 .share-form {
@@ -173,9 +166,15 @@
 .share-field.is-invalid .share-field__input {
   border-color: var(--booth-error);
 }
+.share-field__input--note,
+.share-draft__body {
+  resize: none;
+  /* The browser's scrollbar is white on the dark card: a thin one in the card's own colours. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--booth-quiet) transparent;
+}
 .share-field__input--note {
   min-height: 104px;
-  resize: vertical;
 }
 .share-form__error {
   margin: 0;
@@ -326,9 +325,69 @@
   font-weight: 500;
 }
 .share-draft__body {
-  min-height: 170px;
-  resize: vertical;
+  /* Grows with the email (where the browser can), scrolls past 320 px. */
+  field-sizing: content;
+  min-height: 150px;
+  max-height: 320px;
+  overflow-y: auto;
   font-size: 14px;
+}
+/* While Mark writes: the same box, his words arriving, a caret at the end. */
+.share-draft__body--live {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.share-draft.is-writing .share-draft__subject {
+  min-height: 42px;
+}
+.share-draft__caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: var(--booth-accent);
+  animation: share-caret 1s steps(1) infinite;
+}
+.share-draft__writing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.share-draft__writing::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--booth-accent);
+  animation: share-breathe 1.4s ease-in-out infinite;
+}
+@keyframes share-caret {
+  50% { opacity: 0; }
+}
+
+/* Copy, as an icon: two squares. */
+.share-icon-btn {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--booth-fg-2);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.share-icon-btn:hover {
+  background: var(--booth-hover);
+  color: var(--booth-fg);
+}
+.share-icon-btn.is-copied {
+  color: var(--booth-accent-text);
 }
 
 .share-history {
@@ -345,6 +404,7 @@
 .share-card__close:focus-visible,
 .share-add:focus-visible,
 .share-btn:focus-visible,
+.share-icon-btn:focus-visible,
 .share-action:focus-visible,
 .booth-links__toggle:focus-visible,
 .booth-links__more button:focus-visible {
@@ -518,7 +578,9 @@
   .share-draft,
   .booth-links__row,
   .booth-links__note,
-  .share-action.is-busy .share-action__icon {
+  .share-action.is-busy .share-action__icon,
+  .share-draft__caret,
+  .share-draft__writing::before {
     animation: none !important;
   }
 }

@@ -25,7 +25,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkShareInput, isEmail, noteText, sharePathOf, type ShareLink } from '../src/lib/share-links.js';
+import { checkShareInput, isEmail, noteText, sharePathOf, splitDraft, type ShareLink } from '../src/lib/share-links.js';
 import { newCode, type ShareStore } from '../api/_lib/share-store.js';
 import linksHandler, { setShareLinksStore } from '../api/share-links.js';
 import goHandler, { setShareGoStore } from '../api/share-go.js';
@@ -72,10 +72,17 @@ check('codes: no repeats in 5000', codes.size === 5000);
 
 /* ---------- the stand-ins ---------- */
 
-type Res = { statusCode: number; body: unknown; headers: Record<string, string>; ended: boolean };
+type Res = { statusCode: number; body: unknown; headers: Record<string, string>; ended: boolean; stream: string };
 function call(handler: (req: never, res: never) => unknown, req: Record<string, unknown>): Promise<Res> {
-  const out: Res = { statusCode: 200, body: undefined, headers: {}, ended: false };
+  const out: Res = { statusCode: 200, body: undefined, headers: {}, ended: false, stream: '' };
   const res = {
+    write(chunk: string) {
+      out.stream += chunk;
+      return true;
+    },
+    on() {
+      return res;
+    },
     setHeader: (k: string, v: string) => (out.headers[k.toLowerCase()] = v),
     getHeader: (k: string) => out.headers[k.toLowerCase()],
     status(c: number) {
@@ -350,16 +357,20 @@ check('share-send: the Teams request is mark/share-teams/fixture.json, which Mar
 }
 
 const posts: Array<{ url: string; headers: Record<string, string>; body: ShareTeamsPing }> = [];
-let agentAnswer: string | Error = '{"subject":"Ana, your page","body":"Hi Ana,\\n\\nHave a look."}';
+let agentAnswer: string | Error = 'Subject: Ana, your page\n\nHi Ana,\n\nHave a look.';
+/** The route's events, and the draft it ended with. */
+const eventsOf = (r: Res) => r.stream.split('\n\n').filter(Boolean).map((f) => JSON.parse(f.replace(/^data: /, '')) as { k: string; t?: string; draft?: { to: string; subject: string; body: string; by: string } });
+const draftOf = (r: Res) => eventsOf(r).find((e) => e.k === 'done')?.draft as { to: string; subject: string; body: string; by: string };
 setShareSendSources({
   store: mem.store,
   post: (async (url: string, init: RequestInit) => {
     posts.push({ url, headers: init.headers as Record<string, string>, body: JSON.parse(String(init.body)) });
     return new Response('{}', { status: 200 });
   }) as never,
-  agent: async () => {
+  // Mark, streaming: the answer in a few chunks, as the SDK yields them.
+  agent: async function* () {
     if (agentAnswer instanceof Error) throw agentAnswer;
-    return agentAnswer;
+    for (let i = 0; i < agentAnswer.length; i += 7) yield agentAnswer.slice(i, i + 7);
   },
 });
 const sendEnv = { SHARE_TEAMS_WEBHOOK_URL: 'https://webhook.mark.optimizely.com/webhooks/i/share', SHARE_TEAMS_WEBHOOK_KEY: 's'.repeat(32), SHARE_EMAIL_AGENT_ID: 'agent-1', KV_REST_API_URL: undefined, KV_REST_API_TOKEN: undefined };
@@ -388,17 +399,20 @@ try {
   check('share-send: off without the webhook', (await call(sendHandler, { method: 'POST', body: { channel: 'teams', route: '/lenovo/' } })).statusCode === 503);
 
   const e1 = await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/lenovo/', code: madeBody.code, title: 'Lenovo' } });
-  const d1 = e1.body as { to: string; subject: string; body: string; by: string };
-  check('share-send: Mark\'s draft, to the recipient, with the link', e1.statusCode === 200 && d1.by === 'mark' && d1.to === 'ana@lenovo.com' && d1.subject === 'Ana, your page' && d1.body.endsWith(`https://showcase.optimizely.com/s/${madeBody.code}`), d1);
+  const d1 = draftOf(e1);
+  const chunks = eventsOf(e1).filter((e) => e.k === 'text');
+  check('share-send: the email streams as Mark writes it, then the draft', e1.headers['content-type']?.startsWith('text/event-stream') && chunks.length > 3 && chunks.map((c) => c.t).join('') === agentAnswer && e1.ended, eventsOf(e1));
+  check('share-send: Mark\'s draft, to the recipient, with the link', e1.statusCode === 200 && d1?.by === 'mark' && d1.to === 'ana@lenovo.com' && d1.subject === 'Ana, your page' && d1.body.endsWith(`https://showcase.optimizely.com/s/${madeBody.code}`), d1);
   agentAnswer = new Error('Mark took too long');
-  const d2 = (await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/lenovo/', code: madeBody.code, title: 'Lenovo' } })).body as typeof d1;
+  const d2 = draftOf(await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/lenovo/', code: madeBody.code, title: 'Lenovo' } }));
   check('share-send: Mark unavailable: the template, with the note and the link', d2.by === 'template' && d2.body.includes('Here it is.') && d2.body.includes(`/s/${madeBody.code}`) && d2.subject === 'Ana, a page we made for Lenovo', d2);
   agentAnswer = 'Sure! Here you go: nothing useful';
-  const d3 = (await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/lenovo/', title: 'Lenovo' } })).body as typeof d1;
+  const d3 = draftOf(await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/lenovo/', title: 'Lenovo' } }));
   check('share-send: an answer that isn\'t a draft: the template, to nobody, with the public link', d3.by === 'template' && d3.to === '' && d3.body.includes('https://showcase.optimizely.com/lenovo/'), d3);
-  const d4 = (await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/depaul-university/tracy-krahl/', title: 'Tracy Krahl at DePaul University', recipient: { name: 'Tracy Krahl', title: 'AVP Communications' } } })).body as typeof d1;
+  const d4 = draftOf(await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/depaul-university/tracy-krahl/', title: 'Tracy Krahl at DePaul University', recipient: { name: 'Tracy Krahl', title: 'AVP Communications' } } }));
   check('share-send: a person page without a link still greets its person', d4.body.startsWith('Hi Tracy,') && d4.to === '' && d4.body.includes('/depaul-university/tracy-krahl/'), d4);
-  check('parseDraft: the link is added when Mark left it out', parseDraft('{"subject":"S","body":"B"}', '', 'https://x/s/1')?.body === 'B\n\nhttps://x/s/1');
+  check('parseDraft: the link is added when Mark left it out', parseDraft('Subject: S\n\nB', '', 'https://x/s/1')?.body === 'B\n\nhttps://x/s/1');
+  check('splitDraft: nothing until the subject line has started, then subject and body as they grow', JSON.stringify([splitDraft('Sub'), splitDraft('Subject: Hi'), splitDraft('Subject: Hi Ana\n\nHel')]) === JSON.stringify([{ subject: '', body: '' }, { subject: 'Hi', body: '' }, { subject: 'Hi Ana', body: 'Hel' }]));
 } finally {
   setEnv(sendSaved);
   signIn(null);

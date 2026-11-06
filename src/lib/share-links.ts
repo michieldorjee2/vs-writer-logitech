@@ -133,6 +133,16 @@ export function checkShareInput(body: unknown): ShareInputCheck {
   return { ok: true, value: { ...route, recipient: { name, title, email }, message } }
 }
 
+/**
+ * Mark's email as it is written: "Subject: …", a blank line, then the body (the
+ * showcase_share_email agent's format). Empty until the subject line has started.
+ */
+export function splitDraft(text: string): { subject: string; body: string } {
+  const m = /^\s*subject:[ \t]*([^\n]*)(?:\n([\s\S]*))?$/i.exec(text)
+  if (!m) return { subject: '', body: '' }
+  return { subject: m[1].trim(), body: (m[2] ?? '').replace(/^[ \t]*\n/, '').replace(/^\n+/, '') }
+}
+
 export const firstNameOf = (name: string): string => name.trim().split(/\s+/)[0] ?? ''
 
 /** A name from an address when a sign-in carries none: "michiel.dorjee@…" -> "Michiel Dorjee". */

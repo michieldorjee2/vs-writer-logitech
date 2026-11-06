@@ -5,6 +5,7 @@
  *
  * Env: OPAL_PAT (required), OPAL_BASE_URL, OPAL_INSTANCE_ID.
  */
+import { OpalClient, PatAuth } from '@optimizely-opal/opal-agent-sdk';
 import type { MarkChunk, MarkExecution } from '../../src/lib/page-builds.js';
 
 const BASE_URL = (process.env.OPAL_BASE_URL || 'https://opal.optimizely.com').replace(/\/+$/, '');
@@ -133,4 +134,37 @@ export async function runAgent(agentId: string, parameters: Record<string, unkno
     if (runDone(status)) return typeof ex.result === 'string' ? ex.result : (ex.result?.response ?? '');
   }
   throw new MarkError('Mark took too long', 504);
+}
+
+/**
+ * A quick agent's answer as Mark writes it, chunk by chunk, through the official Agent SDK
+ * (`@optimizely-opal/opal-agent-sdk`, stream-execute): the Share card shows the email being
+ * written. Ends when the run completes; throws when it fails, stalls (20 s without a byte) or
+ * `signal` aborts.
+ */
+export async function* streamAgentText(agentId: string, parameters: Record<string, string>, signal?: AbortSignal): AsyncGenerator<string> {
+  const pat = process.env.OPAL_PAT?.trim();
+  if (!pat) throw new MarkError('OPAL_PAT is not set', 503);
+  const client = new OpalClient({
+    auth: new PatAuth(pat),
+    config: { baseUrl: BASE_URL, instanceId: INSTANCE_ID, timeoutMs: 15_000, streamIdleTimeoutMs: 20_000 },
+  });
+  try {
+    for await (const ev of client.agents.specialized.stream(agentId, { parameters })) {
+      if (signal?.aborted) throw new MarkError('Mark took too long', 504);
+      const p = ev.payload as Record<string, unknown>;
+      if (ev.eventType === 'response_chunk') {
+        const t = typeof p.content === 'string' ? p.content : typeof p.chunk === 'string' ? p.chunk : '';
+        if (t) yield t;
+      } else if (ev.eventType === 'error') {
+        throw new MarkError(`Mark run failed: ${String(p.error_message ?? p.message ?? 'error').slice(0, 200)}`, 502);
+      } else if (ev.eventType === 'execution_complete') {
+        const status = String(p.status ?? 'COMPLETED');
+        if (status.toUpperCase() !== 'COMPLETED') throw new MarkError(`Mark run ${status}`, 502);
+        return;
+      }
+    }
+  } finally {
+    await client.close();
+  }
 }

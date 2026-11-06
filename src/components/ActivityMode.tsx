@@ -129,7 +129,8 @@ export default function ActivityMode({ open, onClose, load, retry, links }: Prop
             <Facts data={data} />
           </div>
         </div>
-        {links && (
+        {/* Only once the page has links: no empty lists. */}
+        {links?.state === 'ready' && links.links.length > 0 && (
           <section className="activity-card__links" aria-labelledby="activity-links-title">
             <h3 id="activity-links-title" className="activity-card__h">
               Shared links

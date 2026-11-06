@@ -9,7 +9,12 @@
    ============================================================ */
 
 :root {
-  --booth-rail-w: 72px;
+  /* Spaced and coloured as Mark's own sidebar, collapsed (mark.optimizely.com, measured 6 Nov
+   * 2026: 8 px in, tiles 4 px apart, rounded 8, icons in fg.secondary, the current one on a soft
+   * wash), with each tool's name kept under its icon, so the tiles are 48 px and the rail 64. */
+  --booth-rail-w: 64px;
+  --booth-rail-on: rgb(32 35 32 / 0.07);
+  --booth-rail-rule: rgb(32 35 32 / 0.12);
   --booth-corner: 20px;
   --booth-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --booth-ease-out: cubic-bezier(0.5, 0, 0.75, 0);
@@ -58,6 +63,8 @@
     --booth-plot-empty: #3c3d40;
     --booth-plot-now: rgb(245 246 247 / 0.51);
     --booth-veil: rgb(20 22 20 / 0.32);
+    --booth-rail-on: rgb(221 233 210 / 0.14);
+    --booth-rail-rule: rgb(221 233 210 / 0.16);
   }
 }
 
@@ -89,7 +96,7 @@ html.booth-page--rail .www-page .www-sticky {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0 16px;
+  padding: 8px 0;
   background: var(--booth-page);
   color: var(--booth-fg);
   font-family: var(--booth-font);
@@ -127,6 +134,20 @@ html.booth-page--rail .www-page .www-sticky {
   flex-direction: column;
   align-items: center;
 }
+/* 4 px between tiles; one folded away (below) gives its gap back. */
+.booth-rail__items > * + * {
+  margin-top: 4px;
+}
+.booth-rail__slot:empty {
+  display: none;
+}
+/* Between getting around and the page's tools, as Mark's sidebar divides its groups. */
+.booth-rail__divider {
+  width: 16px;
+  height: 1px;
+  margin-block: 8px 4px !important;
+  background: var(--booth-rail-rule);
+}
 
 .booth-rail__btn,
 .booth-rail__fold {
@@ -154,6 +175,7 @@ html.booth-page--rail .www-page .www-sticky {
     background 160ms ease,
     color 160ms ease,
     height 420ms var(--booth-ease),
+    margin 420ms var(--booth-ease),
     transform 560ms var(--booth-ease) calc(120ms + var(--i, 0) * 55ms),
     opacity 360ms ease calc(120ms + var(--i, 0) * 55ms);
 }
@@ -163,41 +185,37 @@ html.booth-page--rail .www-page .www-sticky {
 .booth-rail.is-open .booth-rail__btn.is-away,
 .booth-rail.is-open .booth-rail__fold.is-away {
   height: 0;
+  margin-top: 0;
   opacity: 0;
   transform: translateX(-24px);
   pointer-events: none;
   transition:
     height 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
+    margin 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
     opacity 160ms ease calc(var(--i, 0) * 30ms),
     transform 220ms var(--booth-ease-out) calc(var(--i, 0) * 30ms);
 }
 
 .booth-rail__btn {
-  width: 50px;
-  height: 46px;
+  position: relative;
+  width: 48px;
+  height: 50px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
-  font: 500 12px/1 var(--booth-font);
+  color: var(--booth-fg-2);
+  font: 500 11px/1 var(--booth-font);
   letter-spacing: 0;
   white-space: nowrap;
 }
-.booth-rail__btn--back {
-  height: 50px;
-  margin-bottom: -2px;
-  background: var(--booth-tile);
-}
 .booth-rail__btn:hover,
 .booth-rail__btn.is-on {
-  background: var(--booth-hover);
-}
-.booth-rail__btn--back:hover {
-  background: var(--booth-tile);
-  color: var(--booth-accent-text);
+  background: var(--booth-rail-on);
+  color: var(--booth-fg);
 }
 .booth-rail__btn:focus-visible,
 .booth-rail__fold:focus-visible,
@@ -256,8 +274,8 @@ html.booth-page--rail .www-page .www-sticky {
 .booth-rail__btn--send.is-hinted::after {
   content: '';
   position: absolute;
-  inset: 2px;
-  border-radius: 10px;
+  inset: 1px;
+  border-radius: 7px;
   box-shadow: 0 0 0 2px var(--booth-bar);
   pointer-events: none;
   animation: booth-hint-pulse 1.6s ease-in-out infinite;
@@ -271,8 +289,8 @@ html.booth-page--rail .www-page .www-sticky {
 }
 .booth-rail__count {
   position: absolute;
-  top: -6px;
-  right: -11px;
+  top: -5px;
+  right: -9px;
   box-sizing: border-box;
   min-width: 16px;
   height: 16px;
@@ -302,13 +320,6 @@ html.booth-page--rail .www-page .www-sticky {
   50% { transform: translateY(3px); }
 }
 
-/* Share: copied, said in the label for a moment. */
-.booth-rail__btn--share.is-copied {
-  color: var(--booth-accent-text);
-}
-.booth-rail__btn--share.is-failed .booth-rail__label {
-  color: var(--booth-fg-3);
-}
 
 /* The foot: the fold button, or "?" (the Edit tutorial again) while Edit runs. */
 .booth-rail__foot {
@@ -319,16 +330,16 @@ html.booth-page--rail .www-page .www-sticky {
 
 /* The fold button at the foot of the rail. */
 .booth-rail__fold {
-  width: 40px;
+  width: 48px;
   height: 40px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--booth-quiet);
+  color: var(--booth-fg-2);
 }
 .booth-rail__fold:hover {
-  background: var(--booth-hover);
+  background: var(--booth-rail-on);
   color: var(--booth-fg);
 }
 .booth-rail__fold svg {
@@ -339,16 +350,16 @@ html.booth-page--rail .www-page .www-sticky {
 
 .booth-rail-mini {
   position: fixed;
-  left: 11px;
-  bottom: 11px;
+  left: 8px;
+  bottom: 8px;
   z-index: 960;
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--booth-page);
   color: var(--booth-fg);
   box-shadow: 0 10px 30px -8px rgb(8 37 26 / 0.45);
