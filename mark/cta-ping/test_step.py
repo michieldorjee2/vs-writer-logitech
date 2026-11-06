@@ -100,7 +100,13 @@ class Teams(Base):
         self.assertIn("Sam Rep (Sales Development Representative)", body)
         self.assertIn('href="https://showcase.optimizely.com/zurich-versicherung/"', body)
         self.assertIn("4 Nov 2026, 23:06 UTC", body)
-        self.assertIn("Michiel's account", body)
+        # Mark's animated emoji and "Mark here!" open the message; the link names the company, not the URL.
+        self.assertTrue(body.startswith("<p>" + step.MARK_EMOJI + " Mark here! Hi Alex,"), body[:200])
+        self.assertIn('alt="mark-party"', step.MARK_EMOJI)
+        self.assertIn(">Open Zürich Versicherung – “Group” | AG page</a>", body)
+        self.assertNotIn(">https://showcase.optimizely.com/zurich-versicherung/<", body, "the raw URL is no longer the link text")
+        self.assertNotIn("Sent automatically", body, "the sign-off line is gone")
+        self.assertNotIn("Michiel's account", body)
 
     def test_a_person_page_says_whose_page_it_was(self):
         ping = copy.deepcopy(FIXTURE)
@@ -109,6 +115,7 @@ class Teams(Base):
         body = FAKE.calls[1][1]["body"]
         self.assertIn("the Showcase page we wrote for Ben &lt;Yu&gt; at Logitech G", body)
         self.assertIn('href="https://showcase.optimizely.com/logitech/ben-yu/"', body)
+        self.assertIn(">Open Ben &lt;Yu&gt;&#x27;s page</a>", body, "a person page's link names the person")
 
     def test_a_person_page_row_names_the_person(self):
         ping = copy.deepcopy(FIXTURE)

@@ -38,6 +38,9 @@ SENDER_EMAILS = {"michiel@optimizely.com", "michiel.dorjee@optimizely.com"}
 SHEET_ID = "1ZkyFBynQu4k8UynJmgYhrDmdKlMyJgC7VAQYCHoCnOg"  # "Showcase CTA follow-ups"
 SHEET_RANGE = "Pings!A:I"
 MARKERS = "/workspace/cta-ping"
+# Mark's animated "mark-party" Teams custom emoji. Teams looks the image up from the id when the message
+# is sent, so the tag is only id + alt (the id was read back from a message posted with :mark-party:).
+MARK_EMOJI = '<customemoji id="MC1uZXUtZDYtMGZiMWY3NzE4MzczZTBmZTRhZjQ4ZDcyNjhkNWFmMGI=" alt="mark-party"></customemoji>'
 
 # An account page (/<slug>/) or a person page (/<company>/<person>/).
 PAGE = re.compile(r"^https://showcase\.optimizely\.com/[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/(?:[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?/)?$")
@@ -170,9 +173,10 @@ def message(ping):
         if ping["person"]
         else "the %s Showcase page" % html.escape(ping["account"])
     )
+    link = "Open %s's page" % ping["person"] if ping["person"] else "Open %s page" % ping["account"]
     lines = [
-        "<p>Hi %s, <b>someone on %s just asked to talk to their Optimizely team.</b></p>"
-        % (html.escape(rep_first), where),
+        "<p>%s Mark here! Hi %s, <b>someone on %s just asked to talk to their Optimizely team.</b></p>"
+        % (MARK_EMOJI, html.escape(rep_first), where),
         "<p>They clicked %s. The page lists you as the account executive, and it told them"
         " we've let you know.</p>" % html.escape(ping["button"]),
     ]
@@ -182,7 +186,7 @@ def message(ping):
         '<p><a href="%s">%s</a><br>%s%s</p>'
         % (
             html.escape(ping["page"], quote=True),
-            html.escape(ping["page"]),
+            html.escape(link),
             html.escape(when(ping["requested_at"])),
             (" &middot; " + html.escape(ping["campaign"])) if ping["campaign"] else "",
         ),
@@ -190,10 +194,6 @@ def message(ping):
     others = ["%s (%s)" % (m["name"], m["role"]) if m["role"] else m["name"] for m in ping["team"]]
     if others:
         lines.append("<p>Also on the page: %s</p>" % html.escape(", ".join(others)))
-    lines.append(
-        "<p><em>Sent automatically by Showcase from Michiel's account."
-        " The visitor doesn't see this chat.</em></p>"
-    )
     return "".join(lines)
 
 

@@ -17,13 +17,14 @@ When a visitor clicks "talk to your team" on a Showcase account page or person p
 
 The message reads like this (HTML in Teams):
 
-> Hi Alex, **someone on the Zürich Versicherung Showcase page just asked to talk to their Optimizely team.**
+> (Mark's animated `mark-party` emoji) Mark here! Hi Alex, **someone on the Zürich Versicherung Showcase page just asked to talk to their Optimizely team.**
 > They clicked the bar that follows them down the page. The page lists you as the account executive, and it told them we've let you know.
-> https://showcase.optimizely.com/zurich-versicherung/ · 4 Nov 2026, 23:06 UTC · source: outreach
+> [Open Zürich Versicherung page](https://showcase.optimizely.com/zurich-versicherung/) · 4 Nov 2026, 23:06 UTC · source: outreach
 > Also on the page: Sam Rep (Sales Development Representative)
-> *Sent automatically by Showcase from Michiel's account. The visitor doesn't see this chat.*
 
-On a person page the first line reads "someone on the Showcase page we wrote for Ben Yu at Logitech G just asked to talk to their Optimizely team".
+On a person page the first line reads "someone on the Showcase page we wrote for Ben Yu at Logitech G just asked to talk to their Optimizely team" and the link reads "Open Ben Yu's page".
+
+The emoji is a Teams custom emoji, sent as `<customemoji id="…" alt="mark-party">` (`MARK_EMOJI` in `step.py`). Teams fills in the image from the id when it sends, and the id belongs to the emoji uploaded to Michiel's Teams, so renaming or re-uploading it means reading the new id back from a message that uses it.
 
 When the visitor came in by a personal link (a rep's note to one person, from the page's Share card), the click carries `shared`: the link's code, who it was for (name, title, address) and who sent it. The message then adds **"They came in by the personal link Michiel Dorjee sent to Lena Brunner (Head of Digital, lena.brunner@zurich.example)."**, and a sheet row says the same after the campaign. `fixture-shared.json` is such a click, built by `buildPing` (`scripts/check-share-links.ts` checks that); a click without a link has no `shared` at all, so `fixture.json` is unchanged.
 
