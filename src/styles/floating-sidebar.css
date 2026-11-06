@@ -714,9 +714,8 @@ body.xray-active .sticky-cta {
  * Under the booth chrome a www page never stops moving while you scroll (the hero's parallax,
  * each scene's entrance, the progress hairline). A backdrop blur over layers that keep changing
  * flickers in Chrome and Safari (Michiel, 3 Nov: "flickering for the admin sidebar when
- * scrolling"). There the X-ray and Edit bars are solid Dark Fir; the rail is solid already. */
-body:has(.www-page) .xray-hud,
-body:has(.www-page) .edit-hud {
+ * scrolling"). There X-ray's bar is solid Dark Fir; the rail and Edit's surfaces are solid already. */
+body:has(.www-page) .xray-hud {
   background: #08251a;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

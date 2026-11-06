@@ -99,6 +99,8 @@ Unset `OPTIID_RELAY_SECRET` means no gate, and no identity unless `DEV_AUTH_EMAI
 
 The showcase's "Edit mode" (`src/components/EditMode.tsx` + `api/opal-edit-stream.ts`) streams the `account_page_live_edit` Opal specialized agent over SSE and animates its edits on-page before the agent commits a single `update_page`. It absorbed the retired standalone `aldus-live-edit` app (June 2026).
 
+It runs in the booth rail (below): pressing Edit folds the other tools out of the rail and slides Send in under it, with the number of comments waiting; Edit again, or Escape, leaves. A note at the top says what to do until the first comment. The comment popup, Mark's status and change cards, the thanks splash, the "edits are live" toast and the still-working popup all use the rail's surfaces and type, light or dark with the system (`src/styles/edit-mode.css`).
+
 Server-side environment (Vercel project `aldus`; also in local `.env.local`):
 
 ```bash
@@ -112,7 +114,7 @@ Without `OPAL_PAT` the endpoint responds with a clean SSE error ("Server is miss
 
 ## The booth rail and the Report (preview)
 
-With `?search=1` and an Optimizely sign-in, a page gets the booth rail: a full-height column down the left (`src/components/FloatingSidebar.tsx`, `src/styles/booth-rail.css`) with the page set in beside it, rounded at the corners, in the search page's surfaces (Axiom tokens, light or dark with the system). Top to bottom: Search (back to `/search`), Edit, X-ray, Share (copies the page's public address, without `?search=1`) and, on account pages, Report. The button at its foot folds the rail away and leaves one button at the bottom left to bring it back; the choice is kept in this browser. The rail slides and its buttons cascade in from the left. X-ray and Edit take the whole screen, so the rail steps aside while they run.
+With `?search=1` and an Optimizely sign-in, a page gets the booth rail: a full-height column down the left (`src/components/FloatingSidebar.tsx`, `src/styles/booth-rail.css`) with the page set in beside it, rounded at the corners, in the search page's surfaces (Axiom tokens, light or dark with the system). Top to bottom: Search (back to `/search`), Edit (Edit mode runs in the rail, above), X-ray, Share (copies the page's public address, without `?search=1`) and, on account pages, Report. The button at its foot folds the rail away and leaves one button at the bottom left to bring it back; the choice is kept in this browser. The rail slides and its buttons cascade in from the left. X-ray takes the whole screen, so the rail steps aside while it runs.
 
 **Report.** The page's story from ODP, prospects only, over its whole history, on a card over the page, which blurs behind it, the rail included (`src/components/ActivityMode.tsx`). Its data is asked for as the rail mounts (`src/hooks/usePageActivity.ts`): the Report icon waves while it loads and turns to bars when it is in (lime when the page has visits). Journey: when the page was built and last updated, first viewed, first engaged with (a visit of 30 s or more, scrolled past half, or with a click), and first had a CTA pressed; the step it is at opens to the visits behind it. Data: first and last seen, the longest visit, CTA clicks, the account's stage, the last visit's channel and the last country known. Activity: visits in seven slots up to today (days, weeks or 30-day months, by the page's age). "Open in Salesforce" links the page's Salesforce account.
 

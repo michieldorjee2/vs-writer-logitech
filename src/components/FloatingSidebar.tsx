@@ -255,14 +255,17 @@ interface RailButtonProps {
   modifier: string;
   pressed?: boolean;
   on?: boolean;
+  /** Folded out of the rail for now (Edit mode keeps only Search, Edit and Send). */
+  away?: boolean;
 }
 
-function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on }: RailButtonProps) {
+function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on, away }: RailButtonProps) {
   return (
     <button
       type="button"
-      className={`booth-rail__btn booth-rail__btn--${modifier}` + (on ? ' is-on' : '')}
+      className={`booth-rail__btn booth-rail__btn--${modifier}` + (on ? ' is-on' : '') + (away ? ' is-away' : '')}
       style={{ '--i': i } as CSSProperties}
+      inert={away}
       onClick={onClick}
       aria-pressed={pressed}
       aria-label={ariaLabel}
@@ -286,8 +289,9 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on 
  *   • Report (account pages): the page's story from ODP. Its data loads as the rail mounts; the
  *     icon waves until it is in, then turns to bars.
  * The button at the foot folds the rail away; a single Report button stays at the bottom left to
- * bring it back. The rail slides, its buttons cascade in from the left. X-ray and Edit take the
- * whole screen, so the rail steps aside while they run.
+ * bring it back. The rail slides, its buttons cascade in from the left. X-ray takes the whole
+ * screen, so the rail steps aside while it runs. Edit runs in the rail: the other tools fold out,
+ * Send (with the comment count) slides in under Edit, and Edit again (or Escape) leaves.
  *
  * Rendered only for a signed-in employee (see FloatingSidebar above). The
  * routes behind the tools check the session themselves; mounting the
@@ -316,9 +320,12 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
 
   const isWorking = workingUntil > now;
   const remaining = Math.max(0, workingUntil - now);
-  const modeTakesScreen = xrayActive || editActive;
-  const railShown = entered && !collapsed && !modeTakesScreen;
-  const miniShown = entered && collapsed && !modeTakesScreen;
+  // X-ray takes the whole screen. Edit runs in the rail: it opens the rail even when folded, and
+  // its controls (Send) sit under the Edit button.
+  const railShown = entered && (!collapsed || editActive) && !xrayActive;
+  const miniShown = entered && collapsed && !editActive && !xrayActive;
+  /** Where Edit mode puts its controls: a slot in the rail under the Edit button. */
+  const [editSlot, setEditSlot] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
@@ -508,7 +515,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
             onClick={handleEditClick}
             pressed={editActive}
             on={editActive}
-            ariaLabel={isWorking ? `Mark is working on your edits, ${formatRemaining(remaining)} left` : editActive ? 'Exit edit mode' : 'Edit this page'}
+            ariaLabel={isWorking ? `Mark is working on your edits, ${formatRemaining(remaining)} left` : editActive ? 'Exit edit mode' : 'Enter edit mode'}
             label={isWorking ? formatRemaining(remaining) : 'Edit'}
             icon={
               isWorking ? (
@@ -529,13 +536,16 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
               )
             }
           />
+          {/* Edit mode's controls (Send) land here, under the Edit button (EditMode, `controls`). */}
+          <div className="booth-rail__slot" ref={setEditSlot} />
           <RailButton
             i={2}
+            away={editActive}
             modifier="xray"
             onClick={handleXrayClick}
             pressed={xrayActive}
             on={xrayActive}
-            ariaLabel={xrayActive ? 'Exit X-ray' : 'X-ray this page'}
+            ariaLabel={xrayActive ? 'Exit X-ray mode' : 'Enter X-ray mode'}
             label="X-ray"
             icon={
               <svg viewBox="27 111 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -549,6 +559,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           />
           <RailButton
             i={3}
+            away={editActive}
             modifier={'share' + (shared !== 'idle' ? ` is-${shared}` : '')}
             onClick={handleShareClick}
             ariaLabel={shared === 'copied' ? 'Public link copied' : shared === 'failed' ? 'Could not copy the link' : 'Copy the public link'}
@@ -573,6 +584,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           {hasReport && (
             <RailButton
               i={4}
+              away={editActive}
               modifier="report"
               onClick={handleReportClick}
               pressed={reportOpen}
@@ -585,8 +597,9 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         </div>
         <button
           type="button"
-          className="booth-rail__fold"
+          className={'booth-rail__fold' + (editActive ? ' is-away' : '')}
           style={{ '--i': hasReport ? 5 : 4 } as CSSProperties}
+          inert={editActive}
           onClick={collapseRail}
           aria-label="Hide the tools"
           title="Hide the tools"
@@ -622,6 +635,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         page={page}
         variant={variant}
         editorEmail={identity.email}
+        controls={editSlot}
       />
 
       {editsLanded && (

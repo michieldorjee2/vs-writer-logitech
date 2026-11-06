@@ -37,6 +37,12 @@ interface Props {
    * address whatever the browser says.
    */
   editorEmail: string;
+  /**
+   * Where the mode's controls go: a slot in the booth rail under the Edit button
+   * (FloatingSidebar.tsx). Send, with the comment count, is drawn there; the mode has no bar of
+   * its own. Null until the rail has mounted.
+   */
+  controls: HTMLElement | null;
 }
 
 type DocSize = { w: number; h: number };
@@ -214,7 +220,7 @@ function copyNow(fields: string[], shown: Record<string, string | string[]>): Re
   return out;
 }
 
-function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props) {
+function EditMode({ active, onClose, onSent, page, variant, editorEmail, controls }: Props) {
   // On either account template Edit mode offers each part with the fields it shows, tells Mark
   // which fields, and shows Mark's edits by re-rendering the page from the values he streams. The
   // agent platform page is mostly template copy: its parts are the ones a field drives.
@@ -417,7 +423,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
   useEffect(() => {
     if (!activeSection || !popupRef.current) return;
     const r = popupRef.current.getBoundingClientRect();
-    const margin = 80; // keep clear of the top hud
+    const margin = 80; // keep clear of the hint at the top
     const belowFold = r.bottom > window.innerHeight - 24;
     const aboveFold = r.top < margin;
     if (belowFold || aboveFold) {
@@ -431,6 +437,8 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // The Report card open over Edit mode takes this Escape; the comments stay.
+      if (document.documentElement.classList.contains('activity-open')) return;
       if (activeSection) {
         setActiveSection(null);
         return;
@@ -868,7 +876,6 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         >
           <div className="edit-popup__head">
             <div>
-              <div className="edit-popup__eyebrow">Section</div>
               <div className="edit-popup__title">{entry.section.title}</div>
               {(entry.section as EditSectionInfo).hint && <div className="edit-popup__hint">{(entry.section as EditSectionInfo).hint}</div>}
             </div>
@@ -898,7 +905,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
             }}
           />
           <div className="edit-popup__actions">
-            {existing && (
+            {existing ? (
               <button
                 type="button"
                 className="edit-popup__btn edit-popup__btn--delete"
@@ -906,6 +913,10 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
               >
                 Delete
               </button>
+            ) : (
+              <span className="edit-popup__by" title={`Mark makes the edit as ${editorEmail}, the account you signed in with`}>
+                As {editorEmail.split('@')[0]}
+              </span>
             )}
             <div style={{ flex: 1 }} />
             <button
@@ -929,67 +940,57 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     }
   }
 
-  /** Viewport-fixed HUD: title, email pill, send button, exit. */
-  const hudLayer = (
-    <div className={'edit-fixed-layer edit-fixed-layer--' + phase}>
-      <div className="edit-hud" role="toolbar" aria-label="Edit toolbar">
-        <div className="edit-hud__brand">
-          <span className="edit-hud__dot" />
-          <span className="edit-hud__title">Edit Mode</span>
-          <span className="edit-hud__hint">
-            Click any section to leave feedback for Mark
-          </span>
-        </div>
-        <div className="edit-hud__right">
-          <span className="edit-hud__email" title={`Edits are sent as ${editorEmail}, the account you signed in with`}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <polyline points="22,6 12,13 2,6" />
-            </svg>
-            <span>{editorEmail}</span>
-          </span>
-          <button
-            type="button"
-            className={'edit-hud__send' + (canSend ? '' : ' edit-hud__send--disabled')}
-            onClick={canSend ? send : undefined}
-            disabled={!canSend}
-            aria-label="Send feedback"
-          >
+  /**
+   * The mode's controls, in the booth rail under the Edit button (the `controls` slot): Send, with
+   * the number of comments waiting. Leaving is the Edit button again, or Escape.
+   */
+  const railControls = controls
+    ? createPortal(
+        <button
+          type="button"
+          className={'booth-rail__btn booth-rail__btn--send' + (commentCount ? ' has-comments' : '') + (phase === 'working' ? ' is-working' : '')}
+          onClick={canSend ? send : undefined}
+          disabled={!canSend}
+          aria-label="Send feedback"
+          title={
+            phase === 'working'
+              ? 'Mark is making your edits'
+              : commentCount
+                ? `Send ${commentCount} comment${commentCount === 1 ? '' : 's'} to Mark, as ${editorEmail}`
+                : 'Leave a comment on the page first'
+          }
+        >
+          <span className="booth-rail__icon">
             {phase === 'working' ? (
-              <>
-                <span className="edit-hud__spinner" aria-hidden="true" />
-                <span>Editing live…</span>
-              </>
+              <span className="edit-spinner" aria-hidden="true" />
             ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 2L11 13" />
-                  <path d="M22 2l-7 20-4-9-9-4 20-7z" />
-                </svg>
-                <span>
-                  Send feedback
-                  {commentCount > 0 && (
-                    <span className="edit-hud__count">{commentCount}</span>
-                  )}
-                </span>
-              </>
+              <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M17.5 2.5L9.17 10.83" />
+                <path d="M17.5 2.5l-5.83 15-3.34-7.5-7.5-3.33 16.67-4.17z" />
+              </svg>
             )}
-          </button>
-          <button
-            type="button"
-            className="edit-hud__close"
-            onClick={onClose}
-            aria-label="Exit edit mode"
-            title="Exit edit mode"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+            {commentCount > 0 && phase !== 'working' && (
+              <span key={commentCount} className="booth-rail__count">
+                {commentCount}
+              </span>
+            )}
+          </span>
+          <span className="booth-rail__label">{phase === 'working' ? 'Editing' : 'Send'}</span>
+        </button>,
+        controls,
+      )
+    : null;
+
+  /** What to do, until the first comment: a small note at the top of the page. */
+  const hint =
+    phase === 'editing' && commentCount === 0 && !activeSection ? (
+      <div className="edit-hint" role="status">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3.33 16.67h3.34l8.75-8.75a2.36 2.36 0 0 0-3.34-3.34L3.33 13.33v3.34z" />
+        </svg>
+        Click any part of the page to leave feedback for Mark
       </div>
-    </div>
-  );
+    ) : null;
 
   /** Thanks splash that animates in, holds, then animates out. */
   const thanksSplash = phase === 'thanks' ? (
@@ -1044,7 +1045,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
         ) : liveError ? (
           <span className="live-hud__bang" aria-hidden="true">!</span>
         ) : (
-          <span className="edit-hud__spinner" aria-hidden="true" />
+          <span className="edit-spinner" aria-hidden="true" />
         )}
         <span className="live-hud__status">{liveStatus}</span>
         <button
@@ -1090,16 +1091,21 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
     </div>
   ) : null;
 
-  return createPortal(
+  return (
     <>
-      {docLayer}
-      {commentPopup}
-      {hudLayer}
-      {thanksSplash}
-      {liveCard}
-      {liveHud}
-    </>,
-    document.body,
+      {createPortal(
+        <>
+          {docLayer}
+          {commentPopup}
+          {hint}
+          {thanksSplash}
+          {liveCard}
+          {liveHud}
+        </>,
+        document.body,
+      )}
+      {railControls}
+    </>
   );
 }
 

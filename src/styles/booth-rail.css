@@ -23,6 +23,8 @@
   --booth-fg-3: #616755;              /* fg.tertiary */
   --booth-quiet: rgb(32 35 32 / 0.28); /* a step not reached; the fold button */
   --booth-focus: #197a94;             /* border.focus */
+  --booth-error: #cc1616;             /* fg.error */
+  --booth-warn: #8a5a00;              /* a skipped edit */
   --booth-accent: #abff44;            /* LFGreen, the same in both themes */
   --booth-accent-text: #3d8a00;       /* LFGreen deepened to read on the light page */
   --booth-bar: #3d8b14;               /* the Report glyph's bars, the journey line */
@@ -46,6 +48,8 @@
     --booth-fg-3: #a1ac8d;
     --booth-quiet: #484e46;
     --booth-focus: #409aab;
+    --booth-error: #fc8b8b;
+    --booth-warn: #f0b75e;
     --booth-accent-text: #abff44;
     --booth-bar: #abff44;
     --booth-bar-rest: rgb(57 62 50 / 0.32);
@@ -148,8 +152,23 @@ html.booth-page--rail .www-page .www-sticky {
   transition:
     background 160ms ease,
     color 160ms ease,
+    height 420ms var(--booth-ease),
     transform 560ms var(--booth-ease) calc(120ms + var(--i, 0) * 55ms),
     opacity 360ms ease calc(120ms + var(--i, 0) * 55ms);
+}
+
+/* Folded out of the rail while Edit runs (FloatingSidebar: `away`): they slide out to the left and
+ * the rail closes up behind them; leaving Edit brings them back in the same cascade. */
+.booth-rail.is-open .booth-rail__btn.is-away,
+.booth-rail.is-open .booth-rail__fold.is-away {
+  height: 0;
+  opacity: 0;
+  transform: translateX(-24px);
+  pointer-events: none;
+  transition:
+    height 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
+    opacity 160ms ease calc(var(--i, 0) * 30ms),
+    transform 220ms var(--booth-ease-out) calc(var(--i, 0) * 30ms);
 }
 
 .booth-rail__btn {
@@ -187,6 +206,7 @@ html.booth-page--rail .www-page .www-sticky {
 }
 
 .booth-rail__icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 20px;
@@ -198,6 +218,58 @@ html.booth-page--rail .www-page .www-sticky {
 }
 .booth-rail__label {
   display: block;
+}
+
+/* ------------ Edit mode in the rail ------------
+ * Edit pressed shows its pencil in the accent. Its controls arrive in the slot under it (EditMode
+ * portals them there): Send, with the number of comments waiting. */
+
+.booth-rail__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.booth-rail__btn--edit.is-on .booth-rail__icon {
+  color: var(--booth-accent-text);
+}
+.booth-rail__btn--send {
+  overflow: hidden;
+  animation: booth-slot-in 560ms var(--booth-ease) 120ms backwards;
+}
+@keyframes booth-slot-in {
+  from { height: 0; opacity: 0; transform: translateX(-24px); }
+}
+.booth-rail__btn--send:disabled {
+  cursor: default;
+  color: var(--booth-quiet);
+}
+.booth-rail__btn--send:disabled:hover {
+  background: transparent;
+}
+.booth-rail__btn--send.has-comments .booth-rail__icon {
+  color: var(--booth-accent-text);
+}
+.booth-rail__btn--send.is-working {
+  cursor: progress;
+  color: var(--booth-fg);
+}
+.booth-rail__count {
+  position: absolute;
+  top: -6px;
+  right: -11px;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--booth-accent);
+  color: #08251a;
+  font: 700 10px/16px var(--booth-font);
+  text-align: center;
+  animation: booth-count-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes booth-count-pop {
+  from { opacity: 0; transform: scale(0.4); }
 }
 
 /* X-ray: the scan line sweeps while the pointer is on it. */
@@ -390,7 +462,9 @@ html.booth-page--rail .www-page .www-sticky {
     transition-delay: 0ms !important;
   }
   .booth-report-icon.is-loading .booth-report-icon__wave,
-  .booth-rail__scan {
+  .booth-rail__scan,
+  .booth-rail__btn--send,
+  .booth-rail__count {
     animation: none !important;
   }
 }

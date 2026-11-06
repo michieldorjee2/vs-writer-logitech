@@ -679,10 +679,17 @@ test('offer page: scenes on the same background share it instead of each padding
 test('booth chrome on a www page is solid, with no backdrop blur (it flickered while scrolling)', () => {
   // Michiel, 3 Nov: "flickering for the admin sidebar when scrolling".
   const css = readFileSync('src/styles/floating-sidebar.css', 'utf8')
-  const rule = css.match(/body:has\(\.www-page\) \.xray-hud,[\s\S]*?\{([^}]*)\}/)?.[1] ?? ''
+  const rule = css.match(/body:has\(\.www-page\) \.xray-hud\s*\{([^}]*)\}/)?.[1] ?? ''
   assert.match(rule, /backdrop-filter: none/)
   assert.match(rule, /background: #08251a/)
-  for (const sel of ['.xray-hud', '.edit-hud']) assert.ok(css.includes(`body:has(.www-page) ${sel}`), sel)
+  assert.ok(css.includes('body:has(.www-page) .xray-hud'), '.xray-hud')
+  // Edit mode has no bar since 6 Nov (its controls are in the rail); its hint, popup and status are solid.
+  const edit = readFileSync('src/styles/edit-mode.css', 'utf8')
+  assert.ok(!/\.edit-hud\b/.test(edit), 'Edit mode has a bar again')
+  for (const sel of ['.edit-hint', '.edit-popup', '.live-hud']) {
+    const body = edit.match(new RegExp(`\\${sel} \\{([^}]*)\\}`))?.[1] ?? ''
+    assert.ok(body && !/backdrop-filter/.test(body), `${sel} blurs what is behind it`)
+  }
   // The rail (4 Nov) is an opaque surface from the start: no blur anywhere in it.
   const rail = readFileSync('src/styles/booth-rail.css', 'utf8')
   assert.ok(!/backdrop-filter/.test(rail), 'the rail blurs what is behind it')
