@@ -505,7 +505,7 @@ function buildHeadHtml(page: HeadSource): string {
   const isPersonPage = page.__template === 'person' || page.template === 'person';
   const isRetailPage = page.__template === 'retail' || page.template === 'retail';
   const isFinServPage = page.__template === 'finserv' || page.template === 'finserv';
-  let socialImage: string | null = null;
+  let socialImage: string | null;
   if (isRetailPage) {
     // resolveUrl reads either URL shape Graph has used ({ default } or a bare
     // string). The old `x?.imageUrl?.default || x?.imageUrl` chain handed the

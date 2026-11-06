@@ -312,6 +312,7 @@ function EditMode({ active, onClose, page, variant, editorEmail, controls, tutor
   /* ---- Lifecycle: opening / closing the mode ---- */
   useEffect(() => {
     if (!active) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing Edit resets its state together with the stream abort and body class below
       setPhase('editing');
       setOutlines([]);
       setComments({});
@@ -339,6 +340,7 @@ function EditMode({ active, onClose, page, variant, editorEmail, controls, tutor
     if (!active) return;
 
     const ds = getDocSize();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measured from the DOM in a layout effect: there is nothing to derive it from in render
     setDocSize(ds);
     docSizeRef.current = ds;
 

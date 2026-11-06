@@ -163,7 +163,7 @@ check('control: an answer of another shape is a failure, not an empty list', row
 
 sent.length = 0;
 answer = () => ({ success: true, data: { error: 'No Account records found matching your query.' }, totalCount: 0 });
-found = await findAccounts("Levi's 50%");
+await findAccounts("Levi's 50%");
 check('a name asks by name only, cleaned', sent.length === 1 && JSON.stringify(sent[0].filters) === '{"Name":{"$like":["Levi_s 50%","% Levi_s 50%"]}}', sent);
 
 sent.length = 0;

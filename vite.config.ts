@@ -14,10 +14,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
  * scripts/check-graph-queries.mjs), which is what makes a future reintroduction here fail the
  * same way it already fails for the other two files. One module, two callers.
  */
-import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries'
-import { ACCOUNT_PAGE_QUERY } from './src/lib/account-page-query'
-import { graphItems, type GraphResponse } from './src/lib/graph-envelope'
-import { homeIndexFor, loadHomeIndex } from './src/lib/home-index'
+import { EXPERIENCE_QUERIES, normalizeExperienceItem } from './src/lib/experience-queries.ts'
+import { ACCOUNT_PAGE_QUERY } from './src/lib/account-page-query.ts'
+import { graphItems, type GraphResponse } from './src/lib/graph-envelope.ts'
+import { homeIndexFor, loadHomeIndex } from './src/lib/home-index.ts'
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2'
 
@@ -239,7 +239,7 @@ function opalFeedbackDevProxy(devEmail: string | null): Plugin {
         if (!devEmail) return jsonResponse(res, 401, { error: 'Sign in with Optimizely first.' })
         const edit_user_email = devEmail
 
-        let body: Record<string, unknown> = {}
+        let body: Record<string, unknown>
         try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
         const { company_name, company_slug, suggested_edit } = body || {}
 
@@ -290,7 +290,7 @@ function opalCreatePageDevProxy(devEmail: string | null): Plugin {
         if (!devEmail) return jsonResponse(res, 401, { error: 'Sign in with Optimizely first.' })
         const edit_user_email = devEmail
 
-        let body: Record<string, unknown> = {}
+        let body: Record<string, unknown>
         try { body = await readJsonBody(req) } catch { return jsonResponse(res, 400, { error: 'Bad JSON' }) }
         const { company_name } = body || {}
 
@@ -502,7 +502,7 @@ const OCR_FILES: Record<string, string> = {
   'eng.traineddata.gz': 'node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz',
 }
 function ocrFiles(): Plugin {
-  const version = (JSON.parse(readFileSync(path.resolve(__dirname, 'node_modules/tesseract.js/package.json'), 'utf-8')) as { version: string }).version
+  const version = (JSON.parse(readFileSync(path.resolve(import.meta.dirname, 'node_modules/tesseract.js/package.json'), 'utf-8')) as { version: string }).version
   const base = `/ocr/${version}/`
   let ssr = false
   return {
@@ -518,13 +518,13 @@ function ocrFiles(): Plugin {
         if (!file) return next()
         res.setHeader('Content-Type', url.endsWith('.js') ? 'text/javascript' : 'application/octet-stream')
         res.setHeader('Cache-Control', 'no-cache')
-        res.end(readFileSync(path.resolve(__dirname, file)))
+        res.end(readFileSync(path.resolve(import.meta.dirname, file)))
       })
     },
     generateBundle() {
       if (ssr) return
       for (const [name, file] of Object.entries(OCR_FILES)) {
-        this.emitFile({ type: 'asset', fileName: `ocr/${version}/${name}`, source: readFileSync(path.resolve(__dirname, file)) })
+        this.emitFile({ type: 'asset', fileName: `ocr/${version}/${name}`, source: readFileSync(path.resolve(import.meta.dirname, file)) })
       }
     },
   }
@@ -549,8 +549,8 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        '@components': path.resolve(__dirname, 'src/components'),
-        '@assets': path.resolve(__dirname, 'src/assets'),
+        '@components': path.resolve(import.meta.dirname, 'src/components'),
+        '@assets': path.resolve(import.meta.dirname, 'src/assets'),
         /*
          * Upstream's own alias, pointed at the vendored slice. Keeping it means the files
          * under src/vendor/opticom stay byte-comparable to optimizely.com and
@@ -560,7 +560,7 @@ export default defineConfig(({ mode }) => {
          * prefix and takes the first hit, so a bare '@' would also swallow '@components/…'
          * and '@assets/…'. '@/' cannot.
          */
-        '@/': path.resolve(__dirname, 'src/vendor/opticom') + '/',
+        '@/': path.resolve(import.meta.dirname, 'src/vendor/opticom') + '/',
       },
     },
     css: {
@@ -586,10 +586,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         // The search page is its own document (home.html): no router, no Tailwind, no third-party tags.
         input: {
-          main: path.resolve(__dirname, 'index.html'),
-          home: path.resolve(__dirname, 'home.html'),
+          main: path.resolve(import.meta.dirname, 'index.html'),
+          home: path.resolve(import.meta.dirname, 'home.html'),
           // A page's address while Mark builds it (BuildView.tsx).
-          build: path.resolve(__dirname, 'build.html'),
+          build: path.resolve(import.meta.dirname, 'build.html'),
         },
         output: {
           /*

@@ -315,6 +315,7 @@ export default function BadgeLanyard({
     const el = video.current;
     let stream: MediaStream | null = null;
     let closed = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the camera's status follows the effect that starts the camera
     setCamera('starting');
     navigator.mediaDevices
       .getUserMedia({

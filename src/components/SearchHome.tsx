@@ -434,6 +434,7 @@ export default function SearchHome({
   }, []);
   const needsLook = Boolean(asOffer && !asOffer.look && offers?.some((o) => o.id === asOffer.id));
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starting the look's run is the effect; its state follows from that call
     if (needsLook && asOffer && job?.offerId !== asOffer.id) void makeLook(asOffer.id, 'start');
   }, [needsLook, asOffer, job?.offerId, makeLook]);
 
@@ -449,6 +450,7 @@ export default function SearchHome({
   useEffect(() => {
     if (job?.status !== 'done' || !job.look) return;
     const made = job.look;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a finished look is copied onto the offer when the run reports it
     setAsOffer((cur) => (cur?.id === job.offerId ? { ...cur, look: made } : cur));
     setOffers((list) => list?.map((o) => (o.id === job.offerId ? { ...o, look: made } : o)) ?? list);
     // The offline copy was kept before the look existed: the next visit should open on it.
@@ -640,6 +642,7 @@ export default function SearchHome({
           b.status === 'running' ||
           b.status === 'waiting' ||
           // Finished: until the index lists the page itself.
+          // eslint-disable-next-line react-hooks/purity -- 'finished in the last half hour', recomputed whenever the builds list refreshes
           (Date.now() - (b.finishedAt ?? 0) < 30 * 60 * 1000 && !bySlug.has(b.route) && !peopleBySlug.has(b.route)),
       ),
     [builds, bySlug, peopleBySlug],
@@ -693,6 +696,7 @@ export default function SearchHome({
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get('q')?.trim();
     if (!q) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ?q= is read after the first render on purpose, so server and client HTML agree
     setQuery(q);
     inputRef.current?.focus();
   }, []);
@@ -705,6 +709,7 @@ export default function SearchHome({
 
   useEffect(() => {
     if (wanted === shown) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the view swap is timed: leaving clears the moment the wanted view is shown
       setLeaving(null);
       return;
     }
