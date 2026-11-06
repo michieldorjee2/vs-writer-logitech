@@ -101,8 +101,10 @@ html.booth-page--rail .www-page .www-sticky {
   color: var(--booth-fg);
   font-family: var(--booth-font);
   -webkit-font-smoothing: antialiased;
-  /* Closed: off the window with its corners. Closing waits for the buttons to leave. */
-  transform: translateX(calc(-100% - var(--booth-corner)));
+  /* Closed: just off the window. It travels exactly as far as the page moves over (the rail's
+   * width, on the same timing), so no strip of the page's white shows between them as it slides
+   * in; its corners fade with it (below). Closing waits for the buttons to leave. */
+  transform: translateX(-100%);
   transition: transform 360ms var(--booth-ease-out) 140ms;
 }
 .booth-rail.is-open {
@@ -119,6 +121,13 @@ html.booth-page--rail .www-page .www-sticky {
   width: var(--booth-corner);
   height: var(--booth-corner);
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.booth-rail.is-open::before,
+.booth-rail.is-open::after {
+  opacity: 1;
+  transition: opacity 320ms ease 120ms;
 }
 .booth-rail::before {
   top: 0;

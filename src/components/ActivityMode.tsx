@@ -118,6 +118,11 @@ export default function ActivityMode({ open, onClose, load, retry, links }: Prop
               ODP did not answer. Try again
             </button>
           )}
+          <button type="button" className="activity-card__close" onClick={onClose} aria-label="Close" title="Close">
+            <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" aria-hidden="true">
+              <path d="M15 5L5 15M5 5l10 10" />
+            </svg>
+          </button>
         </header>
         <div className="activity-card__cols">
           <div className="activity-card__col">

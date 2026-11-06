@@ -69,10 +69,33 @@ html.activity-open body {
 
 .activity-card__head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 16px;
   margin-bottom: 34px;
+}
+/* The title on the left; Salesforce, a retry and the close button pushed to the right. */
+.activity-card__title {
+  margin-right: auto !important;
+}
+/* Close, top right, as on the Share card. */
+.activity-card__close {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -10px 0 -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--booth-fg-2);
+  cursor: pointer;
+}
+.activity-card__close:hover {
+  background: var(--booth-hover);
+  color: var(--booth-fg);
 }
 .activity-card__title {
   margin: 0;
@@ -105,6 +128,7 @@ html.activity-open body {
 }
 .activity-card__sf:focus-visible,
 .activity-card__retry:focus-visible,
+.activity-card__close:focus-visible,
 .activity-step__toggle:focus-visible {
   outline: 2px solid var(--booth-focus);
   outline-offset: 3px;

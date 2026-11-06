@@ -614,14 +614,16 @@ function XrayMode({ active, onClose, page, variant }: Props) {
               />
             ))}
           </mask>
+          {/* The grid, drawn with the veil: it lines the dimmed page only, never a part or a card. */}
+          <pattern id="xray-grid" width="44" height="44" patternUnits="userSpaceOnUse">
+            <path d="M44 0H0V44" fill="none" stroke="rgb(255 255 255 / 0.045)" strokeWidth="1" />
+          </pattern>
         </defs>
 
-        <rect
-          className="xray-trace__veil"
-          width={docSize.w}
-          height={docSize.h}
-          mask="url(#xray-cutout)"
-        />
+        <g mask="url(#xray-cutout)">
+          <rect className="xray-trace__veil" width={docSize.w} height={docSize.h} />
+          <rect className="xray-trace__grid" width={docSize.w} height={docSize.h} fill="url(#xray-grid)" />
+        </g>
 
         {showCutouts && anchorsInit.map((a, i) => (
           <g
@@ -747,26 +749,26 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     </div>
   );
 
-  /* Viewport-fixed layer: the grid, the vignette and, while scanning, the scan line and its note. */
+  /* Viewport-fixed: the vignette, UNDER the parts and cards (z 939); and while scanning, the scan
+   * line and its note, over everything X-ray draws (z 946). */
   const viewportLayer = (
-    <div className={'xray-fixed-layer xray-fixed-layer--' + phase} aria-hidden={false}>
-      <div className="xray-overlay__grid" aria-hidden="true" />
-      <div className="xray-overlay__vignette" aria-hidden="true" />
-
-      {phase === 'scanning' && (
-        <>
-          <div className="xray-overlay__scanline" aria-hidden="true" />
-          <div className="xray-overlay__scanline-glow" aria-hidden="true" />
-          <div className="xray-overlay__scan-label" aria-hidden="true">
-            <span className="xray-overlay__scan-dot" />
-            Reading the page’s parts…
-          </div>
-        </>
-      )}
+    <div className={'xray-fixed-layer xray-fixed-layer--' + phase} aria-hidden="true">
+      <div className="xray-overlay__vignette" />
     </div>
   );
+  const scanLayer =
+    phase === 'scanning' ? (
+      <div className="xray-scan-layer" aria-hidden="true">
+        <div className="xray-overlay__scanline" />
+        <div className="xray-overlay__scanline-glow" />
+        <div className="xray-overlay__scan-label">
+          <span className="xray-overlay__scan-dot" />
+          Reading the page’s parts…
+        </div>
+      </div>
+    ) : null;
 
-  return createPortal(<>{docLayer}{viewportLayer}</>, document.body);
+  return createPortal(<>{viewportLayer}{docLayer}{scanLayer}</>, document.body);
 }
 
 export default XrayMode;
