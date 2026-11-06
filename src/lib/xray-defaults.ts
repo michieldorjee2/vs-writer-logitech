@@ -33,10 +33,18 @@ export type XraySectionInfo = {
   notes?: string;
 };
 
-/* The account page's parts that came from the earlier account page, under the same ids (so a
-   page's stored X-ray overrides still apply): the agent platform page puts `data-xray="<id>"` on
-   each. */
+/* The takeout account page's parts (src/www/AccountPage.tsx), one per stored component, each found
+   by its `data-xray` hook. The agent platform page carries ten of the same ids for the parts it
+   shares, so a page's stored X-ray overrides apply to both. */
 const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
+  {
+    id: 'hero-3d',
+    selector: '[data-xray="hero-3d"]',
+    title: 'Hero brand mark',
+    tools: ['Brandfetch'],
+    sources: ['Brand logo', 'Brand colours', 'Brand description'],
+    notes: 'Logo extruded in real-time from the brand SVG.',
+  },
   {
     id: 'hero-title',
     selector: '[data-xray="hero-title"]',
@@ -71,6 +79,18 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     ],
   },
   {
+    id: 'stakeholders',
+    selector: '[data-xray="stakeholders"]',
+    title: 'Key stakeholders',
+    tools: ['LinkedIn', 'Salesforce', 'Gravatar'],
+    sources: [
+      'Main contacts + roles',
+      'Account owner',
+      'Key contacts on file',
+      'Profile pictures',
+    ],
+  },
+  {
     id: 'tech-stack',
     selector: '[data-xray="tech-stack"]',
     title: 'Current tech stack',
@@ -86,6 +106,107 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
       'Investor reports',
       'Recent acquisition news',
       'Account communication context',
+    ],
+  },
+  {
+    id: 'news',
+    selector: '[data-xray="news"]',
+    title: 'In the news',
+    tools: ['Web browsing'],
+    sources: [
+      'Google News',
+      'Newsroom feed',
+      'Recent c-level changes',
+      'Recent acquisition news',
+    ],
+  },
+  {
+    id: 'challenge-headline',
+    selector: '[data-xray="challenge-headline"]',
+    title: 'Challenge headline',
+    tools: ['Mark'],
+    sources: [
+      'Competitive positioning',
+      'Messaging frameworks',
+      'Website best practices',
+    ],
+  },
+  {
+    id: 'challenge-screenshot',
+    selector: '[data-xray="challenge-screenshot"]',
+    title: 'Current website capture',
+    tools: ['Mark', 'Web browsing'],
+    sources: ['Live screenshot of brand site', 'Customer website URL'],
+    notes: 'Real capture, not stock imagery.',
+  },
+  {
+    id: 'pain-points',
+    selector: '[data-xray="pain-points"]',
+    title: 'Pain points',
+    tools: ['Mark', 'Web browsing'],
+    sources: [
+      'Site-derived pain narrative',
+      'Competitive positioning',
+      'Customer website context',
+    ],
+  },
+  {
+    id: 'comparison-row',
+    selector: '[data-xray="comparison-row"]',
+    title: 'Comparison row',
+    tools: ['CMS', 'Mark'],
+    sources: [
+      'Competitive pages',
+      'Approved product language',
+      'Competitive positioning',
+    ],
+  },
+  {
+    id: 'logo-wall',
+    selector: '[data-xray="logo-wall"]',
+    title: 'Reference customer',
+    tools: ['CMS'],
+    sources: ['Approved customer logos', 'Vertical-matched stories'],
+  },
+  {
+    id: 'testimonials',
+    selector: '[data-xray="testimonials"]',
+    title: 'Testimonial',
+    tools: ['CMS'],
+    sources: ['Customer stories', 'Approved customer quotes'],
+  },
+  {
+    id: 'analysts',
+    selector: '[data-xray="analysts"]',
+    title: 'Analyst recognition',
+    tools: ['CMS'],
+    sources: [
+      'Forrester TEI report',
+      'Gartner MQ',
+      'Forrester Wave',
+      'Analyst reports',
+    ],
+  },
+  {
+    id: 'roi-cards',
+    selector: '[data-xray="roi-cards"]',
+    title: 'ROI metric',
+    tools: ['CMS', '6sense'],
+    sources: [
+      'Forrester TEI report',
+      'Industry-segmented uplift bands',
+      'Account funnel stage',
+    ],
+  },
+  {
+    id: 'roi-projection',
+    selector: '[data-xray="roi-projection"]',
+    title: 'Revenue projection',
+    tools: ['CMS', '6sense'],
+    sources: [
+      'TEI extrapolation',
+      'Industry benchmarks',
+      'Account activity signals',
     ],
   },
   {
@@ -346,112 +467,215 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
   },
 ];
 
-/** Every part X-ray and Edit mode can find on an account page (the agent platform template). */
+/**
+ * Edit mode on the takeout template (src/www/AccountPage.tsx): every part the page shows, the
+ * stored fields it is drawn from, and a hint for Mark. With the fields named, Mark changes exactly
+ * those and sends each one's full new value, and the page re-renders from it as it streams
+ * (src/www/live-edit.ts), as on the agent platform page. The titles are the section names Mark's
+ * prompt maps to fields. Between them, the parts cover every stored field the page shows.
+ */
+const TAKEOUT_PARTS: Array<{ id: string; title?: string; fields: string[]; hint: string; tools?: string[]; sources?: string[] }> = [
+  { id: 'hero-3d', fields: ['eyebrow', 'customerLogo', 'brandAccentColor'], hint: 'The account\'s logo, the line beside it and the accent stripe under it.' },
+  { id: 'hero-title', fields: ['headline'], hint: 'The headline: the page\'s pitch in a few words.' },
+  { id: 'hero-subtitle', fields: ['subheadline'], hint: 'The line under the headline: what the pitch means for them.' },
+  { id: 'hero-cta', title: 'Hero button', fields: ['cta', 'link'], hint: 'The second button in the hero and where it goes.', tools: ['Mark'], sources: ['cta', 'link'] },
+  { id: 'intel-headline', fields: ['intelEyebrow', 'intelHeadline'], hint: 'The research section\'s eyebrow and headline.' },
+  { id: 'intel-stats', fields: ['intelStats'], hint: 'The account facts: each a value and a label.' },
+  { id: 'stakeholders', fields: ['stakeholders'], hint: 'The people we\'d love to meet: name, role, LinkedIn.' },
+  { id: 'tech-stack', fields: ['techStack', 'brandDomain'], hint: 'The tools they run today; the one being replaced is marked.' },
+  { id: 'investments', fields: ['investments'], hint: 'What they invest in; the primary one is highlighted.' },
+  { id: 'news', fields: ['newsItems'], hint: 'Recent news: date, headline, link.' },
+  { id: 'challenge-headline', fields: ['challengeHeadline'], hint: 'The challenge headline ("You\'re on Sitecore. We hear you.").' },
+  { id: 'challenge-screenshot', fields: ['challengeScreenshotUrl', 'challengeScreenshotAlt', 'challengeBrowserUrl'], hint: 'Their site today: the capture, its alt text and the address shown above it.' },
+  { id: 'pain-points', fields: ['painPoints'], hint: 'The pain points: each a title and a line.' },
+  { id: 'comparison-heading', title: 'Comparison headline', fields: ['comparisonHeadline', 'comparisonDescription', 'competitorName'], hint: 'The comparison\'s headline, its intro and the platform it compares against.', tools: ['Mark'], sources: ['comparisonHeadline', 'comparisonDescription', 'competitorName'] },
+  { id: 'comparison-row', title: 'Comparison table', fields: ['comparisonTableRows'], hint: 'The rows: a capability, then theirs and ours (Yes, No, Limited or a short phrase).' },
+  { id: 'logo-wall', fields: ['logoWallCustomerSlot'], hint: 'The name on their tile in the customer logo strip.' },
+  { id: 'testimonials', title: 'Testimonials', fields: ['testimonial1', 'testimonial1JobTitle', 'testimonial1Company', 'testimonial2', 'testimonial2JobTitle', 'testimonial2Company'], hint: 'Two customer quotes, each with a job title and company.' },
+  { id: 'analysts', fields: ['analystHeadline', 'analystQuote', 'analystSource', 'analystCTA', 'analystCTALink', 'analystCards'], hint: 'The analyst headline, quote and source, its button, and the report cards.' },
+  { id: 'promo', title: 'Promo statement', fields: ['promoEyebrow', 'promoHeading', 'promoDescription', 'promoCTA', 'promoCTALink'], hint: 'The big statement mid-page: eyebrow, heading, line and its button.', tools: ['Mark'], sources: ['promoHeading', 'promoDescription'] },
+  { id: 'roi-heading', title: 'ROI headline', fields: ['roiTitle', 'roiDescription'], hint: 'The impact section\'s headline and intro.', tools: ['Mark'], sources: ['roiTitle', 'roiDescription'] },
+  { id: 'roi-projection', fields: ['roiProjectionValue', 'roiProjectionLabel', 'roiProjectionDetail'], hint: 'The big projected number, its label and the line under it.' },
+  { id: 'roi-cards', title: 'ROI cards', fields: ['roiCards'], hint: 'The impact numbers: metric, unit, label and a citation.' },
+  { id: 'end-cta', title: 'Next step card', fields: ['endHeadline', 'endSubheadline', 'endCTA', 'endCTALink'], hint: 'The card under the impact numbers: a headline, a line and a button.', tools: ['Mark'], sources: ['endHeadline', 'endSubheadline', 'endCTA'] },
+  { id: 'path-heading', title: 'Migration headline', fields: ['migrationTitle', 'migrationDescription'], hint: 'The path section\'s headline and intro.', tools: ['Mark'], sources: ['migrationTitle', 'migrationDescription'] },
+  { id: 'timeline-phases', title: 'Timeline', fields: ['timelinePhases'], hint: 'The phases: each a title and a line.' },
+  { id: 'cta-title', fields: ['ctaTitle'], hint: 'The closing headline.' },
+  { id: 'cta-description', fields: ['ctaDescription', 'ctaButtonText', 'stickyCTAText'], hint: 'The closing line, its button, and the line in the sticky bar.' },
+  { id: 'team-members', fields: ['teamMembers', 'modalScheduleUrl'], hint: 'The Optimizely team on the account, and the schedule link in the panel.' },
+  { id: 'small-print', title: 'Small print', fields: ['footerTagline', 'footerLegal', 'footerLinks'], hint: 'The tagline, legal line and links at the very end.', tools: ['Mark'], sources: ['footerTagline', 'footerLegal', 'footerLinks'] },
+]
+
+export const TAKEOUT_EDIT: EditSectionInfo[] = TAKEOUT_PARTS.map((p) => {
+  const x = ACCOUNT_XRAY_SHARED.find((s) => s.id === p.id)
+  return {
+    id: p.id,
+    selector: `[data-xray="${p.id}"]`,
+    title: p.title ?? x?.title ?? p.id,
+    tools: p.tools ?? x?.tools ?? ['Mark'],
+    sources: p.sources ?? x?.sources ?? p.fields,
+    fields: p.fields,
+    hint: p.hint,
+  }
+})
+
+/** Every part X-ray and Edit mode can find on an account page, either template: each finds what is on screen. */
 export const ABM_XRAY_DEFAULTS: XraySectionInfo[] = [...ACCOUNT_XRAY_SHARED, ...AGENT_PLATFORM_XRAY];
 
-/** Merge any CMS-supplied overrides into the defaults. */
+/** The takeout page's part ids. */
+export const ABM_XRAY_LEGACY_IDS = ACCOUNT_XRAY_SHARED.map((s) => s.id);
+
 /* ── 1:1 person page ──────────────────────────────────────────────────────
-   The person page is generated by a different agent from a different mix of
-   sources, so it needs its own registry rather than reusing the ABM one: the
-   galaxy is drawn from the PARENT page's screenshot, the operation facts come
-   from web research, and the engagement badge is the only thing on the page
-   that Salesforce touches directly. Selectors track the section classes in
-   PersonPageView. */
-export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = [
+   The person page (src/www/PersonPage.tsx) is written by a different agent from a different
+   mix of sources, so it has its own registry: the operation facts come from web research, and
+   the engagement badge is the only thing on the page Salesforce touches directly. Each part is
+   found by its `data-xray` hook; Edit mode names the stored fields each part shows
+   (PERSON_EDIT), so Mark changes exactly those. */
+const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> = [
   {
-    id: 'person-galaxy',
-    selector: '.person__sky',
-    title: 'Hero galaxy',
-    tools: ['Mark', 'Web browsing', 'CMS'],
-    sources: ["The company page's site screenshot", 'Products drawn from this seat\u2019s scorecard'],
-    notes: 'WebGL. The screenshot is inherited from the parent account page, not re-captured.',
+    id: 'person-hero',
+    selector: '',
+    title: 'Who this is for',
+    tools: ['Salesforce', 'CMS'],
+    sources: ['Account logo from the parent account page', 'Contact record'],
+    fields: ['heroEyebrow', 'companyLogo'],
+    hint: 'The line beside their account logo ("Written for Ben"). Personalization is said once, here.',
   },
   {
     id: 'person-identity',
-    selector: '.person__ident, .person__name',
-    title: 'Who this is for',
+    selector: '',
+    title: 'Headline',
     tools: ['Salesforce', 'LinkedIn'],
     sources: ['Contact record', 'Published profile as they wrote it'],
+    fields: ['heroHeadline', 'heroSubheadline', 'personName', 'personTitle', 'roleFrame'],
+    hint: 'With a headline the h1 is the claim; without one it is their name and title.',
   },
   {
     id: 'person-tier',
-    selector: '.person__tier',
+    selector: '',
     title: 'Engagement badge',
     tools: ['Salesforce'],
     sources: ['Logged activity in the last 6 months', 'Open opportunity membership'],
-    notes: 'The only element on the page driven straight from CRM state.',
+    notes: 'The only element on the page driven straight from CRM state, phrased from the reader’s side.',
+    fields: ['engagementTier'],
+    hint: 'key, engaged or known. Never write a pipeline stage on the page.',
   },
   {
     id: 'person-opening',
-    selector: '.person__opening',
-    title: 'The opening',
+    selector: '',
+    title: 'The note',
     tools: ['Mark', 'Web browsing'],
     sources: ['One specific published detail', 'Named account executive'],
+    fields: ['noteBody', 'noteSignedBy', 'noteSignedByRole', 'noteSignedByInitials', 'noteDate'],
+    hint: 'One paragraph from their account executive, signed.',
   },
   {
     id: 'person-measures',
-    selector: '.person__measure',
+    selector: '',
     title: 'What the job is scored on',
     tools: ['Mark'],
     sources: ['Seat inference from title and department', "The parent page's pain points"],
     notes: 'A hypothesis about the role, not a record about the person.',
+    fields: ['scorecardHeadline', 'scorecard'],
+    hint: 'Three or four measures, each with why it is hard and a metric.',
   },
   {
     id: 'person-operation',
-    selector: '.person__fact',
+    selector: '',
     title: 'Your operation',
     tools: ['Web browsing', 'BuiltWith'],
     sources: ['Public site structure', 'Detected platform and stack', 'Filings and newsroom'],
+    fields: ['provenance'],
+    hint: 'The provenance rows with Register "read": public facts, each with its source.',
   },
   {
     id: 'person-practice',
-    selector: '.person__case',
+    selector: '',
     title: 'In practice',
     tools: ['Mark', 'CMS'],
-    sources: ['Product claims from the parent page', 'Reframed to this seat\u2019s vocabulary'],
+    sources: ['Product claims from the parent page', 'Reframed to this seat’s vocabulary'],
+    fields: ['solutionsHeadline', 'solutionsIntro', 'solutions'],
+    hint: 'One card per product, in the order of the measures.',
   },
   {
     id: 'person-how',
-    selector: '.person__steps',
+    selector: '',
     title: 'How it works',
     tools: ['CMS'],
     sources: ['Fixed platform description'],
-    notes: 'Identical on every person page \u2014 held in the frontend, not generated.',
+    notes: 'Identical on every person page — held in the frontend, not generated.',
+    fields: [],
+    hint: 'Template copy, the same on every person page: nothing here is stored on the page.',
   },
   {
     id: 'person-number',
-    selector: '.roi__value-3d',
+    selector: '',
     title: 'The one number',
     tools: ['Mark', 'Web browsing'],
     sources: ['Published customer story or third-party research', 'Cited, never computed'],
+    fields: ['keyNumberPrefix', 'keyNumberValue', 'keyNumberSuffix', 'keyNumberLabel', 'keyNumberDetail', 'keyNumberCitationUrl'],
+    hint: 'A third party’s figure with its source, never our own arithmetic.',
   },
   {
     id: 'person-proof',
-    selector: '.person__quote-card',
+    selector: '',
     title: 'Peer proof',
     tools: ['CMS', 'Mark'],
     sources: ['optimizely.com customer stories', 'Matched on role first, industry second'],
-  },
-  {
-    id: 'person-team',
-    selector: '.person__member',
-    title: 'Your team',
-    tools: ['Salesforce', 'Gravatar'],
-    sources: ['Account team from the parent page', 'Placeholder contacts filtered out'],
+    fields: ['peerProofHeadline', 'peerProof'],
+    hint: 'Quotes from people in a seat like theirs, one per person.',
   },
   {
     id: 'person-working',
-    selector: '.person__working',
-    title: 'Why you\u2019re seeing this',
+    selector: '',
+    title: 'Why you’re seeing this',
     tools: ['Mark', 'Salesforce'],
     sources: ['Their own words', 'Our labelled assumption about the seat'],
     notes: 'The disclosure that earns the rest of the page.',
+    fields: ['provenance'],
+    hint: 'The provenance rows with Register "told" (their words) or "assumed" (ours, labelled).',
   },
-];
+  {
+    id: 'person-cta',
+    selector: '',
+    title: 'The ask',
+    tools: ['Mark'],
+    sources: ['The one-click ask: it tells the account executive'],
+    fields: ['ctaTitle', 'ctaBody', 'ctaButtonText', 'meetingUrl'],
+    hint: 'The button keeps its words only with a booking link in meetingUrl; otherwise it reads "Talk to your team".',
+  },
+  {
+    id: 'person-team',
+    selector: '',
+    title: 'Your team',
+    tools: ['Salesforce', 'Gravatar'],
+    sources: ['Account team from the parent page', 'Placeholder contacts filtered out'],
+    fields: ['teamHeadline', 'team'],
+    hint: 'The account executive (by role) is who the ask messages.',
+  },
+  {
+    id: 'person-small-print',
+    selector: '',
+    title: 'Small print',
+    tools: ['CMS'],
+    sources: ['Stored footer line'],
+    fields: ['footerLine'],
+    hint: 'One line at the foot of the ask.',
+  },
+]
+
+export const PERSON_XRAY_DEFAULTS: XraySectionInfo[] = PERSON_PARTS.map(({ fields: _f, hint: _h, ...p }) => ({
+  ...p,
+  selector: `[data-xray="${p.id}"]`,
+}))
+
+/** Edit mode on a person page: each part with the fields it shows. */
+export const PERSON_EDIT: EditSectionInfo[] = PERSON_PARTS.map((p) => ({ ...p, selector: `[data-xray="${p.id}"]` }))
 
 /** Tools renamed since CMS pages stored their own `Tools` overrides. */
 const RENAMED_TOOLS: Record<string, string> = { 'Opal': 'Mark' };
 
+/** Merge any CMS-supplied overrides into the defaults. */
 export function resolveXraySections(
   defaults: XraySectionInfo[],
   overrides: Array<{

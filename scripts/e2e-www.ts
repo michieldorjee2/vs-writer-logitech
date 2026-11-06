@@ -4,19 +4,21 @@
  *   npm run build && npx tsx scripts/serve-prod.ts &      # or point E2E_BASE at a deployment
  *   npm run e2e:www
  *
- * Env: E2E_BASE (default http://127.0.0.1:5199), E2E_ACCOUNT (default /cdw/), E2E_OFFER
+ * Env: E2E_BASE (default http://127.0.0.1:5199), E2E_ACCOUNT (a takeout pitch, default /cdw/),
+ * E2E_AP_ACCOUNT (an agent platform pitch, default /smartsheet/), E2E_PERSON (default /logitech/ben-yu/), E2E_OFFER
  * (default /vb/no-account-left-behind-scale-ai), E2E_OUT (screenshot folder, default a temp dir),
  * E2E_BYPASS (Vercel protection-bypass secret, for a protected preview).
  *
- * NOTHING LEAVES THE BROWSER. The contact button's sales-team webhook, sign-in, the edit
- * stream to Mark and the republish poll are all answered here; the test fails if any request
- * reaches webhook.opal.optimizely.com.
+ * NOTHING LEAVES THE BROWSER. The contact button's ping (POST /api/cta-ping, which messages the
+ * account executive), sign-in, the edit stream to Mark and the republish poll are all answered
+ * here; the test fails if any request reaches the ping endpoint or a Mark webhook.
  *
  * Layout (Michiel, 2 Nov): a full-screen hero at 75% of the window with the next scene peeking in,
  * scenes at least 75%, the close the full window; one closing CTA; the intro on load settles; the
  * hero landscape is never upscaled.
  *
- * Covers, for the account page (the agent platform template, the only one) and the offer page:
+ * Covers, for both account templates (each page's own pitch picks one: src/www/account-template.ts),
+ * the person page and the offer page:
  * server render + hydration without errors, no sideways scroll on a phone, every section present,
  * sticky bar, the one-click connect panel (pings once per view, from the sticky bar or the close),
  * the review layer and state switch, the offer FAQ, X-ray mode outlining every section, Edit mode
@@ -28,11 +30,16 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../src/lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, PERSON_EDIT, PERSON_XRAY_DEFAULTS, TAKEOUT_EDIT } from '../src/lib/xray-defaults'
 
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
+/** A page that pitches a CMS takeout: the takeout template. */
 const ACCOUNT = process.env.E2E_ACCOUNT || '/cdw/'
+/** A page that pitches the agent platform: Laura's template. */
+const AP_ACCOUNT = process.env.E2E_AP_ACCOUNT || '/smartsheet/'
 const OFFER = process.env.E2E_OFFER || '/vb/no-account-left-behind-scale-ai'
+/** A person page (the 1:1 buyer page, `/<company>/<person>/`) whose team has an account executive. */
+const PERSON = process.env.E2E_PERSON || '/logitech/ben-yu/'
 const OUT = process.env.E2E_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'www-e2e-'))
 const BYPASS = process.env.E2E_BYPASS
 
@@ -41,7 +48,7 @@ const VIEWPORTS = {
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
 } as const
 
-const url = (p: string, q: string) => `${BASE}${p}${p.includes('?') ? '&' : '?'}${q}`
+const url = (p: string, q = '') => (q ? `${BASE}${p}${p.includes('?') ? '&' : '?'}${q}` : `${BASE}${p}`)
 
 /* ------------------------------------------------------------------ harness */
 
@@ -76,18 +83,27 @@ async function newContext(browser: Browser, vp: keyof typeof VIEWPORTS, opts: { 
   })
   const watch: Watch = { errors: [], escaped: [] }
 
-  // The one-click contact: record what would be sent, send nothing.
+  // The one-click contact: record what the page would send, inside the page, and send nothing.
   await ctx.addInitScript(() => {
-    ;(window as unknown as { __beacons: string[] }).__beacons = []
-    navigator.sendBeacon = (_url: string | URL, data?: BodyInit | null) => {
-      void new Response(data ?? '').text().then((t) => (window as unknown as { __beacons: string[] }).__beacons.push(t))
-      return true
+    const w = window as unknown as { __pings: string[] }
+    w.__pings = []
+    const real = window.fetch.bind(window)
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (new URL(url, location.href).pathname === '/api/cta-ping') {
+        w.__pings.push(String(init?.body ?? ''))
+        return Promise.resolve(new Response('{"ok":true}', { status: 202 }))
+      }
+      return real(input, init)
     }
   })
-  await ctx.route('https://webhook.opal.optimizely.com/**', (route) => {
-    watch.escaped.push(route.request().url())
-    return route.fulfill({ status: 200, body: '' })
-  })
+  // Anything that gets past that stand-in fails the run.
+  for (const pattern of ['**/api/cta-ping', 'https://webhook.opal.optimizely.com/**', 'https://webhook.mark.optimizely.com/**']) {
+    await ctx.route(pattern, (route) => {
+      watch.escaped.push(route.request().url())
+      return route.fulfill({ status: 202, json: { ok: true } })
+    })
+  }
   await ctx.route('**/api/auth/me', (route) =>
     opts.signedIn
       ? route.fulfill({ json: { email: 'e2e@optimizely.com', name: 'E2E' } })
@@ -106,9 +122,12 @@ async function open(ctx: BrowserContext, watch: Watch, href: string): Promise<Pa
   page.on('console', (m) => {
     if (m.type() === 'error' && !NOISE.test(m.text())) watch.errors.push(`console: ${m.text()}`)
   })
-  const res = await page.goto(href, { waitUntil: 'load' })
+  // Our page drawn, not every third-party image loaded: a slow logo CDN (Brandfetch) held the
+  // load event past 30s now and then, and failed a run that had nothing wrong with it.
+  const res = await page.goto(href, { waitUntil: 'domcontentloaded' })
   expect(res?.ok(), `${href} answered ${res?.status()}`)
   await page.waitForSelector('.www-page')
+  await page.waitForLoadState('load', { timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(1200) // hydration + fonts
   return page
 }
@@ -207,20 +226,22 @@ async function introSettles(page: Page) {
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-features=AsyncDns'] })
 console.log(`www-design e2e against ${BASE}  (screenshots: ${OUT})`)
 
-const beaconsOf = (page: Page) => page.evaluate(() => (window as unknown as { __beacons: string[] }).__beacons)
+/** What the page asked /api/cta-ping to send, parsed. */
+const pingsOf = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __pings: string[] }).__pings.map((b) => JSON.parse(b) as { route: string; source: string; utm: Record<string, string> }))
 
 for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
-  console.log(`\naccount page, agent platform template (the default), ${vp}`)
+  console.log(`\naccount page, agent platform template (an agent platform pitch), ${vp}`)
   {
     const { ctx, watch } = await newContext(browser, vp)
-    const page = await open(ctx, watch, url(ACCOUNT, 'design=www'))
+    const page = await open(ctx, watch, url(AP_ACCOUNT))
     await test('server-rendered and hydrated without errors', async () => {
-      const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
       expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the server did not render the agent platform page')
       expect(!watch.errors.length, watch.errors.join('\n'))
     })
     await test('the tab title is the template\'s, before and after hydration (no takeout pitch)', async () => {
-      const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
       const server = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? ''
       const client = await page.title()
       expect(/^Optimizely agent platform · Personalized for /.test(server), `server title: ${server}`)
@@ -290,10 +311,11 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       const panel = page.getByRole('dialog')
       await panel.getByText("You're all set").waitFor({ timeout: 3000 })
       expect(!(await panel.locator('form, input, textarea').count()), 'the panel has a form field')
-      const beacons = await beaconsOf(page)
-      expect(beacons.length === 1, `beacons: ${beacons.length}`)
-      const b = JSON.parse(beacons[0])
-      expect(b.event === 'demo_button_clicked' && b.source === 'sticky-connect-btn', `beacon: ${beacons[0]}`)
+      const pings = await pingsOf(page)
+      expect(pings.length === 1, `pings: ${pings.length}`)
+      const b = pings[0]
+      expect(b.source === 'sticky-connect-btn' && b.route === new URL(page.url()).pathname, `ping: ${JSON.stringify(b)}`)
+      expect(Object.keys(b).sort().join() === 'route,source,utm', `the browser sent more than the page and button: ${JSON.stringify(b)}`)
       // The stored "Schedule a call" link lives here now that the close has one CTA.
       const stored = await page.evaluate(() => JSON.stringify((window as unknown as { __SSR_DATA__?: unknown }).__SSR_DATA__ ?? '').match(/"modalScheduleUrl":\{"default":"([^"]+)"/)?.[1] ?? null)
       if (stored) expect((await panel.getByRole('link', { name: /Schedule a call/ }).getAttribute('href')) === stored, 'the panel does not link the stored schedule URL')
@@ -307,7 +329,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
       await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
       await page.locator('#cta-connect-btn').click()
       await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
-      expect((await beaconsOf(page)).length === 1, 'pinged twice')
+      expect((await pingsOf(page)).length === 1, 'pinged twice')
       expect(/You're all set/.test(await page.locator('#cta-connect-btn').innerText()), 'the close button does not say it is done')
       await page.getByRole('button', { name: 'Close' }).click()
       expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
@@ -315,7 +337,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     if (vp === 'desktop') {
       await test('?review=1 shows where each part came from, and switches the lifecycle state', async () => {
         expect(!(await page.locator('.www-review').count()), 'review layer on the production page')
-        const rp = await open(ctx, watch, url(ACCOUNT, 'design=www&review=1'))
+        const rp = await open(ctx, watch, url(AP_ACCOUNT, 'review=1'))
         await rp.locator('.www-review').waitFor()
         await rp.locator('.www-review__state', { hasText: 'Ex-customer' }).click()
         await rp.waitForURL(/state=ex-customer/)
@@ -328,9 +350,129 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await ctx.close()
   }
 
+  console.log(`\naccount page, takeout template (a CMS takeout pitch), ${vp}`)
+  const { ctx, watch } = await newContext(browser, vp)
+  const page = await open(ctx, watch, url(ACCOUNT))
+
+  await test('server-rendered and hydrated without errors', async () => {
+    const html = await (await fetch(url(ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+    expect(html.includes('class="www-page') && html.includes('id="comparison"'), 'the server did not render the takeout page')
+    expect(!watch.errors.length, watch.errors.join('\n'))
+  })
+  await test('every section the ODP tracking observes is on the page', async () => {
+    for (const id of ['hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta'])
+      expect(await page.locator(`#${id}`).count(), `#${id} missing`)
+  })
+  await test('no sideways scroll', () => noSidewaysScroll(page))
+  await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
+  if (vp === 'desktop') {
+    await test('desktop: full screen hero at 75% of the window, the next scene peeking in; scenes at least 75%', () => sceneHeights(page, 900))
+  }
+  await test('the intro plays on load and settles', () => introSettles(page))
+  await test('the hero landscape is never upscaled', () => heroImageSharp(page))
+  await test('their site screenshot is in the challenge scene, never drawn wider than it was taken', async () => {
+    const shotImg = page.locator('#challenge [data-xray="challenge-screenshot"] img')
+    if (!(await shotImg.count())) return
+    expect(!(await page.locator('#hero [data-xray="challenge-screenshot"]').count()), 'still on the hero')
+    const r = await shotImg.evaluate((img: HTMLImageElement) => ({ natural: img.naturalWidth, drawn: img.getBoundingClientRect().width }))
+    expect(r.drawn <= r.natural + 1, `drawn ${r.drawn}px wide from a ${r.natural}px capture`)
+  })
+  await test('the close has one call to action', async () => {
+    const n = await page.locator('#cta .www-btn').count()
+    expect(n === 1, `${n} buttons in the close`)
+  })
+  await test('the sticky bar appears past the hero and hides at the contact card', async () => {
+    expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
+    await page.locator('#comparison').scrollIntoViewIfNeeded()
+    await page.waitForSelector('.www-sticky--visible', { timeout: 3000 })
+    await page.locator('#cta').scrollIntoViewIfNeeded()
+    await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
+  })
+  await test('one click on the contact button tells the team, says so, and opens the connect panel', async () => {
+    await page.locator('#cta-connect-btn').click()
+    await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+    await page.keyboard.press('Escape')
+    await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
+    const pings = await pingsOf(page)
+    expect(pings.length === 1 && pings[0].source === 'cta-connect-btn' && pings[0].route === new URL(page.url()).pathname, `pings: ${JSON.stringify(pings)}`)
+    expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
+  })
+  if (vp === 'phone') {
+    await test('phone: the hero ask is in the first screen', async () => {
+      const cta = await page.locator('#hero .www-btn').first().boundingBox()
+      expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
+    })
+  }
+  await shot(page, `takeout-${vp}`)
+  await ctx.close()
+
+  console.log(`\nperson page, ${vp}`)
+  {
+    const { ctx, watch } = await newContext(browser, vp)
+    const page = await open(ctx, watch, url(PERSON))
+    await test('server-rendered in the www design and hydrated without errors', async () => {
+      const html = await (await fetch(url(PERSON), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+      expect(/class="www-page[^"]*\bwww-person\b/.test(html) && html.includes('id="cta"'), 'the server did not render the www person page')
+      expect(!/person__sky|person-galaxy/.test(html), 'the old galaxy page is still rendered')
+      expect(!watch.errors.length, watch.errors.join('\n'))
+    })
+    await test('every scene of the person page is there', async () => {
+      for (const id of ['hero', 'note', 'problem', 'operation', 'practice', 'how', 'proof', 'working', 'cta'])
+        expect(await page.locator(`#${id}`).count(), `#${id} missing`)
+    })
+    await test('no sideways scroll', () => noSidewaysScroll(page))
+    await test('scenes reveal as they enter, and every scene has revealed by the end', () => revealsAll(page))
+    if (vp === 'desktop') {
+      await test('desktop: full screen hero at 75% of the window; scenes at least 75%', () => sceneHeights(page, 900))
+    }
+    await test('the intro plays on load and settles', () => introSettles(page))
+    await test('the hero landscape is never upscaled', () => heroImageSharp(page))
+    await test('personalization said once: their account logo and the stored eyebrow above the h1', async () => {
+      expect((await page.locator('#hero .www-account').count()) === 1, 'no account mark, or two')
+      expect(/Written for/i.test(await page.locator('#hero .www-account__label').innerText()), 'the eyebrow is not beside the logo')
+    })
+    await test('the close has one call to action', async () => {
+      const n = await page.locator('#cta .www-btn').count()
+      expect(n === 1, `${n} buttons in the close`)
+    })
+    await test('the sticky bar appears past the hero and hides at the close', async () => {
+      await page.evaluate(() => scrollTo(0, 0))
+      await page.waitForTimeout(300)
+      expect(!(await page.locator('.www-sticky--visible').count()), 'visible over the hero')
+      await page.locator('#practice').scrollIntoViewIfNeeded()
+      await page.waitForSelector('.www-sticky--visible', { timeout: 3000 })
+      await page.locator('#cta').scrollIntoViewIfNeeded()
+      await page.waitForFunction(() => !document.querySelector('.www-sticky--visible'), null, { timeout: 3000 })
+    })
+    await test('one click tells their account executive (the panel names them), once, and asks for no form', async () => {
+      await page.locator('#cta-connect-btn').click()
+      const panel = page.getByRole('dialog')
+      await panel.getByText("You're all set").waitFor({ timeout: 3000 })
+      expect(!(await panel.locator('form, input, textarea').count()), 'the panel has a form field')
+      expect(/We've let Caleb know/.test(await panel.innerText()), `the panel does not name the account executive: ${(await panel.innerText()).slice(0, 120)}`)
+      await page.waitForTimeout(500)
+      await page.screenshot({ path: path.join(OUT, `person-connect-${vp}.png`) })
+      await page.keyboard.press('Escape')
+      await page.locator('#cta .www-sent').waitFor({ timeout: 3000 })
+      const pings = await pingsOf(page)
+      expect(pings.length === 1 && pings[0].source === 'cta-connect-btn' && pings[0].route === new URL(page.url()).pathname, `pings: ${JSON.stringify(pings)}`)
+      expect(!watch.escaped.length, `a request reached the real webhook: ${watch.escaped.join(', ')}`)
+    })
+    if (vp === 'phone') {
+      await test('phone: the hero ask is in the first screen', async () => {
+        await page.evaluate(() => scrollTo(0, 0))
+        await page.waitForTimeout(300)
+        const cta = await page.locator('#hero .www-btn').first().boundingBox()
+        expect(cta && cta.y + cta.height <= 844 && cta.x + cta.width <= 390, `hero CTA at ${JSON.stringify(cta)}`)
+      })
+    }
+    await shot(page, `person-${vp}`)
+    await ctx.close()
+  }
+
   console.log(`\noffer page, ${vp}`)
   const o = await newContext(browser, vp)
-  const op = await open(o.ctx, o.watch, url(OFFER, 'design=www'))
+  const op = await open(o.ctx, o.watch, url(OFFER))
   await test('server-rendered and hydrated without errors', async () => {
     expect(!o.watch.errors.length, o.watch.errors.join('\n'))
   })
@@ -358,7 +500,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   // Laura, 3 Nov: tighten the space after "What you'll leave with". Scenes on the same
   // background follow each other at one scene's padding, not two scenes each padded to 75%.
   await test('offer scenes on the same background are one gap apart, not two padded scenes', async () => {
-    const lp = await open(o.ctx, o.watch, url('/vb/sitecore-switch-volvo-cars', 'design=www'))
+    const lp = await open(o.ctx, o.watch, url('/vb/sitecore-switch-volvo-cars'))
     await lp.evaluate(async () => {
       for (let y = 0; y < document.body.scrollHeight; y += 400) {
         scrollTo(0, y)
@@ -392,7 +534,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   })
   for (const long of ['/vb/sitecore-switch-volvo-cars', '/vb/the-north-face-retail-cx-personalization-lab-ralph-lauren-corp']) {
     await test(`a long headline steps down instead of pushing the hero past the window (${long})`, async () => {
-      const lp = await open(o.ctx, o.watch, url(long, 'design=www'))
+      const lp = await open(o.ctx, o.watch, url(long))
       const r = await lp.evaluate(() => {
         const h1 = document.querySelector('#hero h1') as HTMLElement
         const run = h1.querySelector('.origin-bottom-left') as HTMLElement | null
@@ -438,10 +580,10 @@ console.log('\nbooth tools on the agent platform page (signed in, ?search=1)')
     const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
     await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
   })
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(AP_ACCOUNT, 'search=1'))
   // The stored stack, from the server HTML's hydration data (the page drops it once hydrated).
   {
-    const html = await (await fetch(url(ACCOUNT, 'design=www'), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
+    const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
     const data = JSON.parse(html.match(/window\.__SSR_DATA__=(\{[\s\S]*?\})<\/script>/)![1]) as { techStack?: typeof stack }
     stack = data.techStack ?? []
   }
@@ -519,7 +661,7 @@ console.log('\nEdit mode on the agent platform page: the page\'s own text (the h
     statusPolls++
     return route.fulfill({ json: { changed: false } })
   })
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(AP_ACCOUNT, 'search=1'))
   const before = await page.locator('#hero h1').innerText()
   await test('Mark\'s new headline shows live, and Edit mode reloads without waiting for a CMS republish', async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
@@ -551,7 +693,7 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
 {
   const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
   // The stored page, and the same page as Mark saved it: one tool added to the stack.
-  const slug = ACCOUNT.replace(/^\/+|\/+$/g, '')
+  const slug = AP_ACCOUNT.replace(/^\/+|\/+$/g, '')
   const stored = (await (await fetch(`${BASE}/api/content?slug=${encodeURIComponent(slug)}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).json()) as { techStack?: Array<{ Name: string; ColorTag: string | null }> }
   const saved = { ...stored, techStack: [{ Name: 'Shopify Plus', ColorTag: null }, ...(stored.techStack ?? [])] }
   await ctx.route('**/api/opal-edit-stream', async (route) => {
@@ -563,7 +705,7 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
   // The save is live at once, and the saved page is what the content API answers after it.
   await ctx.route('**/api/edit-status**', (route) => route.fulfill({ json: { changed: true, published: '2026-01-01T00:00:00.000Z' } }))
   await ctx.route(/\/api\/content\?slug=[^&]+&_=/, (route) => route.fulfill({ json: saved }))
-  const page = await open(ctx, watch, url(ACCOUNT, 'design=www&search=1'))
+  const page = await open(ctx, watch, url(AP_ACCOUNT, 'search=1'))
   await test('the saved change is shown on the page before the reload: spotlight, re-render, glow', async () => {
     await page.getByRole('button', { name: 'Enter edit mode' }).click()
     await page.locator('[aria-label="Leave feedback on What they run today"]').click()
@@ -582,12 +724,142 @@ console.log('\nEdit mode on the agent platform page when Mark saves without narr
   await ctx.close()
 }
 
+console.log('\nbooth tools on the takeout page (signed in, ?search=1)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  // Mark's edit stream, answered here, as the agent sends it: each applied edit with its field and
+  // the field's full new value. One to the hero headline, one to a part the page newly offers.
+  let heroText = ''
+  let asked = ''
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    asked = route.request().postData() || ''
+    const events = [
+      { type: 'plan', sections: ['Hero headline', 'Comparison headline'], summary: 'e2e' },
+      { type: 'section_focus', section: 'Hero headline' },
+      { type: 'edit', section: 'Hero headline', target: 'headline', kind: 'text', action: 'replace', status: 'applied', old: heroText, new: 'Rewritten by the e2e test', field: 'headline', value: 'Rewritten by the e2e test' },
+      { type: 'section_focus', section: 'Comparison headline' },
+      { type: 'edit', section: 'Comparison headline', target: 'comparisonHeadline', kind: 'text', action: 'replace', status: 'applied', old: '', new: 'Compared by the e2e test', field: 'comparisonHeadline', value: 'Compared by the e2e test' },
+      { type: 'commit', status: 'ok', edits: 2 },
+      { type: 'done', saved: true },
+    ]
+    const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
+  const page = await open(ctx, watch, url(ACCOUNT, 'search=1'))
+  heroText = (await page.locator('[data-xray="hero-title"] h1').innerText()).replace(/\s+/g, ' ').trim()
+
+  const onPage = await page.evaluate(
+    (ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)),
+    ABM_XRAY_DEFAULTS.map((s) => s.id),
+  )
+
+  await test('the page tools render for a signed-in employee', async () => {
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).waitFor({ timeout: 5000 })
+  })
+  await test(`X-ray outlines every section on the page (${onPage.length})`, async () => {
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('.xray-card').length >= n, onPage.length, { timeout: 8000 })
+    const titles = await page.$$eval('.xray-card__title', (els) => els.map((e) => e.textContent))
+    const want = ABM_XRAY_DEFAULTS.filter((s) => onPage.includes(s.id)).map((s) => s.title)
+    for (const t of want) expect(titles.includes(t), `no X-ray card for "${t}"`)
+    await page.screenshot({ path: path.join(OUT, 'booth-xray.png') })
+    await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
+  })
+  const editable = await page.evaluate((ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)), TAKEOUT_EDIT.map((s) => s.id))
+  await test(`Edit mode offers every part of the takeout page (${editable.length} of ${TAKEOUT_EDIT.length}), each named for Mark`, async () => {
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, editable.length, { timeout: 8000 })
+    const labels = await page.$$eval('[aria-label^="Leave feedback on "]', (els) => els.map((e) => e.getAttribute('aria-label')!.replace('Leave feedback on ', '')))
+    for (const s of TAKEOUT_EDIT.filter((x) => editable.includes(x.id))) expect(labels.includes(s.title), `"${s.title}" is not offered`)
+    expect(editable.length >= TAKEOUT_EDIT.length - 3, `only ${editable.length} of the parts are on the page`)
+  })
+  await test("Mark is told each section's fields, and his streamed values re-render the page live", async () => {
+    // The edit overlay is aria-hidden from the page's own tree, so find the box by its label.
+    for (const [part, note] of [['Hero headline', 'Make it about every CDW brand'], ['Comparison headline', 'Name AEM as a Service']]) {
+      await page.locator(`[aria-label="Leave feedback on ${part}"]`).click()
+      await page.locator('.edit-popup__textarea').fill(note)
+      await page.locator('.edit-popup__btn--primary').click()
+    }
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForFunction(
+      () =>
+        /Rewritten by the e2e test/.test(document.querySelector('[data-xray="hero-title"]')?.textContent || '') &&
+        /Compared by the e2e test/.test(document.querySelector('[data-xray="comparison-heading"]')?.textContent || ''),
+      null,
+      { timeout: 15000 },
+    )
+    const req = JSON.parse(asked || '{}').suggested_edit || ''
+    expect(/Section: Hero headline\nFields: headline\n/.test(req), `the request does not name the headline field: ${req.slice(0, 200)}`)
+    expect(/Section: Comparison headline\nFields: comparisonHeadline, comparisonDescription, competitorName\n/.test(req), 'the request does not name the comparison fields')
+    // React drew it from the value (the element that shows the field flashed), not a retyped overlay.
+    expect(await page.locator('[data-field="headline"]').count(), 'the headline has no data-field')
+    await page.screenshot({ path: path.join(OUT, 'booth-edit.png') })
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
+console.log('\nbooth tools on the person page (signed in, ?search=1)')
+{
+  const { ctx, watch } = await newContext(browser, 'desktop', { signedIn: true })
+  let asked = ''
+  await ctx.route('**/api/opal-edit-stream', async (route) => {
+    asked = route.request().postData() || ''
+    const events = [
+      { type: 'plan', sections: ['The note'], summary: 'e2e' },
+      { type: 'section_focus', section: 'The note' },
+      { type: 'done', saved: false },
+    ]
+    const body = events.map((e) => `data: ${JSON.stringify({ k: 'text', t: JSON.stringify(e) })}\n\n`).join('') + `data: {"k":"done"}\n\n`
+    await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+  })
+  const page = await open(ctx, watch, url(PERSON, 'search=1'))
+  const onPage = await page.evaluate((ids) => ids.filter((id) => document.querySelector(`[data-xray="${id}"]`)), PERSON_XRAY_DEFAULTS.map((s) => s.id))
+  await test('the page tools render for a signed-in employee', async () => {
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).waitFor({ timeout: 5000 })
+  })
+  await test(`X-ray outlines every part of the person page (${onPage.length} of ${PERSON_XRAY_DEFAULTS.length})`, async () => {
+    expect(onPage.length >= PERSON_XRAY_DEFAULTS.length - 2, `only ${onPage.join(', ')}`)
+    await page.getByRole('button', { name: 'Enter X-ray mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('.xray-card').length >= n, onPage.length, { timeout: 8000 })
+    const titles = await page.$$eval('.xray-card__title', (els) => els.map((e) => e.textContent))
+    for (const t of PERSON_XRAY_DEFAULTS.filter((s) => onPage.includes(s.id)).map((s) => s.title)) expect(titles.includes(t), `no X-ray card for "${t}"`)
+    await page.screenshot({ path: path.join(OUT, 'booth-person-xray.png') })
+    await page.getByRole('button', { name: 'Exit X-ray mode' }).click()
+  })
+  await test('Edit mode offers every part of the person page and names its fields for Mark', async () => {
+    const editable = PERSON_EDIT.filter((s) => onPage.includes(s.id))
+    await page.getByRole('button', { name: 'Enter edit mode' }).click()
+    await page.waitForFunction((n) => document.querySelectorAll('[aria-label^="Leave feedback on "]').length >= n, editable.length, { timeout: 8000 })
+    const labels = await page.$$eval('[aria-label^="Leave feedback on "]', (els) => els.map((e) => e.getAttribute('aria-label')!.replace('Leave feedback on ', '')))
+    for (const s of editable) expect(labels.includes(s.title), `"${s.title}" is not offered`)
+    await page.locator('[aria-label="Leave feedback on The note"]').click()
+    await page.locator('.edit-popup__textarea').fill('Shorter, please')
+    await page.locator('.edit-popup__btn--primary').click()
+    await page.locator('[aria-label="Send feedback"]').click()
+    await page.waitForFunction(() => true, null, { timeout: 2000 })
+    for (let i = 0; i < 30 && !asked; i++) await page.waitForTimeout(200)
+    const req = JSON.parse(asked || '{}').suggested_edit || ''
+    expect(/Section: The note\nFields: noteBody, noteSignedBy, noteSignedByRole, noteSignedByInitials, noteDate\nFeedback: Shorter, please/.test(req), `the request does not name the note's fields: ${req.slice(0, 200)}`)
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, watch.escaped.join(', '))
+  })
+  await ctx.close()
+}
+
 console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
 {
   const CMS = 'https://app-opti01saas4uc99t001.cms.optimizely.com'
   const keyOf = async (q: string) => ((await (await fetch(`${BASE}/api/content?${q}`, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).json()) as { _metadata?: { key?: string } })._metadata?.key
   const accountKey = await keyOf(`slug=${encodeURIComponent(ACCOUNT.replace(/^\/|\/$/g, ''))}`)
+  const apKey = await keyOf(`slug=${encodeURIComponent(AP_ACCOUNT.replace(/^\/|\/$/g, ''))}`)
   const offerKey = await keyOf(`kind=experience&slug=${encodeURIComponent(OFFER.replace(/^\/vb\/|\/$/g, ''))}`)
+  const personKey = await keyOf(`slug=${encodeURIComponent(PERSON.replace(/^\/|\/$/g, ''))}`)
   const { ctx, watch } = await newContext(browser, 'desktop')
   // The CMS's editor script is the CMS's own: stood in here, and noted, so the test stays on this machine.
   const injector: string[] = []
@@ -615,21 +887,32 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     )
 
   await test('the keys of the pages under test were found', async () => {
-    expect(accountKey && offerKey, `account ${accountKey}, offer ${offerKey}`)
+    expect(accountKey && apKey && offerKey && personKey, `account ${accountKey}, agent platform ${apKey}, offer ${offerKey}, person ${personKey}`)
   })
   const page = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=edit`)
-  await test('an account page draft in the editor is the agent platform template, not the old layout', async () => {
-    await page.waitForSelector('.www-page.www-ap', { timeout: 10000 })
-    expect(!(await page.locator('.abm-page').count()), 'the old ABM layout is on the page')
+  await test('a takeout pitch in the editor is the takeout page in the new design, as at its address', async () => {
+    await page.waitForSelector('.www-page #comparison', { timeout: 10000 })
+    expect(!(await page.locator('.www-ap, .abm-page').count()), 'not the takeout page')
+  })
+  await test('the page lays out for a fixed window, so the frame the CMS sizes to it cannot run away', async () => {
+    // The CMS sets its frame to the page's height. Stand in for that: a frame 20 times taller.
+    const before = await page.evaluate(() => document.documentElement.scrollHeight)
+    await page.setViewportSize({ width: 1440, height: 18000 })
+    await page.waitForTimeout(400)
+    const after = await page.evaluate(() => document.documentElement.scrollHeight)
+    const hero = await page.evaluate(() => document.querySelector('#hero')?.getBoundingClientRect().height ?? 0)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    expect(after <= Math.max(before, 18000) + 2 && Math.abs(after - before) < 50 + Math.max(0, 18000 - before), `page ${before}px in a 900px frame, ${after}px in an 18,000px one`)
+    expect(hero > 300 && hero < 900, `the hero is ${hero}px tall in an 18,000px frame`)
   })
   await test("the CMS's editor script is loaded from the CMS", async () => {
     await page.waitForFunction(() => (window as unknown as { __injector?: boolean }).__injector === true, null, { timeout: 5000 })
     expect(injector.some((u) => u === `${CMS}/util/javascript/communicationinjector.js`), injector.join(', '))
   })
-  await test('the CMS fields the page shows are outlined for the editor (data-epi-edit), the template copy is not', async () => {
+  await test('every stored field the takeout page shows is outlined for the editor (data-epi-edit)', async () => {
     const hooks = await page.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
-    for (const f of ['customerLogo', 'techStack', 'stakeholders']) expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
-    expect(!hooks.some((h) => h?.startsWith('copy.')), `a template copy key is outlined: ${hooks.join(', ')}`)
+    for (const f of ['headline', 'subheadline', 'customerLogo', 'techStack', 'challengeHeadline', 'comparisonTableRows', 'competitorName', 'roiTitle', 'timelinePhases', 'ctaTitle', 'teamMembers'])
+      expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
   })
   await test('a save the CMS reports refreshes the draft in place: fetched again, the page never reloads', async () => {
     await page.evaluate(() => ((window as unknown as { __kept: number }).__kept = 1))
@@ -650,20 +933,46 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     expect(drafts.slice(before).some((q) => new URLSearchParams(q).get('preview_token') === 'e2e-new-token'), `fetched ${drafts.slice(before).join(' | ')}`)
     expect(new URL(page.url()).searchParams.get('preview_token') === 'e2e-new-token', `the address is ${page.url()}`)
     expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept === 1), 'the page reloaded')
-    await page.waitForSelector('.www-page.www-ap')
+    await page.waitForSelector('.www-page #comparison')
   })
   await test('in the preview the one-click ask tells nobody', async () => {
     await page.locator('#cta-connect-btn').click()
     await page.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
     await page.keyboard.press('Escape')
-    expect(!(await beaconsOf(page)).length, 'the preview pinged the team')
+    expect(!(await pingsOf(page)).length, 'the preview pinged the team')
     expect(!watch.escaped.length, watch.escaped.join(', '))
   })
   await shot(page, 'cms-preview-account')
 
+  // A preview token lives five minutes. An old one gets a plain message, and the page stays its
+  // own size in the CMS's frame (it grew to Chrome's 16,777,213 px limit on the error screen).
+  {
+    const tp = await ctx.newPage()
+    await tp.route('**/api/preview?**', (route) =>
+      route.fulfill({ status: 401, json: { error: 'The preview token was refused (Token expired)', expired: true } }),
+    )
+    await tp.setViewportSize({ width: 1440, height: 18000 })
+    await tp.goto(`${BASE}/preview?key=${accountKey}&loc=en&ctx=edit&preview_token=expired`)
+    await test('an expired preview says so, and stays its own size in a frame sized to it', async () => {
+      await tp.getByText('This preview has timed out').waitFor({ timeout: 8000 })
+      const h = await tp.evaluate(() => document.documentElement.scrollHeight)
+      expect(h <= 18000 && (await tp.evaluate(() => document.querySelector('h1')?.getBoundingClientRect().top ?? 1e9)) < 600, `error screen in an 18,000px frame: page ${h}px, message out of sight`)
+    })
+    await tp.close()
+  }
+
+  const apView = await open(ctx, watch, `${BASE}/preview?key=${apKey}&loc=en&ctx=edit`)
+  await test('an agent platform pitch in the editor is the agent platform page, its CMS fields outlined and its template copy not', async () => {
+    await apView.waitForSelector('.www-page.www-ap', { timeout: 10000 })
+    const hooks = await apView.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
+    for (const f of ['customerLogo', 'techStack', 'stakeholders']) expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
+    expect(!hooks.some((h) => h?.startsWith('copy.')), `a template copy key is outlined: ${hooks.join(', ')}`)
+  })
+  await shot(apView, 'cms-preview-agent-platform')
+
   const plainView = await open(ctx, watch, `${BASE}/preview?key=${accountKey}&loc=en&ctx=preview`)
   await test("the CMS's plain preview (ctx=preview) is the reader's page, with no editing hooks", async () => {
-    await plainView.waitForSelector('.www-page.www-ap')
+    await plainView.waitForSelector('.www-page #comparison')
     expect(!(await plainView.locator('[data-epi-edit], [data-epi-block-id]').count()), 'editing hooks outside the editor')
   })
 
@@ -678,6 +987,19 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
     expect((await op.locator('#main-content [data-epi-block-id]').count()) > sections.length, 'the elements are not outlined')
   })
   await shot(op, 'cms-preview-offer')
+
+  const pv = await open(ctx, watch, `${BASE}/preview?key=${personKey}&loc=en&ctx=edit`)
+  await test('a person page in the editor is the www person page, its stored fields outlined, and its ask tells nobody', async () => {
+    await pv.waitForSelector('.www-page.www-person #note', { timeout: 10000 })
+    const hooks = await pv.$$eval('[data-epi-edit]', (els) => [...new Set(els.map((e) => e.getAttribute('data-epi-edit')))])
+    for (const f of ['heroEyebrow', 'companyLogo', 'noteBody', 'scorecard', 'provenance', 'solutions', 'peerProof', 'team', 'ctaTitle', 'footerLine'])
+      expect(hooks.includes(f), `no hook for ${f}: ${hooks.join(', ')}`)
+    await pv.locator('#cta-connect-btn').click()
+    await pv.getByRole('dialog').getByText("You're all set").waitFor({ timeout: 3000 })
+    await pv.keyboard.press('Escape')
+    expect(!(await pingsOf(pv)).length, 'the preview pinged the team')
+  })
+  await shot(pv, 'cms-preview-person')
   await test('no errors, and nothing reached the real webhooks', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))
     expect(!watch.escaped.length, watch.escaped.join(', '))
@@ -685,25 +1007,25 @@ console.log('\nthe CMS preview (/preview, as the CMS opens it in its editor)')
   await ctx.close()
 }
 
-console.log('\nthe default (no parameter); the old switches are gone')
+console.log('\neach account page follows its own pitch; no address switches it')
 const fetchHtml = async (href: string) => (await fetch(href, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
-await test('an account page with no parameter is the agent platform page', async () => {
-  const html = await fetchHtml(`${BASE}${ACCOUNT}`)
-  expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the default account page is not the agent platform page')
+const isAp = (html: string) => /class="www-page[^"]*\bwww-ap\b/.test(html)
+const isTakeout = (html: string) => html.includes('class="www-page') && html.includes('id="comparison"') && !isAp(html)
+await test(`a CMS takeout pitch (${ACCOUNT}) is the takeout page; an agent platform pitch (${AP_ACCOUNT}) is the agent platform page`, async () => {
+  expect(isTakeout(await fetchHtml(url(ACCOUNT))), `${ACCOUNT} is not the takeout page`)
+  expect(isAp(await fetchHtml(url(AP_ACCOUNT))), `${AP_ACCOUNT} is not the agent platform page`)
 })
-await test('an offer page with no parameter is the www offer page', async () => {
-  const html = await fetchHtml(`${BASE}${OFFER}`)
-  expect(html.includes('www-page') && html.includes('id="hero"'), 'the default offer page is not the www design')
-})
-await test('?design=classic and ?template=takeout draw the agent platform page too (the old layouts are gone)', async () => {
+await test('?design=classic and ?template=takeout change nothing (no switches in the address)', async () => {
   for (const q of ['design=classic', 'template=takeout']) {
-    const html = await fetchHtml(url(ACCOUNT, q))
-    expect(/class="www-page[^"]*\bwww-ap\b/.test(html) && !html.includes('abm-page'), `${q}: not the agent platform page`)
+    expect(isTakeout(await fetchHtml(url(ACCOUNT, q))), `${ACCOUNT}?${q}: not the takeout page`)
+    expect(isAp(await fetchHtml(url(AP_ACCOUNT, q))), `${AP_ACCOUNT}?${q}: not the agent platform page`)
   }
 })
-await test('?design=classic draws the www offer page too', async () => {
-  const html = await fetchHtml(url(OFFER, 'design=classic'))
-  expect(html.includes('www-page') && !html.includes('vb-experience'), 'the classic offer page is still served')
+await test('an offer page is the www offer page, with or without ?design=classic', async () => {
+  for (const q of ['', 'design=classic']) {
+    const html = await fetchHtml(url(OFFER, q))
+    expect(html.includes('www-page') && html.includes('id="hero"') && !html.includes('vb-experience'), `?${q}: not the www offer page`)
+  }
 })
 
 await browser.close()

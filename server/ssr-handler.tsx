@@ -3,15 +3,17 @@ import { renderToString } from 'react-dom/server';
 import { Suspense, type ReactElement } from 'react';
 import RetailCustomerPage from '../src/components/RetailCustomerPage';
 import FinServPageServer from '../src/components/FinServPage.server';
-import PersonPageServer from '../src/components/PersonPage.server';
+import WwwPersonPage from '../src/www/PersonPage';
 import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-demo-content';
-import AgentPlatformPage from '../src/www/AgentPlatformPage';
+import AccountRoute from '../src/www/AccountRoute';
+import { accountTemplateOf } from '../src/www/account-template';
 import WwwOfferPage from '../src/www/OfferPage';
 import { isOfferExperience } from '../src/www/design';
 import { agentPlatformHead } from '../src/www/agent-platform/content';
 import { resolveUrl } from '../src/lib/graph-types';
 import { graphItems } from '../src/lib/graph-envelope';
 import { ACCOUNT_PAGE_QUERY } from '../src/lib/account-page-query';
+import { PERSON_PAGE_QUERY } from '../src/lib/person-page-query';
 import type {
   AtelierNoteBlock,
   CompetitorComparisonPage,
@@ -337,9 +339,8 @@ type TypeProbe = { data?: { __type?: { name?: string; fields?: Array<{ name: str
  * other type is tagged on its way out, which is what lets the dispatch below be
  * a switch the compiler can narrow instead of a chain of casts.
  */
-type ParentShot = Pick<PersonPage, 'siteScreenshotUrl' | 'siteScreenshotAlt' | 'siteScreenshotDomain'>;
 type FetchedPage =
-  | (PersonPage & ParentShot & { __template: 'person' })
+  | (PersonPage & { __template: 'person' })
   | (RetailPageData & { __template: 'retail' })
   | (FinServPage & { __template: 'finserv' })
   | (CompetitorComparisonPage & { __template?: undefined });
@@ -366,104 +367,9 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return json;
 }
 
-// PersonPage — the 1:1 buyer page, the only nested route on the site
+// PersonPage (src/lib/person-page-query.ts) is the only nested route on the site
 // (/{company}/{person}). Probed first in fetchPageContent: a slug with two
 // segments cannot be any of the flat types.
-/**
- * The person page shows the company page's screenshot of the customer's
- * current site in its hero galaxy. That asset lives on the PARENT
- * CompetitorComparisonPage, not on PersonPage — pulling it across rather than
- * duplicating it onto the person content type means the two heroes can never
- * drift, and an editor who reshoots the company page's screenshot updates
- * every person page under it for free.
- */
-const PARENT_SHOT_QUERY = `
-query GetParentShot($slug: String!) {
-  CompetitorComparisonPage(
-    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
-    locale: en
-  ) {
-    items {
-      challengeScreenshotUrl { default }
-      challengeScreenshotAlt
-      challengeBrowserUrl
-    }
-  }
-}
-`;
-
-/**
- * Fetch the parent company page's site screenshot for a person page.
- * Best-effort: a person page whose parent has no screenshot (or whose parent
- * query fails) renders its galaxy without one, so this never blocks the page.
- */
-async function fetchParentShot(
-  authKey: string,
-  companySlug: string | null | undefined,
-): Promise<ParentShot> {
-  const slug = (companySlug || '').replace(/^\/+|\/+$/g, '');
-  if (!slug) return {};
-  try {
-    for (const s of [`/${slug}/`, `/en/${slug}/`]) {
-      const json = await queryGraph(authKey, PARENT_SHOT_QUERY, { slug: s });
-      const item = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage')?.[0];
-      if (item?.challengeScreenshotUrl?.default) {
-        return {
-          siteScreenshotUrl: item.challengeScreenshotUrl.default,
-          siteScreenshotAlt: item.challengeScreenshotAlt ?? null,
-          siteScreenshotDomain: item.challengeBrowserUrl ?? null,
-        };
-      }
-    }
-  } catch {
-    /* the galaxy is decorative — never fail the page over it */
-  }
-  return {};
-}
-
-const PERSON_PAGE_QUERY = `
-query GetPersonPage($slug: String!) {
-  PersonPage(
-    where: { _metadata: { url: { hierarchical: { eq: $slug } } } }
-    locale: en
-  ) {
-    items {
-      _metadata { key url { default hierarchical } published lastModified }
-      template
-      PageTitle MetaDescription noIndex
-      companySlug companyName personSlug crmContactId
-      personName personTitle personInitials
-      personLinkedIn { default }
-      personAvatarColor
-      companyLogo { default }
-      brandAccentColor
-      heroEyebrow heroHeadline heroSubheadline heroCtaText heroCtaUrl { default }
-      engagementTier engagementHeadline engagementSummary
-      touchpoints { Date Kind Summary OptimizelyPerson }
-      openOpportunityName openOpportunityStage openOpportunityDetail
-      remitHeadline remitIntro
-      remitPoints { Title Description Metric }
-      roleFrame
-      noteBody noteSignedBy noteSignedByRole noteSignedByInitials noteDate
-      researchHeadline researchClaim
-      provenance { Register Text SourceLabel SourceUrl { default } }
-      scorecardHeadline scorecardIntro
-      scorecard { Measure WhyHard WhatChanges Metric }
-      solutionsHeadline solutionsIntro
-      solutions { Product Headline Body WhyFirst }
-      keyNumberValue keyNumberPrefix keyNumberSuffix keyNumberLabel keyNumberDetail
-      keyNumberCitationUrl { default }
-      peerProofHeadline
-      peerProof { Quote PersonName PersonTitle Company SourceUrl { default } }
-      teamHeadline
-      team { Initials Name Role Email AvatarColor AlreadyMet }
-      ctaTitle ctaBody ctaButtonText meetingUrl { default }
-      footerLine generatedAt generatedBy
-    }
-  }
-}
-`;
-
 async function fetchPageContent(authKey: string, slug: string): Promise<FetchedPage | null> {
   const normalizedSlug = `/${slug}/`;
 
@@ -487,8 +393,7 @@ async function fetchPageContent(authKey: string, slug: string): Promise<FetchedP
     const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
     const items = graphItems<PersonPage>(pJson, 'PersonPage');
     if (items && items.length > 0) {
-      const shot = await fetchParentShot(authKey, items[0]?.companySlug);
-      return { ...items[0], ...shot, __template: 'person' as const };
+      return { ...items[0], __template: 'person' as const };
     }
   }
 
@@ -1200,15 +1105,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let headSource: typeof page = page;
     switch (page.__template) {
       case 'person':
-        // Edit mode, exactly as App.tsx's renderPageBody passes it — to person pages only.
-        // Missing here, the server drew no data-epi-edit hooks; production React keeps the
-        // server's attributes on hydration rather than patching them, so once c4cac94 made
-        // hydration succeed, every person page in ?ctx=edit lost its CMS edit hooks (6 and 8
-        // on the two measured pages, 0 after). Before that, the failed hydration re-rendered
-        // the page in the browser and hid the gap.
-        appHtml = renderPageRoute(
-          <PersonPageServer page={page} editMode={url.searchParams.get('ctx') === 'edit'} />,
-        );
+        // The www design (src/www/PersonPage.tsx). The CMS editor's hooks come from its own
+        // preview route (/preview), never from the address, exactly as on account pages.
+        appHtml = renderPageRoute(<WwwPersonPage page={page} />);
         break;
       case 'retail':
         appHtml = renderPageRoute(<RetailCustomerPage page={page} />);
@@ -1217,9 +1116,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appHtml = renderPageRoute(<FinServPageServer page={page} />);
         break;
       default:
-        // The agent platform template; its <head> replaces the stored title and description (N2).
-        appHtml = renderPageRoute(<AgentPlatformPage page={page} search={url.search} />);
-        headSource = agentPlatformHead(page);
+        // The template the page's own pitch calls for (src/www/account-template.ts). The agent
+        // platform template's <head> replaces the stored title and description (N2).
+        appHtml = renderPageRoute(<AccountRoute page={page} search={url.search} />);
+        if (accountTemplateOf(page) === 'agent-platform') headSource = agentPlatformHead(page);
     }
 
     // ---- Build SEO head tags ----

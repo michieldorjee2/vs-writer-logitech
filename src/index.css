@@ -84,7 +84,6 @@
    Scoped via .finserv-page so other templates' themes are unaffected. */
 @import './styles/finserv-variables.css';
 @import './styles/finserv-layout.css';
-@import './styles/person-page.css';
 
 /* Use-case account page (the `use-case-default` ladder rung) */
 @import './styles/use-case-layout.css';
@@ -839,7 +838,7 @@ html:has(.vb-hero--full) body {
     background: transparent;
     overflow: visible;
     isolation: auto;
-    min-height: 80svh;
+    min-height: calc(80 * var(--www-svh, 1svh));
     justify-content: center;
 }
 .vb-hero.vb-hero--full h1 { font-size: clamp(40px, 6vw, 88px); }
@@ -856,7 +855,7 @@ html:has(.vb-hero--full) body {
     inset: 0 0 auto 0;
     /* the hero is 80svh (or its content, if taller); the backdrop runs 260px PAST it so the fade
        happens under the next section's transparent-to-white top, not at the hero's hard edge */
-    height: calc(var(--vb-hero-h, 80svh) + 260px);
+    height: calc(var(--vb-hero-h, calc(80 * var(--www-svh, 1svh))) + 260px);
     z-index: -1;
     pointer-events: none;
     background-color: #08251a;
@@ -936,11 +935,18 @@ html:has(.vb-hero--full) body {
    row one shared scope: 01, 02, 03. */
 .vb-experience .vb-row { counter-reset: abm-friction; }
 
-/* The CMS preview's note while a saved draft loads (src/components/CmsPreview.tsx). */
+/* In the CMS preview the frame is sized to the page, so nothing may be as tall as the frame: the
+   loading and error screens get a fixed height there (src/main.tsx sets the attribute). */
+html[data-cms-preview] .min-h-screen {
+    min-height: 560px;
+}
+
+/* The CMS preview's note while a saved draft loads (src/components/CmsPreview.tsx). The frame is
+   the whole page there, so it sits at the top, where the editor is looking. */
 .cms-preview-busy {
     position: fixed;
     left: 16px;
-    bottom: 16px;
+    top: 16px;
     z-index: 2147483000;
     padding: 8px 16px;
     border-radius: 999px;

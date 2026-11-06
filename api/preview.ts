@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { graphItems } from '../src/lib/graph-envelope.js';
 import { ACCOUNT_PAGE_PREVIEW_QUERY } from '../src/lib/account-page-query.js';
+import { PERSON_PAGE_PREVIEW_QUERY } from '../src/lib/person-page-query.js';
 import { EXPERIENCE_PREVIEW_QUERIES, normalizeExperienceItem } from '../src/lib/experience-queries.js';
 import { withPageCopy } from './_lib/page-copy.js';
 import { withParentAccount } from './_lib/parent-account.js';
@@ -100,6 +101,12 @@ export function concreteType(item: { __typename?: string; _metadata?: { types?: 
   return item._metadata?.types?.find(isConcrete) ?? null;
 }
 
+/** Graph refused the token (measured: `{"code":"AUTHENTICATION_ERROR","status":401,"details":{"msg":"Token expired"}}`). */
+function refused(json: unknown): string | null {
+  const j = json as { code?: unknown; details?: { msg?: unknown } } | null;
+  return j?.code === 'AUTHENTICATION_ERROR' ? String(j.details?.msg || 'refused') : null;
+}
+
 function one(query: unknown): string | undefined {
   return typeof query === 'string' ? query : undefined;
 }
@@ -128,10 +135,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (loc) variables.loc = [loc];
 
   try {
-    const typed = graphItems<{ __typename?: string; _metadata?: { types?: string[] | null } | null }>(
-      await queryGraph(auth, PREVIEW_TYPE_QUERY, variables),
-      '_Content',
-    )?.[0];
+    const typeJson = await queryGraph(auth, PREVIEW_TYPE_QUERY, variables);
+    // A CMS preview token lives five minutes; the CMS hands a new one with every save. An old one
+    // is not "no such draft": say so, so the page can tell the editor to reload it.
+    const why = previewToken ? refused(typeJson) : null;
+    if (why) return res.status(401).json({ error: `The preview token was refused (${why})`, expired: /expired/i.test(why) });
+    const typed = graphItems<{ __typename?: string; _metadata?: { types?: string[] | null } | null }>(typeJson, '_Content')?.[0];
     const typeName = concreteType(typed);
     if (!typeName) return res.status(404).json({ error: 'Content not found' });
 
@@ -139,6 +148,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const items = graphItems<Record<string, unknown>>(await queryGraph(auth, ACCOUNT_PAGE_PREVIEW_QUERY, variables), typeName);
       if (!items?.length) return res.status(404).json({ error: 'Content not found' });
       return res.status(200).json(await withPageCopy({ ...items[0], __typename: typeName }));
+    }
+
+    // A person page (src/www/PersonPage.tsx), with the fields the live address reads.
+    if (typeName === 'PersonPage') {
+      const items = graphItems<Record<string, unknown>>(await queryGraph(auth, PERSON_PAGE_PREVIEW_QUERY, variables), typeName);
+      if (!items?.length) return res.status(404).json({ error: 'Content not found' });
+      return res.status(200).json({ ...items[0], __typename: typeName, __template: 'person' });
     }
 
     const experience = EXPERIENCE_PREVIEW_QUERIES[typeName];

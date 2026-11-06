@@ -27,6 +27,8 @@ const FILES = [
   // The account page's one field list: the live address, the server render, the dev server and
   // the CMS preview all read it.
   'src/lib/account-page-query.ts',
+  // The person page's one field list (live address, server render, CMS preview, the CTA ping).
+  'src/lib/person-page-query.ts',
   'server/ssr-handler.tsx',
   // The Visual Builder experience queries. They live in one module because api/content.ts
   // and vite.config.ts both serve them, so scanning the module covers both callers.

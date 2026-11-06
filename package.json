@@ -22,7 +22,8 @@
     "check:search-fixes": "tsx scripts/check-search-fixes.ts",
     "check:account-match": "tsx scripts/check-account-match.ts",
     "check:page-activity": "tsx scripts/check-page-activity.ts",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:www"
+    "check:cta-ping": "python3 mark/cta-ping/test_step.py",
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:cta-ping && npm run check:www"
   },
   "dependencies": {
     "@optimizely/cms-sdk": "3.1.0",
@@ -58,7 +59,6 @@
     "@radix-ui/react-toolbar": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@radix-ui/react-visually-hidden": "^1.2.11",
-    "@types/three": "^0.185.4",
     "@upstash/redis": "^1.36.3",
     "@vercel/blob": "^2.8.2",
     "class-variance-authority": "^0.7.1",
@@ -75,8 +75,7 @@
     "react-use": "^17.6.0",
     "react-use-measure": "^2.1.7",
     "sharp": "^0.34.5",
-    "tailwind-merge": "^3.7.0",
-    "three": "^0.185.1"
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

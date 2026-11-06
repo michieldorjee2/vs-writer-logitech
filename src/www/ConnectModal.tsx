@@ -1,16 +1,18 @@
 /**
  * The Limitless one-click ask, in the www design. No form: the click itself tells the account
- * team (the same `demo_button_clicked` ping the legacy page's sticky and closing buttons send,
- * src/lib/abm-demo-webhook.ts), and a confirmation panel opens with the fast track (schedule a
- * call) and the team's contacts.
+ * team (src/lib/cta-ping.ts: the page's account executive gets a Teams message, or the click goes
+ * on the follow-up sheet when the page names none), and a confirmation panel opens with the fast
+ * track (schedule a call) and the team's contacts.
  *
  * The ping goes once per page view: a second click reopens the panel without pinging the team
  * again. The `source` of the first click is what the team sees (which button the visitor used).
+ * The panel names only the person the ping messages, the account executive; with none on the
+ * page it says "your Optimizely team", which is who follows up from the sheet.
  */
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import type { CompetitorComparisonPage } from '../lib/graph-types'
-import { fireDemoWebhook } from '../lib/abm-demo-webhook'
+import { sendCtaPing, type CtaSource } from '../lib/cta-ping'
+import { toldFirstName } from '../lib/account-rep'
 import GravatarAvatar from '../components/GravatarAvatar'
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 
@@ -23,7 +25,7 @@ export interface ConnectPerson {
 
 interface ConnectApi {
   /** Pings the team (first time only) and opens the panel. */
-  connect: (source: string) => void
+  connect: (source: CtaSource) => void
   sent: boolean
 }
 
@@ -31,13 +33,11 @@ const Ctx = createContext<ConnectApi>({ connect: () => {}, sent: false })
 export const useConnect = () => useContext(Ctx)
 
 export function ConnectProvider({
-  page,
   people,
   scheduleUrl,
   teamLabel,
   children,
 }: {
-  page: CompetitorComparisonPage
   /** Named only when the page may name them; otherwise the panel says "your account team". */
   people: ConnectPerson[]
   scheduleUrl: string | null
@@ -48,17 +48,17 @@ export function ConnectProvider({
   const [sent, setSent] = useState(false)
   const pinged = useRef(false)
   const connect = useCallback(
-    (source: string) => {
+    (source: CtaSource) => {
       if (!pinged.current) {
         pinged.current = true
-        fireDemoWebhook(page, source)
+        sendCtaPing(source)
         setSent(true)
       }
       setOpen(true)
     },
-    [page],
+    [],
   )
-  const first = people[0]?.name.split(/\s+/)[0]
+  const first = toldFirstName(people)
   return (
     <Ctx.Provider value={{ connect, sent }}>
       {children}

@@ -5,7 +5,7 @@ import { ctaLabel, normalizeVuid } from '../lib/page-activity';
 import { isStaffBrowser } from '../lib/staff-marker';
 
 /**
- * ODP tracking for the account page (src/www/AgentPlatformPage.tsx).
+ * ODP tracking for the account page, either template.
  *
  * Uses the ODP client SDK (loaded in index.html as zaius-min.js).
  * Tracks: page view, section visibility, CTA clicks, engagement on exit.
@@ -70,11 +70,12 @@ function recordVisit(page: string, signal: { cancelled: boolean }) {
 }
 
 /**
- * The account page's scenes (src/www/AgentPlatformPage.tsx), by their ids. An id not on the page
- * (Who we are is left off some pages) is a no-op: getElementById returns null.
+ * The account page's scenes by their ids, both templates (src/www/AgentPlatformPage.tsx and
+ * src/www/AccountPage.tsx). An id not on the page is a no-op: getElementById returns null.
  */
 const ABM_SECTIONS = [
-  'hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta',
+  'hero', 'who', 'intel', 'signals', 'language', 'usecases', 'challenge', 'comparison', 'proof',
+  'analysts', 'promo', 'roi', 'migration', 'cta',
 ];
 
 /** Send an ODP event via the client SDK (queued if SDK still loading) */

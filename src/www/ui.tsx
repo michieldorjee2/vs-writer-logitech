@@ -165,6 +165,7 @@ export function AccountMark({
   label,
   xray,
   accent = false,
+  edit,
 }: {
   name: string
   logo?: string | null
@@ -172,6 +173,8 @@ export function AccountMark({
   xray?: string
   /** The takeout page's one use of the account's own colour (brandAccentColor): a stripe under the logo. */
   accent?: boolean
+  /** The CMS editor's hooks on the logo and the label, in its preview (./cms-edit.tsx). */
+  edit?: { logo?: Record<string, string>; label?: Record<string, string> }
 }) {
   // A logo URL that no longer answers shows the initials instead of a broken-image icon. It may
   // fail before hydration (no onError then), so the effect also checks the image once mounted.
@@ -183,7 +186,7 @@ export function AccountMark({
   }, [])
   return (
     <div className={cn('www-account', accent && 'www-account--accent')} data-xray={xray}>
-      <span className="www-account__logo">
+      <span className="www-account__logo" {...edit?.logo}>
         {logo && (
           <img
             ref={img}
@@ -198,7 +201,9 @@ export function AccountMark({
           {initialsOf(name)}
         </span>
       </span>
-      <span className="www-account__label">{label}</span>
+      <span className="www-account__label" {...edit?.label}>
+        {label}
+      </span>
     </div>
   )
 }
@@ -304,11 +309,11 @@ export function Scene({
 }) {
   return (
     <section
-      {...attrs}
       id={id}
       data-scene
       data-tone={tone}
       className={cn('www-scene', `www-scene--${tone}`, fill && 'www-scene--fill', compact && 'www-scene--compact', className)}
+      {...attrs}
     >
       <div className={cn('www-scene__inner vb-container mx-auto w-full px-4 lg:px-8', innerClassName)}>{children}</div>
     </section>
@@ -348,6 +353,21 @@ export function Reveal({
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   if (!children) return null
   return <p className={cn('www-eyebrow', className)}>{children}</p>
+}
+
+/**
+ * Converts the legacy rich headings (`We know <em>CDW</em>`, `You're on <span
+ * class="text--highlight">AEM.</span><br>We hear you.`) into StackedHeading's `##run##`.
+ */
+export function richToStacked(html: string | null | undefined): string {
+  if (!html) return ''
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<(em|strong|b)>([\s\S]*?)<\/\1>/gi, '##$2##')
+    .replace(/<span[^>]*class="[^"]*highlight[^"]*"[^>]*>([\s\S]*?)<\/span>/gi, '##$1##')
+    .replace(/<[^>]+>/g, '')
+    .replace(/####/g, '')
+    .trim()
 }
 
 /** Removes `##` emphasis marks, for places that show the words but not the emphasis. */

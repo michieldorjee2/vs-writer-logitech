@@ -4,6 +4,8 @@ import type { CompetitorComparisonPage } from '../lib/graph-types';
 import {
   ABM_XRAY_DEFAULTS,
   AGENT_PLATFORM_EDIT,
+  TAKEOUT_EDIT,
+  PERSON_EDIT,
   PERSON_XRAY_DEFAULTS,
   resolveXraySections,
   type EditSectionInfo,
@@ -179,9 +181,13 @@ function clamp(v: number, lo: number, hi: number): number {
 
 type Phase = 'editing' | 'working' | 'thanks';
 
-/** The www agent platform page (src/www/AgentPlatformPage.tsx) is on screen. */
-function onAgentPlatformPage(): boolean {
-  return typeof document !== 'undefined' && !!document.querySelector('.www-page.www-ap');
+/** Which account template is on screen: the agent platform page or the takeout page (src/www/account-template.ts). */
+function pageTemplate(): 'agent-platform' | 'takeout' | 'person' | null {
+  if (typeof document === 'undefined') return null;
+  if (document.querySelector('.www-page.www-ap')) return 'agent-platform';
+  if (document.querySelector('.www-page.www-takeout')) return 'takeout';
+  if (document.querySelector('.www-page.www-person')) return 'person';
+  return null;
 }
 
 /** Flash the page elements that render `field` (data-field="… field …") once a live edit lands. */
@@ -209,14 +215,25 @@ function copyNow(fields: string[], shown: Record<string, string | string[]>): Re
 }
 
 function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props) {
-  // The agent platform template is mostly template copy: Edit mode offers only the parts a page
-  // field drives, tells Mark which fields, and shows Mark's edits by re-rendering the page.
-  const agentPlatform = useMemo(() => active && onAgentPlatformPage(), [active]);
+  // On either account template Edit mode offers each part with the fields it shows, tells Mark
+  // which fields, and shows Mark's edits by re-rendering the page from the values he streams. The
+  // agent platform page is mostly template copy: its parts are the ones a field drives.
+  const template = useMemo(() => (active ? pageTemplate() : null), [active]);
+  const agentPlatform = template === 'agent-platform';
+  // Live re-render reads account page fields (src/www/live-edit.ts); a person page shows Mark's edits after the save.
+  const live = template === 'agent-platform' || template === 'takeout';
   const defaults =
     variant === 'person' ? PERSON_XRAY_DEFAULTS : ABM_XRAY_DEFAULTS;
   const sections: Array<XraySectionInfo & Partial<Pick<EditSectionInfo, 'fields' | 'hint'>>> = useMemo(
-    () => (agentPlatform ? AGENT_PLATFORM_EDIT : resolveXraySections(defaults, page.xraySections)),
-    [agentPlatform, defaults, page.xraySections],
+    () =>
+      agentPlatform
+        ? AGENT_PLATFORM_EDIT
+        : template === 'takeout'
+          ? TAKEOUT_EDIT
+          : template === 'person'
+            ? PERSON_EDIT
+            : resolveXraySections(defaults, page.xraySections),
+    [agentPlatform, template, defaults, page.xraySections],
   );
 
   const [phase, setPhase] = useState<Phase>('editing');
@@ -497,7 +514,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           copy: agentPlatform && fields ? copyNow(fields, shownCopy) : undefined,
         };
       }),
-      agentPlatform ? 'agent-platform' : undefined,
+      template ?? undefined,
     );
 
     const payload = {
@@ -586,7 +603,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
           } else {
             const els = id ? elementsRef.current.find((x) => x.section.id === id)?.els ?? [] : [];
             let appliedInPlace = false;
-            if (agentPlatform && ev.field !== undefined && ev.value !== undefined && applyLiveField(ev.field, ev.value)) {
+            if (live && ev.field !== undefined && ev.value !== undefined && applyLiveField(ev.field, ev.value)) {
               // The page re-renders from the new value: every place that field shows changes
               // together (pills, homework notes, tiles, evidence lines). Then the changed parts flash.
               await nextFrame();
@@ -596,9 +613,9 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
               setLiveStatus(`Updated ${ev.target ?? ev.section}`);
               await sleep(1400);
               appliedInPlace = true;
-            } else if (els.length && !agentPlatform) {
+            } else if (els.length && !live) {
               // Text the page renders as stored: strike it through and retype it in place. (Not on
-              // the agent platform page, which React re-renders from data: its copy is derived.)
+              // an account page, which React re-renders from data.)
               appliedInPlace = await animateSectionEdit(
                 els,
                 { kind, old: ev.old, new: ev.new, newUrl: ev.newUrl },
@@ -683,9 +700,9 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       } else {
         await sleep(2500);
       }
-      // Agent platform page: show every saved change on the page before the reload, part by part
+      // Account page: show every saved change on the page before the reload, part by part
       // (spotlight, re-render, glow), including any Mark saved without narrating it.
-      if (agentPlatform && !ac.signal.aborted) {
+      if (live && !ac.signal.aborted) {
         try {
           const route = slug.replace(/^\/+|\/+$/g, '');
           const res = await fetch(`/api/content?slug=${encodeURIComponent(route)}&_=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
@@ -718,7 +735,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail }: Props
       }
     }
     liveAbort.current = null;
-  }, [comments, page, sections, onSent, matchSectionId, scrollToSection, agentPlatform]);
+  }, [comments, page, sections, onSent, matchSectionId, scrollToSection, agentPlatform, template, live]);
 
   /** Dismiss the live overlay without reloading (Close on the live HUD). */
   const dismissLive = useCallback(() => {

@@ -8,34 +8,40 @@
  * node.
  *
  * What it proves:
- *   1. the pure helpers (stat formatting, offer detection)
+ *   1. the pure helpers (stat formatting, the comparison table, heading conversion, offer
+ *      detection, which template a page's pitch calls for)
  *   2. readOffer() reads a Visual Builder composition back into the offer blueprint's keys,
  *      including pages that leave a feed out, legacy section names, unknown sections
  *   3. OFFER_SLOTS is the offer blueprint (src/cms/blueprints/offer.ts), feed for feed
- *   4. NOTHING IS LOST on an offer page: every string of every element in its composition renders
+ *   4. NOTHING IS LOST: an account page with all 67 properties filled renders every stored
+ *      value, and an offer page renders every string of every element in its composition
  *   5. X-ray and Edit mode can find every section: each ABM_XRAY_DEFAULTS id has a
- *      `data-xray` hook on the account page and every selector matches it
- *   6. the agent platform template (every account page): the adapter that re-reads existing
- *      pages into it, Laura's rules (N1 to N14, gate 2), the lifecycle states, and that every
- *      stored field is either used or deliberately not shown
+ *      `data-xray` hook on the new page and every selector matches it
+ *   6. the agent platform template (account pages that pitch it): the adapter that re-reads
+ *      existing pages into it, Laura's rules (N1 to N14, gate 2), the lifecycle states, and that
+ *      every stored field is either used or deliberately not shown
  *   7. the CMS preview: /api/preview serves a draft as the live address would, and in the CMS
  *      editor the pages carry the SDK's on-page editing hooks (and nowhere else)
+ *   8. the person page (src/www/PersonPage.tsx): every stored field shown or deliberately not,
+ *      nothing from Salesforce on the page, one ask, its X-ray and Edit hooks, its CMS preview
+ *   9. the CTA ping: the browser sends only the page and button, the server reads the team itself
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { renderToString } from 'react-dom/server'
-import type { CompetitorComparisonPage } from '../../lib/graph-types'
+import type { CompetitorComparisonPage, PersonPage as PersonPageData } from '../../lib/graph-types'
+import AccountPage, { connectProps } from '../AccountPage'
 import OfferPage from '../OfferPage'
-import { ACCOUNT_PAGE_PROPERTIES } from '../account-fields'
-import { formatStatValue, realContacts } from '../account-helpers'
+import { ACCOUNT_FIELDS, ACCOUNT_PAGE_PROPERTIES } from '../account-fields'
+import { comparisonTableHtml, formatStatValue, PROOF_LOGOS, realContacts } from '../account-helpers'
 import { isOfferExperience } from '../design'
 import { nodeKeyOf, OFFER_SLOTS, readOffer, type ElementData } from '../offer-content'
-import { fitVars, plain } from '../ui'
+import { fitVars, plain, richToStacked } from '../ui'
 import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from '../../lib/parent-account'
 import { forgetParentAccounts, parentAccountsOf, parentKey, withParentAccount } from '../../../api/_lib/parent-account'
 import { forgetOfferPages, offerPagesByOffer } from '../../../api/_lib/offer-pages'
 import { withPages } from '../../../api/_lib/offers'
-import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY } from '../../lib/xray-defaults'
+import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, PERSON_EDIT, PERSON_XRAY_DEFAULTS, TAKEOUT_EDIT } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
 import { applyLiveField, changedLiveFields, getLivePatch, LIVE_FIELDS, liveFieldValue, liveValue, mergeLive, resetLive } from '../live-edit'
 import { COPY_KEYS, COPY_THEMES, copyEdits, copyKey, copyValue, expandFields, readCopy } from '../../lib/page-copy'
@@ -44,10 +50,16 @@ import { readPageCopy, savePageCopy, useCopyStore, withPageCopy, type CopyStore 
 import opalEditStream from '../../../api/opal-edit-stream'
 import AgentPlatformPage from '../AgentPlatformPage'
 import offerBlueprint from '../../cms/blueprints/offer'
+import AccountRoute from '../AccountRoute'
+import { accountTemplateOf } from '../account-template'
 import { CmsEditProvider } from '../cms-edit'
 import { inCmsPreview } from '../../lib/cms-preview'
 import { postSignup } from '../../lib/offer-signup'
-import { fireDemoWebhook } from '../../lib/abm-demo-webhook'
+import { sendCtaPing } from '../../lib/cta-ping'
+import PersonPage, { personConnectProps } from '../PersonPage'
+import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, measuresOf, peerProofOf, TIER_LABEL } from '../person-content'
+import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
+import ctaPingHandler, { accountSource, buildPing, canonicalJson, checkOf, personSource, pingRouteOf, type CtaPing } from '../../../api/cta-ping'
 import previewHandler, { concreteType } from '../../../api/preview'
 import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
 import { readStack, stackTiles } from '../agent-platform/stack'
@@ -328,6 +340,33 @@ test('formatStatValue keeps the legacy page formatting', () => {
   assert.equal(formatStatValue('2,273'), '2.3K')
 })
 
+test('comparisonTableHtml: icon tokens AND the word, free text kept, html escaped, x-ray hook per row', () => {
+  const html = comparisonTableHtml(
+    [
+      { Category: 'A & B', OurValue: 'Yes', CompetitorValue: 'Limited' },
+      { Category: 'C', OurValue: '<b>raw</b>', CompetitorValue: 'No' },
+    ],
+    'Rival <CMS>',
+  )
+  assert.match(html, /<th>Rival &lt;CMS&gt;<\/th>/)
+  assert.match(html, /\{true\}<span class="www-cell-label">Yes<\/span>/)
+  assert.match(html, /\{warning\}<span class="www-cell-label">Limited<\/span>/)
+  assert.match(html, /\{false\}<span class="www-cell-label">No<\/span>/)
+  assert.match(html, /<td>A &amp; B<\/td>/)
+  assert.match(html, /<td>&lt;b&gt;raw&lt;\/b&gt;<\/td>/)
+  assert.equal(html.match(/data-xray="comparison-row"/g)?.length, 2)
+})
+
+test('richToStacked turns the legacy emphasis markup into a ##run##', () => {
+  assert.equal(richToStacked('We know <em>CDW</em>'), 'We know ##CDW##')
+  assert.equal(
+    richToStacked('You\'re on <span class="text--highlight">AEM.</span><br>We hear you.'),
+    "You're on ##AEM.##\nWe hear you.",
+  )
+  assert.equal(richToStacked(null), '')
+  assert.equal(plain('A ##run## here'), 'A run here')
+})
+
 test('realContacts drops the generic role-title placeholders, as the legacy page did', () => {
   const kept = realContacts([
     { Initials: 'A', Name: 'Ada', Role: 'AE', Email: null },
@@ -335,6 +374,13 @@ test('realContacts drops the generic role-title placeholders, as the legacy page
     { Initials: 'C', Name: ' customer success manager ', Role: '', Email: null },
   ])
   assert.deepEqual(kept.map((m) => m.Name), ['Ada'])
+})
+
+test('the proof logos are labelled with the brand each image shows', () => {
+  assert.deepEqual(
+    PROOF_LOGOS.map((l) => l.alt),
+    ['Alaska Airlines', 'Zoom', 'Salesforce', 'Admiral', 'The Royal Mint', 'Diligent'],
+  )
 })
 
 test('isOfferExperience: by template, or by the component plan the offer workflow writes', () => {
@@ -393,9 +439,110 @@ test('OFFER_SLOTS is the offer blueprint, slot for slot and feed for feed', () =
   }
 })
 
-const apSearch = (s: string) => renderToString(<AgentPlatformPage page={stackPage({ intelStats: stackPage().intelStats?.filter((x) => !/Optimizely/.test(x.Label)) })} search={s} />)
-const apHtml = apSearch('')
-const apText = textOf(apHtml)
+console.log('\nnothing is lost: account page')
+
+const account = fullAccountPage()
+const accountHtml = renderToString(<AccountPage page={account} />)
+const accountText = textOf(accountHtml)
+
+test('ACCOUNT_FIELDS covers the 67 content-type properties exactly once', () => {
+  const names = ACCOUNT_FIELDS.map((f) => f.field)
+  assert.equal(names.length, 67)
+  assert.equal(new Set(names).size, 67)
+  // The CMS property list (GET /v1/contenttypes/CompetitorComparisonPage, 2026-11-01).
+  const cms = 'comparisonDescription logoWallCustomerSlot comparisonHeadline promoEyebrow comparisonTableRows testimonial1 testimonial1JobTitle testimonial1Company promoHeading promoDescription testimonial2 MetaDescription PageTitle eyebrow headline promoCTA promoCTALink brandDomain brandAccentColor salesforceAccountID intelEyebrow competitorName roiTitle migrationTitle stickyCTAText footerTagline intelHeadline challengeHeadline roiDescription migrationDescription ctaTitle footerLinks testimonial2JobTitle intelStats challengeScreenshotUrl roiCards timelinePhases ctaDescription footerLegal stakeholders challengeScreenshotAlt roiProjectionValue teamMembers ctaButtonText testimonial2Company techStack challengeBrowserUrl roiProjectionLabel modalScheduleUrl investments painPoints roiProjectionDetail newsItems analystHeadline subheadline analystQuote analystSource cta analystCTA link analystCTALink customerLogo endHeadline endSubheadline endCTA endCTALink analystCards'.split(' ')
+  assert.deepEqual([...names].sort(), [...cms].sort())
+})
+
+/** Every string a field holds, flattened through arrays and {default} links. */
+function stringsOf(v: unknown): string[] {
+  if (typeof v === 'string') return [v]
+  if (Array.isArray(v)) return v.flatMap(stringsOf)
+  if (v && typeof v === 'object') return Object.values(v).flatMap(stringsOf)
+  return []
+}
+
+for (const f of ACCOUNT_FIELDS.filter((x) => x.use === 'text')) {
+  test(`text  ${f.field} → ${f.section}`, () => {
+    let values = stringsOf(account[f.field]).filter((s) => !/^(https?:|var\(|Yes$|No$|Limited$|engaged$)/.test(s))
+    if (f.field === 'teamMembers') values = ['F-team-name', 'F-team-role'] // the placeholder member is dropped on purpose
+    if (f.field === 'stakeholders') values = ['F-stakeholder-name', 'F-stakeholder-role', 'F-stakeholder-note', 'In conversation']
+    if (f.field === 'roiCards') values = ['F-metric-1', 'F-unit-1', 'F-roi-label-1', 'F-citation-1', 'F-metric-2', 'F-roi-label-2', 'F-citation-2']
+    for (const raw of values) {
+      // An extruded ##run## renders once per layer, so check the runs and the words between them.
+      for (const part of richToStacked(raw).split(/##|\n/).map((p) => p.trim()).filter(Boolean))
+        assert.ok(accountText.includes(part), `"${part}" is not on the page`)
+    }
+  })
+}
+
+const ATTR_EXPECT: Record<string, string[]> = {
+  link: ['href="https://example.test/F-link"'],
+  customerLogo: ['src="https://example.test/F-customerLogo.png"'],
+  brandAccentColor: ['--www-accent:#0a1b2c'],
+  challengeScreenshotUrl: ['src="https://example.test/F-challengeScreenshotUrl.png"'],
+  challengeScreenshotAlt: ['alt="F-challengeScreenshotAlt"'],
+  analystCTALink: ['href="https://example.test/F-analystCTALink"'],
+  promoCTALink: ['href="https://example.test/F-promoCTALink"'],
+  endCTALink: ['href="https://example.test/F-endCTALink"'],
+  // In the connect panel the one closing CTA opens, not in the server HTML (see the test below).
+  modalScheduleUrl: [],
+}
+for (const f of ACCOUNT_FIELDS.filter((x) => x.use === 'attr')) {
+  test(`attr  ${f.field} → ${f.section}`, () => {
+    const want = ATTR_EXPECT[f.field]
+    assert.ok(want, `no attribute expectation for ${f.field}: add one to ATTR_EXPECT`)
+    for (const w of want) assert.ok(accountHtml.includes(w), `${w} is not in the markup`)
+  })
+}
+
+test('the stored "Schedule a call" link is in the connect panel the one closing CTA opens', () => {
+  assert.equal(connectProps(account).scheduleUrl, 'https://example.test/F-modalScheduleUrl')
+  assert.equal(fromLegacyPage(account).scheduleUrl, 'https://example.test/F-modalScheduleUrl')
+  // ...and the close itself has one button, no second "Schedule a call".
+  const from = accountHtml.indexOf('<section id="cta"')
+  const close = accountHtml.slice(from, accountHtml.indexOf('</section>', from))
+  assert.ok(!close.includes('F-modalScheduleUrl'), 'a second CTA in the close')
+  assert.equal((close.match(/<button\b/g) ?? []).length, 1)
+})
+
+test('links inside arrays keep their targets (LinkedIn, person page, news, footer, analyst, citation, mail)', () => {
+  for (const w of [
+    'href="https://example.test/F-stakeholder-linkedin"',
+    'href="/acme-corp/f-person-slug"',
+    'href="https://example.test/F-news-url"',
+    'href="https://example.test/F-footer-url"',
+    'href="https://example.test/F-analyst-card-url"',
+    'href="https://example.test/F-citation-url"',
+    'href="mailto:f-team@example.test"',
+  ])
+    assert.ok(accountHtml.includes(w), `${w} missing`)
+})
+
+test('the old page\'s "#form" hero link points at the contact card', () => {
+  const page = { ...fullAccountPage(), link: { default: 'https://showcase.optimizely.com/acme#form' } }
+  const html = renderToString(<AccountPage page={page as CompetitorComparisonPage} />)
+  assert.match(html, /<a href="#cta"[^>]*>F-cta</)
+  assert.match(html, /id="form"/)
+})
+
+test('the competitor tool is flagged, the others are not', () => {
+  assert.equal(accountHtml.match(/www-stack-pill--flag/g)?.length, 1)
+})
+
+test('sections keep the ids the ODP tracking hook observes', () => {
+  for (const id of ['hero', 'intel', 'challenge', 'comparison', 'proof', 'roi', 'migration', 'cta'])
+    assert.ok(accountHtml.includes(`id="${id}"`), `#${id} missing`)
+})
+
+test('an account page with only the required minimum still renders (no crash on nulls)', () => {
+  const sparse = {
+    _metadata: { key: 'k', url: { default: '/s/', hierarchical: '/s/' }, published: '' },
+    headline: 'Sparse',
+  } as unknown as CompetitorComparisonPage
+  const html = renderToString(<AccountPage page={sparse} />)
+  assert.match(textOf(html), /Sparse/)
+})
 
 console.log('\nthe brief: a landing page, not a site page')
 
@@ -407,11 +554,15 @@ function extrudedRuns(html: string): Set<string> {
 }
 
 test('no site navigation and no footer, on either page', () => {
-  for (const html of [apHtml, renderToString(<OfferPage experience={fullOffer()} />)]) {
+  for (const html of [accountHtml, renderToString(<OfferPage experience={fullOffer()} />)]) {
     assert.ok(!/<nav[\s>]/.test(html), 'a <nav> is rendered')
     assert.ok(!/<footer[\s>]/.test(html), 'a <footer> is rendered')
     assert.ok(!/<header[\s>]/.test(html), 'a <header> is rendered')
   }
+})
+
+test('one extruded moment per page (brand rule): the ROI number on the account page', () => {
+  assert.deepEqual([...extrudedRuns(accountHtml)], ['F-roiProjectionValue'])
 })
 
 test('one extruded moment per page: the run the writer marked in the offer headline', () => {
@@ -420,11 +571,27 @@ test('one extruded moment per page: the run the writer marked in the offer headl
 
 test('reveal animations can never hide content from a reader without JS', () => {
   // The boot script that arms the reveal styles comes before any scene in the markup...
-  const boot = apHtml.indexOf("classList.add('www-js')")
-  assert.ok(boot > -1 && boot < apHtml.indexOf('data-scene'), 'boot script missing or after the content')
+  const boot = accountHtml.indexOf("classList.add('www-js')")
+  assert.ok(boot > -1 && boot < accountHtml.indexOf('data-scene'), 'boot script missing or after the content')
   // ...and every scene is a full, ordered part of the server HTML (nothing is client-only).
-  const ids = [...apHtml.matchAll(/<section id="([^"]+)" data-scene/g)].map((m) => m[1])
-  assert.deepEqual(ids, ['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta'])
+  const ids = [...accountHtml.matchAll(/<section id="([^"]+)" data-scene/g)].map((m) => m[1])
+  assert.deepEqual(ids, ['hero', 'intel', 'signals', 'challenge', 'comparison', 'proof', 'analysts', 'promo', 'roi', 'migration', 'cta'])
+})
+
+test('a scene with nothing to say is left out rather than rendered empty', () => {
+  const sparse = { ...fullAccountPage(), painPoints: null, challengeHeadline: null, challengeScreenshotUrl: null, analystCards: null, analystHeadline: null, analystQuote: null, promoHeading: null }
+  const html = renderToString(<AccountPage page={sparse as unknown as CompetitorComparisonPage} />)
+  for (const id of ['challenge', 'analysts', 'promo']) assert.ok(!html.includes(`id="${id}"`), `#${id} rendered empty`)
+  // A stored screenshot alone still gets its scene: no stored content is dropped.
+  const shotOnly = renderToString(<AccountPage page={{ ...sparse, challengeScreenshotUrl: { default: 'https://example.test/shot.png' } } as unknown as CompetitorComparisonPage} />)
+  assert.match(shotOnly, /id="challenge"[\s\S]*https:\/\/example\.test\/shot\.png/)
+})
+
+test('metric units: a symbol stays with its number, a word unit is set smaller', () => {
+  const page = { ...fullAccountPage(), roiCards: [{ Metric: '26', Unit: '%', Label: 'L1', CitationText: null }, { Metric: '700', Unit: 'hours', Label: 'L2', CitationText: null }] }
+  const html = renderToString(<AccountPage page={page as unknown as CompetitorComparisonPage} />)
+  assert.match(html, /<span>26<\/span>%<\/dd>/)
+  assert.match(html, /<span class="www-number__unit"> <!-- -->hours<\/span>/)
 })
 
 console.log('\nnothing is lost: offer page')
@@ -487,7 +654,7 @@ test('the offer headline is sized to its length: a long one steps down, a short 
   assert.match(hero, /<h1[^>]*class="[^"]*www-display--fit/)
   assert.ok(hero.includes(`--fit-w:${(fitVars('O-headline ##O-run##') as Record<string, string>)['--fit-w']}`), 'the fit variables are not on the headline')
   // The account page's headline is template copy and keeps its fixed size.
-  assert.ok(!apHtml.includes('www-display--fit'))
+  assert.ok(!renderToString(<AgentPlatformPage page={account} />).includes('www-display--fit'))
 })
 
 test('the offer intro is one column on the content width, not two', () => {
@@ -504,7 +671,7 @@ test('the offer intro is one column on the content width, not two', () => {
 test('offer page: scenes on the same background share it instead of each padding out to 75% (offer pages only)', () => {
   // Laura, 3 Nov. The account pages keep every scene at 75% (Michiel, 2 Nov).
   assert.match(offerHtml, /class="www-page [^"]*www-offer/)
-  assert.ok(!apHtml.includes('www-offer'))
+  assert.ok(!accountHtml.includes('www-offer'))
   const css = readFileSync('src/www/www.css', 'utf8')
   assert.match(css, /\.www-offer \.www-scene\.www-scene--light \+ \.www-scene\.www-scene--light[\s\S]*?min-height: 0/)
 })
@@ -826,6 +993,11 @@ test('every ABM x-ray selector also matches its data-xray hook', () => {
   for (const s of ABM_XRAY_DEFAULTS) assert.ok(s.selector.includes(`[data-xray="${s.id}"]`), s.id)
 })
 
+test('the takeout account page carries a data-xray hook for every legacy x-ray section', () => {
+  const missing = ABM_XRAY_LEGACY_IDS.filter((id) => !accountHtml.includes(`data-xray="${id}"`))
+  assert.deepEqual(missing, [])
+})
+
 /* ------------------------------------------------------ agent platform template */
 
 console.log('\nagent platform template: the adapter (existing pages into the new structure)')
@@ -957,12 +1129,15 @@ test('every one of the 67 stored fields is either used (and where) or deliberate
   const used = USED_FIELDS.map((f) => f.field)
   const off = NOT_SHOWN.map((f) => f.field)
   assert.deepEqual(used.filter((f) => off.includes(f)), [], 'a field is in both lists')
-  assert.deepEqual([...used, ...off].sort(), [...ACCOUNT_PAGE_PROPERTIES].sort())
+  assert.deepEqual([...used, ...off].sort(), ACCOUNT_FIELDS.map((f) => f.field).sort())
   assert.ok(NOT_SHOWN.every((f) => f.rule.length > 8), 'every hidden field names its rule')
 })
 
 console.log('\nagent platform template: the page')
 
+const apSearch = (s: string) => renderToString(<AgentPlatformPage page={stackPage({ intelStats: stackPage().intelStats?.filter((x) => !/Optimizely/.test(x.Label)) })} search={s} />)
+const apHtml = apSearch('')
+const apText = textOf(apHtml)
 
 /** The visible copy a reader gets, excluding the review layer. */
 function readerText(html: string) {
@@ -976,14 +1151,27 @@ function readerText(html: string) {
   )
 }
 
-test('every account page is the agent platform template: the old switches change nothing', () => {
+test('the page\'s own pitch picks its template: the agent platform when it sells that, its own pitch otherwise', () => {
   const ids = (html: string) => [...html.matchAll(/<section id="([^"]+)" data-scene/g)].map((m) => m[1])
-  assert.deepEqual(ids(apHtml), ['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta'])
-  for (const q of ['?template=takeout', '?design=classic']) assert.equal(apSearch(q), apHtml, q)
-  // The router and the server render have no other account renderer left to pick.
-  for (const f of ['src/App.tsx', 'server/ssr-handler.tsx']) {
+  const AP = ['hero', 'who', 'intel', 'language', 'usecases', 'proof', 'migration', 'cta']
+  const TAKEOUT = ['hero', 'intel', 'signals', 'challenge', 'comparison', 'proof', 'analysts', 'promo', 'roi', 'migration', 'cta']
+  // Headlines from the live pages (4 Nov), one per pitch the builder writes.
+  const pitched = (headline: string, subheadline = 'F-subheadline') => ({ ...fullAccountPage(), headline, subheadline }) as CompetitorComparisonPage
+  for (const h of ['Marketing agents for Smartsheet, Inc.', "Agents for ACHE's content team", 'Agents built for Jefferies marketing'])
+    assert.equal(accountTemplateOf(pitched(h)), 'agent-platform', h)
+  assert.equal(accountTemplateOf(pitched("Scale Mace Construct's new brand", 'Optimizely Agent Platform keeps every page on brand.')), 'agent-platform')
+  for (const h of ['Relief for RINA S.p.A.', 'Prove every Lenovo launch', 'Test everything Atlassian ships', 'Limitless for Google Cloud', 'Relief for Core-Mark', 'One platform for <em>Tungsten</em>'])
+    assert.equal(accountTemplateOf(pitched(h)), 'takeout', h)
+  assert.deepEqual(ids(renderToString(<AccountRoute page={pitched('Marketing agents for Smartsheet, Inc.')} />)), AP)
+  assert.deepEqual(ids(renderToString(<AccountRoute page={pitched('Relief for RINA S.p.A.')} />)), TAKEOUT)
+  // No address picks it: the old switches change nothing.
+  for (const q of ['?template=takeout', '?design=classic', '?design=www'])
+    assert.equal(renderToString(<AccountRoute page={pitched('Relief for RINA S.p.A.')} search={q} />), renderToString(<AccountRoute page={pitched('Relief for RINA S.p.A.')} />), q)
+  // The router, the server render and the CMS preview all draw through AccountRoute, never a renderer of their own.
+  for (const f of ['src/App.tsx', 'server/ssr-handler.tsx', 'src/components/CmsPreview.tsx']) {
     const src = readFileSync(f, 'utf8')
-    for (const gone of ['ABMHyperPage', 'DynamicComparisonPage', 'UseCasePage', 'AccountPage', 'wantsWwwDesign', 'wantsTakeout'])
+    assert.ok(/AccountRoute/.test(src), `${f} does not draw through AccountRoute`)
+    for (const gone of ['ABMHyperPage', 'DynamicComparisonPage', 'UseCasePage', 'wantsWwwDesign', 'wantsTakeout'])
       assert.ok(!new RegExp(`\\b${gone}\\b`).test(src), `${f} still names ${gone}`)
   }
 })
@@ -1008,11 +1196,11 @@ test('hero: "Personalized for", the identity sentence first, no account name in 
 })
 
 test('hero: the page says whose it is once, with their logo above the H1 (Michiel, 2 Nov)', () => {
-  for (const [name, html] of [['agent platform', apHtml]] as const) {
+  for (const [name, html] of [['agent platform', apHtml], ['takeout', accountHtml]] as const) {
     const hero = html.slice(html.indexOf('<section id="hero"'), html.indexOf('</section>'))
     const mark = hero.search(/class="www-account[ "]/)
     assert.ok(mark > -1 && mark < hero.indexOf('<h1'), `${name}: no account logo above the H1`)
-    assert.match(hero, /class="www-account__logo"><img src="https:\/\/example\.test\/F-customerLogo\.png"/)
+    assert.match(hero, /class="www-account__logo"[^>]*><img src="https:\/\/example\.test\/F-customerLogo\.png"/)
     // One personalization line: no "Made for" in the corner, no account name on the landscape.
     assert.ok(!/Made for|Built for/.test(textOf(hero)), `${name}: a second personalization line`)
   }
@@ -1022,11 +1210,20 @@ test('hero: the page says whose it is once, with their logo above the H1 (Michie
 })
 
 test('hero: full screen, its landscape in every size up to 2880px wide', () => {
-  for (const html of [apHtml, renderToString(<OfferPage experience={fullOffer()} />)]) {
+  for (const html of [apHtml, accountHtml, renderToString(<OfferPage experience={fullOffer()} />)]) {
     assert.match(html, /<section id="hero" data-scene(="true")? class="www-hero is-in"><div class="www-hero__card/)
     assert.match(html, /mountain-wide-2880\.avif 2880w/)
     assert.match(html, /fetchPriority="high"|fetchpriority="high"/)
   }
+})
+
+test('takeout: the stored site screenshot is in the challenge scene at its own size, not stretched on the hero', () => {
+  const hero = accountHtml.slice(0, accountHtml.indexOf('</section>'))
+  assert.ok(!hero.includes('F-challengeScreenshotUrl'), 'the screenshot is still on the hero')
+  const from = accountHtml.indexOf('<section id="challenge"')
+  const challenge = accountHtml.slice(from, accountHtml.indexOf('</section>', from))
+  assert.match(challenge, /data-xray="challenge-screenshot"[\s\S]*src="https:\/\/example\.test\/F-challengeScreenshotUrl\.png"/)
+  assert.match(challenge, /F-challengeBrowserUrl/)
 })
 
 test('homework runs through the page: one fact per scene, not one homework section (Laura, Dan)', () => {
@@ -1235,9 +1432,11 @@ test('stored small print is kept', () => {
   assert.match(apHtml, /F-customerLogo\.png/)
 })
 
-test('the account page carries a hook for every X-ray section, and no section is offered that it lacks', () => {
-  assert.deepEqual(ABM_XRAY_DEFAULTS.filter((s) => !apHtml.includes(`data-xray="${s.id}"`)).map((s) => s.id), [])
-  assert.ok(AGENT_PLATFORM_XRAY.every((s) => ABM_XRAY_DEFAULTS.includes(s)))
+test('the agent platform page carries a hook for each of its X-ray sections, the takeout page for the legacy ones', () => {
+  const reused = ['hero-title', 'hero-subtitle', 'intel-headline', 'intel-stats', 'tech-stack', 'investments', 'timeline-phases', 'team-members', 'cta-title', 'cta-description']
+  const want = [...AGENT_PLATFORM_XRAY.map((s) => s.id), ...reused]
+  assert.deepEqual(want.filter((id) => !apHtml.includes(`data-xray="${id}"`)), [])
+  assert.deepEqual(ABM_XRAY_LEGACY_IDS.filter((id) => !accountHtml.includes(`data-xray="${id}"`)), [])
 })
 
 test('the one-click ask: buttons, no form anywhere on the page', () => {
@@ -1245,6 +1444,57 @@ test('the one-click ask: buttons, no form anywhere on the page', () => {
   assert.match(apHtml, /id="hero-connect-btn"/)
   assert.match(apHtml, /id="sticky-connect-btn"/)
   assert.match(apHtml, /id="cta-connect-btn"/)
+})
+
+console.log('\nEdit mode on the takeout page')
+
+test('Edit mode offers every part of the takeout page, each with its fields and a hint, and each on the page', () => {
+  const ids = TAKEOUT_EDIT.map((s) => s.id)
+  assert.equal(new Set(ids).size, ids.length, 'a part is offered twice')
+  assert.equal(new Set(TAKEOUT_EDIT.map((s) => s.title)).size, ids.length, 'two parts share a title (Mark matches by title)')
+  assert.deepEqual(ids.filter((id) => !accountHtml.includes(`data-xray="${id}"`)), [], 'offered but not on the page')
+  for (const s of TAKEOUT_EDIT) {
+    assert.ok(s.hint.length > 12, `${s.id}: no hint`)
+    assert.ok(s.fields.length > 0 && s.fields.every((f) => ACCOUNT_PAGE_PROPERTIES.includes(f)), `${s.id}: fields`)
+  }
+})
+
+test('between them the takeout parts cover every stored field the page shows (nothing unmapped)', () => {
+  const offered = new Set(TAKEOUT_EDIT.flatMap((s) => s.fields))
+  const shown = ACCOUNT_FIELDS.filter((f) => f.use === 'text' || f.use === 'attr').map((f) => f.field)
+  assert.deepEqual(shown.filter((f) => !offered.has(f)), [])
+})
+
+test('the request to Mark from a takeout page names each section\'s fields, with no template line', () => {
+  const req = buildSuggestedEdit([{ title: 'Comparison headline', feedback: 'Name Sitecore XM Cloud', fields: ['comparisonHeadline', 'comparisonDescription', 'competitorName'] }], 'takeout')
+  assert.equal(req, 'Section: Comparison headline\nFields: comparisonHeadline, comparisonDescription, competitorName\nFeedback: Name Sitecore XM Cloud')
+  assert.ok(!req.includes(AGENT_PLATFORM_TEMPLATE_LINE))
+})
+
+test('a live edit re-renders the takeout page from Mark\'s value: text and lists, every place they show', () => {
+  resetLive()
+  assert.equal(applyLiveField('headline', 'Live headline for Acme'), true)
+  assert.equal(applyLiveField('comparisonTableRows', [{ Category: 'Live capability', OurValue: 'Yes', CompetitorValue: 'No' }]), true)
+  assert.equal(applyLiveField('comparisonTableRows', 'not rows'), false)
+  assert.equal(applyLiveField('timelinePhases', [{ Title: 'Live phase', Description: 'Live step' }]), true)
+  const shown = mergeLive(account, getLivePatch())
+  const text = textOf(renderToString(<AccountPage page={shown as CompetitorComparisonPage} />))
+  for (const t of ['Live headline for Acme', 'Live capability', 'Live phase']) assert.match(text, new RegExp(t))
+  resetLive()
+  // Each field a takeout part offers that a live edit may change has an element to flash.
+  const NO_ELEMENT = new Set(['stickyCTAText', 'testimonial1JobTitle', 'testimonial1Company', 'testimonial2JobTitle', 'testimonial2Company', 'roiProjectionLabel', 'challengeScreenshotAlt', 'competitorName'])
+  const flashable = TAKEOUT_EDIT.flatMap((s) => s.fields).filter((f) => (LIVE_FIELDS as readonly string[]).includes(f) && !NO_ELEMENT.has(f))
+  assert.deepEqual(flashable.filter((f) => !accountHtml.includes(`data-field="${f}"`)), [])
+})
+
+test('Edit mode runs the takeout page the way it runs the agent platform page', () => {
+  const src = readFileSync('src/components/EditMode.tsx', 'utf8')
+  assert.match(src, /template === 'takeout'\s*\?\s*TAKEOUT_EDIT/)
+  assert.match(src, /template === 'person'\s*\?\s*PERSON_EDIT/)
+  // Live re-render reads account page fields: the person page is not live.
+  assert.match(src, /const live = template === 'agent-platform' \|\| template === 'takeout'/)
+  assert.match(src, /if \(live && ev\.field !== undefined && ev\.value !== undefined && applyLiveField/)
+  assert.match(accountHtml, /class="www-page[^"]*\bwww-takeout\b/)
 })
 
 console.log('\nEdit mode on the agent platform page')
@@ -1276,9 +1526,11 @@ test('Edit mode offers the parts a page field drives and the page\'s own text, e
   assert.ok(!offered.some((f) => /eyebrow|caption|button|story|stories/i.test(f)), 'a label or a proof story is offered')
 })
 
-test('every field a live edit can change has the page elements that render it marked', () => {
+test('every field a live edit can change on this template has the page elements that render it marked', () => {
   const marked = new Set([...apSearch('?state=customer').matchAll(/data-field="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)))
-  for (const f of LIVE_FIELDS) assert.ok(marked.has(f), `no data-field="${f}" on the page`)
+  const here = USED_FIELDS.map((f) => f.field).filter((f) => (LIVE_FIELDS as readonly string[]).includes(f))
+  assert.ok(here.length >= 8)
+  for (const f of here) assert.ok(marked.has(f), `no data-field="${f}" on the page`)
 })
 
 test('page copy: only the template\'s keys, plain text within limits, lists for the checklist', () => {
@@ -1359,7 +1611,7 @@ test('the request to Mark names the template and the fields behind each commente
   )
   assert.ok(ap.startsWith(AGENT_PLATFORM_TEMPLATE_LINE))
   assert.match(ap, /Section: What they run today\nFields: techStack\nFeedback: They moved to Shopify Plus\n\n---\n\nSection: Small print\nFields: footerTagline, footerLegal\nFeedback: Drop the tagline/)
-  // A person page's request is exactly what it always was.
+  // The takeout and person pages send exactly what they always did.
   assert.equal(buildSuggestedEdit([{ title: 'Hero headline', feedback: 'Shorter' }]), 'Section: Hero headline\nFeedback: Shorter')
 })
 
@@ -1387,8 +1639,8 @@ test('after the save, Edit mode replays the parts whose saved value differs from
   const shown = { intelStats: [{ Value: '1', Label: 'a' }, { Value: '2', Label: 'visitors' }], techStack: [{ Name: 'X', ColorTag: null }], headline: 'h' }
   const saved = { intelStats: [{ Value: '1', Label: 'a' }], techStack: [{ Name: 'X', ColorTag: null }], headline: 'changed' }
   assert.deepEqual(changedLiveFields(['intelStats', 'techStack'], shown, saved), ['intelStats'])
-  // Only fields the page can show live; a field the template leaves off never replays.
-  assert.deepEqual(changedLiveFields(['headline'], shown, saved), [])
+  // Only fields a live edit may change; a colour never replays.
+  assert.deepEqual(changedLiveFields(['brandAccentColor'], { ...shown, brandAccentColor: 'a' }, { ...saved, brandAccentColor: 'b' }), [])
 })
 
 test('the live store checks each value\'s shape and starts empty for the server', () => {
@@ -1396,7 +1648,8 @@ test('the live store checks each value\'s shape and starts empty for the server'
   assert.equal(liveValue('techStack', 'Shopify'), null)
   assert.equal(liveValue('intelStats', [{ Value: 3, Label: 'x' }]), null)
   assert.equal(liveValue('footerTagline', 'Hello'), 'Hello')
-  assert.equal(applyLiveField('headline', 'Takeout field'), false, 'a field this template does not show')
+  assert.equal(applyLiveField('brandAccentColor', '#ff0000'), false, 'a field no live edit may change (a colour)')
+  assert.equal(applyLiveField('link', 'https://example.test'), false, 'a link field (it changes on the reload)')
   assert.equal(applyLiveField('techStack', { Name: 'not an array' }), false)
   assert.equal(applyLiveField('footerLegal', 'Edited'), true)
   resetLive()
@@ -1453,6 +1706,41 @@ test('in the CMS editor the account page outlines each CMS field it shows, and n
   }
 })
 
+/**
+ * The takeout page's stored fields the CMS can't outline where they show: values that are not
+ * text on the page (a colour, a link target, the alt text) or that sit inside a vendored card
+ * drawn from several fields (a quote's job title and company, the ROI label), or outside the page
+ * (the sticky bar, hidden in the preview; the schedule link, in the panel).
+ */
+const NOT_OUTLINED = new Set([
+  'brandAccentColor', 'link', 'challengeScreenshotAlt', 'promoCTALink', 'endCTALink', 'analystCTALink',
+  'testimonial1JobTitle', 'testimonial1Company', 'testimonial2JobTitle', 'testimonial2Company', 'roiProjectionLabel',
+  'stickyCTAText', 'modalScheduleUrl',
+])
+
+test('in the CMS editor the takeout page outlines every stored field it shows', () => {
+  const html = renderToString(<CmsEditProvider editing><AccountPage page={fullAccountPage()} /></CmsEditProvider>)
+  const hooks = new Set(epi(html).filter((h) => h.startsWith('edit:')).map((h) => h.slice(5)))
+  const shown = ACCOUNT_FIELDS.filter((f) => f.use === 'text' || f.use === 'attr').map((f) => f.field)
+  assert.deepEqual(shown.filter((f) => !hooks.has(f) && !NOT_OUTLINED.has(f)), [], 'shown but not outlined')
+  assert.deepEqual([...hooks].filter((f) => !ACCOUNT_PAGE_PROPERTIES.includes(f)), [], 'a hook names no property')
+  assert.deepEqual(epi(renderToString(<AccountPage page={fullAccountPage()} />)), [], 'hooks outside the editor')
+})
+
+test('in the CMS preview the page lays out for a fixed window: no scene grows with the frame', () => {
+  const css = readFileSync('src/www/www.css', 'utf8')
+  // Every window height reads the variable the preview sets...
+  const bare = css.replace(/var\(--www-s?vh, 1s?vh\)/g, '').match(/(?<![\w.-])\d+(?:\.\d+)?s?vh\b/g)
+  assert.equal(bare, null, `window heights not behind the variable: ${bare}`)
+  // ...and the preview fixes it, and drops the full-window minimums and the sticky bar.
+  assert.match(css, /html\[data-cms-preview\] \{\s*--www-vh: 9px;\s*--www-svh: 9px;/)
+  assert.match(css, /html\[data-cms-preview\] \.www-page,\s*html\[data-cms-preview\] \.vb-experience \{\s*min-height: 0;/)
+  assert.match(readFileSync('src/components/CmsPreview.tsx', 'utf8'), /setAttribute\('data-cms-preview', ''\)/)
+  // Set before the first render, so the loading and error screens are bounded too.
+  assert.match(readFileSync('src/main.tsx', 'utf8'), /if \(inCmsPreview\(\)\) document\.documentElement\.setAttribute\('data-cms-preview', ''\)/)
+  assert.match(readFileSync('src/index.css', 'utf8'), /html\[data-cms-preview\] \.min-h-screen \{\s*min-height: 560px;/)
+})
+
 test('in the CMS editor every offer section and element is outlined by its Visual Builder node', () => {
   const o = keyedOffer()
   const html = renderToString(<CmsEditProvider editing><OfferPage experience={o} /></CmsEditProvider>)
@@ -1478,30 +1766,28 @@ test('the CMS preview is not a visit: it is known by its address, and nothing el
 testAsync('in the CMS preview the sign-up form and the one-click ask send nothing; for a visitor they do', async () => {
   const realFetch = globalThis.fetch
   const g = globalThis as unknown as { window?: unknown }
-  const realNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   const fetched: string[] = []
-  const beacons: string[] = []
+  const pings: Array<{ url: string; body: string }> = []
   // Stand-ins only: nothing here reaches the network (the webhook is never called for real).
-  globalThis.fetch = (async (url: unknown) => {
-    fetched.push(String(url))
+  globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+    if (String(url) === '/api/cta-ping') pings.push({ url: String(url), body: String(init?.body) })
+    else fetched.push(String(url))
     return new Response('{}', { status: 200 })
   }) as typeof fetch
-  Object.defineProperty(globalThis, 'navigator', { value: { sendBeacon: (u: string) => (beacons.push(u), true) }, configurable: true })
   try {
     assert.equal(await postSignup('offer-1', 'editor@optimizely.com', '', { pathname: '/preview', search: '?key=k' }), 'done')
     assert.deepEqual(fetched, [], 'the preview sent a sign-up')
     assert.equal(await postSignup('offer-1', 'reader@example.com', '', { pathname: '/vb/acme', search: '' }), 'done')
     assert.equal(fetched.length, 1, "a visitor's sign-up is not sent")
-    g.window = { location: { pathname: '/preview', href: 'https://showcase.optimizely.com/preview?key=k' } }
-    fireDemoWebhook(stackPage(), 'cta-connect-btn')
-    assert.deepEqual(beacons, [], 'the preview pinged the team')
-    g.window = { location: { pathname: '/acme/', href: 'https://showcase.optimizely.com/acme/' } }
-    fireDemoWebhook(stackPage(), 'cta-connect-btn')
-    assert.equal(beacons.length, 1, "a visitor's ask does not reach the team")
+    sendCtaPing('cta-connect-btn', { pathname: '/preview', search: '?key=k' })
+    assert.deepEqual(pings, [], 'the preview pinged the team')
+    sendCtaPing('cta-connect-btn', { pathname: '/acme/', search: '?utm_source=outreach&utm_campaign=q4&email=someone%40acme.com' })
+    assert.equal(pings.length, 1, "a visitor's ask does not reach the team")
+    // The browser names the page and the button, and nothing about who is on the team.
+    assert.deepEqual(JSON.parse(pings[0].body), { route: '/acme/', source: 'cta-connect-btn', utm: { source: 'outreach', campaign: 'q4' } })
   } finally {
     globalThis.fetch = realFetch
     delete g.window
-    if (realNavigator) Object.defineProperty(globalThis, 'navigator', realNavigator)
   }
 })
 
@@ -1552,7 +1838,7 @@ const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJlZGl0b3IifQ.c2lnbmF0dXJl'
  * What Graph really answers for a key through `_Content` (measured on the live instance): the BASE
  * type as `__typename`, the concrete one first in `_metadata.types`.
  */
-const BASE_TYPE: Record<string, string> = { CompetitorComparisonPage: '_Page', ABMExperience: '_Experience', HeroSectionBlock: '_Component' }
+const BASE_TYPE: Record<string, string> = { CompetitorComparisonPage: '_Page', PersonPage: '_Page', ABMExperience: '_Experience', HeroSectionBlock: '_Component' }
 const typed = (type: string) => ({
   data: { _Content: { items: [{ __typename: BASE_TYPE[type], _metadata: { types: [type, ...(BASE_TYPE[type] === '_Experience' ? ['_Experience', '_Page'] : [BASE_TYPE[type]]), '_Content', '_Item'] } }] } },
 })
@@ -1644,6 +1930,19 @@ testAsync('/api/preview refuses what is not a key, version, locale or token, and
   })
 })
 
+testAsync("an expired editor token is said as such (401), never read as \"no such draft\"", async () => {
+  // Graph's answer to a CMS preview token past its five minutes, as measured on the live instance.
+  const expired = { code: 'AUTHENTICATION_ERROR', status: 401, details: { msg: 'Token expired' } }
+  await withPreviewGraph({ GetPreviewType: expired }, async (calls) => {
+    const r = await preview({ key: KEY, ver: '7', preview_token: TOKEN })
+    assert.equal(r.status, 401)
+    assert.match((r.body as { error: string }).error, /Token expired/)
+    assert.equal((r.body as { expired: boolean }).expired, true)
+    assert.equal(calls.length, 1, 'kept asking Graph after it refused the token')
+  })
+  assert.match(readFileSync('src/hooks/usePreviewContent.ts', 'utf8'), /401[\s\S]*timed out[\s\S]*Reload it in the CMS/)
+})
+
 testAsync('a Graph error is logged with the key and version, never with the editor token', async () => {
   const realError = console.error
   const logged: string[] = []
@@ -1669,6 +1968,427 @@ test('the CMS preview loads the editor script from the CMS and refreshes through
   assert.ok(!/location\.(reload|replace|assign)\(/.test(src), 'the preview reloads the page')
   const hook = readFileSync('src/hooks/usePreviewContent.ts', 'utf8')
   assert.ok(!/addEventListener\(/.test(hook), 'a second save listener beside the SDK')
+})
+
+console.log('\nthe person page: the 1:1 buyer page in the www design')
+
+/** A person page with every stored field filled, each with a value that can only come from that field. */
+function fullPersonPage(over: Partial<PersonPageData> = {}): PersonPageData {
+  return {
+    _metadata: { key: 'p0000000000000000000000000000001', url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } },
+    template: 'person',
+    companySlug: 'logitech',
+    companyName: 'Logitech G',
+    personSlug: 'ben-yu',
+    crmContactId: 'CRM-0035e00001XyZ',
+    PageTitle: 'P-title',
+    MetaDescription: 'P-meta',
+    noIndex: true,
+    personName: 'Ben Yu',
+    personTitle: 'P-title-of-person',
+    personInitials: 'P-INI',
+    personLinkedIn: { default: 'https://www.linkedin.com/in/p-linkedin' },
+    personAvatarColor: '#ff00aa',
+    companyLogo: { default: 'https://example.test/p-logo.svg' },
+    brandAccentColor: '#00b8fc',
+    heroEyebrow: 'P-eyebrow',
+    heroHeadline: 'P-headline',
+    heroSubheadline: 'P-subheadline',
+    heroCtaText: 'P-hero-cta',
+    heroCtaUrl: { default: 'https://www.optimizely.com/contact/?p-hero-url' },
+    engagementTier: 'engaged',
+    engagementHeadline: 'P-SECRET-engagement-headline',
+    engagementSummary: 'P-SECRET-engagement-summary',
+    touchpoints: [{ Date: '2026-01-01', Kind: 'email', Summary: 'P-SECRET-touchpoint', OptimizelyPerson: 'P-SECRET-sender' } as never],
+    openOpportunityName: 'P-SECRET-opportunity',
+    openOpportunityStage: 'P-SECRET-stage',
+    openOpportunityDetail: 'P-SECRET-opportunity-detail',
+    remitHeadline: 'P-remit-headline',
+    remitIntro: 'P-SECRET-remit-intro',
+    remitPoints: [{ Title: 'P-remit-title', Description: 'P-remit-desc', Metric: 'P-remit-metric' }],
+    roleFrame: 'P-role-frame',
+    noteBody: 'P-note-body',
+    noteSignedBy: 'Caleb Ping',
+    noteSignedByRole: 'P-signed-role',
+    noteSignedByInitials: 'PQ',
+    noteDate: '2026-10-22',
+    researchHeadline: 'P-SECRET-research-headline',
+    researchClaim: 'P-SECRET-research-claim',
+    provenance: [
+      { Register: 'read', Text: 'P-read-fact', SourceLabel: 'P-read-source', SourceUrl: { default: 'https://example.test/p-read' } },
+      { Register: 'told', Text: 'P-told-words', SourceLabel: 'P-told-source', SourceUrl: null },
+      { Register: 'assumed', Text: 'P-assumed', SourceLabel: 'P-SECRET-assumed-source', SourceUrl: null },
+    ],
+    scorecardHeadline: 'P-scorecard-headline',
+    scorecardIntro: 'P-SECRET-scorecard-intro',
+    scorecard: [{ Measure: 'P-measure', WhyHard: 'P-why-hard', WhatChanges: 'P-what-changes', Metric: 'P-metric' }],
+    solutionsHeadline: 'P-solutions-headline',
+    solutionsIntro: 'P-solutions-intro',
+    solutions: [{ Product: 'opal', Headline: 'P-solution-headline', Body: 'P-solution-body', WhyFirst: 'P-why-first' }],
+    keyNumberValue: '4',
+    keyNumberPrefix: 'EUR',
+    keyNumberSuffix: 'M+',
+    keyNumberLabel: 'P-key-label',
+    keyNumberDetail: 'P-key-detail',
+    keyNumberCitationUrl: { default: 'https://example.test/p-cite' },
+    peerProofHeadline: 'P-peer-headline',
+    peerProof: [
+      { Quote: 'P-quote-1', PersonName: 'P-peer', PersonTitle: 'P-peer-title', Company: 'P-peer-co', SourceUrl: { default: 'https://example.test/p-story' } },
+      { Quote: 'P-quote-dup', PersonName: 'P-peer', PersonTitle: 'P-peer-title', Company: 'P-peer-co', SourceUrl: null },
+    ],
+    teamHeadline: 'P-team-headline',
+    team: [
+      { Initials: 'CP', Name: 'Caleb Ping', Role: 'Enterprise Account Executive', Email: 'caleb.ping@optimizely.com', AvatarColor: null, AlreadyMet: true },
+      { Initials: 'SA', Name: 'Solutions Architect', Role: 'Solutions Architect', Email: null, AvatarColor: null, AlreadyMet: false },
+      { Initials: 'AE', Name: 'Account Executive', Role: 'Account Executive', Email: null, AvatarColor: null, AlreadyMet: false },
+      { Initials: 'ZF', Name: 'Zac Fenn', Role: 'P-team-role', Email: null, AvatarColor: null, AlreadyMet: false },
+    ],
+    ctaTitle: 'P-cta-title',
+    ctaBody: 'P-cta-body',
+    ctaButtonText: 'P-cta-button',
+    meetingUrl: { default: 'https://scheduler.zoom.us/p-booking' },
+    footerLine: 'P-footer-line',
+    generatedAt: 'P-SECRET-generated-at',
+    generatedBy: 'P-SECRET-generated-by',
+    ...over,
+  } as PersonPageData
+}
+const personHtml = renderToString(<PersonPage page={fullPersonPage()} />)
+
+test('PERSON_FIELDS places every PersonPage field, and the query fetches only the ones the page uses', () => {
+  const src = readFileSync('src/lib/person-page-query.ts', 'utf8')
+  const list = src.slice(src.indexOf('const PERSON_PAGE_FIELDS = `') + 28, src.indexOf('`;', src.indexOf('const PERSON_PAGE_FIELDS')))
+  let flat = list
+  while (/\{[^{}]*\}/.test(flat)) flat = flat.replace(/\{[^{}]*\}/g, ' ')
+  const queried = flat.split(/\s+/).filter((w) => w && w !== '_metadata')
+  // The query fetches exactly what the page uses: a field it never shows never leaves the CMS.
+  assert.deepEqual([...PERSON_FIELDS.filter((f) => f.use !== 'never').map((f) => f.field)].sort(), [...queried].sort())
+  for (const f of ['crmContactId', 'openOpportunityName', 'openOpportunityStage', 'touchpoints', 'engagementSummary']) {
+    assert.ok(!queried.includes(f), `${f} is fetched`)
+    assert.equal(PERSON_FIELDS.find((p) => p.field === f)?.use, 'never', f)
+  }
+})
+
+test('a person page shows every stored field it places, and nothing that is never shown', () => {
+  const text = textOf(personHtml)
+  const page = fullPersonPage() as unknown as Record<string, unknown>
+  const strings = (v: unknown): string[] =>
+    typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(strings) : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : []
+  for (const f of PERSON_FIELDS.filter((x) => x.use === 'text')) {
+    const values = strings(page[f.field]).filter((v) => v.startsWith('P-') && !v.startsWith('P-SECRET'))
+    for (const v of values) {
+      // Fields shown only when another is missing are checked below.
+      if (['P-remit-headline', 'P-remit-title', 'P-remit-desc', 'P-remit-metric', 'P-what-changes', 'P-quote-dup', 'P-title-of-person'].includes(v)) continue
+      assert.ok(text.includes(v), `${f.field}: "${v}" is not on the page`)
+    }
+  }
+  assert.ok(!/P-SECRET/.test(personHtml), `a never-shown field reached the page: ${personHtml.match(/P-SECRET[\w-]*/g)}`)
+  assert.ok(!personHtml.includes('CRM-0035e'), 'the Salesforce contact id is on the page')
+  assert.ok(!personHtml.includes('p-hero-url'), 'the hero links out to the stored contact form')
+  // The attr fields, in the markup.
+  for (const v of ['https://www.linkedin.com/in/p-linkedin', 'https://example.test/p-logo.svg', 'https://example.test/p-cite', 'https://example.test/p-read', '/logitech/']) {
+    assert.ok(personHtml.includes(v), v)
+  }
+  assert.match(personHtml, /--www-accent:#00b8fc/)
+  // The pairs: a headline replaces the name as the h1, a subheadline the title; the scorecard replaces remitPoints.
+  assert.match(personHtml, /<h1[^>]*>.*P-headline/s)
+  const bare = textOf(renderToString(<PersonPage page={fullPersonPage({ heroHeadline: null, heroSubheadline: null, scorecard: [] })} />))
+  for (const v of ['Ben Yu', 'P-title-of-person', 'P-remit-headline', 'P-remit-title', 'P-remit-desc', 'P-remit-metric']) assert.ok(bare.includes(v), v)
+})
+
+test('a person page keeps the rules: CRM never shown, the badge from the reader\'s side, the working visible', () => {
+  const text = textOf(personHtml)
+  assert.ok(text.includes(TIER_LABEL.engaged))
+  for (const tier of ['key', 'engaged', 'known'] as const) {
+    const t = textOf(renderToString(<PersonPage page={fullPersonPage({ engagementTier: tier })} />))
+    assert.ok(t.includes(TIER_LABEL[tier]), tier)
+    assert.ok(!/Active opportunity|opportunity|pipeline|stage/i.test(t.replace(/P-SECRET[\w-]*/g, '')), `${tier}: CRM language on the page`)
+  }
+  // Their words and our assumptions, with the invitation to correct them.
+  assert.match(text, /You said\s*P-told-words/)
+  assert.match(text, /We assumed\s*P-assumed/)
+  assert.match(text, /If any of that is wrong, tell Caleb Ping and we.ll rewrite it/)
+  // Placeholders are nobody; the account executive's "You have met" stays.
+  assert.ok(!text.includes('Solutions Architect') && !/Account Executive\b(?! )/.test(text.replace('Enterprise Account Executive', '')), 'a placeholder contact')
+  assert.ok(text.includes('You have met'))
+  // One voice per quote card; the one number with its symbol.
+  assert.equal(peerProofOf(fullPersonPage()).length, 1)
+  assert.equal(keyNumberText({ keyNumberPrefix: 'EUR', keyNumberValue: '4', keyNumberSuffix: 'M+' }), '€4M+')
+  assert.equal(keyNumberText({ keyNumberPrefix: null, keyNumberValue: '1500', keyNumberSuffix: null }), '1,500')
+  assert.equal(formatDate('2026-10-22'), '22 Oct 2026')
+  assert.deepEqual(measuresOf({ scorecard: [], remitPoints: null }), [])
+})
+
+test('a person page has one ask: the one-click button, with a booking link only when it is one', () => {
+  assert.equal((personHtml.match(/id="cta-connect-btn"/g) || []).length, 1)
+  assert.ok(!/<form\b|<input\b|<textarea\b/.test(personHtml), 'a form on the page')
+  assert.ok(!/<nav\b|<footer\b/.test(personHtml), 'navigation or a footer')
+  assert.match(textOf(personHtml), /P-cta-button/)
+  assert.deepEqual(personConnectProps(fullPersonPage()).people.map((p) => p.name), ['Caleb Ping', 'Zac Fenn'])
+  assert.equal(personConnectProps(fullPersonPage()).scheduleUrl, 'https://scheduler.zoom.us/p-booking')
+  // 21 of the 33 pages store optimizely.com/contact: a form, so no "Schedule a call", and no booking promise on the button.
+  const contact = fullPersonPage({ meetingUrl: { default: 'https://www.optimizely.com/contact/' } })
+  assert.equal(bookingUrlOf(contact), null)
+  assert.equal(askLabelOf(contact), 'Talk to your team')
+  assert.equal(bookingUrlOf({ meetingUrl: { default: '/bentley-systems/' } }), null)
+  assert.equal(bookingUrlOf({ meetingUrl: { default: 'http://calendly.com/x' } }), null)
+  assert.match(textOf(renderToString(<PersonPage page={contact} />)), /Talk to your team/)
+  // The hero's second button scrolls to the page's argument, never to the stored contact form.
+  assert.match(personHtml, /href="#practice"[^>]*>P-hero-cta/)
+})
+
+test('X-ray and Edit mode find every part of a person page, and Edit mode names its fields', () => {
+  for (const s of PERSON_XRAY_DEFAULTS) assert.ok(personHtml.includes(`data-xray="${s.id}"`), s.id)
+  for (const s of PERSON_EDIT) {
+    assert.equal(s.selector, `[data-xray="${s.id}"]`)
+    for (const f of s.fields) assert.ok(PERSON_FIELDS.some((p) => p.field === f), `${s.id}: ${f} is not a person page field`)
+  }
+  assert.match(personHtml, /class="www-page[^"]*\bwww-person\b/)
+  assert.equal(buildSuggestedEdit([{ title: 'The note', feedback: 'shorter', fields: ['noteBody'] }], 'person'), 'Section: The note\nFields: noteBody\nFeedback: shorter')
+})
+
+test('in the CMS editor a person page carries the on-page editing hooks, and nowhere else', () => {
+  assert.deepEqual(epi(personHtml), [])
+  const hooks = epi(renderToString(<CmsEditProvider editing><PersonPage page={fullPersonPage()} /></CmsEditProvider>))
+  for (const f of ['heroEyebrow', 'heroHeadline', 'noteBody', 'scorecard', 'solutions', 'keyNumberValue', 'peerProof', 'team', 'ctaTitle', 'ctaButtonText', 'footerLine']) {
+    assert.ok(hooks.includes(`edit:${f}`), f)
+  }
+  for (const h of hooks) assert.ok(PERSON_FIELDS.some((p) => `edit:${p.field}` === h), `${h} is not a person page field`)
+})
+
+testAsync('a person page draft comes back from /api/preview with the live fields, and draws the www person page', async () => {
+  const draft = fullPersonPage({ _metadata: { key: KEY, url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } } })
+  await withPreviewGraph({ GetPreviewType: typed('PersonPage'), GetPersonPagePreview: { data: { PersonPage: { items: [draft] } } } }, async (calls) => {
+    const r = await preview({ key: KEY, ver: '7', loc: 'en', ctx: 'edit', preview_token: TOKEN })
+    assert.equal(r.status, 200)
+    assert.deepEqual(calls.map((c) => c.op), ['GetPreviewType', 'GetPersonPagePreview'])
+    const page = r.body as PersonPageData & { __typename: string }
+    assert.equal(page.__typename, 'PersonPage')
+    assert.match(textOf(renderToString(<PersonPage page={page} />)), /P-note-body/)
+  })
+})
+
+console.log('\nthe CTA ping: the click reaches the account executive, or the follow-up sheet')
+
+/* The team a page stores, in the order the builder wrote it: an SDR first, a placeholder, then the AE. */
+const PING_TEAM = [
+  { Initials: 'SR', Name: 'Sam Rep', Role: 'Sales Development Representative', Email: 'sam.rep@optimizely.com' },
+  { Initials: 'SA', Name: 'Solutions Architect', Role: 'Solutions Architect', Email: null },
+  { Initials: 'AE', Name: 'Alex Exec', Role: 'Enterprise Account Executive', Email: 'Alex.Exec@optimizely.com' },
+]
+const PING_PAGE = {
+  _metadata: { url: { default: '/en/zurich-versicherung/', hierarchical: '/en/zurich-versicherung/' } },
+  eyebrow: 'Personalized for Zürich Versicherung',
+  intelHeadline: 'We know <em>Zürich Versicherung – “Group” | AG</em>',
+  teamMembers: PING_TEAM,
+}
+
+test('the account executive is found by role, never by position, and placeholders are nobody', () => {
+  assert.equal(accountExecutiveOf(PING_TEAM)?.Name, 'Alex Exec')
+  assert.equal(accountExecutiveOf(PING_TEAM.slice(0, 2)), null, 'an SDR is not the account executive')
+  assert.equal(accountExecutiveOf([{ Initials: 'AE', Name: 'Your Account Executive', Role: 'Account Executive', Email: null }]), null, 'a role title is not a person')
+  assert.equal(accountExecutiveOf([{ Initials: 'x', Name: ' ', Role: 'Account Executive', Email: 'a@optimizely.com' }]), null, 'an unnamed AE')
+  assert.equal(accountExecutiveOf(null), null)
+  assert.equal(accountExecutiveOf([{ Name: 'Rob Janes', Role: 'Strategic Accounts Executive' }])?.Name, 'Rob Janes', 'a strategic accounts executive is one')
+  // The panel says the person the ping told, so with no AE it names nobody ("your Optimizely team").
+  const people = PING_TEAM.map((m) => ({ name: m.Name, role: m.Role, email: m.Email, initials: m.Initials }))
+  assert.equal(toldFirstName(people), 'Alex')
+  assert.equal(toldFirstName(people.slice(0, 1)), undefined)
+})
+
+test('a ping names the page, its account executive and the rest of the team; the visitor only the button and campaign', () => {
+  const ping = buildPing(accountSource(PING_PAGE as never), 'zurich-versicherung', 'sticky-connect-btn', { source: 'outreach', campaign: 'q4 <takeout>' }, new Date('2026-11-04T23:06:28.545Z'), '77dfb03f-a82d-4ee3-97a1-36b20f6f4043')
+  assert.deepEqual(ping.rep, { name: 'Alex Exec', role: 'Enterprise Account Executive', email: 'alex.exec@optimizely.com' })
+  assert.deepEqual(ping.team, [{ name: 'Sam Rep', role: 'Sales Development Representative' }], 'the AE twice, or the placeholder')
+  assert.equal(ping.page, 'https://showcase.optimizely.com/zurich-versicherung/')
+  assert.equal(ping.account, 'Zürich Versicherung – “Group” | AG')
+  assert.equal(ping.campaign, 'source: outreach · campaign: q4 <takeout>')
+  assert.ok(!JSON.stringify(ping).includes('sam.rep@'), 'only the AE needs an address')
+  // Mark's step (mark/cta-ping/step.py) reads exactly this ping in its own tests: Node and Python agree on `check`.
+  const fixture = JSON.parse(readFileSync('mark/cta-ping/fixture.json', 'utf8')) as CtaPing
+  assert.deepEqual(ping, fixture, 'regenerate mark/cta-ping/fixture.json and rerun python3 mark/cta-ping/test_step.py')
+  const { check, ...rest } = ping
+  assert.equal(check, checkOf(rest))
+  assert.equal(canonicalJson({ b: 1, a: [{ d: null, c: 'ü' }] }), '{"a":[{"c":"ü","d":null}],"b":1}')
+  const changed = { ...rest, rep: { ...rest.rep!, email: 'someone.else@optimizely.com' } }
+  assert.notEqual(checkOf(changed), check, 'a changed ping keeps its check')
+  // No AE on the page: rep is null and everyone real is the team.
+  const none = buildPing(accountSource({ ...PING_PAGE, teamMembers: PING_TEAM.slice(0, 2) } as never), 'zurich-versicherung', 'hero-connect-btn', {})
+  assert.equal(none.rep, null)
+  assert.deepEqual(none.team.map((m) => m.name), ['Sam Rep'])
+  assert.equal(none.campaign, '')
+  assert.match(none.ping_id, /^[0-9a-f-]{36}$/)
+})
+
+test('a ping is only ever for an account page or a person page route', () => {
+  assert.deepEqual(pingRouteOf('/tungsten-automation/'), { path: 'tungsten-automation', person: false })
+  assert.deepEqual(pingRouteOf('/Lenovo'), { path: 'lenovo', person: false })
+  assert.deepEqual(pingRouteOf('/logitech/ben-yu/'), { path: 'logitech/ben-yu', person: true })
+  for (const bad of ['/', '/a/b/c/', '/-acme/', '/acme-/', '/../x/', '/acme/../x/', '/acme?x=1', 'acme', 42, null, `/${'a'.repeat(201)}/`]) {
+    assert.equal(pingRouteOf(bad), null, String(bad))
+  }
+})
+
+test("a person page's ping names whose page it is, its account, and its own team's account executive", () => {
+  const ping = buildPing(
+    personSource({
+      _metadata: { url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } },
+      companyName: 'Logitech G',
+      personName: 'Ben Yu',
+      team: [
+        { Initials: 'ZF', Name: 'Zac Fenn', Role: 'Global Head of Alliances', Email: 'zac@optimizely.com' },
+        { Initials: 'CP', Name: 'Caleb Ping', Role: 'Enterprise Account Executive', Email: 'caleb.ping@optimizely.com' },
+      ],
+    } as never),
+    'logitech/ben-yu',
+    'cta-connect-btn',
+    {},
+  )
+  assert.equal(ping.page, 'https://showcase.optimizely.com/logitech/ben-yu/')
+  assert.equal(ping.account, 'Logitech G')
+  assert.equal(ping.person, 'Ben Yu')
+  assert.deepEqual(ping.rep, { name: 'Caleb Ping', role: 'Enterprise Account Executive', email: 'caleb.ping@optimizely.com' })
+  assert.deepEqual(ping.team, [{ name: 'Zac Fenn', role: 'Global Head of Alliances' }])
+})
+
+type PingCall = { url: string; headers: Record<string, string>; body: string }
+
+/** POST /api/cta-ping with Graph and Mark stood in. Nothing reaches the network; KV is off. */
+async function ping(
+  input: { method?: string; headers?: Record<string, string>; body?: unknown },
+  stand: { page?: unknown; person?: unknown; mark?: number; env?: Record<string, string | undefined> } = {},
+) {
+  const env = { CTA_PING_WEBHOOK_URL: 'https://webhook.mark.optimizely.com/webhooks/inst/trigger', CTA_PING_WEBHOOK_KEY: 'k'.repeat(32), GRAPH_AUTH_KEY: 'graph-key', KV_REST_API_URL: undefined, KV_REST_API_TOKEN: undefined, ...stand.env }
+  const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]))
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined) delete process.env[k]
+    else process.env[k] = v
+  }
+  const realFetch = globalThis.fetch
+  const graph: string[] = []
+  const mark: PingCall[] = []
+  globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+    const u = String(url)
+    if (u.startsWith('https://cg.optimizely.com/')) {
+      const { query, variables } = JSON.parse(String(init?.body)) as { query: string; variables: { slug: string } }
+      graph.push(variables.slug)
+      if (/GetPersonPageTeam/.test(query)) {
+        const items = stand.person && variables.slug === '/logitech/ben-yu/' ? [stand.person] : []
+        return new Response(JSON.stringify({ data: { PersonPage: { items } } }), { status: 200 })
+      }
+      const items = stand.page && variables.slug === '/en/zurich-versicherung/' ? [stand.page] : []
+      return new Response(JSON.stringify({ data: { CompetitorComparisonPage: { items } } }), { status: 200 })
+    }
+    if (u.startsWith('https://webhook.')) {
+      mark.push({ url: u, headers: init?.headers as Record<string, string>, body: String(init?.body) })
+      return new Response('{}', { status: stand.mark ?? 200 })
+    }
+    throw new Error(`unexpected fetch ${u}`)
+  }) as typeof fetch
+  const out = { status: 0, body: undefined as unknown, headers: {} as Record<string, string> }
+  const res = {
+    setHeader(k: string, v: string) {
+      out.headers[k.toLowerCase()] = v
+    },
+    status(c: number) {
+      out.status = c
+      return this
+    },
+    json(b: unknown) {
+      out.body = b
+      return this
+    },
+  }
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', 'x-forwarded-for': '203.0.113.7', ...input.headers }
+  try {
+    await ctaPingHandler({ method: input.method ?? 'POST', headers, body: input.body, socket: {} } as never, res as never)
+  } finally {
+    globalThis.fetch = realFetch
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  }
+  return { ...out, graph, mark }
+}
+
+const CLICK = { route: '/zurich-versicherung/', source: 'cta-connect-btn', utm: { campaign: 'q4', medium: 'x'.repeat(201) } }
+
+testAsync('POST /api/cta-ping hands Mark the page\'s own team, with the trigger key, and nothing the visitor made up', async () => {
+  const r = await ping({ body: { ...CLICK, rep: { email: 'attacker@evil.example' }, team: [{ name: 'Mallory' }] } }, { page: PING_PAGE })
+  assert.equal(r.status, 202)
+  assert.equal(r.headers['cache-control'], 'no-store')
+  assert.deepEqual(r.graph, ['/zurich-versicherung/', '/en/zurich-versicherung/'])
+  assert.equal(r.mark.length, 1)
+  assert.equal(r.mark[0].url, 'https://webhook.mark.optimizely.com/webhooks/inst/trigger')
+  assert.equal(r.mark[0].headers['x-showcase-key'], 'k'.repeat(32))
+  const sent = JSON.parse(r.mark[0].body) as CtaPing
+  assert.equal(sent.rep?.email, 'alex.exec@optimizely.com', 'the rep came from the request')
+  assert.ok(!r.mark[0].body.includes('evil') && !r.mark[0].body.includes('Mallory'))
+  assert.equal(sent.button, 'the button at the end of the page')
+  assert.equal(sent.campaign, 'campaign: q4', 'an over-long utm value is dropped')
+  const { check, ...rest } = sent
+  assert.equal(check, checkOf(rest))
+})
+
+testAsync('POST /api/cta-ping refuses anything but a same-site JSON click on an account page', async () => {
+  const cases: Array<[string, Parameters<typeof ping>[0], number]> = [
+    ['GET', { method: 'GET' }, 405],
+    ['a form post', { headers: { 'content-type': 'text/plain' }, body: JSON.stringify(CLICK) }, 415],
+    ['another site', { headers: { 'sec-fetch-site': 'cross-site' }, body: CLICK }, 403],
+    ['an offer page', { body: { ...CLICK, route: '/vb/zurich' } }, 400],
+    ['three levels deep', { body: { ...CLICK, route: '/zurich-versicherung/alex-exec/more/' } }, 400],
+    ['an unknown button', { body: { ...CLICK, source: 'admin-btn' } }, 400],
+    ['no body', { body: undefined }, 400],
+    ['too large', { body: JSON.stringify({ ...CLICK, pad: 'x'.repeat(3000) }) }, 413],
+  ]
+  for (const [name, input, status] of cases) {
+    const r = await ping(input, { page: PING_PAGE })
+    assert.equal(r.status, status, name)
+    assert.equal(r.mark.length + r.graph.length, 0, `${name} reached Graph or Mark`)
+  }
+})
+
+testAsync("POST /api/cta-ping on a person page reads that page's own team", async () => {
+  const person = {
+    _metadata: { url: { default: '/logitech/ben-yu/', hierarchical: '/logitech/ben-yu/' } },
+    companyName: 'Logitech G',
+    personName: 'Ben Yu',
+    team: [{ Initials: 'CP', Name: 'Caleb Ping', Role: 'Enterprise Account Executive', Email: 'caleb.ping@optimizely.com' }],
+  }
+  const r = await ping({ body: { ...CLICK, route: '/logitech/ben-yu/' } }, { page: PING_PAGE, person })
+  assert.equal(r.status, 202)
+  assert.deepEqual(r.graph, ['/logitech/ben-yu/'], 'looked the person page up as an account page')
+  const sent = JSON.parse(r.mark[0].body) as CtaPing
+  assert.equal(sent.person, 'Ben Yu')
+  assert.equal(sent.rep?.email, 'caleb.ping@optimizely.com')
+  const missing = await ping({ body: { ...CLICK, route: '/logitech/nobody/' } }, { page: PING_PAGE, person })
+  assert.equal(missing.status, 404)
+  assert.equal(missing.mark.length, 0)
+})
+
+testAsync('POST /api/cta-ping sends nothing when off, misconfigured, or the page is not there', async () => {
+  const off = await ping({ body: CLICK }, { page: PING_PAGE, env: { CTA_PING_WEBHOOK_URL: undefined } })
+  assert.equal(off.status, 202, 'previews and local runs (no webhook set) answer as if sent')
+  assert.equal(off.mark.length + off.graph.length, 0)
+  const elsewhere = await ping({ body: CLICK }, { page: PING_PAGE, env: { CTA_PING_WEBHOOK_URL: 'https://example.com/hook' } })
+  assert.equal(elsewhere.status, 202)
+  assert.equal(elsewhere.mark.length, 0, 'a webhook that is not Mark got the team')
+  const plain = await ping({ body: CLICK }, { page: PING_PAGE, env: { CTA_PING_WEBHOOK_URL: 'http://webhook.mark.optimizely.com/x' } })
+  assert.equal(plain.mark.length, 0, 'sent over http')
+  const missing = await ping({ body: { ...CLICK, route: '/nobody-here/' } }, { page: PING_PAGE })
+  assert.equal(missing.status, 404)
+  assert.equal(missing.mark.length, 0)
+  const refused = await ping({ body: CLICK }, { page: PING_PAGE, mark: 401 })
+  assert.equal(refused.status, 502, 'Mark refusing the key looks like success')
+})
+
+testAsync('the browser never holds the Mark webhook or its key', async () => {
+  for (const file of ['src/lib/cta-ping.ts', 'src/www/ConnectModal.tsx']) {
+    const src = readFileSync(file, 'utf8')
+    assert.ok(!/webhook\.(mark|opal)\.optimizely\.com|CTA_PING_WEBHOOK/.test(src), file)
+  }
+  assert.ok(!/fireDemoWebhook|abm-demo-webhook/.test(readFileSync('src/www/ConnectModal.tsx', 'utf8')))
 })
 
 /* -------------------------------------------------------------------- result */

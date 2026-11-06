@@ -18,6 +18,7 @@
 import type { CompetitorComparisonPage } from '../../lib/graph-types'
 import { deriveCustomerName } from '../../lib/page-identity'
 import { formatStatValue, realContacts } from '../account-helpers'
+import { isAccountExecutive } from '../../lib/account-rep'
 import {
   DEFAULT_TEAMS,
   IDENTITY_SENTENCE,
@@ -129,8 +130,6 @@ export function personMatcher(
   return (text) => !!text && re.test(text)
 }
 
-/** The roles that count as the account executive for rule N4. */
-const AE_ROLE = /account executive|\bAE\b|account director|client director/i
 
 /** A founding year is a date, not a count: never "2K". */
 function isYear(s: { Value: string; Label: string }) {
@@ -228,7 +227,7 @@ export function fromLegacyPage(page: CompetitorComparisonPage, opts: { state?: L
 
   // N4: one named rep, the account executive. The stored team often holds an SDR or a growth rep
   // instead; then the page shows the team pod until Agent 1 resolves the AE (opp owner first).
-  const ae = toPeople(page.teamMembers).find((p) => AE_ROLE.test(p.role))
+  const ae = toPeople(page.teamMembers).find((p) => isAccountExecutive(p.name, p.role))
   const named = STATES[state.value].namedRep && ae ? [ae] : []
 
   const tiles = stackTiles(tools)
@@ -346,7 +345,7 @@ export const USED_FIELDS: Array<{ field: string; where: string }> = [
 
 /**
  * Legacy fields the agent platform template deliberately leaves off, with Laura's rule. They stay
- * in the CMS untouched.
+ * in the CMS untouched, and a page with another pitch shows them all on the takeout template.
  */
 export const NOT_SHOWN: Array<{ field: string; rule: string }> = [
   { field: 'eyebrow', rule: 'fixed eyebrow "Personalized for {account}" (4.1); still read for the account name' },
