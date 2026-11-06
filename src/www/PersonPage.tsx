@@ -77,7 +77,7 @@ export default function PersonPage({ page }: Props) {
   const person = page.personName?.trim() || 'you'
   return (
     <ConnectProvider {...personConnectProps(page)}>
-      <WwwPage accent={page.brandAccentColor} className="www-person">
+      <WwwPage className="www-person">
         <div id="main-content">
           <Hero page={page} company={company} person={person} />
           <Note page={page} />
@@ -112,7 +112,6 @@ function Hero({ page, company, person }: { page: PersonPageData; company: string
               logo={resolveUrl(page.companyLogo)}
               label={page.heroEyebrow || `Written for ${person}`}
               xray="person-hero"
-              accent={!!page.brandAccentColor}
               edit={{ logo: field('companyLogo'), label: field('heroEyebrow') }}
             />
           </Reveal>

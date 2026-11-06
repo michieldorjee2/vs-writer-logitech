@@ -475,7 +475,7 @@ export const AGENT_PLATFORM_EDIT: EditSectionInfo[] = [
  * prompt maps to fields. Between them, the parts cover every stored field the page shows.
  */
 const TAKEOUT_PARTS: Array<{ id: string; title?: string; fields: string[]; hint: string; tools?: string[]; sources?: string[] }> = [
-  { id: 'hero-3d', fields: ['eyebrow', 'customerLogo', 'brandAccentColor'], hint: 'The account\'s logo, the line beside it and the accent stripe under it.' },
+  { id: 'hero-3d', fields: ['eyebrow', 'customerLogo'], hint: 'The account\'s logo and the line beside it.' },
   { id: 'hero-title', fields: ['headline'], hint: 'The headline: the page\'s pitch in a few words.' },
   { id: 'hero-subtitle', fields: ['subheadline'], hint: 'The line under the headline: what the pitch means for them.' },
   { id: 'hero-cta', title: 'Hero button', fields: ['cta', 'link'], hint: 'The second button in the hero and where it goes.', tools: ['Mark'], sources: ['cta', 'link'] },

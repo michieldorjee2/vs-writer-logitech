@@ -479,7 +479,6 @@ for (const f of ACCOUNT_FIELDS.filter((x) => x.use === 'text')) {
 const ATTR_EXPECT: Record<string, string[]> = {
   link: ['href="https://example.test/F-link"'],
   customerLogo: ['src="https://example.test/F-customerLogo.png"'],
-  brandAccentColor: ['--www-accent:#0a1b2c'],
   challengeScreenshotUrl: ['src="https://example.test/F-challengeScreenshotUrl.png"'],
   challengeScreenshotAlt: ['alt="F-challengeScreenshotAlt"'],
   analystCTALink: ['href="https://example.test/F-analystCTALink"'],
@@ -1964,6 +1963,25 @@ test('the CMS preview loads the editor script from the CMS and refreshes through
   assert.ok(!/addEventListener\(/.test(hook), 'a second save listener beside the SDK')
 })
 
+test("the hero's top: the search page's white outline wordmark, and their logo filling its tile with no account colour", () => {
+  for (const html of [accountHtml, renderToString(<AgentPlatformPage page={stackPage()} />), renderToString(<OfferPage experience={fullOffer()} />)]) {
+    assert.match(html, /<div class="www-strip"><a href="https:\/\/www\.optimizely\.com\/" aria-label="Optimizely"[^>]*><svg class="www-strip__logo" viewBox="47 47 166\.16 40"/, 'not the outline wordmark')
+    assert.ok(!html.includes('optimizely-logo-color.svg'), 'the green extruded logo is still drawn')
+    assert.ok(!/--www-accent|www-account--accent/.test(html), 'the account colour is still drawn')
+  }
+  // The account colour reaches no page, whatever is stored.
+  assert.ok(!accountHtml.includes('#0a1b2c'), 'the stored brandAccentColor is in the markup')
+  const css = readFileSync('src/www/www.css', 'utf8')
+  assert.ok(!/--www-accent/.test(css), 'a style still reads the account colour')
+  // White on the dark hero, Dark Fir on a light one (the agent platform states use light heroes too).
+  assert.match(css, /\.www-hero__card--darkfir \.www-strip__logo \{\s*color: #fff;/)
+  assert.match(css, /\.www-page \.www-strip__logo \{[^}]*color: var\(--www-fir\);/)
+  // The logo fills the tile edge to edge: no padding, cropped to the tile's rounded corners.
+  const tile = css.match(/\.www-page \.www-account__logo \{[^}]*\}/)?.[0] ?? ''
+  assert.ok(/overflow: hidden/.test(tile) && !/padding/.test(tile), `tile: ${tile}`)
+  assert.match(css, /\.www-page \.www-account__logo img \{[^}]*object-fit: cover;/)
+})
+
 console.log('\nthe person page: the 1:1 buyer page in the www design')
 
 /** A person page with every stored field filled, each with a value that can only come from that field. */
@@ -2083,7 +2101,7 @@ test('a person page shows every stored field it places, and nothing that is neve
   for (const v of ['https://www.linkedin.com/in/p-linkedin', 'https://example.test/p-logo.svg', 'https://example.test/p-cite', 'https://example.test/p-read', '/logitech/']) {
     assert.ok(personHtml.includes(v), v)
   }
-  assert.match(personHtml, /--www-accent:#00b8fc/)
+  assert.ok(!/--www-accent|#00b8fc/.test(personHtml), 'the account colour is on the person page')
   // The pairs: a headline replaces the name as the h1, a subheadline the title; the scorecard replaces remitPoints.
   assert.match(personHtml, /<h1[^>]*>.*P-headline/s)
   const bare = textOf(renderToString(<PersonPage page={fullPersonPage({ heroHeadline: null, heroSubheadline: null, scorecard: [] })} />))
