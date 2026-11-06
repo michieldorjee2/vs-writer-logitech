@@ -17,6 +17,7 @@ import './index.css'
 import 'material-symbols/rounded.css'
 import App from './App.tsx'
 import { inCmsPreview } from './lib/cms-preview'
+import { afterViewTransition } from './lib/after-view-transition'
 
 /*
  * The CMS's preview (/preview): set before anything renders, so even the first loading screen is
@@ -27,10 +28,14 @@ if (inCmsPreview()) document.documentElement.setAttribute('data-cms-preview', ''
 
 const root = document.getElementById('root')!;
 
-if (root.innerHTML.trim().length > 0) {
-  // Server-rendered HTML present — hydrate instead of full render
-  hydrateRoot(root, <StrictMode><App /></StrictMode>);
-} else {
-  // SPA mode (home page, preview, or dev without SSR)
-  createRoot(root).render(<StrictMode><App /></StrictMode>);
-}
+// Opened from the search page, the page morphs in from the server's HTML first: the app starts
+// once that is over (src/lib/after-view-transition.ts), or it cancels the transition.
+afterViewTransition(() => {
+  if (root.innerHTML.trim().length > 0) {
+    // Server-rendered HTML present — hydrate instead of full render
+    hydrateRoot(root, <StrictMode><App /></StrictMode>);
+  } else {
+    // SPA mode (home page, preview, or dev without SSR)
+    createRoot(root).render(<StrictMode><App /></StrictMode>);
+  }
+});

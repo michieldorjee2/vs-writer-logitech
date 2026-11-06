@@ -138,10 +138,15 @@ html, body { margin: 0; background: #f9fcf8; }
    the badge scanner's lanyard when it is up) are named too, so they stay above it while it
    moves, fading out and back in. */
 .sh-scene { view-transition-name: vt-scene; }
+/* The frame itself (its dark ground, its rounded corners) becomes the page's hero block. */
+.sh-hero { view-transition-name: vt-frame; }
 .sh-top__logo { view-transition-name: vt-wordmark; }
 .sh-top { view-transition-name: vt-search-top; }
 .sh-lift { view-transition-name: vt-search-lift; }
 .sh-panel { view-transition-name: vt-search-panel; }
+/* The shade over the photograph fades on its own, so the photograph that moves is the photograph
+   alone, the one the page it opens shows (the boot script carries it there). */
+.sh-scene__shade { view-transition-name: vt-search-shade; }
 .lanyard { view-transition-name: vt-search-lanyard; }
 /* One photograph per layer. A new one (an offer's look) is laid over the last
    and fades in once it has loaded; then the one under it goes. */
@@ -570,6 +575,10 @@ html, body { margin: 0; background: #f9fcf8; }
    before any script runs. The panel clips at the scene's bottom edge, so rows rising
    in or dropping out never show in the page margin below it. */
 .sh-panel__body {
+  /* The page's own colour, so the lists carry their ground with them in the view transition: seen
+     through the cut-out it is the page, but the transition takes the photograph without the
+     cut-out (a clip on .sh-hero), so without it the lists would slide over the photograph. */
+  background: var(--sh-page);
   height: 100%;
   padding-block: var(--sh-pad-t) var(--sh-pad-b);
   transform: translateY(calc(100% - var(--sh-panel-h)));

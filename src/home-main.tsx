@@ -5,6 +5,7 @@ import { randomScene, sceneById } from './lib/home-scenes';
 import { registerOfflineWorker } from './lib/home-offline';
 import type { ShownOffer } from './lib/offer-looks';
 import { servedBadgeReady } from './lib/badge-scan';
+import { afterViewTransition } from './lib/after-view-transition';
 
 /*
  * The search page's entry (home.html, served at /search). In production the
@@ -29,7 +30,11 @@ const app = (
   </StrictMode>
 );
 
-if (served && root.firstElementChild) hydrateRoot(root, app);
-else createRoot(root).render(app);
+// Back on the search page by a fresh load (not the back/forward cache), it morphs in from the
+// server's HTML first: hydrated after (src/lib/after-view-transition.ts), or it cancels the morph.
+afterViewTransition(() => {
+  if (served && root.firstElementChild) hydrateRoot(root, app);
+  else createRoot(root).render(app);
+});
 
 if (import.meta.env.PROD) registerOfflineWorker();

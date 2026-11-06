@@ -33,6 +33,116 @@
   animation-duration: 360ms;
   animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+/* The grounds. Opening a page, the search page's grey stays behind everything while its frame
+   becomes the page's hero block and its left margin the rail; the rest of the page (below the hero)
+   comes in last. Back, the page's ground gives way to the search page's grey at once, and the
+   frame closes over it. Normal blending: plus-lighter brightens two grounds where they overlap. */
+:root:active-view-transition-type(from-search)::view-transition-old(root),
+:root:active-view-transition-type(to-search)::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root:active-view-transition-type(from-search)::view-transition-new(root) {
+  animation: vt-ground-last 620ms linear both;
+  mix-blend-mode: normal;
+}
+:root:active-view-transition-type(to-search)::view-transition-new(root) {
+  animation: vt-ground-first 620ms linear both;
+  mix-blend-mode: normal;
+}
+@keyframes vt-ground-last {
+  0%,
+  70% {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-ground-first {
+  from {
+    opacity: 0;
+  }
+  25%,
+  to {
+    opacity: 1;
+  }
+}
+
+/* ------------ The frame ------------
+ * The search page's frame (.sh-hero) and the page's hero block (.www-hero__card) are one dark
+ * block: it grows out to the window's top and right edges, its bottom rises to the hero's, and its
+ * left edge moves in to the rail's. Its corners go from the frame's to the page's (the rail's
+ * rounded corner, top left, or square on a phone: --vt-frame-r, set by the boot script). The pair
+ * draws the ground (both are #08251a), so no other dark green comes in behind the photograph; the
+ * page's hero copy comes in once the photograph has moved off it, and goes first on the way back. */
+::view-transition-group(vt-frame) {
+  z-index: 0;
+  animation-duration: 620ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.2, 1);
+}
+:root:active-view-transition-type(to-search)::view-transition-group(vt-frame) {
+  animation-timing-function: cubic-bezier(0.3, 0, 0.15, 1);
+}
+::view-transition-image-pair(vt-frame) {
+  overflow: clip;
+  background: #08251a;
+}
+:root:active-view-transition-type(from-search)::view-transition-image-pair(vt-frame) {
+  animation: vt-frame-open 620ms cubic-bezier(0.65, 0, 0.2, 1) both;
+}
+:root:active-view-transition-type(to-search)::view-transition-image-pair(vt-frame) {
+  animation: vt-frame-close 620ms cubic-bezier(0.3, 0, 0.15, 1) both;
+}
+@keyframes vt-frame-open {
+  from {
+    border-radius: 20px;
+  }
+  to {
+    border-radius: var(--vt-frame-r, 0);
+  }
+}
+@keyframes vt-frame-close {
+  from {
+    border-radius: var(--vt-frame-r, 0);
+  }
+  to {
+    border-radius: 20px;
+  }
+}
+::view-transition-old(vt-frame),
+::view-transition-new(vt-frame) {
+  mix-blend-mode: normal;
+}
+:root:active-view-transition-type(from-search)::view-transition-old(vt-frame),
+:root:active-view-transition-type(to-search)::view-transition-new(vt-frame) {
+  animation: none;
+  opacity: 0;
+}
+:root:active-view-transition-type(from-search)::view-transition-new(vt-frame) {
+  animation: vt-copy-in 620ms linear both;
+}
+:root:active-view-transition-type(to-search)::view-transition-old(vt-frame) {
+  animation: vt-copy-out 620ms linear both;
+}
+@keyframes vt-copy-in {
+  0%,
+  45% {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-copy-out {
+  from {
+    opacity: 1;
+  }
+  35%,
+  to {
+    opacity: 0;
+  }
+}
 
 /* The moving parts: one easing, a little longer, with the account above the photograph it
    crosses (the hero draws the photograph after the copy, so without this it would cover them). */
@@ -53,26 +163,56 @@
 }
 
 /* The search page's own layers: above the photograph, below the moving account. They have no
-   counterpart on the page, so they only fade: out quickly as the photograph starts to move, in
-   as it settles. */
+   counterpart on the page. The headline with the search box, and the lists under it, travel:
+   down off the window as a page opens, back up into it as you return (Michiel, 6 Nov: "move down
+   off the page (not fade out) and then back up into view"). The top bar and the lanyard fade.
+   The shade over the photograph clears at once as a page opens, so it never dims the page coming
+   into view, and comes back last, once the photograph fills the frame again. */
 ::view-transition-group(vt-search-top),
 ::view-transition-group(vt-search-lift),
 ::view-transition-group(vt-search-panel),
 ::view-transition-group(vt-search-lanyard) {
   z-index: 2;
 }
-::view-transition-old(vt-search-top),
+/* The shade belongs to the photograph: just over it, under the lists and the headline. */
+::view-transition-group(vt-search-shade) {
+  z-index: 1;
+}
 ::view-transition-old(vt-search-lift),
-::view-transition-old(vt-search-panel),
+::view-transition-old(vt-search-panel) {
+  animation: vt-search-down 400ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+/* Back, they rise once the photograph has grown over the page they would otherwise cross. */
+::view-transition-new(vt-search-lift),
+::view-transition-new(vt-search-panel) {
+  animation: vt-search-up 460ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both;
+}
+@keyframes vt-search-down {
+  to {
+    transform: translateY(100vh);
+  }
+}
+@keyframes vt-search-up {
+  from {
+    transform: translateY(100vh);
+  }
+}
+::view-transition-old(vt-search-top),
 ::view-transition-old(vt-search-lanyard) {
   animation-duration: 260ms;
 }
 ::view-transition-new(vt-search-top),
-::view-transition-new(vt-search-lift),
-::view-transition-new(vt-search-panel),
 ::view-transition-new(vt-search-lanyard) {
   animation-duration: 420ms;
   animation-delay: 260ms;
+  animation-fill-mode: both;
+}
+::view-transition-old(vt-search-shade) {
+  animation-duration: 160ms;
+}
+::view-transition-new(vt-search-shade) {
+  animation-duration: 260ms;
+  animation-delay: 360ms;
   animation-fill-mode: both;
 }
 ::view-transition-old(vt-scene),
@@ -99,6 +239,61 @@
   clip-path: inset(0 round 20px);
 }
 
+/* ------------ The photograph, carried ------------
+ * Opened from the search page, a page's hero shows the search page's photograph (the boot script
+ * puts it in --vt-scene): already loaded, so it is in the first paint the morph lands on, and the
+ * page doesn't wait on its own. The photograph that moves is then the one it becomes, so it moves
+ * alone, never cross-faded (two crops of one photograph, fading, read as a double image): the
+ * search page's image goes the whole way, its rounded frame squaring as it goes, and lands in the
+ * hero's own crop. The hero draws its photograph 12% taller than its frame and raised by as much,
+ * for the drift as the page scrolls (www.css, `inset: -12% 0 0 0`), so the moving image grows into
+ * that box and meets the hero exactly; the page's own image is never shown until it is the page.
+ * Back to Search, when the search page still shows that photograph (the boot script checks), the
+ * same the other way: the search page's image alone, from the hero's crop to its frame. */
+html.vt-scene-carry .www-page .www-hero__img {
+  content: var(--vt-scene);
+}
+:root:active-view-transition-type(carry-scene):active-view-transition-type(from-search)::view-transition-old(vt-scene) {
+  animation: vt-scene-square 620ms cubic-bezier(0.65, 0, 0.2, 1) both;
+}
+:root:active-view-transition-type(carry-scene):active-view-transition-type(to-search)::view-transition-new(vt-scene) {
+  animation: vt-scene-round 620ms cubic-bezier(0.3, 0, 0.15, 1) both;
+}
+/* Back, the photograph grows quickly at first: it covers the page before the search page's
+   headline and lists rise over it. (Forward it starts slowly: they leave first.) */
+:root:active-view-transition-type(to-search)::view-transition-group(vt-scene) {
+  animation-timing-function: cubic-bezier(0.3, 0, 0.15, 1);
+}
+:root:active-view-transition-type(carry-scene):active-view-transition-type(from-search)::view-transition-new(vt-scene),
+:root:active-view-transition-type(carry-scene):active-view-transition-type(to-search)::view-transition-old(vt-scene) {
+  animation: none;
+  opacity: 0;
+}
+@keyframes vt-scene-square {
+  from {
+    top: 0;
+    height: 100%;
+    clip-path: inset(0 round 20px);
+  }
+  to {
+    top: -12%;
+    height: 112%;
+    clip-path: inset(0 round 0);
+  }
+}
+@keyframes vt-scene-round {
+  from {
+    top: -12%;
+    height: 112%;
+    clip-path: inset(0 round 0);
+  }
+  to {
+    top: 0;
+    height: 100%;
+    clip-path: inset(0 round 20px);
+  }
+}
+
 /* A name changes length ("CDW" becomes "Personalized for CDW"): scale it by its height only, so
    the letters never stretch, and let the two cross-fade from the left. */
 ::view-transition-old(vt-name),
@@ -109,22 +304,76 @@
 }
 
 /* ------------ The booth rail ------------
- * Leaving a page with the rail for the search page, the rail slides out to the left, its corners
- * with it, while the page's parts fly back. Arriving with it already there (a page restored from
- * the back/forward cache), it slides in. Between two pages that both have it, it holds still: both
- * images are there, so neither rule applies. */
+ * The search page's grey margin and the rail are one surface (the same grey, light or dark). Opening
+ * a page with the rail open, the rail's ground (.vt-rail-shell, put in by the boot script before
+ * the first paint: the rail itself mounts after the morph) slides in with the frame's left edge,
+ * from the search page's margin (18 px) to the rail's width (64 px); the rail then slides over it,
+ * its icons cascading in. Back to Search, the rail narrows to the margin the same way while its
+ * icons go, over the search page's grey. The page's rounded corners beside the rail are the frame's
+ * own while it moves (their pieces on the rail wait until it has). Between two pages that both have
+ * the rail, it holds still: both images are there, so no rule below applies. */
 .booth-rail {
   view-transition-name: vt-rail;
 }
 .booth-rail-mini {
   view-transition-name: vt-rail-mini;
 }
+.vt-rail-shell {
+  --vt-rail-bg: #f9fcf8;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 950;
+  width: 64px;
+  background: var(--vt-rail-bg);
+  pointer-events: none;
+  view-transition-name: vt-rail-shell;
+}
+@media (prefers-color-scheme: dark) {
+  .vt-rail-shell {
+    --vt-rail-bg: #252825;
+  }
+}
+@media (max-width: 640px) {
+  .vt-rail-shell {
+    display: none;
+  }
+}
+/* The page's two left corners, cut from the rail's ground (as the rail's own, booth-rail.css). */
+.vt-rail-shell::before,
+.vt-rail-shell::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  width: 20px;
+  height: 20px;
+}
+.vt-rail-shell::before {
+  top: 0;
+  background: radial-gradient(circle at 100% 100%, transparent 19.5px, var(--vt-rail-bg) 20px);
+}
+.vt-rail-shell::after {
+  bottom: 0;
+  background: radial-gradient(circle at 100% 0, transparent 19.5px, var(--vt-rail-bg) 20px);
+}
+:root:active-view-transition .vt-rail-shell::before,
+:root:active-view-transition .vt-rail-shell::after,
+:root:active-view-transition .booth-rail::before,
+:root:active-view-transition .booth-rail::after {
+  opacity: 0 !important;
+  transition: none !important;
+}
 ::view-transition-group(vt-rail),
-::view-transition-group(vt-rail-mini) {
+::view-transition-group(vt-rail-mini),
+::view-transition-group(vt-rail-shell) {
   z-index: 2;
 }
+::view-transition-new(vt-rail-shell):only-child {
+  animation: vt-rail-ground-in 620ms cubic-bezier(0.65, 0, 0.2, 1) both;
+}
 ::view-transition-old(vt-rail):only-child {
-  animation: vt-rail-out 380ms cubic-bezier(0.5, 0, 0.75, 0) both;
+  animation: vt-rail-out 620ms cubic-bezier(0.3, 0, 0.15, 1) both;
 }
 ::view-transition-new(vt-rail):only-child {
   animation: vt-rail-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -135,10 +384,22 @@
 ::view-transition-new(vt-rail-mini):only-child {
   animation: vt-rail-mini-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-/* Past its own width by its corners (they hang 20 px off its right edge). */
+/* 46 px: the rail's width (64) less the search page's margin (18). */
+@keyframes vt-rail-ground-in {
+  from {
+    transform: translateX(-46px);
+  }
+}
 @keyframes vt-rail-out {
+  25% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 0;
+  }
   to {
-    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    transform: translateX(-46px);
   }
 }
 @keyframes vt-rail-in {

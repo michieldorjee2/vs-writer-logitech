@@ -998,7 +998,11 @@ export default function SearchHome({
       return;
     }
     if (row.kind === 'offer') {
-      window.open(`/${row.page.route}`, '_blank', 'noopener,noreferrer');
+      // The offer page itself (no booth rail): the same tab too, so it morphs in as a company's
+      // page does, with this page's photograph. Cmd/Ctrl/Shift or a middle click: a new tab.
+      const href = `/${row.page.route.replace(/^\/+/, '')}`;
+      if (newTab) window.open(href, '_blank', 'noopener,noreferrer');
+      else window.location.assign(href);
       return;
     }
     open(row.item.kind === 'company' ? row.item.entry.slug : row.item.person.slug, newTab);
@@ -1382,6 +1386,8 @@ export default function SearchHome({
                           key={row.key}
                           {...common}
                           className={'sh-row sh-row--offer' + (meta ? '' : ' sh-row--plain') + (active ? ' is-active' : '')}
+                          // The view transition's handle on this row (src/lib/view-transitions-boot.js).
+                          data-vt-slug={page.route.replace(/^\/+|\/+$/g, '')}
                         >
                           <Tile sources={[logo]} label={initialsOf(page.companyName)} />
                           <span className="sh-row__text">

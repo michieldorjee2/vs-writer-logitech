@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <!-- Cross-document view transitions to and from the pages it opens (src/lib/view-transitions-boot.js, written in by vite.config.ts). -->
     <script data-view-transitions-boot></script>
+    <!-- The first paint waits until the search box (and the frame and photograph before it) is parsed. -->
+    <link rel="expect" href="#sh-q" blocking="render" />
     <!-- The search page's own document (/search): the server renders the page into #root (server/ssr-handler.tsx),
          so the scene and headline paint before any script runs. Nothing third-party loads here. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

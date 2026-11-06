@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <!-- Cross-document view transitions to and from the search page (src/lib/view-transitions-boot.js, written in by vite.config.ts). -->
     <script data-view-transitions-boot></script>
+    <!-- The first paint (the one a view transition lands on) waits until the hero is parsed: without it,
+         a page arriving from the search page could be captured before its hero existed, and nothing moved. -->
+    <link rel="expect" href="#hero" blocking="render" />
     <!-- A signed-in Optimizely person (the showcase_staff mark, src/lib/staff-marker.ts) is never
          sent to ODP. The snippet below loads ODP's universal tag (oiq.min.js) itself, and turning
          its tracking off does not stop that (it still posted to logx /v1/ingest, 4 Nov 2026), so

@@ -201,6 +201,9 @@ body:has(.www-page) {
 .www-page .www-strip__logo {
   view-transition-name: vt-wordmark;
 }
+.www-page .www-hero__card {
+  view-transition-name: vt-frame;
+}
 .www-page .www-hero__visual {
   view-transition-name: vt-scene;
 }
@@ -210,6 +213,7 @@ body:has(.www-page) {
 .www-page .www-hero .www-account__label {
   view-transition-name: vt-name;
 }
+.vt-far .www-page .www-hero__card,
 .vt-far .www-page .www-strip__logo,
 .vt-far .www-page .www-hero__visual,
 .vt-far .www-page .www-hero .www-account__logo,

@@ -269,7 +269,8 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
     const root = document.documentElement;
     root.classList.add('booth-page');
     root.classList.toggle('booth-page--rail', railRoom);
-    dropRailRoom();
+    // The rail's ground from the view transition (.vt-rail-shell) goes once the rail is over it.
+    dropRailRoom(700);
     return () => root.classList.remove('booth-page', 'booth-page--rail');
   }, [railRoom]);
 

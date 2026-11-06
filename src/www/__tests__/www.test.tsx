@@ -2269,13 +2269,14 @@ test('the parts that move carry one name each, on every page the search page ope
   for (const [sel, name] of [
     ['.www-page .www-strip__logo', 'vt-wordmark'],
     ['.www-page .www-hero__visual', 'vt-scene'],
+    ['.www-page .www-hero__card', 'vt-frame'],
     ['.www-page .www-hero .www-account__logo', 'vt-logo'],
     ['.www-page .www-hero .www-account__label', 'vt-name'],
   ]) {
     assert.match(www, new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{\\s*view-transition-name: ${name};`), `${sel} → ${name}`)
   }
   const home = readFileSync('src/styles/search-home.css', 'utf8')
-  for (const [sel, name] of [['.sh-scene', 'vt-scene'], ['.sh-top__logo', 'vt-wordmark'], ['.sh-top', 'vt-search-top'], ['.sh-lift', 'vt-search-lift'], ['.sh-panel', 'vt-search-panel'], ['.lanyard', 'vt-search-lanyard']]) {
+  for (const [sel, name] of [['.sh-scene', 'vt-scene'], ['.sh-hero', 'vt-frame'], ['.sh-top__logo', 'vt-wordmark'], ['.sh-top', 'vt-search-top'], ['.sh-lift', 'vt-search-lift'], ['.sh-panel', 'vt-search-panel'], ['.lanyard', 'vt-search-lanyard']]) {
     assert.match(home, new RegExp(`\\${sel} \\{ view-transition-name: ${name}; \\}`), `${sel} → ${name}`)
   }
   // Two elements with one name cancel the whole transition: each named part is drawn once.
@@ -2286,7 +2287,7 @@ test('the parts that move carry one name each, on every page the search page ope
     ['offer', renderToString(<OfferPage experience={fullOffer()} />)],
   ]
   for (const [name, html] of pages) {
-    for (const cls of ['www-strip__logo', 'www-hero__visual', 'www-account__logo', 'www-account__label']) {
+    for (const cls of ['www-strip__logo', 'www-hero__visual', 'www-hero__card', 'www-account__logo', 'www-account__label']) {
       const n = (html.match(new RegExp(`class="[^"]*\\b${cls}\\b`, 'g')) || []).length
       assert.equal(n, 1, `${name}: ${cls} is drawn ${n} times`)
     }
@@ -2307,7 +2308,10 @@ test("the search page opens a result in the same tab (Cmd/Ctrl/Shift or a middle
 })
 
 /** Runs the boot script against a stand-in page; returns what it did. */
-function bootOn(where: string, opts: { from?: string; heroBottom?: number; phone?: boolean; rail?: string | null; storageThrows?: boolean } = {}) {
+function bootOn(
+  where: string,
+  opts: { from?: string; heroBottom?: number; phone?: boolean; rail?: string | null; storageThrows?: boolean; session?: Map<string, string>; photos?: string[]; photoLoaded?: boolean } = {},
+) {
   type El = { attrs: Map<string, string>; style: { viewTransitionName: string }; children: Record<string, El> }
   const el = (attrs: Record<string, string> = {}, children: Record<string, El> = {}): El => ({ attrs: new Map(Object.entries(attrs)), style: { viewTransitionName: '' }, children })
   const rows = ['cdw', 'logitech/ben-yu'].map((slug) => el({ 'data-vt-slug': slug }, { '.sh-tile': el(), '.sh-row__name': el() }))
@@ -2322,11 +2326,14 @@ function bootOn(where: string, opts: { from?: string; heroBottom?: number; phone
     querySelector: (sel: string) => (e.children[sel] ? wrap(e.children[sel]) : null),
   })
   const classes = new Set<string>()
+  const props = new Map<string, string>()
+  const appended: Array<{ className: string; attrs: Record<string, string> }> = []
+  const session = opts.session ?? new Map<string, string>()
   const handlers: Record<string, (e: unknown) => void> = {}
   const win = {
     onpagereveal: null,
     innerHeight: 900,
-    location: { href: `https://showcase.optimizely.com${where}`, search: new URL(`https://showcase.optimizely.com${where}`).search },
+    location: { href: `https://showcase.optimizely.com${where}`, search: new URL(`https://showcase.optimizely.com${where}`).search, origin: 'https://showcase.optimizely.com' },
     matchMedia: (q: string) => ({ matches: q === '(max-width: 640px)' && Boolean(opts.phone) }),
     localStorage: {
       getItem: (k: string) => {
@@ -2334,17 +2341,38 @@ function bootOn(where: string, opts: { from?: string; heroBottom?: number; phone
         return k === 'opti.booth.rail' ? (opts.rail ?? null) : null
       },
     },
+    sessionStorage: {
+      getItem: (k: string) => session.get(k) ?? null,
+      setItem: (k: string, v: string) => void session.set(k, String(v)),
+      removeItem: (k: string) => void session.delete(k),
+    },
     navigation: opts.from ? { activation: { from: { url: `https://showcase.optimizely.com${opts.from}` } } } : undefined,
     addEventListener: (type: string, fn: (e: unknown) => void) => void (handlers[type] = fn),
     URL,
     document: {
-      documentElement: { classList: { add: (c: string) => void classes.add(c), remove: (c: string) => void classes.delete(c), contains: (c: string) => classes.has(c) } },
+      documentElement: {
+        classList: { add: (c: string) => void classes.add(c), remove: (c: string) => void classes.delete(c), contains: (c: string) => classes.has(c) },
+        style: { setProperty: (k: string, v: string) => void props.set(k, v) },
+      },
+      createElement: () => {
+        const node = { className: '', attrs: {} as Record<string, string>, setAttribute: (k: string, v: string) => void (node.attrs[k] = v) }
+        return node
+      },
+      body: { appendChild: (node: { className: string; attrs: Record<string, string> }) => void appended.push(node) },
       getElementById: (id: string) => (id === 'hero' && opts.heroBottom !== undefined ? { getBoundingClientRect: () => ({ bottom: opts.heroBottom }) } : null),
       querySelectorAll: (sel: string) =>
-        sel === '[data-vt-slug]' ? rows.map(wrap) : sel === '[data-vt-named]' ? all.filter((e) => e.attrs.has('data-vt-named')).map(wrap) : [],
+        sel === '[data-vt-slug]'
+          ? rows.map(wrap)
+          : sel === '[data-vt-named]'
+            ? all.filter((e) => e.attrs.has('data-vt-named')).map(wrap)
+            : sel === '.sh-scene__layer.is-in .sh-scene__img'
+              ? (opts.photos ?? []).map((src) => ({ currentSrc: src, src, complete: opts.photoLoaded !== false, naturalWidth: opts.photoLoaded === false ? 0 : 1600 }))
+              : [],
     },
   }
-  runInNewContext(readFileSync('src/lib/view-transitions-boot.js', 'utf8'), { window: win, ...win })
+  const context: Record<string, unknown> = { window: win, ...win }
+  ;(win as Record<string, unknown>).window = win
+  runInNewContext(readFileSync('src/lib/view-transitions-boot.js', 'utf8'), context)
   const named = () => Object.fromEntries(rows.flatMap((r) => Object.entries(r.children).filter(([, c]) => c.style.viewTransitionName).map(([sel, c]) => [`${r.attrs.get('data-vt-slug')} ${sel}`, c.style.viewTransitionName])))
   let finish = () => {}
   const transition = () => {
@@ -2352,7 +2380,8 @@ function bootOn(where: string, opts: { from?: string; heroBottom?: number; phone
     const finished = new Promise<void>((resolve) => (finish = resolve))
     return { types, finished, ready: Promise.resolve() }
   }
-  return { handlers, classes, named, transition, finish: () => finish() }
+  const settled = () => (win as unknown as { __vtSettled?: Promise<unknown> }).__vtSettled
+  return { handlers, classes, props, session, appended, named, transition, settled, finish: () => finish() }
 }
 
 testAsync('the boot script names only the row you open, and the row you come back from, then lets go', async () => {
@@ -2397,7 +2426,12 @@ test('opened from the search page with the booth rail open, a page makes the rai
   const reveal = (where: string, opts: Parameters<typeof bootOn>[1] = {}, transition = true) => {
     const page = bootOn(where, { from: '/search?q=cdw', ...opts })
     page.handlers.pagereveal({ viewTransition: transition ? page.transition() : null })
-    return page.classes.has('vt-rail-room')
+    const room = page.classes.has('vt-rail-room')
+    // With the room, the rail's ground (it slides in with the frame) and the frame's corner beside it.
+    const shell = page.appended.filter((n) => n.className === 'vt-rail-shell' && n.attrs['aria-hidden'] === 'true').length
+    assert.equal(shell, room ? 1 : 0, `${where}: ${shell} rail ground(s)`)
+    assert.equal(page.props.get('--vt-frame-r') ?? null, room ? '20px 0 0 0' : null)
+    return room
   }
   assert.ok(reveal('/cdw/?search=1'), 'a desktop, no choice made yet: the rail opens')
   assert.ok(reveal('/logitech/ben-yu/?search=1', { rail: 'open' }), 'a person page, the rail left open')
@@ -2422,7 +2456,7 @@ testAsync("the rail takes its room over as it mounts, gives it back when there's
   const rail = readFileSync('src/components/FloatingSidebar.tsx', 'utf8')
   assert.match(rail, /const \[roomMade\] = useState\(railRoomMade\);/)
   assert.match(rail, /const railRoom = railShown \|\| \(roomMade && !entered\);/)
-  assert.match(rail, /root\.classList\.toggle\('booth-page--rail', railRoom\);\s*dropRailRoom\(\);/)
+  assert.match(rail, /root\.classList\.toggle\('booth-page--rail', railRoom\);\s*\/\/[^\n]*\n\s*dropRailRoom\(700\);/)
   assert.match(rail, /if \(auth\.status === 'signed-out'\) dropRailRoom\(\);/)
   const css = readFileSync('src/styles/view-transitions.css', 'utf8')
   // The room, at the rail's width (booth-rail.css), on www pages and not on a phone.
@@ -2434,6 +2468,200 @@ testAsync("the rail takes its room over as it mounts, gives it back when there's
   assert.match(css, /\.booth-rail-mini \{\s*view-transition-name: vt-rail-mini;/)
   assert.match(css, /::view-transition-old\(vt-rail\):only-child \{\s*animation: vt-rail-out /)
   assert.match(css, /::view-transition-new\(vt-rail\):only-child \{\s*animation: vt-rail-in /)
+})
+
+test("the search page hands its photograph to the page it opens, which shows it in its hero", () => {
+  const session = new Map<string, string>()
+  // Leaving the search page: the top photograph that is in (a new one is laid over the last).
+  const search = bootOn('/search', { session, photos: ['/home/scenes/v1/red-rock-wide-1600.avif', '/home/scenes/v1/river-wide-2400.avif'] })
+  search.handlers.pageswap({ viewTransition: search.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/cdw/?search=1' } } })
+  assert.equal(session.get('vt.scene'), '/home/scenes/v1/river-wide-2400.avif')
+  // Arriving: the hero's photograph is that one, the morph knows (carry-scene), and it is taken once.
+  const page = bootOn('/cdw/?search=1', { from: '/search?q=cdw', session })
+  const vt = page.transition()
+  page.handlers.pagereveal({ viewTransition: vt })
+  assert.ok(page.classes.has('vt-scene-carry'))
+  assert.equal(page.props.get('--vt-scene'), 'url("https://showcase.optimizely.com/home/scenes/v1/river-wide-2400.avif")')
+  assert.deepEqual([...vt.types].sort(), ['carry-scene', 'from-search'])
+  assert.equal(session.has('vt.scene'), false)
+  // No transition (reduced motion): the photograph still comes along, so the page is the same.
+  const calm = bootOn('/logitech/ben-yu/?search=1', { from: '/search', session: new Map([['vt.scene', '/home/scenes/v1/mountain-wide-1600.avif']]) })
+  calm.handlers.pagereveal({ viewTransition: null })
+  assert.ok(calm.classes.has('vt-scene-carry'))
+  // Not from the search page: the page's own photograph.
+  const other = bootOn('/cdw/?search=1', { from: '/smartsheet/?search=1', session: new Map([['vt.scene', '/home/scenes/v1/mountain-wide-1600.avif']]) })
+  other.handlers.pagereveal({ viewTransition: other.transition() })
+  assert.ok(!other.classes.has('vt-scene-carry'))
+  // Back to Search: the page hands the photograph back, and the search page, still showing it
+  // (loaded), moves it without a cross-fade; another photograph, or one not in yet, cross-fades.
+  page.handlers.pageswap({ viewTransition: page.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/search' } } })
+  assert.equal(session.get('vt.scene'), 'https://showcase.optimizely.com/home/scenes/v1/river-wide-2400.avif')
+  for (const [photos, loaded, expected] of [
+    [['/home/scenes/v1/river-wide-2400.avif'], true, ['carry-scene', 'to-search']],
+    [['/home/scenes/v1/mountain-wide-2400.avif'], true, ['to-search']],
+    [['/home/scenes/v1/river-wide-2400.avif'], false, ['to-search']],
+  ] as const) {
+    const back = bootOn('/search', { from: '/cdw/?search=1', session: new Map(session), photos: [...photos], photoLoaded: loaded })
+    const vtBack = back.transition()
+    back.handlers.pagereveal({ viewTransition: vtBack })
+    assert.deepEqual([...vtBack.types].sort(), [...expected], `${photos[0]} loaded ${loaded}`)
+  }
+  // Leaving for another page (not Search): nothing handed on.
+  session.clear()
+  page.handlers.pageswap({ viewTransition: page.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/smartsheet/?search=1' } } })
+  assert.equal(session.has('vt.scene'), false)
+  // Only an https address or the site's own makes it into the CSS, and never a quote.
+  for (const [src, carried] of [
+    ['javascript:alert(1)', null],
+    ['http://elsewhere.example/a.jpg', null],
+    ['data:image/png;base64,AAAA', null],
+    ['https://images.unsplash.com/photo-1?w=1600&q=80', 'url("https://images.unsplash.com/photo-1?w=1600&q=80")'],
+    ['/home/a b".avif', 'url("https://showcase.optimizely.com/home/a%20b%22.avif")'],
+  ] as const) {
+    const p = bootOn('/cdw/?search=1', { from: '/search', session: new Map([['vt.scene', src]]) })
+    p.handlers.pagereveal({ viewTransition: null })
+    assert.equal(p.props.get('--vt-scene') ?? null, carried, src)
+  }
+})
+
+testAsync('the app starts once the transition the page arrived by is over (it cancelled the morph), or at once without one', async () => {
+  // The boot script's promise: settled by the transition's end, or by a reveal without one.
+  const page = bootOn('/cdw/?search=1', { from: '/search' })
+  let done = false
+  page.settled()!.then(() => (done = true))
+  page.handlers.pagereveal({ viewTransition: page.transition() })
+  await new Promise((r) => setTimeout(r, 0))
+  assert.equal(done, false, 'settled while the transition still runs')
+  page.finish()
+  await new Promise((r) => setTimeout(r, 0))
+  assert.equal(done, true)
+  const plain = bootOn('/cdw/')
+  let plainDone = false
+  plain.settled()!.then(() => (plainDone = true))
+  plain.handlers.pagereveal({ viewTransition: null })
+  await new Promise((r) => setTimeout(r, 0))
+  assert.equal(plainDone, true)
+
+  // afterViewTransition() against stand-ins for window and document.
+  const { afterViewTransition } = await import('../../lib/after-view-transition')
+  const g = globalThis as unknown as { window?: unknown; document?: unknown }
+  const saved = { window: g.window, document: g.document }
+  const run = async (env: { settled?: Promise<unknown>; prerendering?: boolean; hidden?: boolean }, maxWait = 1000) => {
+    g.window = { __vtSettled: env.settled, setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms) }
+    g.document = { prerendering: env.prerendering, visibilityState: env.hidden ? 'hidden' : 'visible' }
+    let starts = 0
+    afterViewTransition(() => starts++, maxWait)
+    const now = starts
+    return { now, later: async (ms = 5) => (await new Promise((r) => setTimeout(r, ms)), starts) }
+  }
+  try {
+    assert.equal((await run({})).now, 1, 'no boot promise (no view transitions): at once')
+    const never = new Promise(() => {})
+    assert.equal((await run({ settled: never, prerendering: true })).now, 1, 'prerendering: at once')
+    assert.equal((await run({ settled: never, hidden: true })).now, 1, 'a background tab: at once')
+    let settle = () => {}
+    const waiting = await run({ settled: new Promise<void>((r) => (settle = r)) })
+    assert.equal(waiting.now, 0, 'started during the transition')
+    settle()
+    assert.equal(await waiting.later(), 1, 'not started when it ended')
+    const capped = await run({ settled: never }, 10)
+    assert.equal(await capped.later(30), 1, 'never more than maxWait')
+    const once = await run({ settled: Promise.resolve() }, 5)
+    assert.equal(await once.later(30), 1, 'started twice')
+  } finally {
+    g.window = saved.window
+    g.document = saved.document
+  }
+  // Both documents start this way.
+  assert.match(readFileSync('src/main.tsx', 'utf8'), /afterViewTransition\(\(\) => \{\s*if \(root\.innerHTML\.trim\(\)\.length > 0\) \{[\s\S]*hydrateRoot\(root/)
+  assert.match(readFileSync('src/home-main.tsx', 'utf8'), /afterViewTransition\(\(\) => \{\s*if \(served && root\.firstElementChild\) hydrateRoot\(root, app\);/)
+})
+
+test('offers open in the same tab and morph like pages; the photograph moves alone, without the shade or a cross-fade', () => {
+  const home = readFileSync('src/components/SearchHome.tsx', 'utf8')
+  assert.match(home, /if \(row\.kind === 'offer'\) \{[\s\S]*?if \(newTab\) window\.open\(href, '_blank', 'noopener,noreferrer'\);\s*else window\.location\.assign\(href\);/)
+  assert.match(home, /data-vt-slug=\{page\.route\.replace\(/)
+  assert.match(readFileSync('src/styles/search-home.css', 'utf8'), /\.sh-scene__shade \{ view-transition-name: vt-search-shade; \}/)
+  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
+  assert.match(css, /html\.vt-scene-carry \.www-page \.www-hero__img \{\s*content: var\(--vt-scene\);/)
+  // One image moves, never two cross-fading: forward the search page's, back the search page's.
+  assert.match(css, /:root:active-view-transition-type\(carry-scene\):active-view-transition-type\(from-search\)::view-transition-old\(vt-scene\) \{\s*animation: vt-scene-square /)
+  assert.match(css, /:root:active-view-transition-type\(carry-scene\):active-view-transition-type\(to-search\)::view-transition-new\(vt-scene\) \{\s*animation: vt-scene-round /)
+  assert.match(css, /:root:active-view-transition-type\(carry-scene\):active-view-transition-type\(from-search\)::view-transition-new\(vt-scene\),\s*:root:active-view-transition-type\(carry-scene\):active-view-transition-type\(to-search\)::view-transition-old\(vt-scene\) \{\s*animation: none;\s*opacity: 0;/)
+  // The headline with the search box and the lists travel down and back up; they don't fade.
+  assert.match(css, /::view-transition-old\(vt-search-lift\),\s*::view-transition-old\(vt-search-panel\) \{\s*animation: vt-search-down /)
+  assert.match(css, /::view-transition-new\(vt-search-lift\),\s*::view-transition-new\(vt-search-panel\) \{\s*animation: vt-search-up /)
+  assert.match(css, /@keyframes vt-search-down \{\s*to \{\s*transform: translateY\(100vh\);/)
+  // It lands in the hero's own crop: 12% taller and raised by as much, as www.css draws it.
+  assert.match(readFileSync('src/www/www.css', 'utf8'), /\.www-hero__visual picture \{[^}]*inset: -12% 0 0 0;/)
+  assert.match(css, /to \{\s*top: -12%;\s*height: 112%;/)
+})
+
+testAsync("the search page's frame becomes the page's hero block, and its grey margin the rail: one surface, both ways", async () => {
+  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
+  // One dark block: the pair draws the ground (both are #08251a), its corners from the frame's to the page's.
+  assert.match(readFileSync('src/styles/search-home.css', 'utf8'), /--sh-fir: #08251a;/)
+  assert.match(readFileSync('src/www/www.css', 'utf8'), /--www-fir: #08251a;/)
+  assert.match(css, /::view-transition-image-pair\(vt-frame\) \{\s*overflow: clip;\s*background: #08251a;/)
+  assert.match(css, /@keyframes vt-frame-open \{\s*from \{\s*border-radius: 20px;\s*\}\s*to \{\s*border-radius: var\(--vt-frame-r, 0\);/)
+  assert.match(css, /@keyframes vt-frame-close \{\s*from \{\s*border-radius: var\(--vt-frame-r, 0\);\s*\}\s*to \{\s*border-radius: 20px;/)
+  // The hero copy comes in after the photograph has left it, and goes first on the way back.
+  assert.match(css, /:root:active-view-transition-type\(from-search\)::view-transition-new\(vt-frame\) \{\s*animation: vt-copy-in /)
+  assert.match(css, /:root:active-view-transition-type\(to-search\)::view-transition-old\(vt-frame\) \{\s*animation: vt-copy-out /)
+  // The grounds: the search page's grey stays while a page opens (the page comes in last), and takes
+  // over at once on the way back. Never plus-lighter between them.
+  assert.match(css, /:root:active-view-transition-type\(from-search\)::view-transition-new\(root\) \{\s*animation: vt-ground-last 620ms linear both;\s*mix-blend-mode: normal;/)
+  assert.match(css, /:root:active-view-transition-type\(to-search\)::view-transition-new\(root\) \{\s*animation: vt-ground-first 620ms linear both;\s*mix-blend-mode: normal;/)
+  // The rail's ground: the search page's grey in both themes, sliding in with the frame's left edge
+  // (64 - 18 px), its corner pieces waiting until the move is over; back, the rail narrows the same way.
+  const home = readFileSync('src/styles/search-home.css', 'utf8')
+  assert.match(home, /--sh-page: #f9fcf8;/)
+  assert.match(home, /--sh-page: #252825;/)
+  assert.match(home, /--sh-frame-l: max\(18px, env\(safe-area-inset-left\)\);/)
+  assert.match(readFileSync('src/styles/booth-rail.css', 'utf8'), /--booth-rail-w: 64px;/)
+  assert.match(css, /\.vt-rail-shell \{\s*--vt-rail-bg: #f9fcf8;[\s\S]*?width: 64px;[\s\S]*?view-transition-name: vt-rail-shell;/)
+  assert.match(css, /@media \(prefers-color-scheme: dark\) \{\s*\.vt-rail-shell \{\s*--vt-rail-bg: #252825;/)
+  assert.match(css, /@keyframes vt-rail-ground-in \{\s*from \{\s*transform: translateX\(-46px\);/)
+  assert.match(css, /@keyframes vt-rail-out \{[\s\S]*?to \{\s*opacity: 0;\s*transform: translateX\(-46px\);/)
+  assert.match(css, /:root:active-view-transition \.booth-rail::before,\s*:root:active-view-transition \.booth-rail::after \{\s*opacity: 0 !important;/)
+  // The page waits for its hero before the first paint (the one the transition lands on), the
+  // search page for its search box.
+  assert.match(readFileSync('index.html', 'utf8'), /<script data-view-transitions-boot><\/script>\s*(<!--[\s\S]*?-->\s*)?<link rel="expect" href="#hero" blocking="render" \/>/)
+  assert.match(readFileSync('home.html', 'utf8'), /<script data-view-transitions-boot><\/script>\s*(<!--[\s\S]*?-->\s*)?<link rel="expect" href="#sh-q" blocking="render" \/>/)
+  // Back to Search from a page with its rail open: the frame starts from that rounded corner.
+  const session = new Map<string, string>()
+  const page = bootOn('/cdw/?search=1', { from: '/search', session })
+  page.handlers.pagereveal({ viewTransition: page.transition() })
+  page.classes.add('booth-page--rail')
+  page.handlers.pageswap({ viewTransition: page.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/search' } } })
+  assert.equal(session.get('vt.rail'), '1')
+  const back = bootOn('/search', { from: '/cdw/?search=1', session })
+  back.handlers.pagereveal({ viewTransition: back.transition() })
+  assert.equal(back.props.get('--vt-frame-r'), '20px 0 0 0')
+  assert.equal(session.has('vt.rail'), false)
+  // The rail takes over its ground once it has slid over it: the stand-in goes then, not before.
+  const { dropRailRoom } = await import('../../lib/rail-room')
+  const g = globalThis as unknown as { document?: unknown; window?: unknown }
+  const saved = { document: g.document, window: g.window }
+  let removed = 0
+  const classes = new Set(['vt-rail-room'])
+  g.document = {
+    documentElement: { classList: { remove: (c: string) => void classes.delete(c) } },
+    querySelector: (sel: string) => (sel === '.vt-rail-shell' ? { remove: () => void removed++ } : null),
+  }
+  g.window = { setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms) }
+  try {
+    dropRailRoom(20)
+    assert.equal(classes.has('vt-rail-room'), false)
+    assert.equal(removed, 0, 'the ground went before the rail was over it')
+    await new Promise((r) => setTimeout(r, 40))
+    assert.equal(removed, 1)
+    dropRailRoom()
+    assert.equal(removed, 2, 'no rail (signed out): the ground goes at once')
+  } finally {
+    g.document = saved.document
+    g.window = saved.window
+  }
 })
 
 console.log('\nthe CTA ping: the click reaches the account executive, or the follow-up sheet')
