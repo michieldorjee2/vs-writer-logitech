@@ -219,10 +219,10 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
  *   • Report (account pages): the page's story from ODP. Its data loads as the rail mounts; the
  *     icon waves until it is in, then turns to bars.
  * The button at the foot folds the rail away; a single Report button stays at the bottom left to
- * bring it back. The rail slides, its buttons cascade in from the left. X-ray takes the whole
- * screen, so the rail steps aside while it runs. Edit runs in the rail: the other tools fold out,
- * Send (with the comment count) slides in under Edit, Search turns into Close, and "?" at the foot
- * replays the tutorial shown on the first Edit. Close, Edit again, or Escape leaves.
+ * bring it back. The rail slides, its buttons cascade in from the left. Edit and X-ray run in the
+ * rail: the other tools fold out and Search turns into Close. Under Edit, Send slides in (with the
+ * comment count), and "?" at the foot replays the tutorial shown on the first Edit; under X-ray,
+ * its status (scanning, then the parts it traced). Close, the mode's button again, or Escape leaves.
  *
  * Rendered only for a signed-in employee (see FloatingSidebar above). The
  * routes behind the tools check the session themselves; mounting the
@@ -243,12 +243,14 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   const report = reportState(load);
   /** The Edit tutorial (EditMode draws it): on the first Edit of this browser, and from "?". */
   const [tutorial, setTutorial] = useState(false);
-  // X-ray takes the whole screen. Edit runs in the rail: it opens the rail even when folded, and
-  // its controls (Send) sit under the Edit button.
-  const railShown = entered && (!collapsed || editActive) && !xrayActive;
-  const miniShown = entered && collapsed && !editActive && !xrayActive;
-  /** Where Edit mode puts its controls: a slot in the rail under the Edit button. */
+  /** Edit or X-ray running. Each runs in the rail: it opens the rail even when folded, the other
+   *  tools fold out, the first button closes it, and its own controls sit under its button. */
+  const mode: 'edit' | 'xray' | null = editActive ? 'edit' : xrayActive ? 'xray' : null;
+  const railShown = entered && (!collapsed || mode !== null);
+  const miniShown = entered && collapsed && mode === null;
+  /** Where each mode puts its controls: a slot in the rail under its button. */
   const [editSlot, setEditSlot] = useState<HTMLDivElement | null>(null);
+  const [xraySlot, setXraySlot] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
@@ -293,6 +295,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
     setReportOpen(false);
     setXrayActive((v) => !v);
   }, []);
+  const closeXray = useCallback(() => setXrayActive(false), []);
 
   const handleReportClick = useCallback(() => setReportOpen((v) => !v), []);
   const closeReport = useCallback(() => setReportOpen(false), []);
@@ -340,15 +343,15 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         style={{ '--n': hasReport ? 6 : 5 } as CSSProperties}
       >
         <div className="booth-rail__items">
-          {/* While Edit runs, the first button closes it rather than leaving for the search page. */}
+          {/* While Edit or X-ray runs, the first button closes it rather than leaving for the search page. */}
           <RailButton
             i={0}
-            modifier={editActive ? 'back is-close' : 'back'}
-            onClick={editActive ? closeEdit : handleBack}
-            ariaLabel={editActive ? 'Close edit mode' : 'Back to search'}
-            label={editActive ? 'Close' : 'Search'}
+            modifier={mode ? 'back is-close' : 'back'}
+            onClick={mode === 'edit' ? closeEdit : mode === 'xray' ? closeXray : handleBack}
+            ariaLabel={mode === 'edit' ? 'Close edit mode' : mode === 'xray' ? 'Close X-ray mode' : 'Back to search'}
+            label={mode ? 'Close' : 'Search'}
             icon={
-              editActive ? (
+              mode ? (
                 <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M15 5L5 15M5 5l10 10" />
                 </svg>
@@ -362,6 +365,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           />
           <RailButton
             i={1}
+            away={mode === 'xray'}
             modifier="edit"
             onClick={handleEditClick}
             pressed={editActive}
@@ -398,9 +402,11 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
               </svg>
             }
           />
+          {/* X-ray's status (scanning, then the parts it found) lands here (XrayMode, `controls`). */}
+          <div className="booth-rail__slot" ref={setXraySlot} />
           <RailButton
             i={3}
-            away={editActive}
+            away={mode !== null}
             modifier={'share' + (shared !== 'idle' ? ` is-${shared}` : '')}
             onClick={handleShareClick}
             ariaLabel={shared === 'copied' ? 'Public link copied' : shared === 'failed' ? 'Could not copy the link' : 'Copy the public link'}
@@ -425,7 +431,7 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
           {hasReport && (
             <RailButton
               i={4}
-              away={editActive}
+              away={mode !== null}
               modifier="report"
               onClick={handleReportClick}
               pressed={reportOpen}
@@ -440,9 +446,9 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         <div className="booth-rail__foot">
           <button
             type="button"
-            className={'booth-rail__fold' + (editActive ? ' is-away' : '')}
+            className={'booth-rail__fold' + (mode ? ' is-away' : '')}
             style={{ '--i': hasReport ? 5 : 4 } as CSSProperties}
-            inert={editActive}
+            inert={mode !== null}
             onClick={collapseRail}
             aria-label="Hide the tools"
             title="Hide the tools"
@@ -480,7 +486,8 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
 
       <XrayMode
         active={xrayActive}
-        onClose={() => setXrayActive(false)}
+        onClose={closeXray}
+        controls={xraySlot}
         page={page}
         variant={variant}
       />

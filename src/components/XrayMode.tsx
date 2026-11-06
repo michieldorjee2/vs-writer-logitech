@@ -8,12 +8,19 @@ import {
   type XraySectionInfo,
 } from '../lib/xray-defaults';
 import { XrayToolIcon } from '../lib/xray-tool-icons';
+import '../styles/xray-mode.css';
 
 interface Props {
   active: boolean;
   onClose: () => void;
   page: CompetitorComparisonPage;
   variant: 'abm' | 'person';
+  /**
+   * Where the mode's status goes: a slot in the booth rail under the X-ray button
+   * (FloatingSidebar.tsx). Scanning, then the number of parts traced; the mode has no bar of its
+   * own. Null until the rail has mounted.
+   */
+  controls: HTMLElement | null;
 }
 
 type CardSide = 'above' | 'below' | 'left' | 'right';
@@ -248,12 +255,18 @@ function buildConnectorPath(
   return `M${sx},${sy} C${cx1},${cy1} ${cx2},${cy2} ${ex},${ey}`;
 }
 
+/** Where a part's number badge sits: just inside its box's top-left corner. */
+function numberAt(o: OutlineBox): string {
+  return `translate(${o.left + 18} ${o.top + 18})`;
+}
+
 /** All DOM nodes belonging to one section. Filled in via callback refs. */
 type AnchorDom = {
   maskRect: SVGRectElement | null;
   outlineRect: SVGRectElement | null;
   cornerPaths: (SVGPathElement | null)[]; // 4: tl, tr, br, bl
-  numText: SVGTextElement | null;
+  /** The part's number badge, placed with a transform on the box's top-left corner. */
+  numText: SVGGElement | null;
   card: HTMLDivElement | null;
   wirePath: SVGPathElement | null;
   pulsePath: SVGPathElement | null;
@@ -268,7 +281,7 @@ const emptyDom = (): AnchorDom => ({
   pulsePath: null,
 });
 
-function XrayMode({ active, onClose, page, variant }: Props) {
+function XrayMode({ active, onClose, page, variant, controls }: Props) {
   const defaults =
     variant === 'person' ? PERSON_XRAY_DEFAULTS : ABM_XRAY_DEFAULTS;
   const sections = resolveXraySections(defaults, page.xraySections);
@@ -495,10 +508,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           if (dom.cornerPaths[1]) dom.cornerPaths[1].setAttribute('d', buildCornerPath(o, 'tr'));
           if (dom.cornerPaths[2]) dom.cornerPaths[2].setAttribute('d', buildCornerPath(o, 'br'));
           if (dom.cornerPaths[3]) dom.cornerPaths[3].setAttribute('d', buildCornerPath(o, 'bl'));
-          if (dom.numText) {
-            dom.numText.setAttribute('x', String(o.left + 12));
-            dom.numText.setAttribute('y', String(o.top + 22));
-          }
+          if (dom.numText) dom.numText.setAttribute('transform', numberAt(o));
         }
 
         // Card position writes — only when the placement coords moved.
@@ -635,14 +645,14 @@ function XrayMode({ active, onClose, page, variant }: Props) {
               <path ref={setDomRef(a.section.id, 'cornerPaths', 2)} d={buildCornerPath(a, 'br')} />
               <path ref={setDomRef(a.section.id, 'cornerPaths', 3)} d={buildCornerPath(a, 'bl')} />
             </g>
-            <text
-              ref={setDomRef(a.section.id, 'numText')}
-              className="xray-trace__num"
-              x={a.left + 12}
-              y={a.top + 22}
-            >
-              {String(a.sectionNumber).padStart(2, '0')}
-            </text>
+            <g ref={setDomRef(a.section.id, 'numText')} transform={numberAt(a)}>
+              <g className="xray-trace__num">
+                <circle cx={0} cy={0} r={12} className="xray-trace__num-bg" />
+                <text x={0} y={4} textAnchor="middle" className="xray-trace__num-text">
+                  {a.sectionNumber}
+                </text>
+              </g>
+            </g>
           </g>
         ))}
 
@@ -701,10 +711,9 @@ function XrayMode({ active, onClose, page, variant }: Props) {
                 aria-expanded={isOpen}
               >
                 <div className="xray-card__badge">
-                  <span className="xray-card__badge-num">{String(a.sectionNumber).padStart(2, '0')}</span>
+                  <span className="xray-card__badge-num">{a.sectionNumber}</span>
                 </div>
                 <div className="xray-card__heading">
-                  <div className="xray-card__eyebrow">COMPONENT</div>
                   <div className="xray-card__title">{a.section.title}</div>
                 </div>
                 <svg
@@ -755,7 +764,7 @@ function XrayMode({ active, onClose, page, variant }: Props) {
     </div>
   );
 
-  /* Viewport-fixed layer. */
+  /* Viewport-fixed layer: the grid, the vignette and, while scanning, the scan line and its note. */
   const viewportLayer = (
     <div className={'xray-fixed-layer xray-fixed-layer--' + phase} aria-hidden={false}>
       <div className="xray-overlay__grid" aria-hidden="true" />
@@ -767,32 +776,37 @@ function XrayMode({ active, onClose, page, variant }: Props) {
           <div className="xray-overlay__scanline-glow" aria-hidden="true" />
           <div className="xray-overlay__scan-label" aria-hidden="true">
             <span className="xray-overlay__scan-dot" />
-            ANALYSING PAGE STRUCTURE…
+            Reading the page’s parts…
           </div>
         </>
       )}
-
-      <div className="xray-hud">
-        <div className="xray-hud__left">
-          <span className="xray-hud__dot" />
-          <span className="xray-hud__title">X-RAY MODE</span>
-          {phase === 'revealed' && (
-            <span className="xray-hud__meta">
-              {anchorsInit.length} component{anchorsInit.length === 1 ? '' : 's'} traced
-            </span>
-          )}
-        </div>
-        <button type="button" className="xray-hud__close" onClick={onClose} aria-label="Exit X-ray mode">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-          <span>Exit</span>
-        </button>
-      </div>
     </div>
   );
 
-  return createPortal(<>{docLayer}{viewportLayer}</>, document.body);
+  /** The mode's status in the rail, under the X-ray button: scanning, then the parts traced. */
+  const railStatus = controls
+    ? createPortal(
+        <div className={'booth-rail__stat' + (phase === 'revealed' ? ' is-done' : '')} role="status" aria-live="polite">
+          <span className="booth-rail__stat-value">
+            {phase === 'revealed' ? anchorsInit.length : <span className="booth-rail__stat-scan" aria-hidden="true" />}
+          </span>
+          <span className="booth-rail__label">{phase === 'revealed' ? (anchorsInit.length === 1 ? 'Part' : 'Parts') : 'Scanning'}</span>
+          {phase === 'revealed' && (
+            <span className="sr-only">
+              {anchorsInit.length} part{anchorsInit.length === 1 ? '' : 's'} traced
+            </span>
+          )}
+        </div>,
+        controls,
+      )
+    : null;
+
+  return (
+    <>
+      {createPortal(<>{docLayer}{viewportLayer}</>, document.body)}
+      {railStatus}
+    </>
+  );
 }
 
 export default XrayMode;

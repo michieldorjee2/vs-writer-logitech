@@ -678,11 +678,10 @@ test('offer page: scenes on the same background share it instead of each padding
 
 test('booth chrome on a www page is solid, with no backdrop blur (it flickered while scrolling)', () => {
   // Michiel, 3 Nov: "flickering for the admin sidebar when scrolling".
-  const css = readFileSync('src/styles/floating-sidebar.css', 'utf8')
-  const rule = css.match(/body:has\(\.www-page\) \.xray-hud\s*\{([^}]*)\}/)?.[1] ?? ''
-  assert.match(rule, /backdrop-filter: none/)
-  assert.match(rule, /background: #08251a/)
-  assert.ok(css.includes('body:has(.www-page) .xray-hud'), '.xray-hud')
+  // X-ray has no bar since 6 Nov (its status is in the rail); its cards and note are solid.
+  const xray = readFileSync('src/styles/xray-mode.css', 'utf8')
+  assert.ok(!/\.xray-hud\b/.test(xray), 'X-ray has a bar again')
+  assert.ok(!/backdrop-filter/.test(xray), 'X-ray blurs what is behind it')
   // Edit mode has no bar since 6 Nov (its controls are in the rail); its hint, popup and status are solid.
   const edit = readFileSync('src/styles/edit-mode.css', 'utf8')
   assert.ok(!/\.edit-hud\b/.test(edit), 'Edit mode has a bar again')

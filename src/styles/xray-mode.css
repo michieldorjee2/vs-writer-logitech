@@ -1,0 +1,478 @@
+/* ============================================================
+   X-ray mode (src/components/XrayMode.tsx).
+
+   Two layers:
+   .xray-overlay     → absolute, sized to the whole document: the veil
+                       with a cut-out per part, the traced outlines,
+                       their numbers, the wires and the cards. Every
+                       coordinate is the document's, so the browser
+                       scrolls it with the page (no React per frame).
+   .xray-fixed-layer → fixed to the window: the grid, the vignette, and
+                       while scanning, the scan line and its note.
+   Its status (scanning, then the parts traced) is in the booth rail,
+   under the X-ray button (booth-rail.css); it has no bar of its own.
+
+   The animations are X-ray's own (the scan, the trace drawing in,
+   the pulse along each wire, the cards' float). The surfaces are
+   the rail's: its tokens (booth-rail.css), light or dark with the
+   system, Die Grotesk for words, VC Nudge for titles, the brand's
+   lime kept for what X-ray traces. Below the rail (z 960), so the
+   rail and its corners stay on top; solid, no blur (it flickers
+   over the moving www page).
+   px only: the showcase's root font size is 10px.
+   ============================================================ */
+
+.xray-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 940;
+  pointer-events: none;
+  /* width + height applied inline to match documentElement.scrollWidth/Height */
+  font-family: var(--booth-font);
+  color: var(--booth-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.xray-fixed-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 945;
+  pointer-events: none;
+  font-family: var(--booth-font);
+  color: var(--booth-fg);
+}
+
+.xray-fixed-layer .xray-overlay__grid,
+.xray-fixed-layer .xray-overlay__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.xray-fixed-layer .xray-overlay__grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: 0;
+  transition: opacity 600ms ease 160ms;
+}
+
+.xray-fixed-layer--scanning .xray-overlay__grid,
+.xray-fixed-layer--revealed .xray-overlay__grid {
+  opacity: 1;
+}
+
+.xray-fixed-layer .xray-overlay__vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(0 0 0 / 0.4) 100%);
+  opacity: 0;
+  transition: opacity 600ms ease 100ms;
+}
+
+.xray-fixed-layer--scanning .xray-overlay__vignette,
+.xray-fixed-layer--revealed .xray-overlay__vignette {
+  opacity: 1;
+}
+
+/* ------------ The trace: veil, outlines, numbers, wires ------------ */
+
+.xray-overlay__trace {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* The veil fades in with the scan; the parts show through their cut-outs once traced. */
+.xray-trace__veil {
+  fill: var(--booth-scrim);
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+
+.xray-overlay--scanning .xray-trace__veil,
+.xray-overlay--revealed .xray-trace__veil {
+  opacity: 1;
+}
+
+/* The traced outline: square corners (rx=0) so the brackets sit on them. */
+.xray-trace__rect {
+  fill: rgb(171 255 68 / 0.035);
+  stroke: rgb(171 255 68 / 0.7);
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
+  filter: drop-shadow(0 0 6px rgb(171 255 68 / 0.3));
+  opacity: 0;
+  animation: xray-trace-fade 320ms ease-out forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 80ms);
+}
+
+/* Corner brackets, just after the outline. */
+.xray-trace__corners {
+  fill: none;
+  stroke: var(--booth-accent);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: xray-trace-fade 280ms ease-out forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 220ms);
+}
+
+/* The part's number: a lime badge on its top-left corner, like Edit's comment badges. Popped
+ * from its own centre (an SVG element otherwise scales from the document's corner). */
+.xray-trace__num {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: xray-num-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 320ms);
+}
+
+.xray-trace__num-bg {
+  fill: var(--booth-accent);
+}
+
+.xray-trace__num-text {
+  fill: #08251a;
+  font: 700 12px var(--booth-font);
+}
+
+@keyframes xray-num-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes xray-trace-fade {
+  to { opacity: 1; }
+}
+
+/* The wire from a part to its card. */
+.xray-trace__connector-wire {
+  fill: none;
+  stroke: rgb(171 255 68 / 0.45);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: xray-trace-fade 400ms ease-out forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 80ms + 380ms);
+}
+
+/* A short lime dash that travels the wire from the card to the part (pathLength=100). */
+.xray-trace__connector-pulse {
+  fill: none;
+  stroke: var(--booth-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 5 100;
+  filter: drop-shadow(0 0 4px rgb(171 255 68 / 0.6));
+  opacity: 0;
+  animation:
+    xray-pulse-travel 2.4s linear infinite,
+    xray-trace-fade 400ms ease-out forwards;
+  animation-delay:
+    calc(var(--reveal-index, 0) * 80ms + 380ms),
+    calc(var(--reveal-index, 0) * 80ms + 380ms);
+}
+
+@keyframes xray-pulse-travel {
+  from { stroke-dashoffset: 5; }
+  to { stroke-dashoffset: -100; }
+}
+
+/* ------------ The scan ------------ */
+
+.xray-overlay__scanline,
+.xray-overlay__scanline-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.xray-overlay__scanline {
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--booth-accent) 35%, #ffffff 50%, var(--booth-accent) 65%, transparent 100%);
+  box-shadow: 0 0 14px rgb(171 255 68 / 0.5);
+  animation: xray-scan 1.6s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  will-change: transform;
+}
+
+.xray-overlay__scanline-glow {
+  top: 0;
+  height: 200px;
+  background: linear-gradient(to bottom, rgb(171 255 68 / 0.18) 0%, rgb(171 255 68 / 0.05) 40%, transparent 100%);
+  mix-blend-mode: screen;
+  transform-origin: top center;
+  opacity: 0.9;
+  animation: xray-scan-trail 1.6s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  will-change: transform;
+}
+
+@keyframes xray-scan {
+  0% { transform: translateY(0); opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes xray-scan-trail {
+  0% { transform: translateY(-200px); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0.5; }
+}
+
+/* What it is doing, while it scans: a note in the middle of the page, beside the rail. */
+.xray-overlay__scan-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 10px 14px;
+  border-radius: 12px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font: 500 14px/18px var(--booth-font);
+  white-space: nowrap;
+  box-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.45);
+  transform: translate(-50%, -50%);
+  animation: xray-label-in 420ms var(--booth-ease) backwards;
+}
+html.booth-page--rail .xray-overlay__scan-label {
+  left: calc(50% + var(--booth-rail-w) / 2);
+}
+
+@keyframes xray-label-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); }
+}
+
+.xray-overlay__scan-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--booth-bar);
+  animation: xray-scan-dot 0.8s ease-in-out infinite;
+}
+
+@keyframes xray-scan-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* ------------ The cards ------------ */
+
+/* Outer wrapper: position (inline) and transform (XrayMode's rAF loop: the scroll drag and each
+ * card's float, together so the wire stays on the card's edge). Width matches CARD_WIDTH. */
+.xray-card {
+  position: absolute;
+  z-index: 5;
+  width: 300px;
+  pointer-events: auto;
+  will-change: transform;
+}
+
+.xray-card:hover,
+.xray-card:focus-within {
+  z-index: 6;
+}
+
+/* The card itself, in the rail's surface; it fades in from a blur when its part is traced. */
+.xray-card__inner {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  box-shadow: 0 18px 48px -16px rgb(0 0 0 / 0.55);
+  opacity: 0;
+  animation: xray-card-in 520ms var(--booth-ease) forwards;
+  animation-delay: calc(var(--reveal-index, 0) * 70ms + 200ms);
+}
+
+@keyframes xray-card-in {
+  from { opacity: 0; filter: blur(6px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+.xray-card__header {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: background 140ms ease;
+}
+
+.xray-card__header:hover,
+.xray-card--open .xray-card__header {
+  background: var(--booth-hover);
+}
+
+.xray-card__header:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: -2px;
+}
+
+.xray-card__badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--booth-accent);
+  color: #08251a;
+}
+
+.xray-card__badge-num {
+  font: 700 12px/1 var(--booth-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.xray-card__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.xray-card__title {
+  font: 800 17px/1.15 var(--booth-display);
+  letter-spacing: 0;
+  color: var(--booth-fg);
+}
+
+.xray-card__chev {
+  flex-shrink: 0;
+  color: var(--booth-quiet);
+  transition: transform 220ms var(--booth-ease), color 140ms ease;
+}
+
+.xray-card__chev--open {
+  transform: rotate(180deg);
+  color: var(--booth-fg);
+}
+
+.xray-card__body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 320ms var(--booth-ease),
+    opacity 160ms ease;
+}
+
+.xray-card--open .xray-card__body {
+  max-height: 480px;
+  opacity: 1;
+}
+
+.xray-card__body-inner {
+  padding: 4px 14px 16px;
+}
+
+.xray-card__group {
+  margin-top: 12px;
+}
+
+.xray-card__group-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--booth-fg-3);
+}
+
+.xray-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.xray-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: var(--booth-raised);
+  color: var(--booth-fg);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.xray-card__chip svg {
+  flex-shrink: 0;
+  color: var(--booth-accent-text);
+}
+
+.xray-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.xray-card__list li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--booth-fg-2);
+}
+
+.xray-card__list li::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--booth-bar);
+}
+
+.xray-card__notes {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--booth-raised);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--booth-fg-3);
+}
+
+@media (max-width: 640px) {
+  html.booth-page--rail .xray-overlay__scan-label {
+    left: 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xray-overlay__scanline,
+  .xray-overlay__scanline-glow {
+    animation-duration: 400ms;
+  }
+  .xray-card__inner,
+  .xray-trace__num {
+    animation-duration: 160ms;
+    animation-delay: 0ms !important;
+  }
+  .xray-trace__connector-pulse,
+  .xray-overlay__scan-dot {
+    animation: xray-trace-fade 1ms forwards;
+  }
+}
