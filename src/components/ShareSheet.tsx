@@ -15,7 +15,8 @@ import '../styles/share-sheet.css';
  *
  *   • The link: the page's public address, or, once the rep adds a personal message, a short link
  *     (/s/<code>, api/share-links.ts) that opens on their note to that person (InviteNote.tsx).
- *     Every way out below then shares the personal link.
+ *     Every way out below then shares the personal link; Preview opens it in a new tab, as the
+ *     recipient will see it, without counting as an open.
  *   • Copy link.
  *   • Send to me: Mark messages the rep (only them) in Teams the link with what the page has
  *     seen (api/share-send.ts, mark/share-teams/).
@@ -334,6 +335,21 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
           <div className="share-personal">
             <p className="share-personal__note">{personal.message}</p>
             <div className="share-personal__actions">
+              {/* The link itself, in a new tab: exactly what they'll see. Never counted: you're
+                  signed in, so the note doesn't report the open and the server wouldn't count it
+                  (InviteNote.tsx, api/share-note.ts). */}
+              <a
+                className="share-btn share-btn--ghost share-btn--preview"
+                href={personal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`See it as ${personal.recipient.name} will. Your preview isn't counted as an open`}
+              >
+                Preview
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5L7 9" />
+                </svg>
+              </a>
               <button
                 type="button"
                 className="share-btn share-btn--ghost"

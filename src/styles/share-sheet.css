@@ -195,6 +195,11 @@
   border: 1px solid var(--booth-hover);
   animation: share-in 420ms var(--booth-ease) both;
 }
+/* Preview on the left, Edit and the public link on the right. */
+.share-btn--preview {
+  gap: 6px;
+  margin-right: auto;
+}
 .share-personal__note {
   margin: 0 0 8px;
   font: 400 14px/20px var(--booth-font);
