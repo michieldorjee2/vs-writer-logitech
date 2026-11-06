@@ -36,9 +36,13 @@
     opacity 260ms ease,
     visibility 0s;
 }
-/* The page under the report stays where it was. */
+/* The page under the report (or the Share card) stays where it was: no scrolling, and padded by
+ * the scrollbar it lost, so it doesn't widen under the card (src/lib/scroll-lock.ts). */
 html.activity-open {
   overflow: hidden;
+}
+html.activity-open body {
+  padding-right: var(--scroll-lock-gap, 0px);
 }
 
 .activity-card {

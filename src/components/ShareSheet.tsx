@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { CompetitorComparisonPage, PersonPage } from '../lib/graph-types';
 import { deriveCustomerName } from '../lib/page-identity';
 import { copyText } from '../lib/clipboard';
+import { lockScroll } from '../lib/scroll-lock';
 import { checkShareInput, SHARE_LIMITS, splitDraft, type ShareRecipient } from '../lib/share-links';
 import type { ShareLinksLoad } from '../hooks/useShareLinks';
 import SharedLinks from './SharedLinks';
@@ -121,10 +122,10 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
     card.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
-    document.documentElement.classList.add('activity-open');
+    const release = lockScroll('activity-open');
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.documentElement.classList.remove('activity-open');
+      release();
       before?.focus?.({ preventScroll: true });
     };
   }, [open, onClose]);

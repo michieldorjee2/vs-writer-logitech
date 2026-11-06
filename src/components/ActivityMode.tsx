@@ -16,6 +16,7 @@ import {
 import type { ActivityLoad } from '../hooks/usePageActivity';
 import type { ShareLinksLoad } from '../hooks/useShareLinks';
 import SharedLinks from './SharedLinks';
+import { lockScroll } from '../lib/scroll-lock';
 import '../styles/activity-mode.css';
 
 /**
@@ -78,11 +79,11 @@ export default function ActivityMode({ open, onClose, load, retry, links }: Prop
     card.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
-    // The page under the report stays where it was.
-    document.documentElement.classList.add('activity-open');
+    // The page under the report stays where it was, and as wide as it was.
+    const release = lockScroll('activity-open');
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.documentElement.classList.remove('activity-open');
+      release();
       before?.focus?.({ preventScroll: true });
     };
   }, [open, onClose]);

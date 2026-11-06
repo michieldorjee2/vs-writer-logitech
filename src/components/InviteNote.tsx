@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { normalizeVuid } from '../lib/page-activity';
 import { SHARE_PARAM, SHARE_SESSION_KEY, firstNameOf, type ShareNote } from '../lib/share-links';
 import { isStaffBrowser } from '../lib/staff-marker';
+import { lockScroll } from '../lib/scroll-lock';
 import '../styles/invite-note.css';
 
 /**
@@ -83,12 +84,11 @@ export default function InviteNote({ code }: Props) {
   // The page waits under the note: no scrolling it, and the note has the focus.
   useEffect(() => {
     if (!shown) return;
-    const root = document.documentElement;
-    root.classList.add('invite-open');
+    const release = lockScroll('invite-open');
     const id = window.setTimeout(() => button.current?.focus({ preventScroll: true }), 900);
     return () => {
       window.clearTimeout(id);
-      root.classList.remove('invite-open');
+      release();
     };
   }, [shown]);
 

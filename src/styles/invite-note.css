@@ -12,6 +12,9 @@
 html.invite-open {
   overflow: hidden;
 }
+html.invite-open body {
+  padding-right: var(--scroll-lock-gap, 0px);
+}
 
 .invite-view {
   position: fixed;
