@@ -1,45 +1,56 @@
-import { useRef } from 'react';
+import { useEffect, useState } from 'react';
+import { doneWithHint, takeHint } from '../lib/seen-hints';
+import BadgeIcon from './BadgeIcon';
 import '../styles/badge-scan.css';
 
 /**
- * The search bar's camera (phones): opens the back camera, and hands the photo
- * of a badge to Mark to read (usePageRequest's scan). A quiet icon, so the
- * green go button stays the one thing to press. SearchHome draws it only when
- * the badge reader is set up (useBadgeReady).
+ * The search bar's badge scanner, on every device: a quiet badge icon beside
+ * the green go button. It opens the lanyard (BadgeLanyard), where a badge
+ * drops down and the camera watches for one, out of sight. SearchHome draws it
+ * for anyone signed in.
+ *
+ * On a rep's first visits it says what it is: "New: Scan a conference badge"
+ * hangs off it for a few seconds as it flashes green (seen-hints.ts).
  */
-export default function BadgeScanButton({ onPhoto, disabled }: { onPhoto: (file: File) => void; disabled?: boolean }) {
-  const input = useRef<HTMLInputElement | null>(null);
+export default function BadgeScanButton({ onOpen, disabled }: { onOpen: () => void; disabled?: boolean }) {
+  const [hint, setHint] = useState(false);
+  useEffect(() => {
+    if (!takeHint(HINT)) return;
+    const show = window.setTimeout(() => setHint(true), HINT_DELAY_MS);
+    const hide = window.setTimeout(() => setHint(false), HINT_DELAY_MS + HINT_MS);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+    };
+  }, []);
   return (
-    <>
-      <button
-        type="button"
-        className="sh-search__scan"
-        aria-label="Scan a badge"
-        title="Scan a badge"
-        disabled={disabled}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => input.current?.click()}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.4-2h5.8l1.4 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
-          <circle cx="12" cy="13" r="3.5" />
-        </svg>
-      </button>
-      <input
-        ref={input}
-        className="sh-search__scan-input"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          // Cleared, so the same photo can be picked again after a cancel.
-          e.target.value = '';
-          if (file) onPhoto(file);
-        }}
-      />
-    </>
+    <button
+      type="button"
+      className={'sh-search__scan' + (hint ? ' is-new' : '')}
+      aria-label="Scan a conference badge"
+      title="Scan a conference badge"
+      disabled={disabled}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => {
+        setHint(false);
+        doneWithHint(HINT);
+        onOpen();
+      }}
+    >
+      <BadgeIcon />
+      {/* On the icon itself, its tail pointing at it, so it is clear what the label is for. */}
+      {hint && (
+        <span className="sh-search__scan-hint" aria-hidden="true">
+          <span className="sh-search__scan-hint-body">
+            <b>New:</b> Scan a conference badge
+          </span>
+        </span>
+      )}
+    </button>
   );
 }
+
+/* The hint's name in seen-hints.ts; when it shows after the page opens, and for how long (badge-scan.css times its wipe, shine and fade to this). */
+const HINT = 'badge-scan';
+const HINT_DELAY_MS = 700;
+const HINT_MS = 5000;

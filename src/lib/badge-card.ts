@@ -1,10 +1,10 @@
 /**
- * A badge Mark read, and the page request it turns into.
+ * A badge read, and the page request it turns into.
  *
- * The search page's camera (phones, behind MARK_BADGE_AGENT_ID): the rep snaps a
- * conference badge or a business card, Mark's badge reader answers JSON
- * { name, title, company, email, website }, and the panel shows who and which
- * company. Nothing is built until the rep sends it; each line can be fixed first.
+ * The search page's camera: the rep snaps a conference badge or a business card,
+ * the browser reads it (badge-ocr.ts) or, failing that, Mark's badge reader
+ * (JSON { name, title, company, email, website }), and the panel shows who and
+ * which company. Nothing is built until the rep sends it; each line can be fixed first.
  *
  * Pure, so the search page (useBadgeCard, badge-flow.ts, badge-scan.ts) and the
  * read route (api/badge-read.ts) share it, and server/badge-read-check.ts tests
@@ -156,19 +156,4 @@ export function requestFromCard(
     return { body: { kind: 'account', website: company.website, ...(company.name ? { name: company.name } : {}) }, companyIsNew: true };
   }
   return { needs: 'person' };
-}
-
-/** The panel's two lines for a card: who, and which company (and whether it has a page). */
-export function cardLines(card: BadgeCard, company: CompanyRef | null) {
-  return {
-    person: card.name ? { name: card.name, meta: card.title, missing: false } : { name: 'Name', meta: 'Not on the badge. Tap to add.', missing: true },
-    company:
-      company && 'route' in company
-        ? { name: company.name, meta: 'Has a page', missing: false, route: company.route }
-        : company && 'website' in company
-          ? { name: card.company || company.website, meta: card.company ? `${company.website} · New page` : 'New page', missing: false, route: null }
-          : card.company
-            ? { name: card.company, meta: 'Tap to add its domain.', missing: false, route: null }
-            : { name: 'Company', meta: 'Not on the badge. Tap to add.', missing: true, route: null },
-  };
 }

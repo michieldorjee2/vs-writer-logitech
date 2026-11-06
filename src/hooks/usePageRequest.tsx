@@ -5,7 +5,6 @@ import { askAnswerOf, askNote } from '../lib/offer-from-search';
 import type { FromSearch } from '../lib/offer-looks';
 import type { BuildSummary } from '../lib/page-builds';
 import { looksLikeWebsite } from '../lib/search-entries';
-import { READ_FAILURE } from '../lib/badge-scan';
 import { useBadgeCard } from './useBadgeCard';
 
 /*
@@ -80,10 +79,13 @@ const personNote = ({ build, company: first }: { build: BuildSummary; company?: 
 export function usePageRequest({
   findCompany,
   onStarted,
+  markReadsBadges = false,
 }: {
   /** A company the index has a page for, by name or website (and its domain, when the index has one). */
   findCompany: (text: string) => { route: string; name: string; domain?: string } | null;
   onStarted: (builds: BuildSummary[]) => void;
+  /** Whether Mark's badge reader is set up, for the badges the browser couldn't read. */
+  markReadsBadges?: boolean;
 }) {
   const [phase, setPhase] = useState<RequestPhase>(null);
   const [kind, setKind] = useState<RequestKind>('account');
@@ -160,24 +162,16 @@ export function usePageRequest({
     [findCompany, lookUp],
   );
 
-  /* A badge the rep scanned (phones, useBadgeCard): it has the bar and the panel until it is sent or put away. */
-  const badge = useBadgeCard({
-    findCompany,
-    // A read that failed: the rep types the company instead, as for any person page.
-    onFailed: (failure) => {
-      start('person', '');
-      setError(failure === 'signed-out' ? sendErrorMessage(new Error('signed-out')) : `${READ_FAILURE[failure]} Type their company instead.`);
-    },
-  });
-  const { active: badgeUp, cancel: cancelBadge, edit: editBadge, submit: submitBadge, stop: stopBadge } = badge;
+  /* A badge the rep scanned (useBadgeCard): it lives on the lanyard's badge (BadgeLanyard) until it is sent or put away. */
+  const badge = useBadgeCard({ findCompany, markReads: markReadsBadges });
+  const { submit: submitBadge, stop: stopBadge } = badge;
 
   const cancel = useCallback(() => {
     if (submitting) return;
-    if (!phase && badgeUp) cancelBadge();
     setPhase(null);
     setMatches(null);
     setError(null);
-  }, [submitting, phase, badgeUp, cancelBadge]);
+  }, [submitting]);
 
   /** Sends a page request; true once Mark has it (or already had it). */
   const send = useCallback(
@@ -351,43 +345,33 @@ export function usePageRequest({
           ? 'Company domain, e.g. anaplan.com'
           : 'Company name or website, e.g. Lenovo';
 
-  /** The go button on a badge: the line being fixed goes back to the card, or the card goes to Mark. */
-  const sendCard = useCallback(async () => {
+  /** The badge's send: the card goes to Mark; true once Mark has it (the bar then says what was sent). */
+  const sendCard = useCallback(async (): Promise<boolean> => {
     setError(null);
     const asked = submitBadge();
-    if (!asked) return;
-    if (await send(asked.body, asked.body.kind === 'account' ? accountNote : personNote)) stopBadge();
+    if (!asked) return false;
+    const sent = await send(asked.body, asked.body.kind === 'account' ? accountNote : personNote);
+    if (sent) stopBadge();
+    return sent;
   }, [submitBadge, send, stopBadge]);
 
-  const editCard = useCallback(
-    (field: 'person' | 'company') => {
-      if (submitting) return;
-      setError(null);
-      editBadge(field);
-    },
-    [submitting, editBadge],
-  );
-
-  /* While a badge is up (and no request of this hook's own), the bar and the panel are the badge's. */
-  const shown = !phase && badgeUp ? badge : null;
   return {
-    phase: shown ? shown.phase : phase,
+    phase,
     kind,
-    value: shown ? shown.value : value,
-    setValue: shown ? shown.setValue : setValue,
-    placeholder: shown ? shown.placeholder : placeholder,
-    error: shown?.error ?? error,
+    value,
+    setValue,
+    placeholder,
+    error,
     submitting,
     sentNote,
-    /** A badge Mark read, while the rep checks it (the line being fixed: `phase`), and its company. */
-    card: shown?.card ?? null,
-    cardCompany: shown?.cardCompany ?? null,
-    /** The bar's line in place of the field while Mark reads the badge and while the card waits for a send. */
-    badgeStatus: shown?.status ?? null,
-    /** The panel's note for a badge (null otherwise). */
-    badgeHint: shown?.hint ?? null,
+    /** A badge the rep scanned, for the lanyard (BadgeLanyard): the read, the card, its fixes and its send. */
+    badge: {
+      ...badge,
+      send: sendCard,
+      /** A send that didn't reach Mark says why (this hook's error, while no request of its own is open). */
+      sendError: phase ? null : error,
+    },
     scan: badge.scan,
-    edit: editCard,
     sentStarted,
     /** While the rep picks: the accounts Salesforce matched, and the row the keyboard is on. */
     matches,
@@ -401,6 +385,6 @@ export function usePageRequest({
     offerMode: kind === 'offer' ? (offerRef?.fromSearch ?? null) : null,
     start,
     cancel,
-    submit: shown ? sendCard : submit,
+    submit,
   };
 }

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check:badge": "node scripts/check-badge-read.mjs",
+    "check:badge-ocr": "node scripts/check-badge-ocr.mjs",
     "check:graph": "node scripts/check-graph-queries.mjs",
     "check:www": "node scripts/check-www.mjs",
     "e2e:www": "tsx scripts/e2e-www.ts",
@@ -59,6 +60,7 @@
     "@radix-ui/react-toolbar": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@radix-ui/react-visually-hidden": "^1.2.11",
+    "@tesseract.js-data/eng": "1.0.0",
     "@upstash/redis": "^1.36.3",
     "@vercel/blob": "^2.8.2",
     "class-variance-authority": "^0.7.1",
@@ -75,7 +77,8 @@
     "react-use": "^17.6.0",
     "react-use-measure": "^2.1.7",
     "sharp": "^0.34.5",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

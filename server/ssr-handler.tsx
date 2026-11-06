@@ -992,7 +992,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const offer = await shownOfferFor(req.cookies?.[OFFER_COOKIE]);
     const body = renderToString(<SearchHome scene={scene} offer={offer} />);
     const offerAttr = offer ? ` data-offer="${escapeHtml(JSON.stringify(offer))}"` : '';
-    // Whether Mark's badge reader is set up (phones show a camera): said here, so the page never asks.
+    // Whether Mark's badge reader is set up, for badges the browser can't read: said here, so the page never asks.
     html = html.replace('<div id="root"></div>', `<div id="root" data-scene="${scene.id}"${offerAttr}${badgeRootAttr()}>${body}</div>`);
 
     res.setHeader('Content-Type', 'text/html');

@@ -17,8 +17,7 @@ import {
 import { usePageRequest } from '../hooks/usePageRequest';
 import { choiceMeta, domainOf } from '../lib/account-match';
 import { brandLogoTypeUrl } from '../lib/brand-logo';
-import { cardLines } from '../lib/badge-card';
-import { useBadgeReady } from '../lib/badge-scan';
+import { imageFileOf, useBadgeReady } from '../lib/badge-scan';
 import { clearOfflineCopies, INDEX_URL, keepIndex, readKeptIndex } from '../lib/home-offline';
 import { fillOfferWords, OFFER_ASK_WORDS, offerAddShown } from '../lib/offer-from-search';
 import { sceneBackdrop, sceneSizes, TALL_MEDIA, type Backdrop, type Scene } from '../lib/home-scenes';
@@ -35,6 +34,8 @@ import {
   type RunningOffer,
   type ShownOffer,
 } from '../lib/offer-looks';
+import { bestMatches, type Suggestion } from '../lib/badge-suggest';
+import BadgeLanyard from './BadgeLanyard';
 import BadgeScanButton from './BadgeScanButton';
 import OptimizelyWordmark from './OptimizelyWordmark';
 import ProfileMenu from './ProfileMenu';
@@ -654,14 +655,37 @@ export default function SearchHome({
     },
     [companies],
   );
-  const req = usePageRequest({ findCompany, onStarted: addBuilds });
-  /* Phones: a camera in the bar when Mark's badge reader is set up (MARK_BADGE_AGENT_ID). */
-  const scanReady = useBadgeReady(!!identity, badgeReady);
-  /* A badge line tapped to fix: the bar's field comes back in its place, ready to type. */
-  const fixingLine = !!req.card && (req.phase === 'person' || req.phase === 'company' || req.phase === 'title');
-  useEffect(() => {
-    if (fixingLine) inputRef.current?.focus();
-  }, [fixingLine, req.phase]);
+  /* Mark reads the badges the browser can't, when its badge reader is set up (MARK_BADGE_AGENT_ID). */
+  const markReadsBadges = useBadgeReady(!!identity, badgeReady);
+  const req = usePageRequest({ findCompany, onStarted: addBuilds, markReadsBadges });
+  /* A camera in the bar on every device, for anyone signed in: the browser reads the badge itself. */
+  const scanReady = !!identity;
+  /* A badge photo dropped on the bar, or pasted into it, is read like one the camera took. */
+  const [dropping, setDropping] = useState(false);
+  const takesPhoto = scanReady && !req.phase;
+  /* The badge scanner: the lanyard is up while the rep scans, and while a badge is read or filled in
+     (a photo dropped on the bar opens it too). */
+  const [scanning, setScanning] = useState(false);
+  const lanyardUp = scanning || req.badge.active;
+  /* As a line on the badge is fixed: the people or companies in the index whose name matches what is typed. */
+  const suggestible = useMemo(
+    () => ({
+      person: people.map((p): Suggestion => ({ kind: 'person', route: p.slug, name: p.name, meta: p.company, title: p.title, logo: p.logoUrl })),
+      company: companies.map((e): Suggestion => ({ kind: 'company', route: e.slug, name: e.name, meta: '', logo: e.logoUrl })),
+    }),
+    [people, companies],
+  );
+  const suggest = useCallback((kind: 'person' | 'company', typed: string) => bestMatches(suggestible[kind], typed), [suggestible]);
+  /* A person page in the index, by name, under the company with this route (any company when null). */
+  const findPerson = useCallback(
+    (name: string, companyRoute: string | null) => {
+      const n = name.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!n) return null;
+      const hit = people.find((p) => p.name.trim().toLowerCase().replace(/\s+/g, ' ') === n && (!companyRoute || p.slug.startsWith(`${companyRoute}/`)));
+      return hit ? { route: hit.slug, name: hit.name } : null;
+    },
+    [people],
+  );
 
   /* `?q=`: the browser's "search Showcase" entry (public/opensearch.xml) lands here
      with the query. Filled in after the first render, so the server's HTML and the
@@ -1032,7 +1056,6 @@ export default function SearchHome({
       ? `${shownCount.toLocaleString()} companies and counting…`
       : 'Search companies and people…';
 
-  const badgeLines = req.card ? cardLines(req.card, req.cardCompany) : null;
   const requestHint =
     req.error ??
     (req.offerMode
@@ -1142,8 +1165,24 @@ export default function SearchHome({
             </h1>
           )}
           <form
-            className={'sh-search' + (req.phase ? ' is-request' : '')}
+            className={'sh-search' + (req.phase ? ' is-request' : '') + (dropping ? ' is-drop' : '')}
             role="search"
+            onDragOver={(e) => {
+              if (!takesPhoto || !e.dataTransfer.types.includes('Files')) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+              setDropping(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+            }}
+            onDrop={(e) => {
+              setDropping(false);
+              const file = takesPhoto ? imageFileOf(e.dataTransfer.files) : null;
+              if (!file) return;
+              e.preventDefault();
+              void req.scan(file);
+            }}
             onSubmit={(e) => {
               e.preventDefault();
               if (req.phase) {
@@ -1155,9 +1194,9 @@ export default function SearchHome({
               else inputRef.current?.focus();
             }}
           >
-            {req.phase === 'sent' || req.badgeStatus ? (
+            {req.phase === 'sent' ? (
               <p className="sh-search__status" role="status">
-                {req.phase === 'sent' ? req.sentNote : req.badgeStatus}
+                {req.sentNote}
               </p>
             ) : (
               <input
@@ -1189,6 +1228,12 @@ export default function SearchHome({
                   }, 150);
                 }}
                 onKeyDown={onKeyDown}
+                onPaste={(e) => {
+                  const file = takesPhoto ? imageFileOf(e.clipboardData.files) : null;
+                  if (!file) return;
+                  e.preventDefault();
+                  void req.scan(file);
+                }}
               />
             )}
             {req.phase && req.phase !== 'sent' && (
@@ -1196,16 +1241,16 @@ export default function SearchHome({
                 Cancel
               </button>
             )}
-            {scanReady && !req.phase && <BadgeScanButton onPhoto={(file) => void req.scan(file)} />}
+            {takesPhoto && <BadgeScanButton onOpen={() => setScanning(true)} />}
             {req.phase !== 'sent' && (
               <button
                 type="submit"
                 className="sh-search__go"
-                data-icon={adding || req.card ? 'add' : 'go'}
+                data-icon={adding ? 'add' : 'go'}
                 aria-label={goLabel}
-                disabled={req.submitting || req.phase === 'reading'}
+                disabled={req.submitting}
               >
-                {req.submitting || req.phase === 'reading' ? (
+                {req.submitting ? (
                   <span className="sh-spinner" aria-hidden="true" />
                 ) : (
                   <>
@@ -1242,47 +1287,6 @@ export default function SearchHome({
         <div className="sh-panel__body" ref={listsRef}>
           {!ready && view !== 'request' ? (
             <p className={'sh-loading' + (loadingOut ? ' is-leaving' : '')}>Finding recent &amp; your brands…</p>
-          ) : view === 'request' && (req.card || req.phase === 'reading') ? (
-            // A badge Mark read: who and which company. A tapped line is fixed in the bar.
-            <div className="sh-cols sh-cols--single" data-anim={anim ?? undefined} key="request">
-              <div className="sh-col sh-badge-card">
-                <h2 style={slot(0, 0)}>From the badge</h2>
-                {badgeLines &&
-                  (['person', 'company'] as const).map((field, r) => {
-                    const line = badgeLines[field];
-                    const logo = 'route' in line && line.route ? (companies.find((e) => e.slug === line.route)?.logoUrl ?? null) : null;
-                    return (
-                      <button
-                        key={field}
-                        type="button"
-                        style={slot(r + 1, 0)}
-                        className={'sh-row' + (line.missing ? ' sh-row--add' : '') + (line.meta ? '' : ' sh-row--plain') + (req.phase === field || (field === 'person' && req.phase === 'title') ? ' is-active' : '')}
-                        disabled={req.submitting}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => req.edit(field)}
-                      >
-                        {line.missing ? (
-                          <span className="sh-tile" aria-hidden="true">
-                            <PlusIcon />
-                          </span>
-                        ) : (
-                          <Tile sources={[logo]} label={initialsOf(line.name)} />
-                        )}
-                        <span className="sh-row__text">
-                          <span className="sh-row__name">{line.name}</span>
-                          {line.meta && <span className="sh-row__meta">{line.meta}</span>}
-                        </span>
-                      </button>
-                    );
-                  })}
-                {/* No note when a row already says what to tap. */}
-                {(req.error ?? req.badgeHint) && (
-                  <p className={'sh-note' + (req.error ? ' sh-note--error' : '')} style={slot(badgeLines ? 3 : 1, 0)}>
-                    {req.error ?? req.badgeHint}
-                  </p>
-                )}
-              </div>
-            </div>
           ) : view === 'request' ? (
             <div className="sh-cols sh-cols--single" data-anim={anim ?? undefined} key="request">
               <div className="sh-col">
@@ -1422,6 +1426,22 @@ export default function SearchHome({
       <p className="sh-sr" role="status">
         {resultsNote}
       </p>
+      {lanyardUp && (
+        <BadgeLanyard
+          flow={req.badge}
+          submitting={req.submitting}
+          findPerson={findPerson}
+          logoFor={(route) => bySlug.get(route)?.logoUrl ?? null}
+          suggest={suggest}
+          onOpenPage={open}
+          // "+ Company" from the badge: the search bar's own Add company, as if it had been typed there.
+          onAddCompany={(text) => req.start('account', text)}
+          onClose={() => {
+            req.badge.stop();
+            setScanning(false);
+          }}
+        />
+      )}
     </main>
   );
 }

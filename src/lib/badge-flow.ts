@@ -4,19 +4,24 @@ import { companyOf, hostOf, requestFromCard, type BadgeCard, type FindCompany } 
  * A badge on the search page, step by step. Pure: useBadgeCard keeps the state,
  * server/badge-read-check.ts checks the steps.
  *
- * Mark reads the badge ('reading'), the panel shows the card ('card'), a tapped
- * line is fixed in the bar ('person' then 'title', or 'company') and comes back
- * to the card. Only the go button on the card sends it: no other step ever
- * does. Cancel while fixing a line puts the card back as it was when the line
- * was tapped.
+ * The badge is read ('reading'; 'failed' when it couldn't be), the lanyard's
+ * badge shows the card ('card'), and a line is fixed on the badge itself
+ * ('fix': name, title or company, at once). A card can also start blank, for a
+ * badge typed in by hand ('blank'). Only the send on the card sends it: no
+ * other step ever does.
+ *
+ * The older steps, a line fixed in the bar ('person' then 'title', or
+ * 'company') with Cancel putting the card back, still work the same way.
  */
 
-export type BadgePhase = 'reading' | 'card' | 'person' | 'title' | 'company';
+export type BadgePhase = 'reading' | 'failed' | 'card' | 'person' | 'title' | 'company';
 
 export type BadgeState = {
   phase: BadgePhase;
-  /** What the panel shows (null while Mark reads). */
+  /** What the panel shows (null while it is read). */
   card: BadgeCard | null;
+  /** Who is reading it: the browser first, Mark when the browser couldn't (and Mark's reader is set up). */
+  reader?: 'device' | 'mark';
   /** The line being fixed, as typed in the bar. */
   draft: string;
   /** The card when the line was tapped: Cancel puts it back. */
@@ -26,6 +31,9 @@ export type BadgeState = {
 
 export type BadgeEvent =
   | { type: 'read'; card: BadgeCard }
+  | { type: 'failed'; error: string }
+  | { type: 'blank' }
+  | { type: 'fix'; field: 'name' | 'title' | 'company'; text: string }
   | { type: 'edit'; field: 'person' | 'company' }
   | { type: 'type'; text: string }
   | { type: 'submit' }
@@ -37,7 +45,9 @@ export type BadgeSend = { body: Record<string, unknown>; companyIsNew: boolean }
 /** Where a step leaves the badge (null: put away), and the page request when the rep sent the card. */
 export type BadgeStep = { state: BadgeState | null; send?: BadgeSend };
 
-export const READING: BadgeState = { phase: 'reading', card: null, draft: '', saved: null, error: null };
+export const READING: BadgeState = { phase: 'reading', card: null, draft: '', saved: null, error: null, reader: 'device' };
+export const MARK_READING: BadgeState = { ...READING, reader: 'mark' };
+export const BLANK_CARD: BadgeCard = { name: '', title: '', company: '', email: '', domain: '' };
 
 const onCard = (card: BadgeCard): BadgeState => ({ phase: 'card', card, draft: '', saved: null, error: null });
 
@@ -62,6 +72,19 @@ export function badgeStep(state: BadgeState, event: BadgeEvent, findCompany: Fin
   switch (event.type) {
     case 'read':
       return { state: onCard(event.card) };
+    case 'failed':
+      return { state: { phase: 'failed', card: null, draft: '', saved: null, error: event.error } };
+    case 'blank':
+      return { state: onCard(BLANK_CARD) };
+    case 'fix': {
+      if (!card) return { state };
+      const text = event.text.replace(/\s+/g, ' ').trim();
+      if (event.field === 'name') return { state: onCard({ ...card, name: text.slice(0, 120) }) };
+      if (event.field === 'title') return { state: onCard({ ...card, title: text.slice(0, 160) }) };
+      if (!text) return { state: onCard({ ...card, company: '', domain: '' }) };
+      const fixed = fixCompany(card, text, findCompany);
+      return { state: { ...onCard(fixed.card), error: fixed.error } };
+    }
     case 'type':
       return { state: { ...state, draft: event.text, error: null } };
     case 'cancel':
@@ -103,30 +126,42 @@ function submit(state: BadgeState, card: BadgeCard, findCompany: FindCompany): B
   if (state.phase === 'title') return { state: onCard({ ...card, title: text.slice(0, 160) }) };
 
   if (!text) return ask('Enter the company they work at');
+  const fixed = fixCompany(card, text, findCompany);
+  // Another company, by a name with no page: its domain comes next (Cancel puts the card back).
+  if (fixed.error) return { state: { ...state, card: fixed.card, error: fixed.error } };
+  return { state: onCard(fixed.card) };
+}
+
+/**
+ * The card with its company line fixed to `text` (a name or a domain), and what
+ * is still needed when a name alone can't say which company it is.
+ */
+function fixCompany(card: BadgeCard, text: string, findCompany: FindCompany): { card: BadgeCard; error: string | null } {
   const known = findCompany(text);
   const host = hostOf(text);
-  if (known) return { state: onCard({ ...card, company: known.name, domain: host }) };
+  if (known) return { card: { ...card, company: known.name, domain: host }, error: null };
   if (host) {
     // The domain typed wins: a name read off the badge that finds another company's page is dropped.
-    return { state: onCard({ ...card, domain: host, company: card.company && findCompany(card.company) ? '' : card.company }) };
+    return { card: { ...card, domain: host, company: card.company && findCompany(card.company) ? '' : card.company }, error: null };
   }
   const company = text.slice(0, 120);
   // A misread name, fixed: the domain read off the badge stays.
-  if (card.domain && sameCompany(company, card.domain)) return { state: onCard({ ...card, company }) };
-  // Another company, by a name with no page: its domain comes next (Cancel puts the card back).
+  if (card.domain && sameCompany(company, card.domain)) return { card: { ...card, company }, error: null };
   return {
-    state: {
-      ...state,
-      card: { ...card, company, domain: '' },
-      error: `No page for ${text} yet, and multiple companies might match that name. Enter its domain, e.g. anaplan.com.`,
-    },
+    card: { ...card, company, domain: '' },
+    error: `No page for ${text} yet, and multiple companies might match that name. Enter its domain, e.g. anaplan.com.`,
   };
 }
 
 /** What the bar and the panel say: the bar's line in place of the field, the panel's note, the field's placeholder. */
 export function badgeWords(state: BadgeState, findCompany: FindCompany): { status: string | null; hint: string | null; placeholder: string } {
   const { card } = state;
-  if (state.phase === 'reading' || !card) return { status: 'Mark is reading the badge…', hint: 'Their name, title and company show up here.', placeholder: '' };
+  if (state.phase === 'reading' || !card)
+    return {
+      status: state.reader === 'mark' ? 'Mark is reading the badge…' : 'Reading the badge…',
+      hint: state.reader === 'mark' ? "Couldn't read it here, so Mark is taking a look." : 'Their name, title and company show up here.',
+      placeholder: '',
+    };
   const company = companyOf(card, findCompany);
   const companyName = company ? ('route' in company ? company.name : card.company || company.website) : card.company;
   if (state.phase === 'person') return { status: null, hint: 'Fix their name, then their title.', placeholder: `Who at ${companyName || 'this company'}?` };
@@ -141,10 +176,10 @@ export function badgeWords(state: BadgeState, findCompany: FindCompany): { statu
     status: `Build a page for ${card.name || companyName}?`,
     hint:
       asked.body.kind === 'account'
-        ? "Mark builds the company's page in about 15 minutes. Tap a line to fix it."
+        ? "Mark builds the company's page in about 15 minutes. Select a line to fix it."
         : asked.companyIsNew
-          ? "Mark builds the company's page first (about 15 minutes), then this person's (about 4 more). Tap a line to fix it."
-          : 'Mark builds a page for this person in about 4 minutes. Tap a line to fix it.',
+          ? "Mark builds the company's page first (about 15 minutes), then this person's (about 4 more). Select a line to fix it."
+          : 'Mark builds a page for this person in about 4 minutes. Select a line to fix it.',
     placeholder: '',
   };
 }

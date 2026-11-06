@@ -3,15 +3,17 @@ import { BADGE_ERRORS, cardFromAgent, MAX_PHOTO_DATA_URL, type BadgeCard, type B
 
 /*
  * The search page's side of reading a badge (api/badge-read.ts the server's):
- * whether the camera shows, the photo made small on the phone, and Mark's read
+ * whether the camera shows, the photo made small in the browser, and Mark's read
  * followed until it is done. useBadgeCard turns the card into a page request.
  */
 
 const ENDPOINT = '/api/badge-read';
 /** The header a read is followed by: never the address, which lands in the request logs. */
 export const TICKET_HEADER = 'X-Badge-Ticket';
-/* Phones only, as the Notion item asks: the same width search-home.css and SearchHome switch layouts at. */
-const SCAN_MEDIA = '(max-width: 799.98px)';
+/* The camera opens in the page on every device that can (BadgeScanButton's
+   CameraSheet), so it can take the photo by itself. Without a camera API in
+   the page (an old browser, or not https), the file input opens the device's
+   camera app, or a file chooser on a computer. */
 const POLL_MS = 1500;
 const READ_MS = 60_000;
 
@@ -25,18 +27,18 @@ export function servedBadgeReady(drawnByServer: boolean, attr: string | undefine
   return dev ? null : false;
 }
 
-const subscribePhone = (onChange: () => void) => {
-  const query = window.matchMedia(SCAN_MEDIA);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-};
-const onPhone = () => window.matchMedia(SCAN_MEDIA).matches;
+const noSubscribe = () => () => {};
+const noCameraInPage = () => typeof navigator.mediaDevices?.getUserMedia !== 'function';
 
-/** Whether this page shows the camera: signed in, on a phone, and Mark's badge reader is set up (`served`, or asked when null). */
+/** Whether the camera button opens the device's own camera app (true) or the camera in the page (false). */
+export function useNativeCamera(): boolean {
+  return useSyncExternalStore(noSubscribe, noCameraInPage, () => true);
+}
+
+/** Whether this page shows the camera: signed in and Mark's badge reader is set up (`served`, or asked when null). Every device. */
 export function useBadgeReady(signedIn: boolean, served: boolean | null): boolean {
-  const phone = useSyncExternalStore(subscribePhone, onPhone, () => false);
   const [asked, setAsked] = useState(false);
-  const ask = served === null && signedIn && phone;
+  const ask = served === null && signedIn;
   useEffect(() => {
     if (!ask) return;
     let cancelled = false;
@@ -52,7 +54,13 @@ export function useBadgeReady(signedIn: boolean, served: boolean | null): boolea
       cancelled = true;
     };
   }, [ask]);
-  return signedIn && phone && (served ?? asked);
+  return signedIn && (served ?? asked);
+}
+
+/** The first image among dropped or pasted files: a badge photo given to the search bar without the camera. */
+export function imageFileOf(files: FileList | null | undefined): File | null {
+  for (const file of Array.from(files ?? [])) if (file.type.startsWith('image/')) return file;
+  return null;
 }
 
 /**

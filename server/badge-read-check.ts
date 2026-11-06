@@ -50,7 +50,6 @@ import { join } from 'node:path';
 import {
   BADGE_ERRORS,
   cardFromAgent,
-  cardLines,
   companyOf,
   isFreeMail,
   MAX_PHOTO_DATA_URL,
@@ -58,8 +57,13 @@ import {
   type BadgeCard,
   type FindCompany,
 } from '../src/lib/badge-card';
-import { badgeStep, badgeWords, READING, sameCompany, type BadgeEvent, type BadgeSend, type BadgeState } from '../src/lib/badge-flow';
-import { servedBadgeReady, TICKET_HEADER } from '../src/lib/badge-scan';
+import { badgeStep, badgeWords, BLANK_CARD, READING, sameCompany, type BadgeEvent, type BadgeSend, type BadgeState } from '../src/lib/badge-flow';
+import { imageFileOf, servedBadgeReady, TICKET_HEADER } from '../src/lib/badge-scan';
+import { measure, WATCH_START, watchStep, type Gray, type Verdict } from '../src/lib/badge-detect';
+import { asleep, clip, hold, makeLanyard, step as lanyardStep, STEP, strapPath } from '../src/lib/lanyard-physics';
+import { bestMatches, folded } from '../src/lib/badge-suggest';
+import { cardFromLines, type OcrLine } from '../src/lib/badge-ocr';
+import { OCR_VERSION } from '../src/lib/badge-read-device';
 import { badgeRootAttr } from '../api/_lib/badge-mode';
 import { overReadLimit, READS_PER_WINDOW, WINDOW_SECONDS, type CountStore } from '../api/_lib/badge-read-limit';
 import { sessionKey } from '../api/_lib/auth';
@@ -216,13 +220,11 @@ await check('the email read off the badge is never in a page request', () => {
     assert.ok(!JSON.stringify(asked.body).includes('@'), JSON.stringify(asked.body));
   }
 });
-await check("the panel's lines say whether the company has a page", () => {
-  assert.equal(cardLines(JANE, companyOf(JANE, findCompany)).company.meta, 'acmecorp.example · New page');
+await check("the badge's company is one with a page, else the website of one without, else nothing", () => {
+  assert.deepEqual(companyOf(JANE, findCompany), { website: 'acmecorp.example', name: 'Acme Corp' });
   const known = { ...JANE, domain: 'anaplan.com' };
-  assert.deepEqual(cardLines(known, companyOf(known, findCompany)).company, { name: 'Anaplan', meta: 'Has a page', missing: false, route: 'anaplan' });
-  const none = { ...JANE, company: '', domain: '' };
-  assert.equal(cardLines(none, companyOf(none, findCompany)).company.missing, true);
-  assert.equal(cardLines({ ...JANE, name: '' }, null).person.missing, true);
+  assert.deepEqual(companyOf(known, findCompany), { route: 'anaplan', name: 'Anaplan' });
+  assert.equal(companyOf({ ...JANE, company: '', domain: '' }, findCompany), null);
 });
 await check("a team or country domain finds its company's page, by a parent domain or by name, never a second page", () => {
   const ibm = cardFromAgent(answer({ name: 'Jane Doe', company: 'IBM', email: 'jane@uk.ibm.com' }));
@@ -326,7 +328,7 @@ await check('the showcase keeps no photo: no store, no file, no log of it, nothi
   const server = ['api/badge-read.ts', 'api/_lib/badge-read.ts', 'api/_lib/badge-mode.ts'].map((f) => [f, readFileSync(join(root, f), 'utf-8')] as const);
   // The cap's count (rule 8) is the one thing in a store, and it is checked to be a count.
   const counter = ['api/_lib/badge-read-limit.ts'].map((f) => [f, readFileSync(join(root, f), 'utf-8')] as const);
-  const client = ['src/lib/badge-scan.ts', 'src/lib/badge-flow.ts', 'src/hooks/useBadgeCard.ts', 'src/components/BadgeScanButton.tsx'].map(
+  const client = ['src/lib/badge-scan.ts', 'src/lib/badge-detect.ts', 'src/lib/badge-ocr.ts', 'src/lib/badge-read-device.ts', 'src/lib/badge-flow.ts', 'src/components/BadgeLanyard.tsx', 'src/lib/lanyard-physics.ts', 'src/hooks/useBadgeCard.ts', 'src/components/BadgeScanButton.tsx'].map(
     (f) => [f, readFileSync(join(root, f), 'utf-8')] as const,
   );
   for (const [file, text] of server) {
@@ -540,10 +542,313 @@ await check("a line the page needs opens instead of sending, and the bar asks fo
   assert.match(ready.hint ?? '', /^Mark builds the company's page first/);
   assert.equal(badgeWords(walk({ ...JANE, name: '' }).state!, findCompany).status, 'Build a page for Acme Corp?');
 });
-await check('on a touch screen only the line being fixed is lit, not the one fixed before (tapped lines keep :hover)', () => {
-  assert.match(source('src/components/SearchHome.tsx'), /<div className="sh-col sh-badge-card">\s*<h2 style=\{slot\(0, 0\)\}>From the badge<\/h2>/);
-  const touch = source('src/styles/badge-scan.css').match(/@media \(hover: none\) \{([^}]*\})\s*\}/)?.[1] ?? '';
-  assert.match(touch, /\.sh-badge-card \.sh-row:hover:not\(\.is-active\) \{ background: none; \}/);
+await check('a line is fixed on the badge itself: at once, and the company by name or domain as in the bar', () => {
+  const fix = (field: 'name' | 'title' | 'company', text: string): BadgeEvent => ({ type: 'fix', field, text });
+  assert.deepEqual(walk(JANE, fix('name', '  Jane  Q.  Doe ')).state, { phase: 'card', card: { ...JANE, name: 'Jane Q. Doe' }, draft: '', saved: null, error: null });
+  assert.equal(walk(JANE, fix('title', 'CMO')).state?.card?.title, 'CMO');
+  // A company with a page, by name or by domain; a name with no page asks for its domain, which then settles it.
+  assert.deepEqual(companyOf(walk(JANE, fix('company', 'Anaplan')).state!.card!, findCompany), { route: 'anaplan', name: 'Anaplan' });
+  assert.deepEqual(walk(JANE, fix('company', 'anaplan.com')).state?.card, { ...JANE, company: 'Anaplan', domain: 'anaplan.com' });
+  const other = walk(JANE, fix('company', 'Other Co')).state;
+  assert.deepEqual([other?.phase, other?.card?.company, other?.card?.domain], ['card', 'Other Co', '']);
+  assert.match(other?.error ?? '', /^No page for Other Co yet, and multiple companies might match that name/);
+  assert.deepEqual(walk(JANE, fix('company', 'Other Co'), fix('company', 'otherco.com')).state, {
+    phase: 'card',
+    card: { ...JANE, company: 'Other Co', domain: 'otherco.com' },
+    draft: '',
+    saved: null,
+    error: null,
+  });
+  // A misread name of the company the email names stays that company.
+  assert.deepEqual(walk(JANE, fix('company', 'Acme')).state?.card, { ...JANE, company: 'Acme' });
+  // Emptied, the card needs a company again before anything is sent.
+  assert.deepEqual(walk(JANE, fix('company', '  '), SUBMIT).sends, []);
+  // Fixing never sends.
+  assert.deepEqual(walk(JANE, fix('name', 'X'), fix('title', 'Y'), fix('company', 'anaplan.com')).sends, []);
+});
+await check("a badge that couldn't be read says why, and one can be typed in from blank", () => {
+  const failed = badgeStep(READING, { type: 'failed', error: "Couldn't read that badge." }, findCompany).state;
+  assert.deepEqual(failed, { phase: 'failed', card: null, draft: '', saved: null, error: "Couldn't read that badge." });
+  const blank = badgeStep(READING, { type: 'blank' }, findCompany).state!;
+  assert.deepEqual([blank.phase, blank.card], ['card', BLANK_CARD]);
+  // Typed in on the badge, then sent: the same person-page request as a read card.
+  let state: BadgeState = blank;
+  for (const event of [
+    { type: 'fix', field: 'name', text: 'Jane Doe' },
+    { type: 'fix', field: 'company', text: 'anaplan.com' },
+  ] as BadgeEvent[])
+    state = badgeStep(state, event, findCompany).state!;
+  assert.deepEqual(badgeStep(state, SUBMIT, findCompany).send?.body, { kind: 'person', personName: 'Jane Doe', company: { route: 'anaplan', name: 'Anaplan' } });
+});
+await check("the scanner shows the camera's picture only blurred and in our greens, and runs the camera only while it waits for a badge", () => {
+  const lanyard = source('src/components/BadgeLanyard.tsx');
+  // The picture: the video plays out of sight; a small canvas shows it mapped to dark greens (every
+  // pixel, by its brightness) and blurred, faded in only while the camera is live and waiting.
+  const css = source('src/styles/badge-lanyard.css');
+  assert.match(lanyard, /<video ref=\{video\} className="lanyard__video" playsInline muted \/>/);
+  assert.match(css, /\.lanyard__video \{[^}]*width: 2px; height: 2px; opacity: 0\.01;/);
+  assert.match(lanyard, /d\[p\] = FEED_MAP\[v\];\s*d\[p \+ 1\] = FEED_MAP\[v \+ 1\];\s*d\[p \+ 2\] = FEED_MAP\[v \+ 2\];/);
+  assert.match(css, /\.lanyard__feed-picture \{[^}]*filter: blur\(14px\);/);
+  assert.match(lanyard, /'lanyard__feed' \+ \(camera === 'live' && looking \? ' is-live' : ''\)/);
+  assert.match(css, /\.lanyard__feed \{[^}]*opacity: 0;/);
+  // Waiting, or again after a badge couldn't be read; never while one is read or filled in.
+  assert.match(lanyard, /const looking = !flow\.active \|\| flow\.phase === 'failed';/);
+  assert.match(lanyard, /if \(!looking \|\| native\) return;/, 'the camera runs while a badge is read or filled in');
+  assert.match(lanyard, /stream\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\)/, 'the camera is left on');
+  // The green picture behind the badge says the camera is on; nothing else needs to.
+  assert.doesNotMatch(lanyard, /Camera on/);
+  // What the badge asks; the window's own quieter buttons: typing one in, and scanning a new one.
+  assert.match(lanyard, /'Hold up your badge'/);
+  assert.match(lanyard, /<button type="button" className="lanyard__type" onClick=\{typeIn\}>\s*Type manually/);
+  assert.match(lanyard, /<button type="button" className="lanyard__type" onClick=\{scanNew\} disabled=\{sending\}>\s*<BadgeIcon size=\{16\} \/>\s*Scan new badge/);
+  assert.doesNotMatch(lanyard, /Choose a photo|Try again|Scan another/);
+  // Read, the badge has two buttons, Company and Person: each opens its page when the index has one, else has it made.
+  assert.match(lanyard, /onClick=\{\(\) => \(companyRoute \? openPage\(companyRoute\) : addCompany\(\)\)\}/);
+  assert.match(lanyard, /onClick=\{\(\) => \(person \? openPage\(person\.route\) : void addPerson\(\)\)\}/);
+  assert.match(lanyard, /className=\{'lanyard__page' \+ \(found \? ' is-found' : ''\)\}/);
+  // "+ Company" hands the company to the search bar's own Add company; "+ Person" sends the card (a missing line opens instead).
+  assert.match(lanyard, /onAddCompany\(text\);\s*leave\(\);/);
+  // "Detect badges automatically": on, the camera's looks take the photo; off, they don't, and Scan on the ribbon does.
+  assert.match(lanyard, /if \(camera !== 'live' \|\| !looking \|\| !auto\) return;/);
+  assert.match(lanyard, /<button type="button" className="lanyard__scan" onClick=\{takePhoto\} disabled=\{camera !== 'live'\}>/);
+  assert.match(lanyard, /<button type="button" className="lanyard__auto" role="switch" aria-checked=\{auto\} onClick=\{toggleAuto\}>/);
+  assert.match(source('src/lib/scan-prefs.ts'), /return window\.localStorage\.getItem\(KEY\) !== 'off';/, 'it is on unless turned off');
+  // Every way it closes pulls the badge up out of the screen first (the close button and Escape too).
+  assert.match(lanyard, /<button type="button" className="lanyard__close" aria-label="Close" onClick=\{leave\}>/);
+  assert.match(lanyard, /e\.preventDefault\(\);\s*leave\(\);/);
+  assert.match(lanyard, /rehang\(current, \{ x: from\.x, y: from\.y - rise \* e \}, length \* \(1 - 0\.45 \* e\)\);/);
+  assert.match(lanyard, /if \(!card\?\.name\) return setEditing\('name'\);\s*if \(flow\.needs === 'company'\) return setEditing\('company'\);/);
+  assert.match(source('src/components/SearchHome.tsx'), /onAddCompany=\{\(text\) => req\.start\('account', text\)\}/);
+  // Leaving a field keeps what was typed; clicking outside the badge doesn't close the scanner.
+  assert.match(lanyard, /onBlur=\{\(\) => done\(true\)\}/);
+  assert.doesNotMatch(lanyard, /e\.target === dialog\.current/);
+  // The company by its name only: no domain, no initials; its logo when it has a page.
+  assert.doesNotMatch(lanyard, /brandLogoTypeUrl|\.slice\(0, 1\)\.toUpperCase\(\)|· no page yet/);
+  assert.match(lanyard, /logo=\{companyRoute \? logoFor\(companyRoute\) : null\}/);
+  // The search bar's icon opens the lanyard; a photo dropped on the bar opens it too (the badge flow is up).
+  assert.match(source('src/components/BadgeScanButton.tsx'), /doneWithHint\(HINT\);\s*onOpen\(\);/);
+  assert.match(source('src/components/SearchHome.tsx'), /const lanyardUp = scanning \|\| req\.badge\.active;/);
+});
+await check('the badge icon is in the bar at every width, and only an image dropped or pasted on the bar is read', () => {
+  const css = source('src/styles/badge-scan.css');
+  assert.match(css, /^\.sh-search__scan \{[^}]*display: grid;/m);
+  const scan = source('src/lib/badge-scan.ts');
+  assert.doesNotMatch(scan, /max-width/, 'the badge scanner hangs on the screen width');
+  assert.match(scan, /return signedIn && \(served \?\? asked\);/);
+  const list = (...files: File[]) => files as unknown as FileList;
+  const badge = new File(['x'], 'badge.jpg', { type: 'image/jpeg' });
+  assert.equal(imageFileOf(list(new File(['x'], 'notes.pdf', { type: 'application/pdf' }), badge)), badge);
+  assert.equal(imageFileOf(list(new File(['x'], 'notes.pdf', { type: 'application/pdf' }))), null);
+  assert.equal(imageFileOf(null), null);
+});
+await check('a line on the badge suggests the pages whose name starts with what is typed, then a word of it, then anywhere', () => {
+  const people = [
+    { name: 'Michiel Dorjee', route: 'optimizely/michiel-dorjee' },
+    { name: 'Michelle Obi', route: 'acme/michelle-obi' },
+    { name: 'Dana Michaels', route: 'acme/dana-michaels' },
+    { name: 'Jo Lamichi', route: 'acme/jo-lamichi' },
+    { name: 'Michiel Dorjee', route: 'acme/michiel-dorjee' },
+  ];
+  assert.deepEqual(bestMatches(people, 'mich', 5).map((p) => p.route), ['acme/michelle-obi', 'optimizely/michiel-dorjee', 'acme/michiel-dorjee', 'acme/dana-michaels', 'acme/jo-lamichi']);
+  assert.deepEqual(bestMatches(people, 'mich').length, 3, 'three at most');
+  assert.deepEqual(bestMatches(people, 'm'), [], 'one letter is not enough');
+  // Accents and case don't matter.
+  assert.equal(folded('Lars Østergaard'), 'lars ostergaard');
+  assert.deepEqual(bestMatches([{ name: 'Lars Østergaard', route: 'm/lars' }], 'lars oster').length, 1);
+});
+/* The lanyard (src/lib/lanyard-physics.ts): dropped in, flung, pulled. */
+const settle = (l: ReturnType<typeof makeLanyard>, seconds: number) => {
+  let t = 0;
+  while (t < seconds && !asleep(l)) {
+    lanyardStep(l);
+    t += STEP;
+  }
+  return t;
+};
+await check('the badge drops in, swings, and comes to rest straight below where the strap hangs, facing the rep', () => {
+  const l = makeLanyard({ x: 600, y: -20 }, 360, 6, true);
+  assert.ok(clip(l).y < 0, 'it starts above the screen');
+  const t = settle(l, 10);
+  assert.ok(t < 8, `still moving after ${t.toFixed(1)} s`);
+  assert.ok(Math.abs(clip(l).x - 600) < 3 && Math.abs(clip(l).y - 340) < 4, `rests at ${JSON.stringify(clip(l))}`);
+  assert.ok(Math.abs(l.tilt) < 0.02 && Math.abs(l.spin % 360) < 1.5, `tilt ${l.tilt}, spin ${l.spin}`);
+  // The strap is drawn as one smooth path through every point, anchor first.
+  assert.match(strapPath(l.points), /^M600\.0,-20\.0( C[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+){6}$/);
+});
+await check('a badge flung sideways swings past the middle and turns round, then settles facing the rep again', () => {
+  const l = makeLanyard({ x: 600, y: -20 }, 360, 6, false);
+  let x = clip(l).x;
+  const y = clip(l).y;
+  for (let i = 0; i < 12; i++) {
+    x += 30;
+    hold(l, { x, y });
+    lanyardStep(l);
+  }
+  hold(l, null);
+  let crossed = false;
+  let turned = 0;
+  let t = 0;
+  while (t < 12 && !asleep(l)) {
+    lanyardStep(l);
+    t += STEP;
+    crossed ||= clip(l).x < 590;
+    turned = Math.max(turned, Math.abs(l.spin));
+  }
+  assert.ok(crossed, 'it never swung back past the middle');
+  assert.ok(turned > 90, `it only turned ${turned.toFixed(0)}°`);
+  assert.ok(t < 12 && Math.abs(Math.round(l.spin / 360) * 360 - l.spin) < 1.5, `not settled facing the rep: spin ${l.spin}`);
+});
+await check('a badge pulled further than its strap reaches stops where the strap is taut', () => {
+  const l = makeLanyard({ x: 600, y: -20 }, 360, 6, false);
+  hold(l, { x: 600, y: 2000 });
+  for (let i = 0; i < 60; i++) lanyardStep(l);
+  assert.ok(Math.abs(Math.hypot(clip(l).x - 600, clip(l).y + 20) - 360) < 0.5);
+  // Let go there, it comes back to rest.
+  hold(l, null);
+  assert.ok(settle(l, 12) < 12);
+});
+/* The camera's own eye (src/lib/badge-detect.ts), on made-up frames: a 96×144 grey room, and a badge
+   (a white card with lines of dark print) that is lifted in, then held. Sensor noise on every frame. */
+const W = 96;
+const H = 144;
+const seeded = (seed: number) => () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+function room(noise: () => number, light = 120): Gray {
+  const data = new Uint8Array(W * H);
+  for (let i = 0; i < data.length; i++) data[i] = Math.max(0, Math.min(255, light + Math.round((noise() - 0.5) * 4)));
+  return { data, width: W, height: H };
+}
+/** The badge drawn over `base`, its left edge at `left` (it slides in from the right). `blur` washes the print out. */
+function badge(base: Gray, left: number, blur = false): Gray {
+  const data = new Uint8Array(base.data);
+  for (let y = 8; y < H - 8; y++) {
+    for (let x = Math.max(0, left); x < Math.min(W, left + 80); x++) {
+      const cx = x - left;
+      // Print: three rows of words, 2 px strokes 3 px apart, with gaps between words.
+      const inRow = (y >= 40 && y < 56) || (y >= 70 && y < 80) || (y >= 96 && y < 106);
+      const stroke = inRow && cx > 6 && cx < 74 && cx % 5 < 2 && cx % 23 < 19;
+      data[y * W + x] = blur ? 200 : stroke ? 30 : 235;
+    }
+  }
+  return { data, width: W, height: H };
+}
+function watchFrames(frames: Gray[]): Verdict[] {
+  let watch = WATCH_START;
+  let prev: Gray | null = null;
+  const out: Verdict[] = [];
+  for (const f of frames) {
+    const step = watchStep(watch, measure(f, prev));
+    watch = step.watch;
+    prev = f;
+    out.push(step.verdict);
+  }
+  return out;
+}
+const empty = (n: number, noise: () => number, light?: number) => Array.from({ length: n }, () => room(noise, light));
+await check('the camera takes a badge lifted into the frame on the first look it is still and sharp (the frame flashes green)', () => {
+  const noise = seeded(7);
+  const frames = [
+    ...empty(4, noise),
+    ...[96, 70, 45, 25, 10, 8].map((left) => badge(room(noise), left)),
+    ...Array.from({ length: 8 }, () => badge(room(noise), 8)),
+  ];
+  const verdicts = watchFrames(frames);
+  const first = verdicts.indexOf('take');
+  // Looks 4–9 move it in (10 → 8 is still a move); look 10 is the first still one: taken there, no wait.
+  assert.equal(first, 10, `taken at look ${first}: ${verdicts.join(' ')}`);
+  assert.ok(verdicts.slice(0, first).every((v) => v === 'looking'));
+});
+await check('the camera takes nothing it should not: an empty room, a badge never held still, a blurred card, a dark room, a badge in view from the start', () => {
+  const noise = seeded(11);
+  assert.ok(!watchFrames(empty(60, noise)).includes('take'), 'an empty room was taken');
+  const waving = [...empty(4, noise), ...Array.from({ length: 40 }, (_, i) => badge(room(noise), 8 + ((i * 7) % 15) - 7))];
+  assert.ok(!watchFrames(waving).includes('take'), 'a badge waved about was taken');
+  // A fraction of a pixel back and forth (a hand drifting, in this small copy): too much to read sharply, too little to count as a move.
+  const mix = (a: Gray, b: Gray, w: number): Gray => ({ ...a, data: a.data.map((v, i) => Math.round(v * (1 - w) + b.data[i] * w)) });
+  const drift = [...empty(4, noise), ...[90, 60, 30, 8].map((l) => badge(room(noise), l)), ...Array.from({ length: 30 }, (_, i) => mix(badge(room(noise), 8), badge(room(noise), 9), i % 2 ? 0.7 : 0.3))];
+  assert.ok(!watchFrames(drift).includes('take'), 'a badge drifting by half a pixel was taken');
+  const blurred = [...empty(4, noise), ...[90, 60, 30, 8].map((l) => badge(room(noise), l, true)), ...Array.from({ length: 12 }, () => badge(room(noise), 8, true))];
+  assert.ok(!watchFrames(blurred).includes('take'), 'a card without readable print was taken');
+  const dark = (g: Gray): Gray => ({ ...g, data: g.data.map((v) => v >> 3) });
+  const night = [...empty(4, noise, 15), ...[90, 60, 30, 8].map((l) => dark(badge(room(noise, 15), l))), ...Array.from({ length: 12 }, () => dark(badge(room(noise, 15), 8)))];
+  assert.ok(!watchFrames(night).includes('take'), 'a room too dark to read was taken');
+  // Nothing arrived, so nothing is taken: the frame starts on a busy scene as often as on a badge. "Take photo" is there.
+  assert.ok(!watchFrames(Array.from({ length: 30 }, () => badge(room(noise), 8))).includes('take'), 'a scene that never changed was taken');
+});
+await check('control: the same badge, held still, is taken once it arrives (the negatives above fail on their own terms)', () => {
+  const noise = seeded(3);
+  const verdicts = watchFrames([...empty(4, noise), badge(room(noise), 60), ...Array.from({ length: 8 }, () => badge(room(noise), 8))]);
+  assert.ok(verdicts.includes('take'), verdicts.join(' '));
+});
+/* The browser's read (src/lib/badge-ocr.ts): the lines Tesseract gives, sorted into a card. npm run check:badge-ocr runs Tesseract itself on drawn badges. */
+const ocr = (...rows: Array<[string, number, number?]>): OcrLine[] => {
+  let top = 0;
+  return rows.map(([text, height, confidence = 95]) => {
+    const l = { text, height, top, left: 40, confidence };
+    top += height + 20;
+    return l;
+  });
+};
+await check('the browser sorts a badge: the biggest name-like words are the name, title words the title, the line under the name the company', () => {
+  assert.deepEqual(cardFromLines(ocr(['OPTICON 2026', 48], ['THANDIWE', 76], ['OKONKWO', 77], ['Head of Cold-Chain Pricing', 43], ['Quillmoor Freight', 56], ['ATTENDEE', 50])), {
+    name: 'Thandiwe Okonkwo',
+    title: 'Head of Cold-Chain Pricing',
+    company: 'Quillmoor Freight',
+    email: '',
+    domain: '',
+  });
+  // A company's name printed bigger than the person's, and spelled by the email: the company, not the name.
+  const employee = cardFromLines(ocr(['LUMENVALE', 87], ['Marisol Etxeberria', 56], ['Solutions Architect', 36], ['marisol @ lumenvale.com', 30, 67]));
+  assert.deepEqual([employee?.name, employee?.company, employee?.domain], ['Marisol Etxeberria', 'LUMENVALE', 'lumenvale.com']);
+  // Without an email, a lone word in big letters still loses to a two-word name.
+  assert.equal(cardFromLines(ocr(['LUMENVALE', 87], ['Marisol Etxeberria', 60], ['Solutions Architect', 36]))?.name, 'Marisol Etxeberria');
+  // A title that runs on to the next line; a company's line under it is not part of it.
+  assert.equal(cardFromLines(ocr(['Aurelia Montgomery', 69], ['Senior Director,', 41], ['Global E-commerce', 35], ['Calloway & Finch Co.', 53]))?.title, 'Senior Director, Global E-commerce');
+  assert.equal(cardFromLines(ocr(['Oliver Brandt', 60], ['Head of Growth', 36], ['Digital Commerce Group', 40]))?.title, 'Head of Growth');
+  const comma = cardFromLines(ocr(['Aurelia Montgomery', 69], ['Senior Director,', 41], ['Calloway Technologies', 41]));
+  assert.deepEqual([comma?.title, comma?.company], ['Senior Director', 'Calloway Technologies']);
+  // The company the email spells wins over the line under the name (here a tagline).
+  const tagline = cardFromLines(ocr(['Brightwater', 50], ['Jonas Feldmann', 66], ['Director of Ecommerce', 36], ['Ask me about our spring line', 30], ['jonas@brightwater.com', 30]));
+  assert.deepEqual([tagline?.name, tagline?.company], ['Jonas Feldmann', 'Brightwater']);
+  // The company only in the email; free mail gives none.
+  assert.deepEqual(
+    [cardFromLines(ocr(['Sofia Marchetti', 60], ['Customer Success Manager', 41], ['sofia.marchetti@verdantia.io', 35]))].map((c) => [c?.company, c?.domain])[0],
+    ['Verdantia', 'verdantia.io'],
+  );
+  assert.deepEqual(
+    [cardFromLines(ocr(['Dana Kim', 90], ['dana.kim@gmail.com', 30]))].map((c) => [c?.company, c?.domain])[0],
+    ['', ''],
+  );
+});
+await check("the browser's read leaves out what the event printed and what Tesseract was guessing at", () => {
+  const card = cardFromLines(ocr(['DXP CONFERENCE 2026', 50], ['Rafael Quintero', 71], ['Principal Engineer', 44], ['Tidewell Analytics', 51], ['[L]', 40, 43], ['ff at', 85, 33], ['#10482', 30], ['SPEAKER', 48]));
+  assert.deepEqual([card?.name, card?.title, card?.company], ['Rafael Quintero', 'Principal Engineer', 'Tidewell Analytics']);
+  // A role ribbon is never the company, however it is printed or misread; one printed on the company's line is taken off it.
+  for (const ribbon of ['SPONSOR', 'Sponsor.', 'GOLD SPONSOR', 'SPONS0R', 'SPONSDR', 'Exhibitor Staff', 'SPEAKER | VIP']) {
+    const c = cardFromLines(ocr(['Michiel Dorjee', 70], ['Field Engineer', 36], [ribbon, 48]));
+    assert.equal(c?.company, '', `${ribbon} read as the company`);
+  }
+  assert.equal(cardFromLines(ocr(['Michiel Dorjee', 70], ['Field Engineer', 36], ['SPONSOR', 48], ['Optimizely', 40]))?.company, 'Optimizely');
+  assert.equal(cardFromLines(ocr(['OPTIMIZELY', 60], ['Michiel Dorjee', 70], ['Field Engineer', 36], ['SPONSOR', 48]))?.company, 'OPTIMIZELY');
+  assert.equal(cardFromLines(ocr(['Michiel Dorjee', 70], ['Optimizely Gold Sponsor', 40]))?.company, 'Optimizely');
+  assert.equal(cardFromLines(ocr(['Michiel Dorjee', 70], ['Sponsor: Optimizely', 40]))?.company, 'Optimizely');
+  // A company whose own name ends in such a word keeps it.
+  assert.equal(cardFromLines(ocr(['Jane Smith', 70], ['Summit Partners', 40]))?.company, 'Summit Partners');
+  assert.equal(cardFromLines(ocr(['Jane Smith', 70], ['Silver Lake', 40]))?.company, 'Silver Lake');
+  const sticker = cardFromLines(ocr(['HELLO', 154], ['my name', 37], ['Dana Kim', 130]));
+  assert.deepEqual([sticker?.name, sticker?.company], ['Dana Kim', '']);
+  // Nothing legible: no card, and the rep types the company instead.
+  assert.equal(cardFromLines(ocr(['[L]', 40, 30], ['ATTENDEE', 50], ['#10482', 30])), null);
+  assert.equal(cardFromLines([]), null);
+});
+await check("the browser's Tesseract files are the installed version's, served from this site", () => {
+  const installed = (JSON.parse(source('node_modules/tesseract.js/package.json')) as { version: string }).version;
+  assert.equal(OCR_VERSION, installed, 'badge-read-device.ts asks for another version than vite.config.ts serves');
+  const device = source('src/lib/badge-read-device.ts');
+  assert.match(device, /workerPath: `\$\{BASE\}\/worker\.min\.js`/);
+  assert.match(device, /cacheMethod: 'none'/, 'the model would be kept in IndexedDB');
+  assert.doesNotMatch(device, /jsdelivr|unpkg|projectnaptha/);
+  assert.match(source('vercel.json'), /"source": "\/ocr\/\(\.\*\)"/);
+  assert.match(source('public/search-sw.js'), /url\.pathname\.startsWith\('\/ocr\/'\)/);
 });
 await check("the panel's heading changes only once a request is sent (a badge's failed send leaves it as it was)", () => {
   const hook = source('src/hooks/usePageRequest.tsx');
