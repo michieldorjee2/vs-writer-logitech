@@ -8,7 +8,8 @@
  *     link's opens. Off unless SHARE_TEAMS_WEBHOOK_URL and SHARE_TEAMS_WEBHOOK_KEY are set.
  *     `check` is the SHA-256 of the rest as canonical JSON, recomputed by the workflow.
  *   channel "email": Mark's "Showcase share email" agent writes the email (to the recipient, from
- *     their note when there is one); answers { to, subject, body, by }. A template when Mark is
+ *     their note when there is one; without a link, to `recipient`, the person a person page is
+ *     for); answers { to, subject, body, by }. A template when Mark is
  *     unavailable or slow, so the rep always gets a draft to open in Outlook.
  *
  * The page's title and summary come from the page the rep is on (they only shape a message to
@@ -171,6 +172,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!body || !channel || !route) return res.status(400).json({ error: 'Bad request' });
   const title = oneLine(body.title, 160);
   const summary = oneLine(body.summary, 400);
+  // Without a personal link, who the page itself is for (a person page's person), for the draft only.
+  const hint = (body.recipient && typeof body.recipient === 'object' ? body.recipient : {}) as Record<string, unknown>;
   const code = body.code == null ? null : shareCodeOf(body.code);
   if (body.code != null && !code) return res.status(400).json({ error: 'Bad request' });
 
@@ -211,15 +214,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!(await underLimit(store, 'email', who, SHARE_LIMITS_PER.emailDay, 'day', now))) return res.status(429).json({ error: 'That’s a lot of drafts for one day' });
     const to = link?.recipient.email ?? '';
     const url = link?.url ?? pageUrl;
-    const fallback = templateDraft({ to, recipientName: link?.recipient.name ?? '', account: title, message: link?.message ?? '', url, sender: identity.name || nameFromEmail(who) });
+    const recipientName = link?.recipient.name ?? oneLine(hint.name, 120);
+    const recipientTitle = link?.recipient.title ?? oneLine(hint.title, 120);
+    const fallback = templateDraft({ to, recipientName, account: title, message: link?.message ?? '', url, sender: identity.name || nameFromEmail(who) });
     const agentId = EMAIL_AGENT_ID();
     if (!agentId || (!override.agent && !markConfigured())) return res.status(200).json(fallback);
     try {
       const text = await (override.agent ?? runAgent)(
         agentId,
         {
-          recipient_name: link?.recipient.name ?? '',
-          recipient_title: link?.recipient.title ?? '',
+          recipient_name: recipientName,
+          recipient_title: recipientTitle,
           personal_message: link?.message ?? '',
           page_title: title,
           page_summary: summary,

@@ -179,12 +179,14 @@ export default function ShareSheet({ open, onClose, page, variant, links, onLink
   const onEmail = useCallback(async () => {
     setEmail({ s: 'busy' });
     try {
-      const draft = await postJson<Draft>('/api/share-send', { channel: 'email', route, code: personal?.code ?? null, title: about.title, summary: about.summary });
+      // Without a personal link, a person page's email is still to its person.
+      const recipient = !personal && prefill.name ? { name: prefill.name, title: prefill.title } : undefined;
+      const draft = await postJson<Draft>('/api/share-send', { channel: 'email', route, code: personal?.code ?? null, title: about.title, summary: about.summary, recipient });
       setEmail({ s: 'done', value: draft });
     } catch (err) {
       setEmail({ s: 'error', message: err instanceof Error ? err.message : 'No draft' });
     }
-  }, [route, personal, about]);
+  }, [route, personal, about, prefill]);
 
   const setDraft = (patch: Partial<Draft>) => setEmail((prev) => (prev.s === 'done' ? { s: 'done', value: { ...prev.value, ...patch } } : prev));
 

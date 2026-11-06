@@ -396,6 +396,8 @@ try {
   agentAnswer = 'Sure! Here you go: nothing useful';
   const d3 = (await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/lenovo/', title: 'Lenovo' } })).body as typeof d1;
   check('share-send: an answer that isn\'t a draft: the template, to nobody, with the public link', d3.by === 'template' && d3.to === '' && d3.body.includes('https://showcase.optimizely.com/lenovo/'), d3);
+  const d4 = (await call(sendHandler, { method: 'POST', body: { channel: 'email', route: '/depaul-university/tracy-krahl/', title: 'Tracy Krahl at DePaul University', recipient: { name: 'Tracy Krahl', title: 'AVP Communications' } } })).body as typeof d1;
+  check('share-send: a person page without a link still greets its person', d4.body.startsWith('Hi Tracy,') && d4.to === '' && d4.body.includes('/depaul-university/tracy-krahl/'), d4);
   check('parseDraft: the link is added when Mark left it out', parseDraft('{"subject":"S","body":"B"}', '', 'https://x/s/1')?.body === 'B\n\nhttps://x/s/1');
 } finally {
   setEnv(sendSaved);
