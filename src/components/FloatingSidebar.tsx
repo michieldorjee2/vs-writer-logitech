@@ -103,19 +103,25 @@ function EmployeeLinkRedirect() {
   );
 }
 
-/** The rail folded away stays folded on the next page (this browser only). */
+/**
+ * The rail folded away stays folded on the next page, and opened stays open (this browser only).
+ * Until someone chooses, a phone starts folded: there the rail lies over the page rather than
+ * beside it (booth-rail.css), so it waits one tap away.
+ */
 const RAIL_KEY = 'opti.booth.rail';
+const PHONE = '(max-width: 640px)';
 function readRailCollapsed(): boolean {
   try {
-    return localStorage.getItem(RAIL_KEY) === 'collapsed';
+    const chosen = localStorage.getItem(RAIL_KEY);
+    if (chosen) return chosen === 'collapsed';
   } catch {
-    return false;
+    /* private window: the default below */
   }
+  return typeof window !== 'undefined' && Boolean(window.matchMedia?.(PHONE).matches);
 }
 function writeRailCollapsed(collapsed: boolean): void {
   try {
-    if (collapsed) localStorage.setItem(RAIL_KEY, 'collapsed');
-    else localStorage.removeItem(RAIL_KEY);
+    localStorage.setItem(RAIL_KEY, collapsed ? 'collapsed' : 'open');
   } catch {
     /* private window: the rail just opens again next time */
   }

@@ -61,6 +61,10 @@ body:has(.www-page) {
 }
 
 .www-page {
+  /* Parts that slide in from the side (data-reveal="right") start 48 px out until they are
+   * scrolled to: clipped, so a phone can't pan the page sideways before they arrive. `clip`, not
+   * `hidden`: no scroll container, so sticky parts still stick. */
+  overflow-x: clip;
   --www-fir: #08251a;
   --www-n3: #e4f0da;
   --www-lime: #abff44;
