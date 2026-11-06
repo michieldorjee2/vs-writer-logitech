@@ -164,6 +164,10 @@ export function XrayToolIcon({ name, size = 12 }: { name: string; size?: number 
  *   6sense: its new favicon (the 6 and its dot, on white), from its own SVG wordmark.
  *   BuiltWith: the "b" of its own SVG wordmark, white on its favicon's green.
  *   Gravatar: the symbol of its own SVG logo, on white, as its favicon.
+ *   ZoomInfo: its favicon, the Z on red, as in its own SVG logo.
+ *   CaliberMind: the mark of its new SVG logo, white on its favicon's navy.
+ *   Outreach: the mark of its own SVG logo, as its favicon.
+ *   Clay: a 3D render with no vector version anywhere on its site, so its favicon as a small WebP.
  * Brandfetch has one for light and one for dark; the cards follow the system theme too.
  */
 const TOOL_LOGOS: Record<string, string | { light: string; dark: string }> = {
@@ -173,6 +177,10 @@ const TOOL_LOGOS: Record<string, string | { light: string; dark: string }> = {
   '6sense': '/logos/tools/6sense.svg',
   'Gravatar': '/logos/tools/gravatar.svg',
   'Brandfetch': { light: '/logos/tools/brandfetch-light.svg', dark: '/logos/tools/brandfetch-dark.svg' },
+  'ZoomInfo': '/logos/tools/zoominfo.svg',
+  'CaliberMind': '/logos/tools/calibermind.svg',
+  'Outreach': '/logos/tools/outreach.svg',
+  'Clay': '/logos/tools/clay.webp',
   // Our own products: Optimizely's favicon.
   'ODP': '/logos/tools/optimizely.svg',
   'CMS': '/logos/tools/optimizely.svg',

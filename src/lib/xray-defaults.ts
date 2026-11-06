@@ -7,7 +7,8 @@
    curated set that maps 1:1 to icons in `xray-tool-icons.tsx`:
 
      Salesforce, BuiltWith, Mark, ODP, CMS, Web browsing,
-     Sitemap, LinkedIn, 6sense, Gravatar, Brandfetch
+     Sitemap, LinkedIn, 6sense, Gravatar, Brandfetch, ZoomInfo,
+     Clay, CaliberMind, Outreach
 
    When the CMS supplies overrides via `xraySections`, those win
    for any matching `id` — see `resolveXraySections`.
@@ -71,16 +72,16 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'intel-headline',
     selector: '[data-xray="intel-headline"]',
     title: 'Account intel headline',
-    logic: "Mark frames the research around their industry and where 6sense puts them in the funnel.",
-    tools: ['Mark', '6sense'],
+    logic: "Mark frames the research around their industry and where 6sense and CaliberMind put them in the funnel.",
+    tools: ['Mark', '6sense', 'CaliberMind'],
     sources: ['Account name', 'Industry', 'Funnel stage'],
   },
   {
     id: 'intel-stats',
     selector: '[data-xray="intel-stats"]',
     title: 'Stat ribbon',
-    logic: "Their scale in a few numbers: people from LinkedIn, content and recent updates from their sitemap.",
-    tools: ['Web browsing', 'LinkedIn', 'Sitemap'],
+    logic: "Their scale in a few numbers: firmographics from ZoomInfo and LinkedIn, content and recent updates from their sitemap.",
+    tools: ['ZoomInfo', 'Web browsing', 'LinkedIn', 'Sitemap'],
     sources: [
       'Investor reports',
       'Employee count',
@@ -92,8 +93,8 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'stakeholders',
     selector: '[data-xray="stakeholders"]',
     title: 'Key stakeholders',
-    logic: "The roles we most want to meet, matched from Salesforce and LinkedIn; photos from Gravatar.",
-    tools: ['LinkedIn', 'Salesforce', 'Gravatar'],
+    logic: "The roles we most want to meet, found in ZoomInfo and Clay, matched to Salesforce and LinkedIn; photos from Gravatar.",
+    tools: ['ZoomInfo', 'Clay', 'LinkedIn', 'Salesforce', 'Gravatar'],
     sources: [
       'Main contacts + roles',
       'Account owner',
@@ -244,8 +245,8 @@ const ACCOUNT_XRAY_SHARED: XraySectionInfo[] = [
     id: 'team-members',
     selector: '[data-xray="team-members"]',
     title: 'Account team',
-    logic: "The Optimizely people on the account in Salesforce, with Gravatar photos.",
-    tools: ['Salesforce', 'Gravatar'],
+    logic: "The Optimizely people working the account, from Salesforce and Outreach, with Gravatar photos.",
+    tools: ['Salesforce', 'Outreach', 'Gravatar'],
     sources: [
       'Account owner',
       'Key contacts on file',
@@ -682,8 +683,8 @@ const PERSON_PARTS: Array<XraySectionInfo & { fields: string[]; hint: string }> 
     id: 'person-team',
     selector: '',
     title: 'Your team',
-    logic: "Their account team from the parent page, with placeholder contacts left out.",
-    tools: ['Salesforce', 'Gravatar'],
+    logic: "Their account team from the parent page (Salesforce and Outreach), with placeholder contacts left out.",
+    tools: ['Salesforce', 'Outreach', 'Gravatar'],
     sources: ['Account team from the parent page', 'Placeholder contacts filtered out'],
     fields: ['teamHeadline', 'team'],
     hint: 'The account executive (by role) is who the ask messages.',
