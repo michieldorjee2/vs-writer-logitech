@@ -233,11 +233,13 @@ html.booth-page--rail .www-page .www-sticky {
   color: var(--booth-accent-text);
 }
 .booth-rail__btn--send {
-  overflow: hidden;
+  position: relative;
   animation: booth-slot-in 560ms var(--booth-ease) 120ms backwards;
 }
+/* Clipped only while it grows in, so the count badge on its corner is never cut off after. */
 @keyframes booth-slot-in {
-  from { height: 0; opacity: 0; transform: translateX(-24px); }
+  from { height: 0; opacity: 0; transform: translateX(-24px); overflow: hidden; }
+  to { overflow: hidden; }
 }
 .booth-rail__btn--send:disabled {
   cursor: default;
@@ -248,6 +250,19 @@ html.booth-page--rail .www-page .www-sticky {
 }
 .booth-rail__btn--send.has-comments .booth-rail__icon {
   color: var(--booth-accent-text);
+}
+/* While the tutorial is up, Send pulses: the step people forget. */
+.booth-rail__btn--send.is-hinted::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px var(--booth-bar);
+  pointer-events: none;
+  animation: booth-hint-pulse 1.6s ease-in-out infinite;
+}
+@keyframes booth-hint-pulse {
+  50% { opacity: 0.25; }
 }
 .booth-rail__btn--send.is-working {
   cursor: progress;
@@ -294,36 +309,11 @@ html.booth-page--rail .www-page .www-sticky {
   color: var(--booth-fg-3);
 }
 
-/* Edit while Mark works on the last feedback: a ring empties with the countdown. */
-.booth-rail__btn--edit.is-working {
-  cursor: help;
-}
-.booth-rail__btn--edit.is-working .booth-rail__label {
-  font-variant-numeric: tabular-nums;
-}
-.booth-rail__working {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-}
-.booth-rail__ring {
-  display: block;
-  transform: rotate(-90deg);
-}
-.booth-rail__ring-track {
-  fill: none;
-  stroke: var(--booth-hover);
-  stroke-width: 3.5;
-}
-.booth-rail__ring-fill {
-  fill: none;
-  stroke: var(--booth-bar);
-  stroke-width: 3.5;
-  stroke-linecap: round;
-  stroke-dasharray: 100;
-  /* React moves the offset once a second; this keeps the sweep smooth between. */
-  transition: stroke-dashoffset 900ms linear;
+/* The foot: the fold button, or "?" (the Edit tutorial again) while Edit runs. */
+.booth-rail__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* The fold button at the foot of the rail. */
@@ -464,6 +454,7 @@ html.booth-page--rail .www-page .www-sticky {
   .booth-report-icon.is-loading .booth-report-icon__wave,
   .booth-rail__scan,
   .booth-rail__btn--send,
+  .booth-rail__btn--send.is-hinted::after,
   .booth-rail__count {
     animation: none !important;
   }

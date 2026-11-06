@@ -16,90 +16,21 @@ interface Props {
   variant: 'abm' | 'person';
 }
 
-/* ------------ "Working…" countdown helpers ------------
- *
- * After the user hits Send Feedback, Opal needs ~a few minutes to
- * process. We disable resubmission for that window so booth visitors
- * don't pile up overlapping requests. The expiry is per-slug and
- * persisted to localStorage so it survives reloads / tab switches.
- *
- * Alongside the timer we poll /api/edit-status for the page's
- * `published` timestamp. When it moves past the baseline we captured
- * at submit time, the lockout drops early and we show a "Your edits
- * landed" toast.
- */
-const WORKING_DURATION_MS = 3 * 60 * 1000;
-const WORKING_KEY_PREFIX = 'opti.editmode.working.';
-const BASELINE_KEY_PREFIX = 'opti.editmode.baseline.';
-/** Polls don't start immediately — the first ~25s the AI is still
- *  reading the request, so polling earlier just wastes calls. */
-const POLL_INITIAL_DELAY_MS = 25_000;
-const POLL_INTERVAL_MS = 15_000;
-
-function workingKey(): string {
-  // The slug here is the visible URL — same key whether the visitor
-  // refreshes or re-opens the tab from the search page.
-  return WORKING_KEY_PREFIX + window.location.pathname;
-}
-
-function baselineKey(): string {
-  return BASELINE_KEY_PREFIX + window.location.pathname;
-}
-
-/** Polling needs both the CMS content key (so we can ask Graph for
- *  *this* exact piece of content regardless of slug shape) and the
- *  baseline `published` timestamp to compare against. We persist
- *  them together as JSON. */
-type Baseline = { key: string; published: string; lastModified?: string | null };
-
-function readBaseline(): Baseline | null {
+/** The Edit tutorial is shown the first time someone opens Edit mode (this browser). */
+const TUTORIAL_KEY = 'opti.editmode.tutorial';
+function tutorialSeen(): boolean {
   try {
-    const raw = localStorage.getItem(baselineKey());
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<Baseline>;
-    if (!parsed?.key || !parsed?.published) return null;
-    return { key: parsed.key, published: parsed.published, lastModified: parsed.lastModified ?? null };
+    return localStorage.getItem(TUTORIAL_KEY) === 'seen';
   } catch {
-    return null;
+    return false;
   }
 }
-
-function writeBaseline(v: Baseline): void {
-  try { localStorage.setItem(baselineKey(), JSON.stringify(v)); } catch { /* ignore */ }
-}
-
-function clearBaseline(): void {
-  try { localStorage.removeItem(baselineKey()); } catch { /* ignore */ }
-}
-
-function readWorkingUntil(): number {
+function markTutorialSeen(): void {
   try {
-    const raw = localStorage.getItem(workingKey());
-    if (!raw) return 0;
-    const t = parseInt(raw, 10);
-    if (!Number.isFinite(t) || t <= Date.now()) {
-      localStorage.removeItem(workingKey());
-      return 0;
-    }
-    return t;
+    localStorage.setItem(TUTORIAL_KEY, 'seen');
   } catch {
-    return 0;
+    /* private window: it shows again next time */
   }
-}
-
-function writeWorkingUntil(t: number): void {
-  try { localStorage.setItem(workingKey(), String(t)); } catch { /* ignore */ }
-}
-
-function clearWorking(): void {
-  try { localStorage.removeItem(workingKey()); } catch { /* ignore */ }
-}
-
-function formatRemaining(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 /** This page as a visitor sees it: the same URL without the booth flag. */
@@ -282,8 +213,7 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
  * corners, in the search page's surfaces (search-home.css: Axiom tokens, light or dark with the
  * system). Top to bottom:
  *   • Search: back to /search.
- *   • Edit: feedback mode, routed to Mark. After feedback is sent the button counts down
- *     ("Working…"); pressing it then explains instead of letting them resubmit.
+ *   • Edit: feedback mode, routed to Mark, who edits the page live and reloads it when done.
  *   • X-ray: the per-section data overlay.
  *   • Share: copies the page's public address (without ?search=1).
  *   • Report (account pages): the page's story from ODP. Its data loads as the rail mounts; the
@@ -291,7 +221,8 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
  * The button at the foot folds the rail away; a single Report button stays at the bottom left to
  * bring it back. The rail slides, its buttons cascade in from the left. X-ray takes the whole
  * screen, so the rail steps aside while it runs. Edit runs in the rail: the other tools fold out,
- * Send (with the comment count) slides in under Edit, and Edit again (or Escape) leaves.
+ * Send (with the comment count) slides in under Edit, Search turns into Close, and "?" at the foot
+ * replays the tutorial shown on the first Edit. Close, Edit again, or Escape leaves.
  *
  * Rendered only for a signed-in employee (see FloatingSidebar above). The
  * routes behind the tools check the session themselves; mounting the
@@ -310,16 +241,8 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
   const reportPage = useMemo(() => (typeof window === 'undefined' ? '' : pageKey(window.location.pathname)), []);
   const { load, retry } = usePageActivity(reportPage, hasReport);
   const report = reportState(load);
-  const [workingUntil, setWorkingUntil] = useState<number>(() => readWorkingUntil());
-  const [now, setNow] = useState<number>(() => Date.now());
-  const [showWorkingModal, setShowWorkingModal] = useState(false);
-  /** Set when polling detects that Opal republished. Drives the
-   *  celebratory "Your edits landed" toast and an early Working-state
-   *  exit. Cleared when the user dismisses the toast. */
-  const [editsLanded, setEditsLanded] = useState(false);
-
-  const isWorking = workingUntil > now;
-  const remaining = Math.max(0, workingUntil - now);
+  /** The Edit tutorial (EditMode draws it): on the first Edit of this browser, and from "?". */
+  const [tutorial, setTutorial] = useState(false);
   // X-ray takes the whole screen. Edit runs in the rail: it opens the rail even when folded, and
   // its controls (Send) sit under the Edit button.
   const railShown = entered && (!collapsed || editActive) && !xrayActive;
@@ -358,22 +281,6 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
     }
   }, []);
 
-  /* Tick every second while the working window is open. We avoid a
-   * permanent interval — the timer only runs when there's something
-   * to count down. */
-  useEffect(() => {
-    if (!isWorking) return;
-    const id = window.setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= workingUntil) {
-        clearWorking();
-        setWorkingUntil(0);
-      }
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [isWorking, workingUntil]);
-
   const handleBack = useCallback(() => {
     if (document.referrer && document.referrer.includes('/search')) {
       window.history.back();
@@ -407,85 +314,22 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
     writeRailCollapsed(false);
   }, []);
 
+  const closeEdit = useCallback(() => {
+    setEditActive(false);
+    setTutorial(false);
+  }, []);
   const handleEditClick = useCallback(() => {
-    if (isWorking) {
-      setShowWorkingModal(true);
-      return;
-    }
     setReportOpen(false);
-    setEditActive((v) => !v);
-  }, [isWorking]);
-
-  /* Called by EditMode after the webhook resolves. Latches the
-   * Working… timer for WORKING_DURATION_MS from now and snapshots
-   * the page key + current `published` as the baseline polling will
-   * compare against. */
-  const handleSent = useCallback(() => {
-    const until = Date.now() + WORKING_DURATION_MS;
-    writeWorkingUntil(until);
-    setWorkingUntil(until);
-    setNow(Date.now());
-    const meta = page._metadata;
-    if (meta?.key && meta?.published) {
-      writeBaseline({ key: meta.key, published: meta.published, lastModified: meta.lastModified ?? null });
-    }
-    setEditsLanded(false);
-  }, [page]);
-
-  /* Polling loop: while the Working window is open, hit
-   * /api/edit-status by content key (stable across slug shapes) and
-   * compare the returned `published` against the baseline we
-   * captured at submit time. First poll waits POLL_INITIAL_DELAY_MS
-   * so we don't spam Graph during the AI's first read. */
-  useEffect(() => {
-    if (!isWorking) return;
-    const baseline = readBaseline();
-    if (!baseline) return; // submit happened on a different visit / device
-
-    let canceled = false;
-    let intervalId: number | null = null;
-
-    const poll = async () => {
-      try {
-        // lastModified moves on every save; published only on the first publish.
-        const qs =
-          'key=' + encodeURIComponent(baseline.key) +
-          (baseline.lastModified
-            ? '&modifiedSince=' + encodeURIComponent(baseline.lastModified)
-            : '&since=' + encodeURIComponent(baseline.published));
-        const res = await fetch('/api/edit-status?' + qs, { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = (await res.json()) as { changed?: boolean };
-        if (canceled || !data?.changed) return;
-        // The endpoint already purged the Vercel edge cache for this
-        // page's Cache-Tag, so a plain reload below will hit fresh
-        // HTML on the first try.
-        clearWorking();
-        clearBaseline();
-        setWorkingUntil(0);
-        setEditsLanded(true);
-        setShowWorkingModal(false);
-      } catch {
-        /* network blip — try again next interval */
-      }
-    };
-
-    const timeoutId = window.setTimeout(() => {
-      if (canceled) return;
-      poll();
-      intervalId = window.setInterval(poll, POLL_INTERVAL_MS);
-    }, POLL_INITIAL_DELAY_MS);
-
-    return () => {
-      canceled = true;
-      window.clearTimeout(timeoutId);
-      if (intervalId !== null) window.clearInterval(intervalId);
-    };
-  }, [isWorking]);
-
-  /* Progress ring fraction — full at start, empty when the timer
-   * runs out. Strokes the working button with a dwindling halo. */
-  const progressPct = isWorking ? remaining / WORKING_DURATION_MS : 0;
+    if (editActive) return closeEdit();
+    setEditActive(true);
+    // Opening Edit for the first time in this browser: the tutorial first.
+    if (!tutorialSeen()) setTutorial(true);
+  }, [editActive, closeEdit]);
+  const openTutorial = useCallback(() => setTutorial(true), []);
+  const tutorialDone = useCallback(() => {
+    markTutorialSeen();
+    setTutorial(false);
+  }, []);
 
   return (
     <>
@@ -496,44 +340,41 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
         style={{ '--n': hasReport ? 6 : 5 } as CSSProperties}
       >
         <div className="booth-rail__items">
+          {/* While Edit runs, the first button closes it rather than leaving for the search page. */}
           <RailButton
             i={0}
-            modifier="back"
-            onClick={handleBack}
-            ariaLabel="Back to search"
-            label="Search"
+            modifier={editActive ? 'back is-close' : 'back'}
+            onClick={editActive ? closeEdit : handleBack}
+            ariaLabel={editActive ? 'Close edit mode' : 'Back to search'}
+            label={editActive ? 'Close' : 'Search'}
             icon={
-              <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M15.83 10H4.17" />
-                <path d="M10 15.83L4.17 10L10 4.17" />
-              </svg>
+              editActive ? (
+                <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M15 5L5 15M5 5l10 10" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M15.83 10H4.17" />
+                  <path d="M10 15.83L4.17 10L10 4.17" />
+                </svg>
+              )
             }
           />
           <RailButton
             i={1}
-            modifier={isWorking ? 'edit is-working' : 'edit'}
+            modifier="edit"
             onClick={handleEditClick}
             pressed={editActive}
             on={editActive}
-            ariaLabel={isWorking ? `Mark is working on your edits, ${formatRemaining(remaining)} left` : editActive ? 'Exit edit mode' : 'Enter edit mode'}
-            label={isWorking ? formatRemaining(remaining) : 'Edit'}
+            ariaLabel={editActive ? 'Exit edit mode' : 'Enter edit mode'}
+            label="Edit"
             icon={
-              isWorking ? (
-                <span className="booth-rail__working" aria-hidden="true">
-                  {/* The ring empties as the timer runs out; pathLength=100 makes the offset a percentage. */}
-                  <svg className="booth-rail__ring" viewBox="0 0 36 36" width="26" height="26">
-                    <circle className="booth-rail__ring-track" cx="18" cy="18" r="16" />
-                    <circle className="booth-rail__ring-fill" cx="18" cy="18" r="16" pathLength={100} strokeDashoffset={100 - progressPct * 100} />
-                  </svg>
-                </span>
-              ) : (
-                <svg viewBox="27.5 64.5 20 20" width="20" height="20" aria-hidden="true">
+              <svg viewBox="27.5 64.5 20 20" width="20" height="20" aria-hidden="true">
                   <path
                     fill="currentColor"
                     d="M31.5217 82C31.1088 82 30.752 81.8499 30.4512 81.5496C30.1504 81.2494 30 80.8931 30 80.481V69.7801C30 69.3679 30.1504 69.0117 30.4512 68.7114C30.752 68.4112 31.1088 68.261 31.5217 68.261H37.259C37.4757 68.261 37.6382 68.3282 37.7465 68.4624C37.8548 68.5966 37.909 68.7432 37.909 68.9023C37.909 69.0615 37.8543 69.2086 37.7448 69.3436C37.6354 69.4785 37.4785 69.546 37.2742 69.546H31.5217C31.463 69.546 31.4093 69.5704 31.3604 69.619C31.3116 69.6678 31.2872 69.7215 31.2872 69.7801V80.481C31.2872 80.5395 31.3116 80.5932 31.3604 80.642C31.4093 80.6907 31.463 80.715 31.5217 80.715H42.2413C42.3 80.715 42.3538 80.6907 42.4026 80.642C42.4514 80.5932 42.4758 80.5395 42.4758 80.481V74.6889C42.4758 74.4725 42.5438 74.3103 42.6798 74.2022C42.8156 74.0941 42.9641 74.04 43.1252 74.04C43.2832 74.04 43.429 74.0941 43.5627 74.2022C43.6962 74.3103 43.763 74.4725 43.763 74.6889V80.481C43.763 80.8931 43.6126 81.2494 43.3119 81.5496C43.0111 81.8499 42.6542 82 42.2413 82H31.5217ZM34.8184 76.437V74.975C34.8184 74.7673 34.8575 74.5689 34.9357 74.3799C35.014 74.1908 35.1279 74.0265 35.2774 73.887L41.8107 67.365C41.9322 67.2354 42.0698 67.1421 42.2234 67.0852C42.3771 67.0284 42.5332 67 42.6918 67C42.86 67 43.024 67.0329 43.1837 67.0987C43.3433 67.1645 43.4908 67.2572 43.6263 67.3768L44.6107 68.3692C44.7412 68.5018 44.8388 68.6471 44.9033 68.8052C44.9678 68.9633 45 69.1262 45 69.2938C45 69.4612 44.9679 69.623 44.9036 69.7793C44.8394 69.9355 44.7445 70.0784 44.6191 70.208L38.0907 76.7518C37.9471 76.893 37.7812 77.0013 37.593 77.0767C37.4049 77.1523 37.2074 77.1901 37.0007 77.1901H35.5727C35.3645 77.1901 35.1867 77.1165 35.0393 76.9695C34.892 76.8224 34.8184 76.6449 34.8184 76.437ZM36.1056 75.9051H37.0969L41.886 71.1434L41.3824 70.6375L40.861 70.128L36.1056 74.8672V75.9051Z"
                   />
                 </svg>
-              )
             }
           />
           {/* Edit mode's controls (Send) land here, under the Edit button (EditMode, `controls`). */}
@@ -595,17 +436,35 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
             />
           )}
         </div>
-        <button
-          type="button"
-          className={'booth-rail__fold' + (editActive ? ' is-away' : '')}
-          style={{ '--i': hasReport ? 5 : 4 } as CSSProperties}
-          inert={editActive}
-          onClick={collapseRail}
-          aria-label="Hide the tools"
-          title="Hide the tools"
-        >
-          <PanelIcon />
-        </button>
+        {/* The foot: fold the rail away, or, while Edit runs, the tutorial again. */}
+        <div className="booth-rail__foot">
+          <button
+            type="button"
+            className={'booth-rail__fold' + (editActive ? ' is-away' : '')}
+            style={{ '--i': hasReport ? 5 : 4 } as CSSProperties}
+            inert={editActive}
+            onClick={collapseRail}
+            aria-label="Hide the tools"
+            title="Hide the tools"
+          >
+            <PanelIcon />
+          </button>
+          <button
+            type="button"
+            className={'booth-rail__fold booth-rail__help' + (editActive ? '' : ' is-away')}
+            style={{ '--i': 3 } as CSSProperties}
+            inert={!editActive}
+            onClick={openTutorial}
+            aria-label="How Edit works"
+            title="How Edit works"
+          >
+            <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="10" cy="10" r="8.33" />
+              <path d="M7.58 7.5a2.5 2.5 0 0 1 4.86.83c0 1.67-2.5 2.5-2.5 2.5" />
+              <path d="M10 14.17h.01" />
+            </svg>
+          </button>
+        </div>
       </nav>
 
       <button
@@ -630,114 +489,15 @@ function BoothTools({ page, variant, identity }: Props & { identity: Identity })
 
       <EditMode
         active={editActive}
-        onClose={() => setEditActive(false)}
-        onSent={handleSent}
+        onClose={closeEdit}
         page={page}
         variant={variant}
         editorEmail={identity.email}
         controls={editSlot}
+        tutorial={tutorial}
+        onTutorialDone={tutorialDone}
       />
 
-      {editsLanded && (
-        <div
-          className="edit-landed-toast"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="edit-landed-toast__icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-          </div>
-          <div className="edit-landed-toast__copy">
-            <strong>Your edits are live</strong>
-            <span>Mark just republished this page. Refresh to see them.</span>
-          </div>
-          <div className="edit-landed-toast__actions">
-            <button
-              type="button"
-              className="edit-landed-toast__btn"
-              onClick={() => {
-                /* Belt and braces with the server-side Cache-Tag
-                 * purge: that's eventually consistent (Vercel's
-                 * tag eviction can lag 30s+), but THIS click needs
-                 * to land on fresh HTML the very first time. A
-                 * unique `?refresh=…` query param routes to a
-                 * separate edge cache key — guaranteed miss → fresh
-                 * SSR fetch from Graph. The param is stripped from
-                 * the address bar after mount via history.replaceState. */
-                const u = new URL(window.location.href);
-                u.searchParams.set('refresh', String(Date.now()));
-                window.location.href = u.toString();
-              }}
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              className="edit-landed-toast__close"
-              onClick={() => setEditsLanded(false)}
-              aria-label="Dismiss"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showWorkingModal && (
-        <div
-          className="edit-working-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-working-title"
-          onClick={() => setShowWorkingModal(false)}
-        >
-          <div
-            className="edit-working-modal__card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="edit-working-modal__close"
-              onClick={() => setShowWorkingModal(false)}
-              aria-label="Close"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="edit-working-modal__icon" aria-hidden="true">
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" />
-              </svg>
-            </div>
-            <h3 id="edit-working-title" className="edit-working-modal__title">
-              Still working on it
-            </h3>
-            <p className="edit-working-modal__sub">
-              Mark is processing your previous feedback right now. You'll get a
-              Teams message as soon as the changes are ready.
-            </p>
-            <div className="edit-working-modal__chip" aria-hidden="true">
-              <span className="edit-working-modal__chip-dot" />
-              {formatRemaining(remaining)} estimated
-            </div>
-            <div className="edit-working-modal__actions">
-              <button
-                type="button"
-                className="edit-working-modal__btn"
-                onClick={() => setShowWorkingModal(false)}
-              >
-                OK, got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

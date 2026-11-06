@@ -8,7 +8,7 @@ import type { PathSegment } from './page-activity';
 
 /** Everything the booth tools draw over the page (FloatingSidebar and its modes). */
 export const BOOTH_CHROME =
-  '.booth-rail, .booth-rail-mini, .activity-view, .xray-fixed-layer, .xray-overlay, .edit-overlay, .edit-popup, .edit-hint, .live-hud, .live-card, .edit-landed-toast, .edit-working-modal, .employee-link-alert';
+  '.booth-rail, .booth-rail-mini, .activity-view, .xray-fixed-layer, .xray-overlay, .edit-overlay, .edit-popup, .edit-hint, .live-hud, .live-card, .edit-tutorial, .employee-link-alert';
 /** The page a visitor reads: the www page's root (src/www/ui.tsx, WwwPage). The sticky bar is inside it. */
 export const PAGE_ROOT = '.www-page';
 

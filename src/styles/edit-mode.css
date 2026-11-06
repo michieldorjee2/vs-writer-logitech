@@ -120,8 +120,11 @@ body.edit-active .sticky-cta {
 
 .edit-box__badge {
   pointer-events: none;
-  animation: edit-badge-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  /* From the badge's own centre: an SVG element's origin is otherwise the document's corner, and
+   * the badge flew in from across the page (Michiel, 6 Nov: "jumps all over"). */
+  transform-box: fill-box;
   transform-origin: center;
+  animation: edit-badge-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
 .edit-box__badge-bg {
@@ -199,6 +202,113 @@ html.booth-page--rail .edit-hint {
     white-space: normal;
     width: calc(100vw - 32px);
   }
+}
+
+/* ------------ The tutorial ------------
+ * Beside the rail, under Edit and Send: what Edit mode is for, in three steps. Solid, like the
+ * rest (blur flickers over the moving www page). */
+
+.edit-tutorial {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1003;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  padding: 22px 22px 18px;
+  border-radius: 20px;
+  background: var(--booth-page);
+  color: var(--booth-fg);
+  font-family: var(--booth-font);
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 0 24px 60px -18px rgb(0 0 0 / 0.55);
+  animation: edit-tutorial-in 560ms var(--booth-ease) 200ms backwards;
+}
+html.booth-page--rail .edit-tutorial {
+  left: calc(var(--booth-rail-w) + 16px);
+}
+@keyframes edit-tutorial-in {
+  from { opacity: 0; transform: translateX(-16px); }
+}
+.edit-tutorial__title {
+  margin: 0 0 18px;
+  font: 800 22px/1.1 var(--booth-display);
+  letter-spacing: 0;
+}
+.edit-tutorial__steps {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: edit-step;
+}
+.edit-tutorial__steps li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  font: 400 15px/20px var(--booth-font);
+  animation: edit-tutorial-step 520ms var(--booth-ease) backwards;
+  animation-delay: calc(320ms + var(--i, 0) * 90ms);
+}
+@keyframes edit-tutorial-step {
+  from { opacity: 0; transform: translateX(-10px); }
+}
+.edit-tutorial__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--booth-raised);
+  color: var(--booth-accent-text);
+}
+/* The step's number on its tile. */
+.edit-tutorial__icon::after {
+  counter-increment: edit-step;
+  content: counter(edit-step);
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--booth-fg);
+  color: var(--booth-page);
+  font: 700 10px/16px var(--booth-font);
+  text-align: center;
+}
+.edit-tutorial__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+.edit-tutorial__note {
+  font: 500 14px/18px var(--booth-font);
+  color: var(--booth-accent-text);
+}
+.edit-tutorial__ok {
+  appearance: none;
+  flex: none;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--booth-accent);
+  color: #08251a;
+  font: 500 14px/18px var(--booth-font);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.edit-tutorial__ok:hover {
+  background: #c5ff7e;
+}
+.edit-tutorial__ok:focus-visible {
+  outline: 2px solid var(--booth-focus);
+  outline-offset: 2px;
 }
 
 /* ------------ Comment popup ------------ */
@@ -300,15 +410,6 @@ html.booth-page--rail .edit-hint {
   align-items: center;
   gap: 8px;
   margin-top: 14px;
-}
-
-.edit-popup__by {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--booth-fg-3);
 }
 
 .edit-popup__btn {
@@ -486,250 +587,6 @@ html.booth-page--rail .edit-hint {
   }
 }
 
-/* ------------ "Edits landed" toast ------------
- * Drops in at the top when polling sees Mark republished the page. Refresh (the obvious follow-up)
- * and dismiss; it stays until the person does either. */
-
-.edit-landed-toast {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  z-index: 1004;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  max-width: calc(100vw - 32px);
-  padding: 12px 12px 12px 14px;
-  border-radius: 16px;
-  background: var(--booth-page);
-  color: var(--booth-fg);
-  font-family: var(--booth-font);
-  -webkit-font-smoothing: antialiased;
-  box-shadow: 0 18px 48px -14px rgb(0 0 0 / 0.5);
-  transform: translateX(-50%);
-  animation: edit-landed-in 420ms var(--booth-ease);
-}
-html.booth-page--rail .edit-landed-toast {
-  left: calc(50% + var(--booth-rail-w) / 2);
-}
-
-@keyframes edit-landed-in {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
-}
-
-.edit-landed-toast__icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--booth-accent);
-  color: #08251a;
-  animation: edit-landed-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms backwards;
-}
-
-@keyframes edit-landed-pop {
-  from { opacity: 0; transform: scale(0.4); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.edit-landed-toast__copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  line-height: 1.3;
-}
-
-.edit-landed-toast__copy strong {
-  font: 800 16px/1.15 var(--booth-display);
-  letter-spacing: 0;
-}
-
-.edit-landed-toast__copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--booth-fg-3);
-}
-
-@media (max-width: 640px) {
-  .edit-landed-toast,
-  html.booth-page--rail .edit-landed-toast { left: 50%; }
-  .edit-landed-toast__copy span { white-space: normal; }
-}
-
-.edit-landed-toast__actions {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
-}
-
-.edit-landed-toast__btn {
-  appearance: none;
-  padding: 9px 16px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--booth-accent);
-  color: #08251a;
-  font: 500 14px/18px var(--booth-font);
-  cursor: pointer;
-  transition: background 140ms ease;
-}
-
-.edit-landed-toast__btn:hover {
-  background: #c5ff7e;
-}
-
-.edit-landed-toast__close {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--booth-quiet);
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.edit-landed-toast__close:hover {
-  background: var(--booth-hover);
-  color: var(--booth-fg);
-}
-
-/* ------------ "Still working" popup ------------
- * Pressing Edit while Mark is still on the last feedback: a card over the page, blurred like the
- * Report's (the page is not moving under it). */
-
-.edit-working-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1005;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: var(--booth-veil);
-  -webkit-backdrop-filter: blur(22px) saturate(110%);
-  backdrop-filter: blur(22px) saturate(110%);
-  font-family: var(--booth-font);
-  -webkit-font-smoothing: antialiased;
-  animation: edit-fade-in 220ms ease-out;
-}
-
-.edit-working-modal__card {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  box-sizing: border-box;
-  padding: 28px 28px 24px;
-  border-radius: 20px;
-  background: var(--booth-page);
-  color: var(--booth-fg);
-  box-shadow: 0 30px 80px -24px rgb(0 0 0 / 0.55);
-  animation: edit-modal-in 420ms var(--booth-ease);
-}
-
-.edit-working-modal__close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  appearance: none;
-  display: inline-flex;
-  padding: 6px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--booth-quiet);
-  cursor: pointer;
-}
-
-.edit-working-modal__close:hover {
-  background: var(--booth-hover);
-  color: var(--booth-fg);
-}
-
-.edit-working-modal__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 16px;
-  border-radius: 12px;
-  background: var(--booth-raised);
-  color: var(--booth-accent-text);
-}
-
-.edit-working-modal__title {
-  margin: 0 0 8px;
-  font: 800 24px/1.1 var(--booth-display);
-  letter-spacing: 0;
-  color: var(--booth-fg);
-}
-
-.edit-working-modal__sub {
-  margin: 0 0 18px;
-  font-size: 15px;
-  line-height: 1.45;
-  color: var(--booth-fg-3);
-}
-
-.edit-working-modal__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--booth-raised);
-  color: var(--booth-fg);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.edit-working-modal__chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--booth-bar);
-  animation: edit-dot-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes edit-dot-pulse {
-  50% { opacity: 0.35; }
-}
-
-.edit-working-modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 22px;
-}
-
-.edit-working-modal__btn {
-  appearance: none;
-  padding: 10px 18px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--booth-accent);
-  color: #08251a;
-  font: 500 14px/18px var(--booth-font);
-  cursor: pointer;
-  transition: background 140ms ease;
-}
-
-.edit-working-modal__btn:hover {
-  background: #c5ff7e;
-}
-
 /* Reduced-motion guards */
 @media (prefers-reduced-motion: reduce) {
   .edit-box__rect,
@@ -747,10 +604,8 @@ html.booth-page--rail .edit-landed-toast {
   .edit-hint {
     animation: none;
   }
-  .edit-working-modal__icon,
-  .edit-working-modal__chip-dot,
-  .edit-landed-toast,
-  .edit-landed-toast__icon {
+  .edit-tutorial,
+  .edit-tutorial__steps li {
     animation: none !important;
   }
 }

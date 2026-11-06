@@ -22,13 +22,6 @@ import '../styles/edit-mode.css';
 interface Props {
   active: boolean;
   onClose: () => void;
-  /**
-   * Fired exactly once after the feedback webhook resolves (success or
-   * failure — the user has already let go of the page either way).
-   * The parent uses this to start the "Working…" countdown on the
-   * Edit sidebar button.
-   */
-  onSent?: () => void;
   page: CompetitorComparisonPage;
   variant: 'abm' | 'person';
   /**
@@ -43,6 +36,12 @@ interface Props {
    * its own. Null until the rail has mounted.
    */
   controls: HTMLElement | null;
+  /**
+   * The tutorial card is up (the first Edit in this browser, or "?" in the rail). Done with it
+   * ("Got it", Escape, or clicking a part of the page) calls onTutorialDone.
+   */
+  tutorial: boolean;
+  onTutorialDone: () => void;
 }
 
 type DocSize = { w: number; h: number };
@@ -177,6 +176,11 @@ function placePopup(
   return { left, top: Math.max(m, aboveTop) };
 }
 
+/** Where a part's comment badge sits: just inside its box's top-right corner. */
+function badgeAt(box: OutlineBox): string {
+  return `translate(${box.left + box.width - 18} ${box.top + 18})`;
+}
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -220,7 +224,7 @@ function copyNow(fields: string[], shown: Record<string, string | string[]>): Re
   return out;
 }
 
-function EditMode({ active, onClose, onSent, page, variant, editorEmail, controls }: Props) {
+function EditMode({ active, onClose, page, variant, editorEmail, controls, tutorial, onTutorialDone }: Props) {
   // On either account template Edit mode offers each part with the fields it shows, tells Mark
   // which fields, and shows Mark's edits by re-rendering the page from the values he streams. The
   // agent platform page is mostly template copy: its parts are the ones a field drives.
@@ -258,6 +262,8 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
   // Refs the rAF loop reads + writes
   const elementsRef = useRef<Array<{ section: XraySectionInfo; els: Element[] }>>([]);
   const rectRefs = useRef<Map<string, SVGRectElement | null>>(new Map());
+  /** Each commented part's badge, moved with its box by the rAF loop (as the rect is). */
+  const badgeRefs = useRef<Map<string, SVGGElement | null>>(new Map());
   const docSizeRef = useRef<DocSize>({ w: 0, h: 0 });
 
   const sendError = useRef<string | null>(null);
@@ -394,6 +400,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
           rect.setAttribute('width', String(o.width));
           rect.setAttribute('height', String(o.height));
           lastBox.set(e.section.id, { l: o.left, t: o.top, w: o.width, h: o.height });
+          badgeRefs.current.get(e.section.id)?.setAttribute('transform', badgeAt(o));
         }
         if (e.section.id === focusRef.current && spotRef.current) {
           spotRef.current.setAttribute('x', String(o.left));
@@ -439,6 +446,10 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
       if (e.key !== 'Escape') return;
       // The Report card open over Edit mode takes this Escape; the comments stay.
       if (document.documentElement.classList.contains('activity-open')) return;
+      if (tutorial) {
+        onTutorialDone();
+        return;
+      }
       if (activeSection) {
         setActiveSection(null);
         return;
@@ -447,13 +458,15 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, activeSection, onClose]);
+  }, [active, activeSection, onClose, tutorial, onTutorialDone]);
 
   /* ---- Comment popup handlers ---- */
   const openCommentForSection = useCallback((sectionId: string) => {
+    // Clicking a part of the page is the tutorial's first step: it has done its job.
+    if (tutorial) onTutorialDone();
     setDraftComment(comments[sectionId] || '');
     setActiveSection(sectionId);
-  }, [comments]);
+  }, [comments, tutorial, onTutorialDone]);
 
   const saveComment = useCallback(() => {
     if (!activeSection) return;
@@ -690,9 +703,6 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
       }
     }
 
-    // Notify the parent (sidebar countdown) regardless of outcome.
-    onSent?.();
-
     // If the agent committed, WAIT for the republish to actually land —
     // poll the Graph `published` ping — then cache-bust reload so the
     // visitor sees the real, freshly-published change (not just our
@@ -743,7 +753,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
       }
     }
     liveAbort.current = null;
-  }, [comments, page, sections, onSent, matchSectionId, scrollToSection, agentPlatform, template, live]);
+  }, [comments, page, sections, matchSectionId, scrollToSection, agentPlatform, template, live]);
 
   /** Dismiss the live overlay without reloading (Close on the live HUD). */
   const dismissLive = useCallback(() => {
@@ -830,21 +840,23 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
                 className="edit-box__rect"
               />
               {hasComment && (
-                <g className="edit-box__badge">
-                  <circle
-                    cx={box.left + box.width - 18}
-                    cy={box.top + 18}
-                    r={12}
-                    className="edit-box__badge-bg"
-                  />
-                  <text
-                    x={box.left + box.width - 18}
-                    y={box.top + 22}
-                    textAnchor="middle"
-                    className="edit-box__badge-text"
-                  >
-                    1
-                  </text>
+                /* Placed with a transform the rAF loop keeps on the box's corner; the inner group pops in
+                 * from its own centre (edit-mode.css), not the document's. */
+                <g
+                  ref={(el) => {
+                    badgeRefs.current.set(section.id, el);
+                    // Placed at once on its box as it is now: the loop moves it only when the box moves.
+                    const o = rectRefs.current.get(section.id);
+                    if (el && o) el.setAttribute('transform', badgeAt({ left: +o.getAttribute('x')!, top: +o.getAttribute('y')!, width: +o.getAttribute('width')!, height: 0 }));
+                  }}
+                  transform={badgeAt(box)}
+                >
+                  <g className="edit-box__badge">
+                    <circle cx={0} cy={0} r={12} className="edit-box__badge-bg" />
+                    <text x={0} y={4} textAnchor="middle" className="edit-box__badge-text">
+                      1
+                    </text>
+                  </g>
                 </g>
               )}
             </g>
@@ -913,11 +925,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
               >
                 Delete
               </button>
-            ) : (
-              <span className="edit-popup__by" title={`Mark makes the edit as ${editorEmail}, the account you signed in with`}>
-                As {editorEmail.split('@')[0]}
-              </span>
-            )}
+            ) : null}
             <div style={{ flex: 1 }} />
             <button
               type="button"
@@ -948,7 +956,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
     ? createPortal(
         <button
           type="button"
-          className={'booth-rail__btn booth-rail__btn--send' + (commentCount ? ' has-comments' : '') + (phase === 'working' ? ' is-working' : '')}
+          className={'booth-rail__btn booth-rail__btn--send' + (commentCount ? ' has-comments' : '') + (phase === 'working' ? ' is-working' : '') + (tutorial ? ' is-hinted' : '')}
           onClick={canSend ? send : undefined}
           disabled={!canSend}
           aria-label="Send feedback"
@@ -983,12 +991,59 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
 
   /** What to do, until the first comment: a small note at the top of the page. */
   const hint =
-    phase === 'editing' && commentCount === 0 && !activeSection ? (
+    phase === 'editing' && commentCount === 0 && !activeSection && !tutorial ? (
       <div className="edit-hint" role="status">
         <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3.33 16.67h3.34l8.75-8.75a2.36 2.36 0 0 0-3.34-3.34L3.33 13.33v3.34z" />
         </svg>
         Click any part of the page to leave feedback for Mark
+      </div>
+    ) : null;
+
+  /**
+   * The tutorial: what Edit mode is for, in three steps, beside the rail. On the first Edit in this
+   * browser and from "?" at the foot of the rail. Send pulses in the rail while it is up.
+   */
+  const tutorialCard =
+    tutorial && phase === 'editing' ? (
+      <div className="edit-tutorial" role="dialog" aria-labelledby="edit-tutorial-title">
+        <h2 id="edit-tutorial-title" className="edit-tutorial__title">
+          Edit with Mark
+        </h2>
+        <ol className="edit-tutorial__steps">
+          <li style={{ '--i': 0 } as CSSProperties}>
+            <span className="edit-tutorial__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4.17 2.5l11.66 5.83-5 1.67-1.66 5z" />
+                <path d="M10.83 10l4.17 4.17" />
+              </svg>
+            </span>
+            <span>Click on an element you’d like to change</span>
+          </li>
+          <li style={{ '--i': 1 } as CSSProperties}>
+            <span className="edit-tutorial__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.5 12.5a1.67 1.67 0 0 1-1.67 1.67h-10L2.5 17.5V4.17A1.67 1.67 0 0 1 4.17 2.5h11.66a1.67 1.67 0 0 1 1.67 1.67z" />
+              </svg>
+            </span>
+            <span>Tell Mark what you’d like to change</span>
+          </li>
+          <li style={{ '--i': 2 } as CSSProperties}>
+            <span className="edit-tutorial__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.5 2.5L9.17 10.83" />
+                <path d="M17.5 2.5l-5.83 15-3.34-7.5-7.5-3.33 16.67-4.17z" />
+              </svg>
+            </span>
+            <span>Send all your comments to Mark for updates</span>
+          </li>
+        </ol>
+        <div className="edit-tutorial__foot">
+          <span className="edit-tutorial__note">Don’t forget to send!</span>
+          <button type="button" className="edit-tutorial__ok" onClick={onTutorialDone} autoFocus>
+            Got it
+          </button>
+        </div>
       </div>
     ) : null;
 
@@ -1098,6 +1153,7 @@ function EditMode({ active, onClose, onSent, page, variant, editorEmail, control
           {docLayer}
           {commentPopup}
           {hint}
+          {tutorialCard}
           {thanksSplash}
           {liveCard}
           {liveHud}

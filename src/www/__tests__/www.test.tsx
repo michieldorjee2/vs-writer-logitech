@@ -696,6 +696,16 @@ test('booth chrome on a www page is solid, with no backdrop blur (it flickered w
   assert.match(rail, /\.booth-rail \{[^}]*background: var\(--booth-page\)/)
 })
 
+test('a comment badge pops from its own centre and moves with its box', () => {
+  // Michiel, 6 Nov: the little "1" "jumps all over". An SVG element scales from the document's
+  // corner unless told otherwise, and the badge was placed once while its box kept moving.
+  const css = readFileSync('src/styles/edit-mode.css', 'utf8')
+  const badge = css.match(/\.edit-box__badge \{([^}]*)\}/)?.[1] ?? ''
+  assert.match(badge, /transform-box: fill-box/)
+  const src = readFileSync('src/components/EditMode.tsx', 'utf8')
+  assert.match(src, /badgeRefs\.current\.get\(e\.section\.id\)\?\.setAttribute\('transform', badgeAt\(o\)\)/)
+})
+
 test('every FAQ question and answer is in the server HTML as FAQPage data (answers open on click)', () => {
   assert.equal(faqLd?.['@type'], 'FAQPage')
   assert.deepEqual(

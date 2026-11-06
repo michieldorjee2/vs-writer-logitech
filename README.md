@@ -99,7 +99,7 @@ Unset `OPTIID_RELAY_SECRET` means no gate, and no identity unless `DEV_AUTH_EMAI
 
 The showcase's "Edit mode" (`src/components/EditMode.tsx` + `api/opal-edit-stream.ts`) streams the `account_page_live_edit` Opal specialized agent over SSE and animates its edits on-page before the agent commits a single `update_page`. It absorbed the retired standalone `aldus-live-edit` app (June 2026).
 
-It runs in the booth rail (below): pressing Edit folds the other tools out of the rail and slides Send in under it, with the number of comments waiting; Edit again, or Escape, leaves. A note at the top says what to do until the first comment. The comment popup, Mark's status and change cards, the thanks splash, the "edits are live" toast and the still-working popup all use the rail's surfaces and type, light or dark with the system (`src/styles/edit-mode.css`).
+It runs in the booth rail (below): pressing Edit folds the other tools out of the rail and slides Send in under it, with the number of comments waiting; the rail's first button turns from Search into Close, and "?" at its foot replays the tutorial. The first Edit in a browser opens with that tutorial (click an element, tell Mark what to change, send all your comments; don't forget to send), with Send pulsing in the rail. Close, Edit again, or Escape leaves. Until the first comment a note at the top says what to do. Mark edits the page live and reloads it when done, so there is no waiting timer on the Edit button. The comment popup, Mark's status and change cards, the tutorial and the thanks splash use the rail's surfaces and type, light or dark with the system (`src/styles/edit-mode.css`).
 
 Server-side environment (Vercel project `aldus`; also in local `.env.local`):
 
