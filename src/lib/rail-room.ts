@@ -12,7 +12,15 @@ export function railRoomMade(): boolean {
   return typeof document !== 'undefined' && document.documentElement.classList.contains(RAIL_ROOM);
 }
 
-/** The rail holds the room now (or there is no rail): the boot script's class goes. */
-export function dropRailRoom(): void {
-  if (typeof document !== 'undefined') document.documentElement.classList.remove(RAIL_ROOM);
+/**
+ * The rail holds the room now (or there is no rail): the boot script's class goes, and its stand-in
+ * for the rail's ground (`.vt-rail-shell`) after `shellAfterMs`, once the rail has slid over it.
+ */
+export function dropRailRoom(shellAfterMs = 0): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.remove(RAIL_ROOM);
+  const shell = document.querySelector('.vt-rail-shell');
+  if (!shell) return;
+  if (shellAfterMs > 0) window.setTimeout(() => shell.remove(), shellAfterMs);
+  else shell.remove();
 }

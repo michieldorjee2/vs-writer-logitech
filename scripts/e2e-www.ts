@@ -1022,12 +1022,19 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     mine: [],
     viewer: SEARCH_ME,
   }
+  // One running offer with one page: the offer page the suite already reads (OFFER).
+  const offerPage = { route: OFFER.replace(/^\//, ''), companyName: 'Scale AI', domain: 'scale.com', logoUrl: null, published: '2026-11-01T00:00:00Z' }
+  const running = { id: 'e2e-offer', title: 'No account left behind', windowStart: '2026-11-01', windowEnd: '2026-12-31', look: null, pages: [offerPage], fromSearch: 'off' }
   const vtContext = async (opts: { reducedMotion?: 'reduce' } = {}) => {
     const ctx = await vtBrowser.newContext({ ...VIEWPORTS.desktop, serviceWorkers: 'block', reducedMotion: opts.reducedMotion ?? 'no-preference', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
     const watch: Watch = { errors: [], escaped: [] }
     await ctx.route('**/api/auth/me', (route) => route.fulfill({ json: { email: SEARCH_ME, name: 'E2E' } }))
     await ctx.route('**/api/home-index', (route) => route.fulfill({ json: index }))
-    await ctx.route('**/api/offers', (route) => route.fulfill({ json: { offers: [] } }))
+    await ctx.route('**/api/offers', (route) => route.fulfill({ json: { offers: [running] } }))
+    await ctx.route('**/api/offers/**', (route) => {
+      watch.escaped.push(route.request().url())
+      return route.fulfill({ status: 404, json: { error: 'not in this test' } })
+    })
     await ctx.route('**/api/page-builds', (route) => route.fulfill({ json: { builds: [] } }))
     await ctx.route('**/api/edit-status**', (route) => route.fulfill({ json: { changed: false, published: '2026-01-01T00:00:00.000Z' } }))
     // The booth rail's own reads: no Report (it shows its error state), no shared links yet.
@@ -1062,17 +1069,28 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
           const railOut = document
             .getAnimations()
             .some((a) => (a.effect as KeyframeEffect | null)?.pseudoElement === '::view-transition-old(vt-rail)' && (a as CSSAnimation).animationName === 'vt-rail-out')
+          const hero = document.querySelector('.www-hero__img')
           w.__vt.push({
             at: 'ready',
+            t: performance.now(),
             groups: [...new Set(groups)],
             types: vt.types ? [...vt.types] : [],
             logoLeft: logo ? Math.round(logo.getBoundingClientRect().left) : null,
             room: getComputedStyle(document.body).paddingLeft,
             railOut,
+            heroContent: hero ? getComputedStyle(hero).content : null,
+            // Which animation each part runs ("::view-transition-old(vt-scene) vt-scene-square").
+            moves: document
+              .getAnimations()
+              .map((a) => `${(a.effect as KeyframeEffect | null)?.pseudoElement ?? ''} ${(a as CSSAnimation).animationName ?? ''}`)
+              .filter((m) => m.startsWith('::view-transition')),
           })
         })
         // A tick later: the page's own clean-up runs on the same promise, after this one.
-        vt?.finished.then(() => setTimeout(() => w.__vt.push({ at: 'finished', named: document.querySelectorAll('[data-vt-named]').length }), 0))
+        vt?.finished.then(() => {
+          const t = performance.now()
+          setTimeout(() => w.__vt.push({ at: 'finished', t, named: document.querySelectorAll('[data-vt-named]').length }), 0)
+        })
       })
     })
     return { ctx, watch }
@@ -1082,12 +1100,19 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     const t0 = Date.now()
     while (Date.now() - t0 < 8000) {
       const entries = await log(page).catch(() => [])
-      const ready = [...entries].reverse().find((x) => x.at === 'ready') as { groups: string[]; types: string[]; logoLeft: number | null; room: string; railOut: boolean } | undefined
-      if (ready && entries.some((x) => x.at === 'finished')) return ready
+      const ready = [...entries].reverse().find((x) => x.at === 'ready') as
+        | { t: number; groups: string[]; types: string[]; logoLeft: number | null; room: string; railOut: boolean; heroContent: string | null; moves: string[] }
+        | undefined
+      const finished = [...entries].reverse().find((x) => x.at === 'finished') as { t: number } | undefined
+      // How long it ran: a transition the page cancels (its own start, a resize) ends in a few ms.
+      if (ready && finished) return { ...ready, ran: Math.round(finished.t - ready.t) }
       await page.waitForTimeout(100)
     }
     return null
   }
+  /** The photograph the search page shows: its top layer that is in. */
+  const searchPhoto = (page: Page) =>
+    page.evaluate(() => ([...document.querySelectorAll('.sh-scene__layer.is-in .sh-scene__img')].pop() as HTMLImageElement | undefined)?.currentSrc ?? '')
   const search = async (page: Page, q: string) => {
     await page.goto(url('/search'), { waitUntil: 'domcontentloaded' })
     await page.locator('.sh-search__input').waitFor({ timeout: 10000 })
@@ -1110,17 +1135,37 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
       const optIn = head.search(/<style>@view-transition\s*\{\s*navigation:\s*auto;?\s*\}/)
       const firstOther = head.search(/<script|<link rel="stylesheet"/)
       expect(optIn >= 0 && optIn < firstOther, `${path}: the opt-in is not inline ahead of the scripts and stylesheets (at ${optIn}, first script or stylesheet at ${firstOther})`)
+      // The first paint, the one the transition lands on, waits for the hero (the search box).
+      const expects = path === '/search' ? '#sh-q' : '#hero'
+      expect(head.includes(`<link rel="expect" href="${expects}" blocking="render"`), `${path}: the first paint doesn't wait for ${expects}`)
     }
   })
-  await test('a search result opens its page in the same tab, and the row, the wordmark and the photograph move into it', async () => {
+  await test('a search result opens its page in the same tab, and the row, the wordmark and the photograph move into it, the whole way', async () => {
     await search(page, 'cdw')
+    const photo = await searchPhoto(page)
     await page.locator(`[data-vt-slug="${slug}"]`).click()
     await page.waitForURL(`**${ACCOUNT.replace(/\/$/, '')}?search=1`, { timeout: 10000 })
     await page.locator('.www-page').waitFor({ timeout: 10000 })
     const ready = await lastReady(page)
     expect(ready, `no view transition on the account page: ${JSON.stringify(await log(page))}`)
-    for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
-    expect(ready.types.includes('from-search'), `types: ${ready.types}`)
+    for (const g of ['vt-scene', 'vt-frame', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
+    expect(ready.types.includes('from-search') && ready.types.includes('carry-scene'), `types: ${ready.types}`)
+    // It runs its course (620 ms): the app starts after it, not during it (it cancelled the morph).
+    expect(ready.ran >= 500, `the transition was cut short after ${ready.ran} ms`)
+    // The hero shows the search page's photograph, so the photograph moves without a cross-fade.
+    expect(!!photo && (ready.heroContent ?? '').includes(photo), `the hero's photograph is ${ready.heroContent}, the search page showed ${photo}`)
+    // One photograph moves (the search page's), the page's own stays out of it; the headline with
+    // the search box and the lists travel down off the window.
+    for (const m of [
+      '::view-transition-old(vt-scene) vt-scene-square',
+      '::view-transition-old(vt-search-lift) vt-search-down',
+      '::view-transition-old(vt-search-panel) vt-search-down',
+      // The frame opens into the hero block; the rail's ground slides in with its left edge.
+      '::view-transition-image-pair(vt-frame) vt-frame-open',
+      '::view-transition-new(vt-rail-shell) vt-rail-ground-in',
+    ])
+      expect(ready.moves.includes(m), `not running: ${m} (${ready.moves.join(', ')})`)
+    expect(!ready.moves.some((m) => m.startsWith('::view-transition-new(vt-scene) -ua-')), 'the photograph cross-fades')
     expect(await page.evaluate(() => document.documentElement.classList.contains('vt-in')), 'the hero intro played under the morph')
     expect(ctx.pages().length === 1, 'opened in a new tab')
   })
@@ -1132,11 +1177,13 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     const after = await page.evaluate(() => ({
       logoLeft: Math.round(document.querySelector('.www-hero .www-account__logo')!.getBoundingClientRect().left),
       room: document.documentElement.classList.contains('vt-rail-room'),
+      ground: document.querySelectorAll('.vt-rail-shell').length,
       rail: document.documentElement.classList.contains('booth-page--rail'),
       railRight: Math.round(document.querySelector('.booth-rail')!.getBoundingClientRect().right),
     }))
     expect(ready?.logoLeft === after.logoLeft, `the hero's logo moved after the morph, from ${ready?.logoLeft} to ${after.logoLeft} px`)
     expect(!after.room && after.rail, `the rail did not take its room over (vt-rail-room ${after.room}, booth-page--rail ${after.rail})`)
+    expect(after.ground === 0, `the rail's stand-in ground is still there (${after.ground})`)
     expect(after.railRight === 64, `the rail is not in place: its right edge at ${after.railRight} px`)
   })
   await test("back to search with the rail's Search button: the page comes back as it was (query, list), the logo flies back into its row, the rail slides away", async () => {
@@ -1149,7 +1196,10 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     expect(ready, 'no view transition back to the search page')
     for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name', 'vt-search-top', 'vt-search-lift', 'vt-search-panel', 'vt-rail']) expect(ready.groups.includes(g), `${g} did not animate: ${ready.groups.join(', ')}`)
     expect(ready.railOut, 'the rail did not slide out (vt-rail-out)')
-    expect(ready.types.includes('to-search'), `types: ${ready.types}`)
+    expect(ready.types.includes('to-search') && ready.types.includes('carry-scene'), `types: ${ready.types}`)
+    // The same photograph comes back alone, and the headline with the box and the lists rise back up.
+    for (const m of ['::view-transition-new(vt-scene) vt-scene-round', '::view-transition-new(vt-search-lift) vt-search-up', '::view-transition-new(vt-search-panel) vt-search-up', '::view-transition-image-pair(vt-frame) vt-frame-close'])
+      expect(ready.moves.includes(m), `not running: ${m} (${ready.moves.join(', ')})`)
     const done = [...entries].reverse().find((x) => x.at === 'finished') as { named: number }
     expect(done.named === 0, `${done.named} element(s) kept a transition name`)
   })
@@ -1160,6 +1210,42 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     const ready = await lastReady(page)
     expect(ready, 'no view transition on the person page')
     for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
+    expect(ready.ran >= 500 && ready.types.includes('carry-scene'), `cut short after ${ready.ran} ms, or the photograph not carried (${ready.types})`)
+  })
+  await test("an offer opens in the same tab too, and morphs the same way, with the search page's photograph", async () => {
+    // The search page run as the offer (its cookie), so its page shows among the answers. The
+    // cookie comes with the offers list, after the server drew /search: the server never reads the
+    // real offers for it. The offer's look is drawn from a local photograph.
+    const look = {
+      headline: 'No account left behind',
+      background: { base: '/e2e-look', aspect: 1.6, lqip: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', sourceUrl: 'https://example.com/photo', license: 'stock' },
+      madeBy: 'e2e',
+      madeAt: '2026-11-01T00:00:00Z',
+    }
+    await page.route('**/api/offers', (route) =>
+      route.fulfill({ json: { offers: [{ ...running, look }] }, headers: { 'set-cookie': 'sh_offer=e2e-offer; Path=/; SameSite=Lax' } }),
+    )
+    await page.route('**/e2e-look/*', (route) => {
+      const avif = route.request().url().endsWith('.avif')
+      return route.fulfill({ contentType: avif ? 'image/avif' : 'image/webp', body: fs.readFileSync(`public/home/scenes/v1/river-wide-1600.${avif ? 'avif' : 'webp'}`) })
+    })
+    await search(page, 'scale')
+    await page.locator(`[data-vt-slug="${OFFER.replace(/^\/|\/$/g, '')}"]`).waitFor({ timeout: 10000 })
+    // The offer's photograph, once it has faded in over the page's.
+    await page.waitForFunction(() => ([...document.querySelectorAll('.sh-scene__layer.is-in .sh-scene__img')].pop() as HTMLImageElement | undefined)?.currentSrc.includes('/e2e-look/'), null, { timeout: 10000 })
+    const photo = await searchPhoto(page)
+    await page.locator(`[data-vt-slug="${OFFER.replace(/^\/|\/$/g, '')}"]`).click()
+    await page.locator('.www-page').waitFor({ timeout: 15000 })
+    expect(new URL(page.url()).pathname.replace(/\/$/, '') === OFFER.replace(/\/$/, ''), `opened ${page.url()}`)
+    expect(ctx.pages().length === 1, 'opened in a new tab')
+    const ready = await lastReady(page)
+    expect(ready, 'no view transition on the offer page')
+    for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
+    expect(ready.ran >= 500, `cut short after ${ready.ran} ms`)
+    expect(!!photo && (ready.heroContent ?? '').includes(photo), `the offer's hero shows ${ready.heroContent}, the search page showed ${photo}`)
+    await page.unroute('**/api/offers')
+    await page.unroute('**/e2e-look/*')
+    await ctx.clearCookies({ name: 'sh_offer' })
   })
   await test('Cmd/Ctrl-click still opens a new tab, and the search page stays', async () => {
     await search(page, 'cdw')
