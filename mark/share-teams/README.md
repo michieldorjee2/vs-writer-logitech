@@ -3,7 +3,7 @@
 When a rep presses **Send on Teams** on a Showcase page's Share card, Mark's **Showcase share to Teams** workflow messages that rep the page's link, with their personal link and note when they made one, and what the page has seen. It is a webhook trigger and one code step, with no agent and no model, so a message costs about 4 credits.
 
 - Workflow: `showcase_share_teams` (`dfaa30dc-53a1-4123-a672-9c25211955c6`), owned by Michiel. Private, with private runs, because each run stores the request's headers, the trigger key among them.
-- Trigger: a webhook (`d2bade82-daaf-43d8-a37a-c1053a45c9bb`) that only accepts posts carrying the `x-showcase-key` header. Its URL and key are in Vercel as `SHARE_TEAMS_WEBHOOK_URL` and `SHARE_TEAMS_WEBHOOK_KEY`, on `feat/admin-analytics` previews for now. Only `api/share-send.ts` posts to it.
+- Trigger: a webhook (`d2bade82-daaf-43d8-a37a-c1053a45c9bb`) that only accepts posts carrying the `x-showcase-key` header. Its URL and key are in Vercel as `SHARE_TEAMS_WEBHOOK_URL` and `SHARE_TEAMS_WEBHOOK_KEY`, on Production and the `feat/admin-analytics` previews. Only `api/share-send.ts` posts to it.
 - Sender: Mark runs a webhook workflow as the person who created the trigger, so the messages come from Michiel's account. Michiel's own requests go to his Teams notes chat (`48:notes`); anyone else's open a 1:1 chat between them and Michiel.
 
 ## What the step does

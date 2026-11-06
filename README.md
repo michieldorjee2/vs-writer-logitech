@@ -146,7 +146,7 @@ Links live in Upstash Redis for 400 days (`api/_lib/share-store.ts`): the link (
 
 Env:
 
-- `SHARE_TEAMS_WEBHOOK_URL`, `SHARE_TEAMS_WEBHOOK_KEY`: the share workflow's webhook and its `x-showcase-key` (this branch's previews for now; Production when it ships). Unset, Send on Teams answers 503.
+- `SHARE_TEAMS_WEBHOOK_URL`, `SHARE_TEAMS_WEBHOOK_KEY`: the share workflow's webhook and its `x-showcase-key` (Production, and `feat/admin-analytics` previews). Unset, Send on Teams answers 503.
 - `OPAL_PAT`: Mark's API, for the email agent (Production, and this branch's previews). `SHARE_EMAIL_AGENT_ID` overrides the agent (default `73f146bc-a052-4d5f-be22-06fc36f010cd`).
 - `ODP_PRIVATE_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`: as for the Report.
 
