@@ -5,6 +5,9 @@
    page's whole stylesheet: home.html loads nothing else.
    ============================================================ */
 
+/* Cross-document view transitions to and from the pages it opens (account and person pages load it too). */
+@import './view-transitions.css';
+
 /* The two cuts the page draws with first are preloaded in home.html. */
 @font-face {
   font-family: 'VC Nudge';
@@ -129,6 +132,17 @@ html, body { margin: 0; background: #f9fcf8; }
   inset: 0;
 }
 .sh-scene { overflow: hidden; }
+/* The view transition's moving parts (view-transitions.css): the photograph becomes the hero's,
+   the wordmark the hero's. The row you open names its own logo and name (the boot script). The
+   page's own layers above the photograph (the top bar, the headline and search box, the lists,
+   the badge scanner's lanyard when it is up) are named too, so they stay above it while it
+   moves, fading out and back in. */
+.sh-scene { view-transition-name: vt-scene; }
+.sh-top__logo { view-transition-name: vt-wordmark; }
+.sh-top { view-transition-name: vt-search-top; }
+.sh-lift { view-transition-name: vt-search-lift; }
+.sh-panel { view-transition-name: vt-search-panel; }
+.lanyard { view-transition-name: vt-search-lanyard; }
 /* One photograph per layer. A new one (an offer's look) is laid over the last
    and fades in once it has loaded; then the one under it goes. */
 .sh-scene__layer { position: absolute; inset: 0; overflow: hidden; }

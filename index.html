@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Cross-document view transitions to and from the search page (src/lib/view-transitions-boot.js, written in by vite.config.ts). -->
+    <script data-view-transitions-boot></script>
     <!-- A signed-in Optimizely person (the showcase_staff mark, src/lib/staff-marker.ts) is never
          sent to ODP. The snippet below loads ODP's universal tag (oiq.min.js) itself, and turning
          its tracking off does not stop that (it still posted to logx /v1/ingest, 4 Nov 2026), so

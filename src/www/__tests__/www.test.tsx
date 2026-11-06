@@ -28,6 +28,7 @@
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 import { renderToString } from 'react-dom/server'
 import type { CompetitorComparisonPage, PersonPage as PersonPageData } from '../../lib/graph-types'
 import AccountPage, { connectProps } from '../AccountPage'
@@ -2236,6 +2237,203 @@ testAsync('a person page draft comes back from /api/preview with the live fields
     assert.equal(page.__typename, 'PersonPage')
     assert.match(textOf(renderToString(<PersonPage page={page} />)), /P-note-body/)
   })
+})
+
+console.log('\nview transitions: the search page and the pages it opens')
+
+test('both documents opt in to cross-document view transitions, and a reader asking for less motion is left out', () => {
+  const optIn = readFileSync('src/styles/view-transitions-opt-in.css', 'utf8')
+  assert.match(optIn, /@view-transition \{\s*navigation: auto;\s*\}/)
+  assert.match(optIn, /@media \(prefers-reduced-motion: reduce\) \{\s*@view-transition \{\s*navigation: none;/)
+  // One source: the opt-in is inlined at the top of both <head>s, never also in a stylesheet,
+  // which the page you arrive on can read too late (it then drops the transition).
+  assert.doesNotMatch(readFileSync('src/styles/view-transitions.css', 'utf8'), /@view-transition \{/)
+  assert.match(readFileSync('src/index.css', 'utf8'), /@import '\.\/styles\/view-transitions\.css';/)
+  assert.match(readFileSync('src/styles/search-home.css', 'utf8'), /@import '\.\/view-transitions\.css';/)
+  // The boot script goes into both <head>s, before the stylesheets and any module, as a classic script.
+  for (const f of ['index.html', 'home.html']) {
+    const html = readFileSync(f, 'utf8')
+    const head = html.slice(0, html.indexOf('</head>'))
+    assert.ok(head.includes('<script data-view-transitions-boot></script>'), `${f}: no boot placeholder in <head>`)
+    assert.ok(head.indexOf('data-view-transitions-boot') < head.indexOf('<link rel="stylesheet"') || !head.includes('<link rel="stylesheet"'), `${f}: the boot script comes after a stylesheet`)
+  }
+  const vite = readFileSync('vite.config.ts', 'utf8')
+  assert.match(vite, /viewTransitionsBoot\(\),\s*stripHtmlComments\(\)/)
+  assert.match(vite, /order: 'pre'/)
+  assert.match(vite, /src\/styles\/view-transitions-opt-in\.css/)
+  assert.match(vite, /`<style>\$\{optIn\}<\/style>\\n {4}<script>\$\{source\.trim\(\)\}<\/script>`/)
+})
+
+test('the parts that move carry one name each, on every page the search page opens and on the search page', () => {
+  const www = readFileSync('src/www/www.css', 'utf8')
+  for (const [sel, name] of [
+    ['.www-page .www-strip__logo', 'vt-wordmark'],
+    ['.www-page .www-hero__visual', 'vt-scene'],
+    ['.www-page .www-hero .www-account__logo', 'vt-logo'],
+    ['.www-page .www-hero .www-account__label', 'vt-name'],
+  ]) {
+    assert.match(www, new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{\\s*view-transition-name: ${name};`), `${sel} → ${name}`)
+  }
+  const home = readFileSync('src/styles/search-home.css', 'utf8')
+  for (const [sel, name] of [['.sh-scene', 'vt-scene'], ['.sh-top__logo', 'vt-wordmark'], ['.sh-top', 'vt-search-top'], ['.sh-lift', 'vt-search-lift'], ['.sh-panel', 'vt-search-panel'], ['.lanyard', 'vt-search-lanyard']]) {
+    assert.match(home, new RegExp(`\\${sel} \\{ view-transition-name: ${name}; \\}`), `${sel} → ${name}`)
+  }
+  // Two elements with one name cancel the whole transition: each named part is drawn once.
+  const pages: Array<[string, string]> = [
+    ['takeout', accountHtml],
+    ['agent platform', renderToString(<AgentPlatformPage page={stackPage()} />)],
+    ['person', renderToString(<PersonPage page={fullPersonPage()} />)],
+    ['offer', renderToString(<OfferPage experience={fullOffer()} />)],
+  ]
+  for (const [name, html] of pages) {
+    for (const cls of ['www-strip__logo', 'www-hero__visual', 'www-account__logo', 'www-account__label']) {
+      const n = (html.match(new RegExp(`class="[^"]*\\b${cls}\\b`, 'g')) || []).length
+      assert.equal(n, 1, `${name}: ${cls} is drawn ${n} times`)
+    }
+  }
+  // Arriving by the morph, the hero skips its own intro.
+  for (const sel of ['.www-hero [data-reveal]', '.www-hero .www-w', '.www-strip', '.www-hero__visual', '.www-hero__img']) {
+    assert.ok(www.includes(`.vt-in .www-page ${sel}`), `${sel} still plays its intro under the morph`)
+  }
+})
+
+test("the search page opens a result in the same tab (Cmd/Ctrl/Shift or a middle click: a new one), each row naming its page", () => {
+  const src = readFileSync('src/components/SearchHome.tsx', 'utf8')
+  assert.match(src, /window\.location\.assign\(href\)/)
+  assert.match(src, /if \(newTab\) \{\s*window\.open\(href, '_blank', 'noopener,noreferrer'\)/)
+  assert.match(src, /onClick: \(e: React\.MouseEvent\) => pick\(row, e\.metaKey \|\| e\.ctrlKey \|\| e\.shiftKey\)/)
+  assert.match(src, /if \(e\.button === 1\) pick\(row, true\)/)
+  assert.match(src, /data-vt-slug=\{item\.kind === 'company' \? item\.entry\.slug : item\.person\.slug\}/)
+})
+
+/** Runs the boot script against a stand-in page; returns what it did. */
+function bootOn(where: string, opts: { from?: string; heroBottom?: number; phone?: boolean; rail?: string | null; storageThrows?: boolean } = {}) {
+  type El = { attrs: Map<string, string>; style: { viewTransitionName: string }; children: Record<string, El> }
+  const el = (attrs: Record<string, string> = {}, children: Record<string, El> = {}): El => ({ attrs: new Map(Object.entries(attrs)), style: { viewTransitionName: '' }, children })
+  const rows = ['cdw', 'logitech/ben-yu'].map((slug) => el({ 'data-vt-slug': slug }, { '.sh-tile': el(), '.sh-row__name': el() }))
+  const all = rows.flatMap((r) => [r, ...Object.values(r.children)])
+  const wrap = (e: El) => ({
+    get style() {
+      return e.style
+    },
+    getAttribute: (k: string) => e.attrs.get(k) ?? null,
+    setAttribute: (k: string, v: string) => void e.attrs.set(k, v),
+    removeAttribute: (k: string) => void e.attrs.delete(k),
+    querySelector: (sel: string) => (e.children[sel] ? wrap(e.children[sel]) : null),
+  })
+  const classes = new Set<string>()
+  const handlers: Record<string, (e: unknown) => void> = {}
+  const win = {
+    onpagereveal: null,
+    innerHeight: 900,
+    location: { href: `https://showcase.optimizely.com${where}`, search: new URL(`https://showcase.optimizely.com${where}`).search },
+    matchMedia: (q: string) => ({ matches: q === '(max-width: 640px)' && Boolean(opts.phone) }),
+    localStorage: {
+      getItem: (k: string) => {
+        if (opts.storageThrows) throw new Error('SecurityError')
+        return k === 'opti.booth.rail' ? (opts.rail ?? null) : null
+      },
+    },
+    navigation: opts.from ? { activation: { from: { url: `https://showcase.optimizely.com${opts.from}` } } } : undefined,
+    addEventListener: (type: string, fn: (e: unknown) => void) => void (handlers[type] = fn),
+    URL,
+    document: {
+      documentElement: { classList: { add: (c: string) => void classes.add(c), remove: (c: string) => void classes.delete(c), contains: (c: string) => classes.has(c) } },
+      getElementById: (id: string) => (id === 'hero' && opts.heroBottom !== undefined ? { getBoundingClientRect: () => ({ bottom: opts.heroBottom }) } : null),
+      querySelectorAll: (sel: string) =>
+        sel === '[data-vt-slug]' ? rows.map(wrap) : sel === '[data-vt-named]' ? all.filter((e) => e.attrs.has('data-vt-named')).map(wrap) : [],
+    },
+  }
+  runInNewContext(readFileSync('src/lib/view-transitions-boot.js', 'utf8'), { window: win, ...win })
+  const named = () => Object.fromEntries(rows.flatMap((r) => Object.entries(r.children).filter(([, c]) => c.style.viewTransitionName).map(([sel, c]) => [`${r.attrs.get('data-vt-slug')} ${sel}`, c.style.viewTransitionName])))
+  let finish = () => {}
+  const transition = () => {
+    const types = new Set<string>()
+    const finished = new Promise<void>((resolve) => (finish = resolve))
+    return { types, finished, ready: Promise.resolve() }
+  }
+  return { handlers, classes, named, transition, finish: () => finish() }
+}
+
+testAsync('the boot script names only the row you open, and the row you come back from, then lets go', async () => {
+  // Leaving the search page for a person page: that row's logo and name, nothing else.
+  const out = bootOn('/search')
+  out.handlers.pageswap({ viewTransition: out.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/logitech/ben-yu?search=1' } } })
+  assert.deepEqual(out.named(), { 'logitech/ben-yu .sh-tile': 'vt-logo', 'logitech/ben-yu .sh-row__name': 'vt-name' })
+  // Back on the search page from CDW: CDW's row takes the names, and gives them up when it is done.
+  const back = bootOn('/search', { from: '/cdw?search=1' })
+  const vt = back.transition()
+  back.handlers.pagereveal({ viewTransition: vt })
+  assert.deepEqual(back.named(), { 'cdw .sh-tile': 'vt-logo', 'cdw .sh-row__name': 'vt-name' })
+  assert.deepEqual([...vt.types], ['to-search'])
+  back.finish()
+  await new Promise((r) => setTimeout(r, 0))
+  assert.deepEqual(back.named(), {})
+  // No transition (a reload, reduced motion): nothing is named.
+  const plain = bootOn('/search', { from: '/cdw' })
+  plain.handlers.pagereveal({ viewTransition: null })
+  assert.deepEqual(plain.named(), {})
+})
+
+test('the boot script on a page: from the search page it skips the hero intro; scrolled past the hero it morphs nothing', () => {
+  const page = bootOn('/cdw', { from: '/search?q=cdw' })
+  const vt = page.transition()
+  page.handlers.pagereveal({ viewTransition: vt })
+  assert.ok(page.classes.has('vt-in'))
+  assert.deepEqual([...vt.types], ['from-search'])
+  // Leaving with the hero scrolled away: no flight in from above the window.
+  const far = bootOn('/cdw', { heroBottom: 100 })
+  far.handlers.pageswap({ viewTransition: far.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/search' } } })
+  assert.ok(far.classes.has('vt-far'))
+  const near = bootOn('/cdw', { heroBottom: 700 })
+  near.handlers.pageswap({ viewTransition: near.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/search' } } })
+  assert.ok(!near.classes.has('vt-far'))
+  // Restored later, the page morphs again.
+  far.handlers.pagereveal({ viewTransition: null })
+  assert.ok(!far.classes.has('vt-far'))
+})
+
+test('opened from the search page with the booth rail open, a page makes the rail its room before the first paint', () => {
+  const reveal = (where: string, opts: Parameters<typeof bootOn>[1] = {}, transition = true) => {
+    const page = bootOn(where, { from: '/search?q=cdw', ...opts })
+    page.handlers.pagereveal({ viewTransition: transition ? page.transition() : null })
+    return page.classes.has('vt-rail-room')
+  }
+  assert.ok(reveal('/cdw/?search=1'), 'a desktop, no choice made yet: the rail opens')
+  assert.ok(reveal('/logitech/ben-yu/?search=1', { rail: 'open' }), 'a person page, the rail left open')
+  assert.ok(reveal('/cdw/?search=1', { storageThrows: true }), 'a private window: the rail opens')
+  assert.ok(!reveal('/cdw/?search=1', { rail: 'collapsed' }), 'the rail folded away stays folded: no room')
+  assert.ok(!reveal('/cdw/?search=1', { phone: true }), 'a phone: the rail lies over the page')
+  assert.ok(!reveal('/cdw/', {}), 'no ?search: no rail')
+  assert.ok(!reveal('/cdw/?search=1', { from: '/smartsheet/?search=1' }), 'not from the search page')
+  assert.ok(!reveal('/cdw/?search=1', {}, false), 'no view transition (reduced motion): the rail slides in with the page as it always did')
+  // The boot script reads the rail's own setting: the same key, the same phone width.
+  const boot = readFileSync('src/lib/view-transitions-boot.js', 'utf8')
+  const rail = readFileSync('src/components/FloatingSidebar.tsx', 'utf8')
+  const key = rail.match(/const RAIL_KEY = '([^']+)'/)?.[1]
+  const phone = rail.match(/const PHONE = '([^']+)'/)?.[1]
+  assert.ok(key && boot.includes(`localStorage.getItem('${key}') !== 'collapsed'`), `the boot script reads ${key}`)
+  assert.ok(phone && boot.includes(`matchMedia('${phone}')`), `the boot script's phone is ${phone}`)
+})
+
+testAsync("the rail takes its room over as it mounts, gives it back when there's no rail, and slides out on the way back to Search", async () => {
+  const { RAIL_ROOM } = await import('../../lib/rail-room')
+  assert.equal(RAIL_ROOM, 'vt-rail-room')
+  const rail = readFileSync('src/components/FloatingSidebar.tsx', 'utf8')
+  assert.match(rail, /const \[roomMade\] = useState\(railRoomMade\);/)
+  assert.match(rail, /const railRoom = railShown \|\| \(roomMade && !entered\);/)
+  assert.match(rail, /root\.classList\.toggle\('booth-page--rail', railRoom\);\s*dropRailRoom\(\);/)
+  assert.match(rail, /if \(auth\.status === 'signed-out'\) dropRailRoom\(\);/)
+  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
+  // The room, at the rail's width (booth-rail.css), on www pages and not on a phone.
+  const width = readFileSync('src/styles/booth-rail.css', 'utf8').match(/--booth-rail-w: (\d+px);/)?.[1]
+  assert.match(css, new RegExp(`html\\.vt-rail-room body:has\\(\\.www-page\\) \\{\\s*padding-left: ${width};`))
+  assert.match(css, /@media \(max-width: 640px\) \{\s*html\.vt-rail-room body:has\(\.www-page\) \{\s*padding-left: 0;/)
+  // The rail and its folded button: named, and slid only when the other page has none.
+  assert.match(css, /\.booth-rail \{\s*view-transition-name: vt-rail;/)
+  assert.match(css, /\.booth-rail-mini \{\s*view-transition-name: vt-rail-mini;/)
+  assert.match(css, /::view-transition-old\(vt-rail\):only-child \{\s*animation: vt-rail-out /)
+  assert.match(css, /::view-transition-new\(vt-rail\):only-child \{\s*animation: vt-rail-in /)
 })
 
 console.log('\nthe CTA ping: the click reaches the account executive, or the follow-up sheet')
