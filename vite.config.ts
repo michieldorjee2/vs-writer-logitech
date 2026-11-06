@@ -593,7 +593,7 @@ export default defineConfig(({ mode }) => {
         '@/': path.resolve(import.meta.dirname, 'src/vendor/opticom') + '/',
         /*
          * The icon font's stylesheet, src/main.tsx's `import 'material-symbols/rounded.css'`: the
-         * same face and class with the icons this site draws (145 kB) in place of the package's
+         * same face and class with the icons this site draws (151 kB) in place of the package's
          * every icon (5.4 MB). See src/styles/material-symbols/rounded.css.
          */
         'material-symbols/rounded.css': path.resolve(import.meta.dirname, 'src/styles/material-symbols/rounded.css'),

@@ -41,7 +41,7 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:www
+npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:icons, check:perf, check:www
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
@@ -246,6 +246,18 @@ npm run check:badge                    # the flow, the detector, the sorting rul
 npm run check:badge-ocr                # Tesseract on 16 made-up badges (server/fixtures/badges)
 python3 scripts/make-badge-fixtures.py # redraw those badges
 ```
+
+## Speed: the detail pages
+
+Measured 6 November with the `web-perf` harness (Lighthouse median of 3) and curl, and fixed where the time went. Four things keep them fast; each has a check.
+
+The icon font is a subset. Material Symbols Rounded is 5.4 MB in the `material-symbols` package and was 85% of a detail page's weight. `src/main.tsx`'s `import 'material-symbols/rounded.css'` resolves to `src/styles/material-symbols/rounded.css` (an alias in `vite.config.ts`), whose font has only the 112 icons `src` draws (151 kB, the same glyphs pixel for pixel; no icon outside it on 100 sampled live pages). Drawing a new icon in code means running `npm run icons:subset` (it asks Google Fonts for the subset) and committing `src/styles/material-symbols/`; `npm run check:icons` fails until you do. A name only the CMS knows still draws: `src/lib/icon-font.ts` sees it on the page and loads the whole font.
+
+React has its own chunk. Rolldown (Vite 8) gives each `codeSplitting` group its modules' dependencies, so the groups have priorities with React's first; otherwise `vendor-motion` takes React and every page loads framer-motion before it can run.
+
+The server render reads Graph once, in parallel. A slug can be a person, retail, fin-serv or account page, and those reads (with the build lookup) now run together and answer in the old order (`server/reads.ts`). An uncached account page renders in about 180 ms instead of 390. Each renderer's lazy chunks (and the booth rail's, on `?search=1`) are preloaded at low priority from Vite's manifest (`scripts/build-ssr.mjs`), so hydration does not wait for `main.js` to ask for them.
+
+The search page gets the next page ready. The row a rep rests on (hover, arrow keys, or the top result as they type) is prerendered with a Speculation Rules list rule, at most two at a time, or requested once to warm the edge cache where the browser has no Speculation Rules (`src/lib/warm-pages.ts`). Everyone on `/search` carries the staff mark, so a prerendered page sends nothing to ODP or Optimizely; the booth rail's loads are reads. `npm run check:perf` covers the reads, the warming and the wiring.
 
 ## Related
 

@@ -14,6 +14,7 @@
  * resolves to; see vite.config.ts):
  *   src/styles/material-symbols/icons.json           the names in the subset, sorted
  *   src/styles/material-symbols/rounded-subset.woff2  the font: those icons, all four axes kept
+ *   src/styles/material-symbols/extra-names.json      icon names Google has that the package's list lacks
  *
  * Which names: every string in src (tests aside) that is a Material Symbols name, in a file that
  * draws icons at all (MaterialIcon, material-symbols, an `icon` field). Generous on purpose: a
@@ -38,12 +39,31 @@ const CHECK = process.argv.includes('--check');
 /** www.css draws these by codepoint (`[data-table-icon]::before { content: '\e5ca' }`), not by name. */
 const CODEPOINT_ICONS = ['check', 'close', 'emergency_home'];
 
-/** Every name the font knows: the package's own list of them. */
-const known = new Set(
+/*
+ * Every name the font knows. The package's own list (index.d.ts) is not all of them — 'insights',
+ * drawn on every agent platform page, is missing from it — so a run also reads Google's list for
+ * the variable font and keeps the names the package lacks in extra-names.json, for `--check`,
+ * which reads no network.
+ */
+const EXTRA = path.join(OUT_DIR, 'extra-names.json');
+const CODEPOINTS =
+  'https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsRounded%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints';
+const packaged = new Set(
   readFileSync(path.join(ROOT, 'node_modules/material-symbols/index.d.ts'), 'utf8')
     .match(/"[a-z0-9_]+"/g)
     .map((s) => s.slice(1, -1)),
 );
+let extra;
+if (CHECK) {
+  extra = existsSync(EXTRA) ? JSON.parse(readFileSync(EXTRA, 'utf8')) : [];
+} else {
+  const res = await fetch(CODEPOINTS);
+  if (!res.ok) throw new Error(`Google's codepoints list answered ${res.status}`);
+  const google = (await res.text()).split('\n').map((l) => l.trim().split(/\s+/)[0]).filter((n) => /^[a-z0-9_]+$/.test(n ?? ''));
+  if (google.length < 3000) throw new Error(`Google's codepoints list has only ${google.length} names`);
+  extra = [...new Set(google.filter((n) => !packaged.has(n)))].sort();
+}
+const known = new Set([...packaged, ...extra]);
 
 function sourceFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -104,6 +124,7 @@ if (font.subarray(0, 4).toString('latin1') !== 'wOF2') throw new Error('Google F
 
 writeFileSync(FONT, font);
 writeFileSync(LIST, `${JSON.stringify(names, null, 2)}\n`);
+writeFileSync(EXTRA, `${JSON.stringify(extra)}\n`);
 const full = statSync(path.join(ROOT, 'node_modules/material-symbols/material-symbols-rounded.woff2')).size;
 console.log(
   `✓ ${names.length} icons, ${font.length.toLocaleString()} bytes (the whole font: ${full.toLocaleString()}),` +

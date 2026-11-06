@@ -3,7 +3,7 @@
  * stylesheet, which src/main.tsx imports) — that import resolves here (vite.config.ts, resolve.alias).
  *
  * The same face and class as the package, with one change: the font is the icons this site
- * draws (rounded-subset.woff2, 145 kB), not the package's every icon (5.4 MB, which was 85% of
+ * draws (rounded-subset.woff2, 151 kB), not the package's every icon (5.4 MB, which was 85% of
  * an account page's weight). scripts/subset-icons.mjs makes it and lists its icons in
  * icons.json; `npm run check` fails when src draws an icon the subset lacks. A page that draws
  * a name the subset does not know (one only the CMS has) gets the whole font from
