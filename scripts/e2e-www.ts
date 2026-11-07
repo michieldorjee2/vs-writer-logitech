@@ -9,6 +9,10 @@
  * (default /vb/no-account-left-behind-scale-ai), E2E_OUT (screenshot folder, default a temp dir),
  * E2E_BYPASS (Vercel protection-bypass secret, for a protected preview).
  *
+ * The checks that start on the search page need it signed in: the local stand-in does that
+ * (SERVE_SIGNED_IN=<email>). Against a deployment, which sends a signed-out /search to sign-in,
+ * they are skipped by name and counted as skipped in the tally (searchSignInGate).
+ *
  * NOTHING LEAVES THE BROWSER. The contact button's ping (POST /api/cta-ping, which messages the
  * account executive), sign-in, the edit stream to Mark and the republish poll are all answered
  * here; the test fails if any request reaches the ping endpoint or a Mark webhook.
@@ -70,6 +74,30 @@ async function test(name: string, fn: () => Promise<void>) {
 function expect(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg)
 }
+const skipped: string[] = []
+function skip(name: string, why: string) {
+  skipped.push(name)
+  console.log(`  skip ${name}\n       ${why}`)
+}
+
+/**
+ * The checks that start on the search page need it signed in. The local stand-in serves it
+ * signed in (SERVE_SIGNED_IN); a deployment sends a signed-out browser to Optimizely sign-in, and
+ * the test has no real session to give it. There those checks are skipped, by name and counted
+ * in the tally, and every other check runs. Never on a local server: there a redirect means the
+ * stand-in was started without SERVE_SIGNED_IN, and the checks must fail.
+ */
+async function searchSignInGate(): Promise<string | null> {
+  if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(BASE)) return null
+  const res = await fetch(url('/search'), { redirect: 'manual', headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })
+  const to = res.headers.get('location') || ''
+  return res.status >= 300 && res.status < 400 && /^(https?:\/\/[^/]+)?\/api\/auth\/[^/?]+\/start\b/.test(to)
+    ? `needs a signed-in search page: ${BASE}/search sends a signed-out browser to sign-in (${to.split('?')[0]})`
+    : null
+}
+const SEARCH_GATE = await searchSignInGate()
+/** test() for a check that starts on the search page: skipped where it can't be signed in. */
+const searchTest = (name: string, fn: () => Promise<void>) => (SEARCH_GATE ? Promise.resolve(skip(name, SEARCH_GATE)) : test(name, fn))
 
 /** Console/page errors that are not the page's fault (third-party avatars and logos). */
 const NOISE = /gravatar|brandfetch|brand-logo|Failed to load resource|favicon|zaius|net::ERR_/i
@@ -1164,7 +1192,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
   const page = await ctx.newPage()
   page.on('pageerror', (e) => watch.errors.push(`pageerror: ${e.message}`))
   const slug = ACCOUNT.replace(/^\/|\/$/g, '')
-  await test('both documents opt in, and the boot script is in both <head>s', async () => {
+  await searchTest('both documents opt in, and the boot script is in both <head>s', async () => {
     for (const path of ['/search', ACCOUNT]) {
       const html = await (await fetch(url(path), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
       const head = html.slice(0, html.indexOf('</head>'))
@@ -1180,7 +1208,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
       expect(head.includes(`<link rel="expect" href="${expects}" blocking="render"`), `${path}: the first paint doesn't wait for ${expects}`)
     }
   })
-  await test('a search result opens its page in the same tab, and the row, the wordmark and the photograph move into it, the whole way', async () => {
+  await searchTest('a search result opens its page in the same tab, and the row, the wordmark and the photograph move into it, the whole way', async () => {
     await search(page, 'cdw')
     const photo = await searchPhoto(page)
     // The search page's frame and its photograph's size: the crop the hero has to land on.
@@ -1232,7 +1260,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     expect(kept.ssr, "the app replaced the server's page as it started")
     expect(!kept.spinner, 'the spinner was drawn as the page started (a full-window flash)')
   })
-  await test("the booth rail's room is there from the first frame: the rail slides into it and the page holds still", async () => {
+  await searchTest("the booth rail's room is there from the first frame: the rail slides into it and the page holds still", async () => {
     const ready = await lastReady(page)
     expect(ready?.room === '64px', `no room for the rail as the morph set off (padding-left ${ready?.room})`)
     await page.locator('.booth-rail.is-open').waitFor({ timeout: 10000 })
@@ -1249,7 +1277,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     expect(after.ground === 0, `the rail's stand-in ground is still there (${after.ground})`)
     expect(after.railRight === 64, `the rail is not in place: its right edge at ${after.railRight} px`)
   })
-  await test("back to search with the rail's Search button: the page comes back as it was (query, list), the logo flies back into its row, the rail slides away", async () => {
+  await searchTest("back to search with the rail's Search button: the page comes back as it was (query, list), the logo flies back into its row, the rail slides away", async () => {
     await page.locator('.booth-rail__btn--back').click()
     await page.locator('.sh-search__input').waitFor({ timeout: 10000 })
     const ready = await lastReady(page)
@@ -1266,7 +1294,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     const done = [...entries].reverse().find((x) => x.at === 'finished') as { named: number }
     expect(done.named === 0, `${done.named} element(s) kept a transition name`)
   })
-  await test('a person page morphs the same way (their company logo, their name)', async () => {
+  await searchTest('a person page morphs the same way (their company logo, their name)', async () => {
     await search(page, 'ben')
     await page.locator(`[data-vt-slug="${PERSON.replace(/^\/|\/$/g, '')}"]`).click()
     await page.locator('.www-page.www-person').waitFor({ timeout: 10000 })
@@ -1275,7 +1303,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     for (const g of ['vt-scene', 'vt-wordmark', 'vt-logo', 'vt-name']) expect(ready.groups.includes(g), `${g} did not move: ${ready.groups.join(', ')}`)
     expect(ready.ran >= 500 && ready.types.includes('carry-scene'), `cut short after ${ready.ran} ms, or the photograph not carried (${ready.types})`)
   })
-  await test("an offer opens in the same tab too, and morphs the same way, with the search page's photograph", async () => {
+  await searchTest("an offer opens in the same tab too, and morphs the same way, with the search page's photograph", async () => {
     // The search page run as the offer (its cookie), so its page shows among the answers. The
     // cookie comes with the offers list, after the server drew /search: the server never reads the
     // real offers for it. The offer's look is drawn from a local photograph.
@@ -1310,14 +1338,14 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     await page.unroute('**/e2e-look/*')
     await ctx.clearCookies({ name: 'sh_offer' })
   })
-  await test('Cmd/Ctrl-click still opens a new tab, and the search page stays', async () => {
+  await searchTest('Cmd/Ctrl-click still opens a new tab, and the search page stays', async () => {
     await search(page, 'cdw')
     const [popup] = await Promise.all([ctx.waitForEvent('page'), page.locator(`[data-vt-slug="${slug}"]`).click({ modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control'] })])
     await popup.waitForURL((u) => u.pathname.startsWith(ACCOUNT.replace(/\/$/, '')), { timeout: 10000 })
     expect(new URL(page.url()).pathname === '/search', `the search page went to ${page.url()}`)
     await popup.close()
   })
-  await test('no errors, and nothing reached the real webhooks', async () => {
+  await searchTest('no errors, and nothing reached the real webhooks', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))
     expect(!watch.escaped.length, watch.escaped.join(', '))
   })
@@ -1325,7 +1353,7 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
 
   const reduced = await vtContext({ reducedMotion: 'reduce' })
   const calm = await reduced.ctx.newPage()
-  await test('a reader who asked for reduced motion just navigates', async () => {
+  await searchTest('a reader who asked for reduced motion just navigates', async () => {
     await search(calm, 'cdw')
     await calm.locator(`[data-vt-slug="${slug}"]`).click()
     await calm.locator('.www-page').waitFor({ timeout: 10000 })
@@ -1491,7 +1519,7 @@ console.log('\nspeed: the icon subset, no renderer preloads, the page fetched ah
   })
   await ctx.close()
 
-  await test('the search page prefetches the row a rep rests on (Speculation Rules, its own address, never a prerender)', async () => {
+  await searchTest('the search page prefetches the row a rep rests on (Speculation Rules, its own address, never a prerender)', async () => {
     const search = await browser.newContext({ ...VIEWPORTS.desktop, serviceWorkers: 'block', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
     // A signed-in Optimizely person's browser, as everyone on /search is.
     await search.addCookies([{ name: 'showcase_staff', value: '1', url: BASE }])
@@ -1532,7 +1560,7 @@ console.log('\nspeed: the icon subset, no renderer preloads, the page fetched ah
 }
 
 await browser.close()
-console.log(`\n${passed} passed, ${failures.length} failed  (screenshots: ${OUT})`)
+console.log(`\n${passed} passed, ${failures.length} failed${skipped.length ? `, ${skipped.length} skipped (${SEARCH_GATE})` : ''}  (screenshots: ${OUT})`)
 if (failures.length) {
   console.log(failures.map((f) => `  - ${f}`).join('\n'))
   process.exit(1)
