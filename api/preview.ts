@@ -7,6 +7,7 @@ import { EXPERIENCE_PREVIEW_QUERIES, normalizeExperienceItem } from '../src/lib/
 import { withPageCopy } from './_lib/page-copy.js';
 import { withParentAccount } from './_lib/parent-account.js';
 import { withOfferSignup } from './_lib/offer-signup.js';
+import { graphOp, postGraphRead } from './_lib/graph-read.js';
 
 /**
  * `/api/preview?key=&ver=&loc=&preview_token=` — the draft the CMS is previewing (src/components/CmsPreview.tsx).
@@ -74,17 +75,21 @@ const TOKEN = /^[A-Za-z0-9._-]{1,8192}$/;
 
 type Auth = { token: string } | { key: string };
 
+/** Bounded, and a stalled read asked once more (api/_lib/graph-read.ts); a second stall is the handler's 500 (no-store). */
 async function queryGraph(auth: Auth, query: string, variables: Record<string, unknown>) {
   const url = 'token' in auth ? GRAPH_ENDPOINT : `${GRAPH_ENDPOINT}?auth=${encodeURIComponent(auth.key)}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...('token' in auth ? { Authorization: `Bearer ${auth.token}` } : {}),
+  const { res, json } = await postGraphRead(
+    url,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...('token' in auth ? { Authorization: `Bearer ${auth.token}` } : {}),
+      },
+      body: JSON.stringify({ query, variables }),
     },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = await res.json();
+    graphOp(query),
+  );
   const errors = (json as { errors?: Array<{ message: string }> })?.errors;
   if (errors?.length) {
     // The variables are the key, version and locale: never the token, which rides in the header.

@@ -38,6 +38,7 @@ import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 import { withParentAccount } from '../api/_lib/parent-account';
 import { withPageCopy } from '../api/_lib/page-copy';
 import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from './reads';
+import { graphOp, postGraphRead } from '../api/_lib/graph-read';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -349,32 +350,15 @@ type FetchedPage =
   | (CompetitorComparisonPage & { __template?: undefined });
 
 /*
- * Graph reads are bounded, and a stalled one is asked once more. A read that stalls (6 Nov 2026:
- * a connection that never sent headers) held the whole render until undici gave up at 300 s, the
- * function's own limit; asked again, on a new connection, it usually answers at once. A second
- * stall fails the page as any Graph error does (the shell, uncached). Reads only: safe to repeat.
+ * Graph reads are bounded, and a stalled one is asked once more (api/_lib/graph-read.ts). A second
+ * stall fails the page as any Graph error does (the shell, uncached).
  */
-const GRAPH_TIMEOUT_MS = 4000;
-
-function postGraph(authKey: string, query: string, variables: Record<string, unknown>, timeoutMs: number) {
-  return fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(timeoutMs),
-  }).then(async (res) => ({ res, json: await res.json() }));
-}
-
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
-  let answer: { res: Response; json: unknown };
-  try {
-    answer = await postGraph(authKey, query, variables, GRAPH_TIMEOUT_MS);
-  } catch (err) {
-    if (!(err instanceof Error && err.name === 'TimeoutError')) throw err;
-    console.warn(`[graph] ${/query\s+(\w+)/.exec(query)?.[1] ?? 'anonymous'} stalled; asking once more`);
-    answer = await postGraph(authKey, query, variables, GRAPH_TIMEOUT_MS * 2);
-  }
-  const { res, json } = answer;
+  const { res, json } = await postGraphRead(
+    `${GRAPH_ENDPOINT}?auth=${authKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) },
+    graphOp(query),
+  );
   // A selection on a field Graph does not know fails the WHOLE query: `data`
   // comes back null, and every caller below reads that as "no such page". That
   // is how one schema drift 404'd all 2,676 account pages for days without
