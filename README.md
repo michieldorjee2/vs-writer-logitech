@@ -211,6 +211,8 @@ Env (Production only):
 
 The click is still tracked in ODP as before (`useOdpTracking`).
 
+Someone from Optimizely who is signed in (the `showcase_staff` mark set beside the session, `src/lib/staff-marker.ts`) is asked first: "Seems like you're an Optimizely employee. Send anyway? This won't be tracked as a conversion." Cancel sends nothing and opens nothing. Send anyway pings the team once and opens the panel, as for anyone. It is not a conversion: the same mark keeps that browser out of ODP, and `api/cta-ping.ts` counts no personal link for a signed-in person.
+
 ## Offer pages: the email sign-up form
 
 Each offer in Limitless picks how people sign up on its pages: the close band's button links out (the default, every page today), or an email-only form on the page (aldus-ui `lib/offers/signup.ts`; Laura's ask, Notion "Add an optional email-only form block to the offer template"). Nothing is written to the CMS and no page is regenerated.

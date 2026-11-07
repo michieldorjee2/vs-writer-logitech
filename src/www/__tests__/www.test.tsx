@@ -56,7 +56,7 @@ import { accountTemplateOf } from '../account-template'
 import { CmsEditProvider } from '../cms-edit'
 import { inCmsPreview } from '../../lib/cms-preview'
 import { postSignup } from '../../lib/offer-signup'
-import { sendCtaPing } from '../../lib/cta-ping'
+import { connectStep, sendCtaPing } from '../../lib/cta-ping'
 import PersonPage, { personConnectProps } from '../PersonPage'
 import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, measuresOf, peerProofOf, publicPersonPage } from '../person-content'
 import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
@@ -1813,6 +1813,24 @@ testAsync('in the CMS preview the sign-up form and the one-click ask send nothin
     globalThis.fetch = realFetch
     delete g.window
   }
+})
+
+test('someone from Optimizely, signed in, is asked before the ask messages the team; anyone else tells it at once', () => {
+  assert.equal(connectStep(false, false), 'ping', "a visitor's first click tells the team")
+  assert.equal(connectStep(false, true), 'ask', 'a signed-in Optimizely person is asked first')
+  assert.equal(connectStep(true, true), 'open', 'once sent, the panel opens without asking again')
+  assert.equal(connectStep(true, false), 'open', 'once sent, the panel opens without pinging again')
+  const modal = readFileSync('src/www/ConnectModal.tsx', 'utf8')
+  // The staff mark (set beside the session) decides; the question is Michiel's, word for word.
+  assert.match(modal, /const step = connectStep\(pinged\.current, isStaffBrowser\(\)\)/)
+  assert.match(modal, /<AlertDialog\.Title[^>]*>Seems like you&apos;re an Optimizely employee<\/AlertDialog\.Title>/)
+  assert.match(modal, /<AlertDialog\.Description[^>]*>Send anyway\? This won&apos;t be tracked as a conversion\.<\/AlertDialog\.Description>/)
+  assert.match(modal, /<AlertDialog\.Cancel[^>]*>Cancel<\/AlertDialog\.Cancel>/)
+  assert.match(modal, /<AlertDialog\.Action[^>]*onClick=\{sendAnyway\}>\s*Send anyway\s*<\/AlertDialog\.Action>/)
+  // Sending anyway is the same ping as anyone's: no second path to the team.
+  assert.equal((modal.match(/sendCtaPing\(/g) ?? []).length, 1)
+  // And it is not a conversion: the staff mark keeps the browser's clicks out of ODP.
+  assert.match(readFileSync('src/hooks/useOdpTracking.ts', 'utf8'), /if \(isStaffBrowser\(\)\) return;/)
 })
 
 console.log('\nthe CMS preview: /api/preview serves a draft as the live address would')

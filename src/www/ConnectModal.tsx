@@ -8,10 +8,17 @@
  * again. The `source` of the first click is what the team sees (which button the visitor used).
  * The panel names only the person the ping messages, the account executive; with none on the
  * page it says "your Optimizely team", which is who follows up from the sheet.
+ *
+ * Someone from Optimizely, signed in (the staff mark, src/lib/staff-marker.ts), is asked first:
+ * their click would message the account executive like a visitor's. Sent anyway, it is the ping
+ * and the panel as for anyone; it is never a conversion (the staff mark keeps the browser out of
+ * ODP, src/hooks/useOdpTracking.ts, and api/cta-ping.ts counts no personal link for them).
  */
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { sendCtaPing, type CtaSource } from '../lib/cta-ping'
+import * as AlertDialog from '@radix-ui/react-alert-dialog'
+import { connectStep, sendCtaPing, type CtaSource } from '../lib/cta-ping'
+import { isStaffBrowser } from '../lib/staff-marker'
 import { toldFirstName } from '../lib/account-rep'
 import GravatarAvatar from '../components/GravatarAvatar'
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
@@ -46,22 +53,47 @@ export function ConnectProvider({
 }) {
   const [open, setOpen] = useState(false)
   const [sent, setSent] = useState(false)
+  /** The button someone from Optimizely clicked, while they are asked whether to send. */
+  const [asking, setAsking] = useState<CtaSource | null>(null)
   const pinged = useRef(false)
+  const ping = useCallback((source: CtaSource) => {
+    pinged.current = true
+    sendCtaPing(source)
+    setSent(true)
+    setOpen(true)
+  }, [])
   const connect = useCallback(
     (source: CtaSource) => {
-      if (!pinged.current) {
-        pinged.current = true
-        sendCtaPing(source)
-        setSent(true)
-      }
-      setOpen(true)
+      const step = connectStep(pinged.current, isStaffBrowser())
+      if (step === 'open') setOpen(true)
+      else if (step === 'ask') setAsking(source)
+      else ping(source)
     },
-    [],
+    [ping],
   )
+  const sendAnyway = useCallback(() => {
+    if (asking) ping(asking)
+    setAsking(null)
+  }, [asking, ping])
   const first = toldFirstName(people)
   return (
     <Ctx.Provider value={{ connect, sent }}>
       {children}
+      <AlertDialog.Root open={asking !== null} onOpenChange={(o) => !o && setAsking(null)}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="www-modal__overlay" />
+          <AlertDialog.Content className="www-modal www-modal--confirm">
+            <AlertDialog.Title className="www-modal__title">Seems like you&apos;re an Optimizely employee</AlertDialog.Title>
+            <AlertDialog.Description className="www-modal__body">Send anyway? This won&apos;t be tracked as a conversion.</AlertDialog.Description>
+            <div className="www-modal__actions">
+              <AlertDialog.Cancel className="www-modal__btn">Cancel</AlertDialog.Cancel>
+              <AlertDialog.Action className="www-modal__btn www-modal__btn--primary" onClick={sendAnyway}>
+                Send anyway
+              </AlertDialog.Action>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="www-modal__overlay" />
