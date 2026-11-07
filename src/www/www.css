@@ -1393,6 +1393,58 @@ a.www-modal__tile:hover {
   font-weight: 800;
   font-size: 18px;
 }
+/* Someone from Optimizely clicked the ask: send it anyway? (ConnectModal.tsx) The panel's own card,
+   small, on white: the question, then Cancel and Send anyway. */
+.www-modal--confirm {
+  width: min(460px, calc(100vw - 24px));
+  padding: 32px 28px 24px;
+}
+.www-modal--confirm .www-modal__title {
+  font-size: clamp(26px, calc(3.6 * var(--www-vh, 1vh)), 32px);
+  line-height: 1.05;
+}
+.www-modal--confirm .www-modal__body {
+  margin-top: 12px;
+  color: rgb(8 37 26 / 0.75);
+}
+.www-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.www-modal__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1.5px solid #08251a;
+  border-radius: 999px;
+  background: transparent;
+  color: #08251a;
+  font: 600 16px/1 var(--font-body), Arial, Helvetica, sans-serif;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+.www-modal__btn:hover {
+  background: #e4f0da;
+}
+.www-modal__btn--primary {
+  border-color: #abff44;
+  background: #abff44;
+}
+.www-modal__btn--primary:hover {
+  background: #7ddd3d;
+  border-color: #7ddd3d;
+}
+.www-modal__btn:focus-visible {
+  outline: 2px solid #08251a;
+  outline-offset: 2px;
+}
 @keyframes www-fade {
   from {
     opacity: 0;

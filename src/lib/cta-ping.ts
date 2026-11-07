@@ -22,6 +22,17 @@ export type CtaSource = (typeof CTA_SOURCES)[number]
 
 type Where = Pick<Location, 'pathname' | 'search'>
 
+/**
+ * What a click on the ask does (src/www/ConnectModal.tsx). Once the team has been told in this page
+ * view, it opens the panel again. For someone from Optimizely, signed in (the staff mark,
+ * src/lib/staff-marker.ts), it asks first: their click is not a visitor's, yet it would message
+ * the account executive in Teams all the same (Michiel, 7 Nov). Anyone else's click tells the team.
+ */
+export function connectStep(pinged: boolean, staff: boolean): 'open' | 'ask' | 'ping' {
+  if (pinged) return 'open'
+  return staff ? 'ask' : 'ping'
+}
+
 /** POST the click to the site's own server. Never throws. */
 export function sendCtaPing(source: CtaSource, location: Where | null = typeof window !== 'undefined' ? window.location : null): void {
   if (!location || inCmsPreview(location)) return
