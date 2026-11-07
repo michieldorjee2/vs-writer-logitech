@@ -40,3 +40,8 @@ export function heroPainted(maxWait = 1500): Promise<void> {
   });
   return painted;
 }
+
+/** For the checks: forget the answer, so the next call looks at the page again. */
+export function resetHeroPainted(): void {
+  painted = null;
+}

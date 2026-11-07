@@ -5,11 +5,14 @@
  *      field selecting only `_metadata { key }`), takes the first in order as the one-by-one reads
  *      did, treats a Graph error as "ask one by one" rather than "no page", and a read started
  *      early is never an unhandled rejection.
- *   2. src/lib/warm-pages.ts: the address a search page row opens (the same as SearchHome's
- *      open()), and what getting it ready does: a Speculation Rules list of at most two pages,
- *      replaced as the rep moves on, or one request per page where the browser has no rules.
- *   3. Wiring, read from the sources: SearchHome calls the hook with its active row and opens
- *      rows at the address the hook prerenders; the server render preloads no renderer chunk.
+ *   2. src/lib/warm-pages.ts: the address a search page row opens (the same as SearchHome's),
+ *      and what getting it ready does: a Speculation Rules list of at most two pages, replaced as
+ *      the rep moves on, or one request per page where the browser has no rules.
+ *   3. src/lib/hero-painted.ts: the renderer waits for the hero's first frame, not at all with no
+ *      hero, when prerendering or in a background tab, and never past its cap.
+ *   4. Wiring, read from the sources: App loads the account and person renderers after the hero
+ *      has painted; SearchHome calls the hook with its active row and opens rows at the address
+ *      the hook prerenders; the server render preloads no renderer chunk.
  *
  * No network, no credentials.
  *
@@ -20,6 +23,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from '../server/reads.js';
 import { KEEP, pageHrefOf, prerenderRules, resetWarmPages, warmPage } from '../src/lib/warm-pages.js';
+import { heroPainted, resetHeroPainted } from '../src/lib/hero-painted.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f: string) => readFileSync(join(root, f), 'utf8');
@@ -179,7 +183,53 @@ await check('no Speculation Rules: each page requested once, same-origin, low pr
   }
 });
 
-console.log('3. wiring');
+console.log('3. the page renderer after the hero has painted');
+type Listener = () => void;
+function fakePage(opts: { hero?: 'loading' | 'complete' | null; prerendering?: boolean; hidden?: boolean }) {
+  const listeners: Record<string, Listener> = {};
+  const img = opts.hero ? { complete: opts.hero === 'complete', addEventListener: (type: string, fn: Listener) => (listeners[type] = fn) } : null;
+  const g = globalThis as Record<string, unknown>;
+  g.document = { querySelector: () => img, prerendering: !!opts.prerendering, visibilityState: opts.hidden ? 'hidden' : 'visible' };
+  g.window = { setTimeout: (fn: Listener, ms: number) => setTimeout(fn, ms) };
+  g.requestAnimationFrame = (fn: Listener) => setTimeout(fn, 16);
+  resetHeroPainted();
+  return listeners;
+}
+const resolvedWithin = async (p: Promise<void>, ms: number) => Promise.race([p.then(() => true), after(ms, false)]);
+try {
+  await check('no hero, a prerendered page or a background tab: at once', async () => {
+    for (const opts of [{ hero: null }, { hero: 'loading' as const, prerendering: true }, { hero: 'loading' as const, hidden: true }]) {
+      fakePage(opts);
+      assert(await resolvedWithin(heroPainted(5000), 5), `waited for ${JSON.stringify(opts)}`);
+    }
+  });
+  await check('a hero still loading: waits for it, then a frame', async () => {
+    const listeners = fakePage({ hero: 'loading' });
+    const p = heroPainted(5000);
+    assert(!(await resolvedWithin(p, 60)), 'did not wait for the image');
+    listeners.load();
+    assert(await resolvedWithin(p, 100), 'did not go on a frame after the image');
+  });
+  await check('a hero already in: a frame, no more', async () => {
+    fakePage({ hero: 'complete' });
+    assert(await resolvedWithin(heroPainted(5000), 100), 'waited past a frame');
+  });
+  await check('never longer than maxWait (an image that never answers)', async () => {
+    fakePage({ hero: 'loading' });
+    assert(await resolvedWithin(heroPainted(80), 200), 'waited past maxWait');
+  });
+} finally {
+  for (const k of ['document', 'window', 'requestAnimationFrame']) delete (globalThis as Record<string, unknown>)[k];
+  resetHeroPainted();
+}
+
+console.log('4. wiring');
+await check('App loads the account and person renderers after the hero has painted (the offer renderer as before)', () => {
+  const app = read('src/App.tsx');
+  assert(app.includes("lazy(() => heroPainted().then(() => import('./www/AccountRoute')))"), 'AccountRoute');
+  assert(app.includes("lazy(() => heroPainted().then(() => import('./www/PersonPage')))"), 'PersonPage');
+  assert(app.includes("lazy(() => import('./components/VisualBuilderPage'))"), 'VisualBuilderPage');
+});
 await check("SearchHome calls the hook with its active row, and its rows go where the hook prerenders", () => {
   const src = read('src/components/SearchHome.tsx');
   assert(/useWarmPage\(navRows\[activeIdx\]\)/.test(src), 'useWarmPage(navRows[activeIdx]) not found');
