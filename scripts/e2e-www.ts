@@ -1295,6 +1295,98 @@ await test('an offer page is the www offer page, with or without ?design=classic
   }
 })
 
+console.log('\nspeed: the icon subset, no renderer preloads, the page fetched ahead from the search page')
+{
+  await test('no renderer chunk is preloaded: the hero paints before hydration starts', async () => {
+    for (const href of [url(ACCOUNT), url(ACCOUNT, 'search=1'), url(PERSON), url(OFFER)]) {
+      const lazy = [...(await fetchHtml(href)).matchAll(/<link rel="modulepreload"[^>]*href="\/assets\/(AccountRoute|PersonPage|VisualBuilderPage|FloatingSidebar)-/g)].map((m) => m[1])
+      expect(!lazy.length, `${href} preloads ${lazy.join(', ')}`)
+    }
+  })
+
+  const { ctx, watch } = await newContext(browser, 'desktop')
+  const fonts: string[] = []
+  ctx.on('request', (r) => {
+    if (/\.woff2(\?|$)/.test(r.url()) && /material-symbols|rounded-subset/.test(r.url())) fonts.push(new URL(r.url()).pathname)
+  })
+  /** Icons drawn as glyphs (about one em wide), not as their names in letters. */
+  const iconsAsText = (page: Page) =>
+    page.evaluate(async () => {
+      await document.fonts.ready
+      return [...document.querySelectorAll<HTMLElement>('.material-symbols-rounded')]
+        .filter((el) => el.getBoundingClientRect().width > parseFloat(getComputedStyle(el).fontSize) * 1.4)
+        .map((el) => el.textContent)
+    })
+  for (const href of [AP_ACCOUNT, ACCOUNT, PERSON]) {
+    await test(`${href}: icons draw from the subset font; the whole font is never fetched`, async () => {
+      fonts.length = 0
+      const page = await open(ctx, watch, url(href))
+      const asText = await iconsAsText(page)
+      expect(fonts.some((f) => /rounded-subset/.test(f)), `subset not loaded: ${fonts.join(', ') || 'no icon font'}`)
+      expect(!fonts.some((f) => /material-symbols-rounded-/.test(f)), `the whole font was fetched: ${fonts.join(', ')}`)
+      expect(!asText.length, `icons drawn as text: ${asText.join(', ')}`)
+      await page.close()
+    })
+  }
+  await test('an icon outside the subset (a CMS-only name) brings in the whole font, and draws', async () => {
+    fonts.length = 0
+    const page = await open(ctx, watch, url(ACCOUNT))
+    await page.evaluate(() => {
+      const el = document.createElement('span')
+      el.className = 'material-symbols-rounded'
+      el.textContent = 'pets'
+      document.body.append(el)
+    })
+    await page.waitForSelector('style[data-icon-font="whole"]', { state: 'attached', timeout: 3000 })
+    // Both faces of the family loaded: the subset, and the whole font declared after it.
+    await page.waitForFunction(() => [...document.fonts].filter((f) => f.family.replace(/"/g, '') === 'Material Symbols Rounded' && f.status === 'loaded').length >= 2, null, { timeout: 20000 })
+    const asText = await iconsAsText(page)
+    expect(fonts.some((f) => /material-symbols-rounded-/.test(f)), `the whole font was not fetched: ${fonts.join(', ')}`)
+    expect(!asText.length, `drawn as text: ${asText.join(', ')}`)
+    await page.close()
+  })
+  await ctx.close()
+
+  await test('the search page prefetches the row a rep rests on (Speculation Rules, its own address, never a prerender)', async () => {
+    const search = await browser.newContext({ ...VIEWPORTS.desktop, serviceWorkers: 'block', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
+    // A signed-in Optimizely person's browser, as everyone on /search is.
+    await search.addCookies([{ name: 'showcase_staff', value: '1', url: BASE }])
+    const meta = (route: string) => ({ url: { default: route, hierarchical: route }, published: '2026-11-01T00:00:00Z' })
+    const slug = ACCOUNT.replace(/^\/|\/$/g, '')
+    const index = {
+      companies: [{ _metadata: meta(ACCOUNT), headline: 'One platform', eyebrow: `Personalized for ${slug}`, competitorName: 'Adobe', brandDomain: `${slug}.com`, brandAccentColor: null, customerLogo: null, intelHeadline: slug }],
+      total: 1,
+      people: [],
+      mine: [],
+      viewer: 'e2e@optimizely.com',
+    }
+    await search.route('**/api/auth/me', (r) => r.fulfill({ json: { email: index.viewer, name: 'E2E' } }))
+    await search.route('**/api/home-index', (r) => r.fulfill({ json: index }))
+    await search.route('**/api/offers', (r) => r.fulfill({ json: { offers: [] } }))
+    await search.route('**/api/page-builds', (r) => r.fulfill({ json: { builds: [] } }))
+    const page = await search.newPage()
+    await page.goto(url('/search'), { waitUntil: 'domcontentloaded' })
+    await page.locator('.sh-search__input').waitFor({ timeout: 10000 })
+    expect((await page.locator('script[type="speculationrules"]').count()) === 0, 'rules written before the rep did anything')
+    await page.locator('.sh-search__input').fill(slug)
+    const row = page.locator(`.sh-row[data-vt-slug="${slug}"]`).first()
+    await row.waitFor({ timeout: 8000 })
+    await row.hover()
+    await page.waitForSelector('script[type="speculationrules"]', { state: 'attached', timeout: 3000 })
+    const rules = await page.locator('script[type="speculationrules"]').allTextContents()
+    expect(rules.length === 1, `${rules.length} rule scripts`)
+    const parsed = JSON.parse(rules[0]) as { prefetch?: Array<{ source: string; urls: string[] }>; prerender?: unknown }
+    expect(!parsed.prerender, 'a prerender rule: the view transition needs the page to start after the click (src/lib/warm-pages.ts)')
+    const urls = parsed.prefetch?.[0]?.urls ?? []
+    expect(urls[0] === `/${slug}?search=1`, `prefetches ${urls.join(', ') || 'nothing'}`)
+    await search.close()
+  })
+  await test('no errors, and nothing reached the real webhooks', async () => {
+    expect(!watch.errors.length, watch.errors.join('\n'))
+    expect(!watch.escaped.length, `requests escaped: ${watch.escaped.join(', ')}`)
+  })
+}
+
 await browser.close()
 console.log(`\n${passed} passed, ${failures.length} failed  (screenshots: ${OUT})`)
 if (failures.length) {

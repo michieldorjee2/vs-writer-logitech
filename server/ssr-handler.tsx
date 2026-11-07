@@ -37,6 +37,7 @@ import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
 import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 import { withParentAccount } from '../api/_lib/parent-account';
 import { withPageCopy } from '../api/_lib/page-copy';
+import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from './reads';
 
 /*
  * Visual Builder (/vb/:slug) render chain — imported directly rather than through
@@ -347,13 +348,33 @@ type FetchedPage =
   | (FinServPage & { __template: 'finserv' })
   | (CompetitorComparisonPage & { __template?: undefined });
 
-async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
-  const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
+/*
+ * Graph reads are bounded, and a stalled one is asked once more. A read that stalls (6 Nov 2026:
+ * a connection that never sent headers) held the whole render until undici gave up at 300 s, the
+ * function's own limit; asked again, on a new connection, it usually answers at once. A second
+ * stall fails the page as any Graph error does (the shell, uncached). Reads only: safe to repeat.
+ */
+const GRAPH_TIMEOUT_MS = 4000;
+
+function postGraph(authKey: string, query: string, variables: Record<string, unknown>, timeoutMs: number) {
+  return fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
-  });
-  const json = await res.json();
+    signal: AbortSignal.timeout(timeoutMs),
+  }).then(async (res) => ({ res, json: await res.json() }));
+}
+
+async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
+  let answer: { res: Response; json: unknown };
+  try {
+    answer = await postGraph(authKey, query, variables, GRAPH_TIMEOUT_MS);
+  } catch (err) {
+    if (!(err instanceof Error && err.name === 'TimeoutError')) throw err;
+    console.warn(`[graph] ${/query\s+(\w+)/.exec(query)?.[1] ?? 'anonymous'} stalled; asking once more`);
+    answer = await postGraph(authKey, query, variables, GRAPH_TIMEOUT_MS * 2);
+  }
+  const { res, json } = answer;
   // A selection on a field Graph does not know fails the WHOLE query: `data`
   // comes back null, and every caller below reads that as "no such page". That
   // is how one schema drift 404'd all 2,676 account pages for days without
@@ -369,79 +390,100 @@ async function queryGraph(authKey: string, query: string, variables: Record<stri
   return json;
 }
 
+/** One candidate's whole page: the full query for its type at its address, or null. */
+async function readPage(authKey: string, c: Candidate, finservQuery: string | null): Promise<FetchedPage | null> {
+  switch (c.kind) {
+    case 'person': {
+      const items = graphItems<PersonPage>(await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: c.slug }), 'PersonPage');
+      // Their unpublished words never leave the server (src/www/person-content.ts).
+      return items?.length ? { ...publicPersonPage(items[0]), __template: 'person' as const } : null;
+    }
+    case 'retail': {
+      const items = graphItems<RetailPageData>(await queryGraph(authKey, await getRetailQuery(authKey), { slug: c.slug }), 'RetailCustomerPage');
+      return items?.length ? { ...items[0], __template: 'retail' as const } : null;
+    }
+    case 'finserv': {
+      if (!finservQuery) return null;
+      const items = graphItems<FinServPage>(await queryGraph(authKey, finservQuery, { slug: c.slug }), 'FinServPage');
+      return items?.length ? { ...items[0], __template: 'finserv' as const } : null;
+    }
+    case 'account': {
+      const items = graphItems<CompetitorComparisonPage>(await queryGraph(authKey, PAGE_QUERY, { slug: c.slug }), 'CompetitorComparisonPage');
+      // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
+      return items?.length ? withPageCopy(items[0]) : null;
+    }
+  }
+}
+
+/** A Meridian Bank demo slug, synthesized so the demo renders before the CMS type has content. */
+function finservDemo(slug: string): FetchedPage | null {
+  const synth = isFinServDemoSlug(slug) ? synthFinServPageFromDemo(slug) : null;
+  return synth ? { ...synth, __template: 'finserv' as const } : null;
+}
+
 // PersonPage (src/lib/person-page-query.ts) is the only nested route on the site
 // (/{company}/{person}). Probed first in fetchPageContent: a slug with two
 // segments cannot be any of the flat types.
+//
+// The order decides: person, retail, fin-serv, the fin-serv demo, then the account page. Graph
+// is asked once which of them has a page (server/reads.ts, whichPageQuery), then that page is
+// read: two requests, where asking each in turn cost an account page seven.
 async function fetchPageContent(authKey: string, slug: string): Promise<FetchedPage | null> {
   const normalizedSlug = `/${slug}/`;
+  const tries = [normalizedSlug];
+  // Fallback: the /en/ prefix (Graph stores locale-prefixed URLs).
+  if (!slug.startsWith('en/')) tries.push(`/en/${slug}/`);
 
-  // Retail dispatch: try RetailCustomerPage first on every request. The CMS
+  // Retail dispatch: RetailCustomerPage is tried on every request. The CMS
   // rejects '/' in route segments, so retail pages live at flat slugs like
   // `/isabella-chen`. Hierarchical `/retail/<slug>` is also supported. If
   // nothing matches the retail content type, fall through to comparison.
-  const retailTries = [normalizedSlug];
-  if (!slug.startsWith('en/')) retailTries.push(`/en/${slug}/`);
+  const retailTries = [...tries];
   // Also accept hierarchical /retail/<slug> path by stripping the prefix.
   if (slug.startsWith('retail/')) {
     const stripped = slug.replace(/^retail\//, '');
     retailTries.push(`/${stripped}/`);
     retailTries.push(`/en/${stripped}/`);
   }
-  // Person pages are the only nested route, so try them before the flat
-  // types; a two-segment slug can only be one of these.
-  const personTries = [normalizedSlug];
-  if (!slug.startsWith('en/')) personTries.push(`/en/${slug}/`);
-  for (const s of personTries) {
-    const pJson = await queryGraph(authKey, PERSON_PAGE_QUERY, { slug: s });
-    const items = graphItems<PersonPage>(pJson, 'PersonPage');
-    if (items && items.length > 0) {
-      // Their unpublished words never leave the server (src/www/person-content.ts).
-      return { ...publicPersonPage(items[0]), __template: 'person' as const };
-    }
-  }
 
-  const retailQuery = await getRetailQuery(authKey);
-  for (const s of retailTries) {
-    const json = await queryGraph(authKey, retailQuery, { slug: s });
-    const items = graphItems<RetailPageData>(json, 'RetailCustomerPage');
-    if (items && items.length > 0) {
-      return { ...items[0], __template: 'retail' as const };
-    }
-  }
-
-  // FinServ dispatch (Meridian Bank). Query Graph if the content type exists;
-  // otherwise (or on miss) synthesize from demo content for known FS slugs so
-  // the demo renders before the CMS content type is registered.
-  const finservTries = [normalizedSlug];
-  if (!slug.startsWith('en/')) finservTries.push(`/en/${slug}/`);
+  // FinServ dispatch (Meridian Bank): asked only when the content type exists in Graph (probed
+  // once per instance), since a type Graph does not know fails the whole question.
   const finservQuery = await getFinServQuery(authKey);
-  if (finservQuery) {
-    for (const s of finservTries) {
-      const fsJson = await queryGraph(authKey, finservQuery, { slug: s });
-      const items = graphItems<FinServPage>(fsJson, 'FinServPage');
-      if (items && items.length > 0) {
-        return { ...items[0], __template: 'finserv' as const };
+  const candidates: Candidate[] = [
+    // Person pages are the only nested route, so they come before the flat
+    // types; a two-segment slug can only be one of these.
+    ...tries.map((s) => ({ kind: 'person' as const, slug: s })),
+    ...retailTries.map((s) => ({ kind: 'retail' as const, slug: s })),
+    ...(finservQuery ? tries.map((s) => ({ kind: 'finserv' as const, slug: s })) : []),
+    ...tries.map((s) => ({ kind: 'account' as const, slug: s })),
+  ];
+
+  // No answer at all (Graph down, or the read timed out) fails the page here, as any Graph failure
+  // always has: asking eight more times would only wait eight times as long.
+  const { query, variables } = whichPageQuery(candidates);
+  const answer = await queryGraph(authKey, query, variables);
+  let found: Candidate | null;
+  try {
+    found = firstCandidateFound(candidates, answer);
+  } catch (err) {
+    // Graph answered the question with errors: ask each candidate in turn, as before.
+    console.error('[ssr] WhichPage failed, reading each candidate in turn:', err instanceof Error ? err.message : err);
+    for (const c of candidates) {
+      if (c.kind === 'account') {
+        const demo = finservDemo(slug);
+        if (demo) return demo;
       }
+      const page = await readPage(authKey, c, finservQuery);
+      if (page) return page;
     }
+    return null;
   }
-  if (isFinServDemoSlug(slug)) {
-    const synth = synthFinServPageFromDemo(slug);
-    if (synth) return { ...synth, __template: 'finserv' as const };
+  // The demo comes after the fin-serv pages and before the account pages.
+  if (!found || found.kind === 'account') {
+    const demo = finservDemo(slug);
+    if (demo) return demo;
   }
-
-  let json = await queryGraph(authKey, PAGE_QUERY, { slug: normalizedSlug });
-  let items = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage');
-
-  // Fallback: try with /en/ prefix (Graph stores locale-prefixed URLs)
-  if ((!items || items.length === 0) && !slug.startsWith('en/')) {
-    const enSlug = `/en/${slug}/`;
-    json = await queryGraph(authKey, PAGE_QUERY, { slug: enSlug });
-    items = graphItems<CompetitorComparisonPage>(json, 'CompetitorComparisonPage');
-  }
-
-  if (!items || items.length === 0) return null;
-  // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
-  return withPageCopy(items[0]);
+  return found ? readPage(authKey, found, finservQuery) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1001,6 +1043,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   /*
+   * The page's Graph reads start here, beside the build lookup below rather than after it:
+   * they are read-only, and an answer the build makes unnecessary (its view, its redirect) is
+   * simply never awaited. Visual Builder experiences (/vb/:slug) are dispatched ahead of
+   * `fetchPageContent`, so a request for one never runs that function's person / retail /
+   * fin-serv / account reads: no legacy content type is ever registered at a `vb/`-prefixed
+   * URL, so every one of those queries was guaranteed to come back empty for this slug shape.
+   */
+  const authKey = process.env.GRAPH_AUTH_KEY;
+  const expSlug = slug.startsWith('vb/') ? slug.slice('vb/'.length) : null;
+  const experienceRead = authKey && expSlug ? startRead(fetchExperienceContent(authKey, expSlug)) : null;
+  const pageRead = authKey && expSlug === null ? startRead(fetchPageContent(authKey, slug)) : null;
+
+  /*
    * An address Mark is building a page at (api/page-builds). Signed-in people see the
    * build there (BuildView.tsx) until the page is done; everyone else sees what is there.
    * While a build owns the address nothing is cached, for anyone: the edge would hand the
@@ -1024,23 +1079,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const authKey = process.env.GRAPH_AUTH_KEY;
   if (!authKey) {
     console.warn('[ssr] GRAPH_AUTH_KEY not set, serving SPA shell');
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(template);
   }
 
-  /*
-   * Visual Builder experiences (/vb/:slug) — dispatched here, ahead of `fetchPageContent`, so
-   * a request for one never runs that function's six-query chain (person x2, retail x2,
-   * finserv, comparison): no legacy content type is ever registered at a `vb/`-prefixed URL,
-   * so every one of those queries was guaranteed to come back empty for this slug shape.
-   */
-  if (slug.startsWith('vb/')) {
-    const expSlug = slug.slice('vb/'.length);
+  // Visual Builder experiences (/vb/:slug): their read started above, beside the build lookup.
+  if (expSlug !== null) {
     try {
-      const item = expSlug ? await fetchExperienceContent(authKey, expSlug) : null;
+      const item = experienceRead ? await experienceRead() : null;
 
       if (!item) {
         res.setHeader('Content-Type', 'text/html');
@@ -1090,7 +1138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const page = await fetchPageContent(authKey, slug);
+    const page = pageRead ? await pageRead() : null;
 
     if (!page) {
       // Built a moment ago and not in Graph yet: the build view, which reloads into the page.
@@ -1127,6 +1175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- Build SEO head tags ----
+    // No preload of the renderer's lazy chunk: anything that starts the app before the hero image
+    // has painted holds that paint back (see the chunk note in vite.config.ts). With the preloads
+    // and the chunk change together, mobile LCP went from 3.6 s to 5.9 s (6 Nov 2026).
     const headHtml = buildHeadHtml(headSource);
 
     // ---- Embed page data for client hydration (avoids double-fetch) ----

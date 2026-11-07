@@ -41,7 +41,7 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:www
+npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:icons, check:perf, check:www
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
@@ -246,6 +246,18 @@ npm run check:badge                    # the flow, the detector, the sorting rul
 npm run check:badge-ocr                # Tesseract on 16 made-up badges (server/fixtures/badges)
 python3 scripts/make-badge-fixtures.py # redraw those badges
 ```
+
+## Speed: the detail pages
+
+Measured 6 November with the `web-perf` harness (Lighthouse median of 3, preview against a preview of `main`) and curl, and fixed where the time went. Three things keep them fast, and one thing is left alone on purpose; each has a check.
+
+The icon font is a subset. Material Symbols Rounded is 5.4 MB in the `material-symbols` package and was 85% of a detail page's weight. `src/main.tsx`'s `import 'material-symbols/rounded.css'` resolves to `src/styles/material-symbols/rounded.css` (an alias in `vite.config.ts`), whose font has only the 112 icons `src` draws (151 kB, the same glyphs pixel for pixel; no icon outside it on 100 sampled live pages). Drawing a new icon in code means running `npm run icons:subset` (it asks Google Fonts for the subset) and committing `src/styles/material-symbols/`; `npm run check:icons` fails until you do. A name only the CMS knows still draws: `src/lib/icon-font.ts` sees it on the page and loads the whole font.
+
+The server render asks Graph which page an address is, once. A slug can be a person, retail, fin-serv or account page, and asking each in turn cost an account page seven Graph round trips. Now one query asks every candidate (each selecting only `_metadata { key }`, which no schema change can break), the first in the old order wins, and that page is read: two requests on one connection, beside the build lookup (`server/reads.ts`). Not all at once in parallel: Graph stalls some requests in bursts (7 of 80 in bursts of eight, 0 of 20 one at a time). If Graph answers the question with errors, the render asks one by one as before; a Graph read that stalls is given up after 4 s and asked once more, on a new connection (a stalled one used to hold the render until undici's 300 s timeout). An uncached account page renders in about 200 ms instead of 430.
+
+The search page fetches the next page ahead. The row a rep rests on (hover, arrow keys, or the top result as they type) is prefetched with a Speculation Rules list rule, at most two at a time, or requested once to warm the edge cache where the browser has no Speculation Rules (`src/lib/warm-pages.ts`). Prefetched, never prerendered: a prerendered page runs before the click, but the view transition from the search page makes the booth rail's room as the page is revealed and starts the app only once the morph is over (see View transitions), and Chrome turns prerendering off under automation, so no check could watch it. A prefetch only GETs the HTML; nothing runs. `npm run check:perf` covers the reads, the warming and the wiring.
+
+The chunk order is left as it is, on purpose: today it is what keeps React off the main thread until the hero has painted. Under Vite 8 the `manualChunks` function in `vite.config.ts` lets `vendor-motion` take React itself, so every entry, the search page included, loads 157 kB of framer-motion one request after its own script. Fixing that alone (Rolldown `codeSplitting` groups, React's first) let React start before the hero image's first paint, which then waited for it: mobile LCP 3.6 s to 6.6 s on an account page, 3.6 s to 6.1 s on a person page, while the offer page (still behind framer-motion) did not move. Preloading the renderers' lazy chunks does the same thing. Both wait for a start-up gate (`src/main.tsx`, `src/lib/after-view-transition.ts`) that also waits for the hero to paint; `check:perf` fails if the chunk order changes without that.
 
 ## Related
 

@@ -591,6 +591,12 @@ export default defineConfig(({ mode }) => {
          * and '@assets/…'. '@/' cannot.
          */
         '@/': path.resolve(import.meta.dirname, 'src/vendor/opticom') + '/',
+        /*
+         * The icon font's stylesheet, src/main.tsx's `import 'material-symbols/rounded.css'`: the
+         * same face and class with the icons this site draws (151 kB) in place of the package's
+         * every icon (5.4 MB). See src/styles/material-symbols/rounded.css.
+         */
+        'material-symbols/rounded.css': path.resolve(import.meta.dirname, 'src/styles/material-symbols/rounded.css'),
       },
     },
     css: {
@@ -627,6 +633,13 @@ export default defineConfig(({ mode }) => {
            * left react/jsx-runtime to whichever chunk imported it first — framer-motion's — so every
            * page, the search page included, loaded vendor-motion to render JSX at all, and react-dom's
            * client fell into a shared chunk. The router has its own chunk: the search page does not route.
+           *
+           * Under Vite 8 (Rolldown) this function does it again: a group takes its modules'
+           * dependencies, so vendor-motion takes React itself and every entry loads it one request
+           * after its own script. Don't fix that alone. Done with `codeSplitting` groups (React's
+           * first) on 6 Nov 2026, React then started before the hero image's first paint and held
+           * it: mobile LCP 3.6 s -> 6.6 s on an account page, preview against preview. Fix it with a
+           * start-up gate (src/main.tsx) that waits for the hero to paint.
            */
           manualChunks(id) {
             if (!id.includes('/node_modules/')) return undefined
