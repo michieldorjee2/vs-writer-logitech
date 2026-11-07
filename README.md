@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-06
+updated: 2026-11-07
 ---
 
 # vs-writer-logitech
@@ -258,6 +258,12 @@ The server render asks Graph which page an address is, once. A slug can be a per
 The search page fetches the next page ahead. The row a rep rests on (hover, arrow keys, or the top result as they type) is prefetched with a Speculation Rules list rule, at most two at a time, or requested once to warm the edge cache where the browser has no Speculation Rules (`src/lib/warm-pages.ts`). Prefetched, never prerendered: a prerendered page runs before the click, but the view transition from the search page makes the booth rail's room as the page is revealed and starts the app only once the morph is over (see View transitions), and Chrome turns prerendering off under automation, so no check could watch it. A prefetch only GETs the HTML; nothing runs. `npm run check:perf` covers the reads, the warming and the wiring.
 
 The chunk order is left as it is, on purpose: today it is what keeps React off the main thread until the hero has painted. Under Vite 8 the `manualChunks` function in `vite.config.ts` lets `vendor-motion` take React itself, so every entry, the search page included, loads 157 kB of framer-motion one request after its own script. Fixing that alone (Rolldown `codeSplitting` groups, React's first) let React start before the hero image's first paint, which then waited for it: mobile LCP 3.6 s to 6.6 s on an account page, 3.6 s to 6.1 s on a person page, while the offer page (still behind framer-motion) did not move. Preloading the renderers' lazy chunks does the same thing. Both wait for a start-up gate (`src/main.tsx`, `src/lib/after-view-transition.ts`) that also waits for the hero to paint; `check:perf` fails if the chunk order changes without that.
+
+## Cache: a CMS publish empties the page's edge cache
+
+A page's HTML is kept at Vercel's edge for an hour, then served once more while it re-renders for up to a day (`PAGE_CACHE_CONTROL` in `server/ssr-handler.tsx`). That is safe because the CMS says when a page changes. CMS (SaaS) calls `/api/cms-published` for every published version and every deleted item, through two subscriptions on its webhooks API (`/v1/experimental/webhooks`, keys `showcase-cache-published` and `showcase-cache-deleted`), with the bearer token in `CMS_WEBHOOK_TOKEN`. The CMS calls at publish, before Optimizely Graph has the new version, and pages are rendered from Graph, so the endpoint first waits (up to 30 s) until Graph serves that version, or no longer has a deleted item, and then deletes the page's cache by its tag (`page:<key>`, `api/_lib/purge-page.ts`), every address it was cached at included (`/x/`, `/x/?search=1`). A delete, not an invalidate: an invalidated page is shown once more while it refreshes, and copy taken off a page must not be. Edit mode's save purges the same way.
+
+Pages are tagged with `Vercel-Cache-Tag`, the header Vercel's CDN reads. Until 7 November they carried only `Cache-Tag`, which production returned to the browser as is (a header Vercel reads is not passed on), so Edit mode's purge most likely never reached a page; the 60-second cache hid it. A page without a key and the not-found shell keep the 60-second cache, as do offer experiences (their sign-up form changes outside the CMS). A deploy empties the cache too. `npm run check:cms-purge` covers the handshake, the token, the wait and the tags, with Graph and Vercel stubbed.
 
 ## Related
 
