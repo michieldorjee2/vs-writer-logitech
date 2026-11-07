@@ -9,6 +9,7 @@ import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerP
 import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
 import { withParentAccount } from './_lib/parent-account.js';
 import { withPageCopy } from './_lib/page-copy.js';
+import { graphOp, postGraphRead } from './_lib/graph-read.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -93,13 +94,16 @@ query GetRetailPage($slug: String!) {
  */
 const PAGE_QUERY = ACCOUNT_PAGE_QUERY;
 
+/**
+ * Bounded, and a stalled read asked once more (api/_lib/graph-read.ts). A second stall lands in the
+ * handler's catch: a 500 with no Cache-Control, so no cache keeps it.
+ */
 async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
-  const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = await res.json();
+  const { res, json } = await postGraphRead(
+    `${GRAPH_ENDPOINT}?auth=${authKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) },
+    graphOp(query),
+  );
   // A selection on a field Graph does not know fails the WHOLE query: `data`
   // comes back null, and every caller below reads that as "no such page". That
   // is how one schema drift 404'd all 2,676 account pages for days without
@@ -148,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const s of tries) {
         for (const { typeName, query, template } of EXPERIENCE_QUERIES) {
           const json = await queryGraph(authKey, query, { slug: s });
-          const items = json?.data?.[typeName]?.items;
+          const items = graphItems<Record<string, unknown>>(json, typeName);
           if (items && items.length > 0) {
             const shown = await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template })));
             res.setHeader('Cache-Control', signupCacheControl(shown, 's-maxage=60, stale-while-revalidate=300'));
