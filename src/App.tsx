@@ -146,11 +146,49 @@ function useHydrated(): boolean {
     return useSyncExternalStore(noopSubscribe, () => true, () => false);
 }
 
+/*
+ * What only the browser draws beside a page: the booth's sales sidebar (back-to-search + X-ray),
+ * or a personal link's note. Never in the server's HTML, so both wait for hydration: drawn in
+ * the hydration pass, they put a node where the server HTML had none and failed hydration for
+ * every booth visit.
+ *
+ * Its own component, inside the page's boundary, so that the re-render once hydration is done
+ * (useHydrated) is this component's alone. In PageLoader it re-rendered the page's <Suspense>,
+ * and a boundary updated before it has hydrated is thrown away: the page renderers are lazy
+ * chunks, so the boundary is still waiting on one when the root hydrates, and React deleted the
+ * server's page and showed the spinner until the chunk came. On a page opened from the search
+ * page that was a full-window flash of the spinner right as the view transition settled (7 Nov
+ * 2026). Here the re-render comes only once the boundary has hydrated, around the server's HTML.
+ *
+ * Each in its own boundary with no fallback: the sidebar and the note are lazy chunks too, and
+ * one suspending into the page's boundary would hide the page behind its spinner while it loads.
+ */
+function PageExtras({ data }: { data: CompetitorComparisonPage }) {
+    const [searchParams] = useSearchParams();
+    const hydrated = useHydrated();
+    if (!hydrated || isRetailPage(data) || isFinServPage(data)) return null;
+    // The whole sales sidebar is booth-only: only for a visitor who came in via /search.
+    if (searchParams.has('search')) {
+        return (
+            <Suspense fallback={null}>
+                <FloatingSidebar page={data} variant={isPersonPage(data) ? 'person' : 'abm'} />
+            </Suspense>
+        );
+    }
+    // A personal link (src/lib/share-links.ts): never with the booth tools, never on retail or fin-serv.
+    const shareCode = shareCodeOf(searchParams.get(SHARE_PARAM));
+    if (!shareCode) return null;
+    return (
+        <Suspense fallback={null}>
+            <InviteNote code={shareCode} />
+        </Suspense>
+    );
+}
+
 function PageLoader() {
     const { '*': slug } = useParams();
     const [searchParams] = useSearchParams();
     const { data, isLoading, error } = usePageContent(slug || '');
-    const hydrated = useHydrated();
 
     // Inject title, meta description, canonical, and JSON-LD. The agent platform template
     // replaces the stored title and description (they name the competitor), exactly as the
@@ -173,27 +211,12 @@ function PageLoader() {
         return <NotFound slug={slug || ''} />;
     }
 
-    // The whole sales sidebar (back-to-search + X-ray) is booth-only.
-    // Only mount it when we know the visitor came in via /search — and only after
-    // hydration: the server never renders it, so drawing it in the hydration pass put a
-    // node where the server HTML had none and failed hydration for every booth visit.
-    const fromSearch = hydrated && searchParams.has('search');
-    // A personal link (src/lib/share-links.ts): never with the booth tools, never on retail or fin-serv.
-    const shareCode = hydrated && !fromSearch && !isRetailPage(data) && !isFinServPage(data) ? shareCodeOf(searchParams.get(SHARE_PARAM)) : null;
-
     return (
         // server/ssr-handler.tsx's renderPageRoute() reproduces this exact shape — including
         // the second slot — because useId() counts a children array. Change one, change both.
         <Suspense fallback={<RouteSpinner />}>
             {renderPageBody(data, searchParams.toString())}
-            {fromSearch && !isRetailPage(data) && !isFinServPage(data) ? (
-                <FloatingSidebar page={data} variant={isPersonPage(data) ? 'person' : 'abm'} />
-            ) : shareCode ? (
-                // Its own boundary: loading the note never swaps the page for the spinner.
-                <Suspense fallback={null}>
-                    <InviteNote code={shareCode} />
-                </Suspense>
-            ) : null}
+            <PageExtras data={data} />
         </Suspense>
     );
 }

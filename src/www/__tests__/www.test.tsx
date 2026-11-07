@@ -2310,7 +2310,7 @@ test("the search page opens a result in the same tab (Cmd/Ctrl/Shift or a middle
 /** Runs the boot script against a stand-in page; returns what it did. */
 function bootOn(
   where: string,
-  opts: { from?: string; heroBottom?: number; phone?: boolean; rail?: string | null; storageThrows?: boolean; session?: Map<string, string>; photos?: string[]; photoLoaded?: boolean } = {},
+  opts: { from?: string; heroBottom?: number; phone?: boolean; rail?: string | null; storageThrows?: boolean; session?: Map<string, string>; photos?: string[]; photoLoaded?: boolean; photoSize?: [number, number]; frame?: [number, number]; heroBox?: [number, number] } = {},
 ) {
   type El = { attrs: Map<string, string>; style: { viewTransitionName: string }; children: Record<string, El> }
   const el = (attrs: Record<string, string> = {}, children: Record<string, El> = {}): El => ({ attrs: new Map(Object.entries(attrs)), style: { viewTransitionName: '' }, children })
@@ -2366,8 +2366,13 @@ function bootOn(
           : sel === '[data-vt-named]'
             ? all.filter((e) => e.attrs.has('data-vt-named')).map(wrap)
             : sel === '.sh-scene__layer.is-in .sh-scene__img'
-              ? (opts.photos ?? []).map((src) => ({ currentSrc: src, src, complete: opts.photoLoaded !== false, naturalWidth: opts.photoLoaded === false ? 0 : 1600 }))
+              ? (opts.photos ?? []).map((src) => ({ currentSrc: src, src, complete: opts.photoLoaded !== false, naturalWidth: opts.photoLoaded === false ? 0 : (opts.photoSize?.[0] ?? 1600), naturalHeight: opts.photoLoaded === false ? 0 : (opts.photoSize?.[1] ?? 1067) }))
               : [],
+      // The search page's frame, and a page's hero photograph box (the <picture>), as laid out.
+      querySelector: (sel: string) => {
+        const box = sel === '.sh-scene' ? opts.frame : sel === '.www-page .www-hero__visual picture' ? opts.heroBox : undefined
+        return box ? { getBoundingClientRect: () => ({ width: box[0], height: box[1] }) } : null
+      },
     },
   }
   const context: Record<string, unknown> = { window: win, ...win }
@@ -2524,6 +2529,72 @@ test("the search page hands its photograph to the page it opens, which shows it 
   }
 })
 
+test('the hero shows the carried photograph at the crop the morph lands it at, so the transition ends on the page', () => {
+  // The search page keeps its frame and the photograph's size with the photograph.
+  const session = new Map<string, string>()
+  const search = bootOn('/search', { session, photos: ['/home/scenes/v1/mountain-wide-2400.avif'], photoSize: [2400, 1600], frame: [1404, 864] })
+  search.handlers.pageswap({ viewTransition: search.transition(), activation: { entry: { url: 'https://showcase.optimizely.com/cdw/?search=1' } } })
+  assert.equal(session.get('vt.scene.box'), '1404 864 2400 1600')
+  // A 1440x900 window: the frame (1404x864) is wider than the 3:2 photograph, so it crops its
+  // height, and its image, covering the hero's 662x756 box, is that much closer than the hero's own.
+  const page = bootOn('/cdw/?search=1', { from: '/search?q=cdw', session, heroBox: [662, 756] })
+  page.handlers.pagereveal({ viewTransition: page.transition() })
+  assert.equal(page.props.get('--vt-scene-z'), (((1404 / 2400) * (756 / 864)) / (756 / 1600)).toFixed(4))
+  assert.equal(page.props.get('--vt-scene-z'), '1.0833')
+  assert.equal(session.has('vt.scene.box'), false, 'taken with the photograph')
+  // A photograph as wide as the frame: the two crops are the same, no zoom.
+  const wide = bootOn('/cdw/?search=1', { from: '/search', heroBox: [662, 756], session: new Map([['vt.scene', '/home/scenes/v1/river-wide-1600.avif'], ['vt.scene.box', '1404 864 1600 968']]) })
+  wide.handlers.pagereveal({ viewTransition: wide.transition() })
+  assert.equal(wide.props.get('--vt-scene-z') ?? null, null)
+  // No transition (reduced motion), no measurements, or a page not opened from Search: no zoom.
+  const box = (): Map<string, string> => new Map([['vt.scene', '/home/scenes/v1/mountain-wide-2400.avif'], ['vt.scene.box', '1404 864 2400 1600']])
+  const calm = bootOn('/cdw/?search=1', { from: '/search', heroBox: [662, 756], session: box() })
+  calm.handlers.pagereveal({ viewTransition: null })
+  assert.equal(calm.props.get('--vt-scene-z') ?? null, null)
+  const unmeasured = bootOn('/cdw/?search=1', { from: '/search', session: box() })
+  unmeasured.handlers.pagereveal({ viewTransition: unmeasured.transition() })
+  assert.equal(unmeasured.props.get('--vt-scene-z') ?? null, null)
+  const junk = bootOn('/cdw/?search=1', { from: '/search', heroBox: [662, 756], session: new Map([['vt.scene', '/home/scenes/v1/mountain-wide-2400.avif'], ['vt.scene.box', '1404 NaN 0 1600']]) })
+  junk.handlers.pagereveal({ viewTransition: junk.transition() })
+  assert.equal(junk.props.get('--vt-scene-z') ?? null, null)
+  // The hero draws it that close, only with the carried photograph.
+  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
+  assert.match(css, /html\.vt-scene-carry \.www-page \.www-hero__img \{\s*content: var\(--vt-scene\);[\s\S]*?transform: scale\(var\(--vt-scene-z, 1\)\);/)
+  // ...and nothing else on the hero image sets a transform while it arrives by the morph.
+  assert.match(readFileSync('src/www/www.css', 'utf8'), /\.vt-in \.www-page \.www-hero__img \{\s*animation: none;/)
+})
+
+test("the frame's rounded corners show the rail's grey while it moves, and the rail's ground brings the page's bottom corner", () => {
+  const css = readFileSync('src/styles/view-transitions.css', 'utf8')
+  assert.match(css, /::view-transition-group\(vt-frame\) \{\s*background: var\(--vt-ground\);/)
+  // The search page's margin and the rail are that grey, light and dark.
+  const search = readFileSync('src/styles/search-home.css', 'utf8')
+  const rail = readFileSync('src/styles/booth-rail.css', 'utf8')
+  assert.match(search, /--sh-page: #f9fcf8;/)
+  assert.match(search, /--sh-page: #252825;/)
+  assert.match(rail, /--booth-page: #f9fcf8;/)
+  assert.match(rail, /--booth-page: #252825;/)
+  // The ground's bottom corner is drawn through the transition; its top one, and the rail's, wait.
+  const hidden = css.match(/((?::root:active-view-transition [^{,]+,?\s*)+)\{\s*opacity: 0 !important;/)?.[1] ?? ''
+  assert.ok(hidden.includes('.vt-rail-shell::before') && !hidden.includes('.vt-rail-shell::after'), hidden)
+  assert.ok(hidden.includes('.booth-rail::before') && hidden.includes('.booth-rail::after'), hidden)
+})
+
+test("hydration never touches the page's boundary: what only the browser draws re-renders on its own", () => {
+  const app = readFileSync('src/App.tsx', 'utf8')
+  // PageLoader holds no hydration flag: its re-render once hydrated threw the server's page away.
+  const loader = app.slice(app.indexOf('function PageLoader()'), app.indexOf('function App()'))
+  assert.ok(loader.length > 0 && !/useHydrated\(\)/.test(loader), 'PageLoader reads useHydrated()')
+  assert.match(loader, /<Suspense fallback=\{<RouteSpinner \/>\}>\s*\{renderPageBody\(data, searchParams\.toString\(\)\)\}\s*<PageExtras data=\{data\} \/>\s*<\/Suspense>/)
+  // PageExtras: hydrated first, and each lazy chunk in its own boundary with no fallback.
+  const extras = app.slice(app.indexOf('function PageExtras('), app.indexOf('function PageLoader()'))
+  assert.match(extras, /const hydrated = useHydrated\(\);\s*if \(!hydrated \|\| isRetailPage\(data\) \|\| isFinServPage\(data\)\) return null;/)
+  assert.match(extras, /<Suspense fallback=\{null\}>\s*<FloatingSidebar /)
+  assert.match(extras, /<Suspense fallback=\{null\}>\s*<InviteNote /)
+  // The server mirrors the two slots.
+  assert.match(readFileSync('server/ssr-handler.tsx', 'utf8'), /<Suspense fallback=\{null\}>\s*\{page\}\s*\{\/\*[^*]*PageExtras[^*]*\*\/\}\s*\{false\}\s*<\/Suspense>/)
+})
+
 testAsync('the app starts once the transition the page arrived by is over (it cancelled the morph), or at once without one', async () => {
   // The boot script's promise: settled by the transition's end, or by a reveal without one.
   const page = bootOn('/cdw/?search=1', { from: '/search' })
@@ -2619,8 +2690,8 @@ testAsync("the search page's frame becomes the page's hero block, and its grey m
   assert.match(home, /--sh-page: #252825;/)
   assert.match(home, /--sh-frame-l: max\(18px, env\(safe-area-inset-left\)\);/)
   assert.match(readFileSync('src/styles/booth-rail.css', 'utf8'), /--booth-rail-w: 64px;/)
-  assert.match(css, /\.vt-rail-shell \{\s*--vt-rail-bg: #f9fcf8;[\s\S]*?width: 64px;[\s\S]*?view-transition-name: vt-rail-shell;/)
-  assert.match(css, /@media \(prefers-color-scheme: dark\) \{\s*\.vt-rail-shell \{\s*--vt-rail-bg: #252825;/)
+  assert.match(css, /:root \{\s*--vt-ground: #f9fcf8;\s*\}\s*@media \(prefers-color-scheme: dark\) \{\s*:root \{\s*--vt-ground: #252825;/)
+  assert.match(css, /\.vt-rail-shell \{\s*--vt-rail-bg: var\(--vt-ground\);[\s\S]*?width: 64px;[\s\S]*?view-transition-name: vt-rail-shell;/)
   assert.match(css, /@keyframes vt-rail-ground-in \{\s*from \{\s*transform: translateX\(-46px\);/)
   assert.match(css, /@keyframes vt-rail-out \{[\s\S]*?to \{\s*opacity: 0;\s*transform: translateX\(-46px\);/)
   assert.match(css, /:root:active-view-transition \.booth-rail::before,\s*:root:active-view-transition \.booth-rail::after \{\s*opacity: 0 !important;/)

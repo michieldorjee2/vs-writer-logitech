@@ -15,6 +15,9 @@
  *   - an account, person or offer page opened from the search page shows the search page's
  *     photograph in its hero (`vt-scene-carry`, --vt-scene): already loaded, so it is there for the
  *     first paint the morph lands on, and the photograph moves without a cross-fade (`carry-scene`)
+ *   - at the crop the morph lands it at (--vt-scene-z): the search page's image of the photograph
+ *     is its own crop, so the hero shows the photograph that close too, and the morph ends on the
+ *     page exactly instead of jumping to the hero's own crop
  *   - a page skips its hero intro (`vt-in`): the hero arrives by the morph
  *   - and, opened from the search page with the booth rail open, makes the rail's room before the
  *     first paint (`vt-rail-room`, view-transitions.css), so the hero lands where it stays; the
@@ -61,23 +64,35 @@
   }
   /* The photograph on the search page: the top layer that is in (a new one is laid over the last). */
   var SCENE_KEY = 'vt.scene';
+  var BOX_KEY = 'vt.scene.box';
   var RAIL_KEY = 'vt.rail';
   function keepScene() {
     var imgs = document.querySelectorAll('.sh-scene__layer.is-in .sh-scene__img');
     var img = imgs[imgs.length - 1];
+    var frame = document.querySelector('.sh-scene');
     try {
       if (img && (img.currentSrc || img.src)) sessionStorage.setItem(SCENE_KEY, img.currentSrc || img.src);
       else sessionStorage.removeItem(SCENE_KEY);
+      /* And how the search page shows it: its frame, and the photograph's own size (sceneZoom). */
+      var r = frame && img && img.naturalWidth ? frame.getBoundingClientRect() : null;
+      if (r) sessionStorage.setItem(BOX_KEY, [r.width, r.height, img.naturalWidth, img.naturalHeight].join(' '));
+      else sessionStorage.removeItem(BOX_KEY);
     } catch (e) {
       /* no storage: the page shows its own photograph */
     }
   }
+  /* The search page's frame and photograph sizes, kept with the photograph (taken with it). */
+  var sceneBox = null;
   /* Taken once: only an https address, or this site's own. */
   function takeScene() {
     var src = '';
+    sceneBox = null;
     try {
       src = sessionStorage.getItem(SCENE_KEY) || '';
       sessionStorage.removeItem(SCENE_KEY);
+      var box = (sessionStorage.getItem(BOX_KEY) || '').split(' ').map(Number);
+      sessionStorage.removeItem(BOX_KEY);
+      if (box.length === 4 && box.every(function (n) { return n > 0 && isFinite(n); })) sceneBox = box;
     } catch (e) {
       return '';
     }
@@ -92,6 +107,28 @@
   }
   function cssUrl(href) {
     return 'url("' + href.replace(/["\\\s]/g, encodeURIComponent) + '")';
+  }
+  /*
+   * How much closer the hero shows the carried photograph, so the morph lands on it exactly.
+   *
+   * The photograph that moves is the search page's image of it (view-transitions.css,
+   * vt-scene-square): its frame's crop, laid over the hero's photograph box (the <picture>,
+   * 12% taller than its frame, www.css) to cover it. The search frame is wider than a 3:2
+   * photograph, so its crop shows less of the photograph's height than the hero's own does, and
+   * the image the morph ends on was some 8% (a wide window: 20%) closer than the page under it,
+   * which jumped as the transition ended. The hero draws the photograph that much closer instead:
+   * the scale the image lands at over the hero's scale. Both crops are centred, so the scale is all.
+   */
+  function sceneZoom(box) {
+    var pic = box && document.querySelector('.www-page .www-hero__visual picture');
+    var p = pic && pic.getBoundingClientRect();
+    if (!p || !p.width || !p.height) return 0;
+    var fw = box[0], fh = box[1], nw = box[2], nh = box[3];
+    var search = Math.max(fw / nw, fh / nh); // the search page's photograph, covering its frame
+    var image = Math.max(p.width / fw, p.height / fh); // its image of it, covering the hero's box
+    var hero = Math.max(p.width / nw, p.height / nh); // the hero's own, covering the same box
+    var z = (search * image) / hero;
+    return isFinite(z) && z > 1.001 && z < 4 ? z : 0;
   }
   /* The photograph this page shows in its hero, the search page's (kept to hand it back). */
   var carried = '';
@@ -204,5 +241,8 @@
       }
     }
     root.classList.add('vt-in');
+    /* Measured with the rail's room made and the hero's intro off: the hero as the morph ends. */
+    var z = scene && isSearchPath(from) ? sceneZoom(sceneBox) : 0;
+    if (z) root.style.setProperty('--vt-scene-z', z.toFixed(4));
   });
 })();

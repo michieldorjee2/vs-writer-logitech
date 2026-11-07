@@ -88,6 +88,15 @@
   overflow: clip;
   background: #08251a;
 }
+/* What shows in the frame's rounded corners while it moves: the grey of the search page's margin
+   and of the rail beside the page (the same grey, --vt-ground), which is what is there before and
+   after. Not the grounds behind: opening a page, its white comes in under the morph's last third
+   (vt-ground-last), and the hero's corner beside the rail turned white, then grey again as the
+   transition ended and the rail's own corner took over (Michiel, 7 Nov: "white in the rounded
+   corners"). */
+::view-transition-group(vt-frame) {
+  background: var(--vt-ground);
+}
 :root:active-view-transition-type(from-search)::view-transition-image-pair(vt-frame) {
   animation: vt-frame-open 620ms cubic-bezier(0.65, 0, 0.2, 1) both;
 }
@@ -252,6 +261,9 @@
  * same the other way: the search page's image alone, from the hero's crop to its frame. */
 html.vt-scene-carry .www-page .www-hero__img {
   content: var(--vt-scene);
+  /* At the crop the morph lands it at (the boot script's sceneZoom: the search page's crop shows
+     less of the photograph than the hero's own), so the transition ends on the page exactly. */
+  transform: scale(var(--vt-scene-z, 1));
 }
 :root:active-view-transition-type(carry-scene):active-view-transition-type(from-search)::view-transition-old(vt-scene) {
   animation: vt-scene-square 620ms cubic-bezier(0.65, 0, 0.2, 1) both;
@@ -309,8 +321,8 @@ html.vt-scene-carry .www-page .www-hero__img {
  * the first paint: the rail itself mounts after the morph) slides in with the frame's left edge,
  * from the search page's margin (18 px) to the rail's width (64 px); the rail then slides over it,
  * its icons cascading in. Back to Search, the rail narrows to the margin the same way while its
- * icons go, over the search page's grey. The page's rounded corners beside the rail are the frame's
- * own while it moves (their pieces on the rail wait until it has). Between two pages that both have
+ * icons go, over the search page's grey. The page's top corner beside the rail is the frame's own while
+ * it moves (its piece on the rail waits until it has); the bottom one comes with the rail's ground. Between two pages that both have
  * the rail, it holds still: both images are there, so no rule below applies. */
 .booth-rail {
   view-transition-name: vt-rail;
@@ -318,8 +330,16 @@ html.vt-scene-carry .www-page .www-hero__img {
 .booth-rail-mini {
   view-transition-name: vt-rail-mini;
 }
+:root {
+  --vt-ground: #f9fcf8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --vt-ground: #252825;
+  }
+}
 .vt-rail-shell {
-  --vt-rail-bg: #f9fcf8;
+  --vt-rail-bg: var(--vt-ground);
   position: fixed;
   top: 0;
   bottom: 0;
@@ -329,11 +349,6 @@ html.vt-scene-carry .www-page .www-hero__img {
   background: var(--vt-rail-bg);
   pointer-events: none;
   view-transition-name: vt-rail-shell;
-}
-@media (prefers-color-scheme: dark) {
-  .vt-rail-shell {
-    --vt-rail-bg: #252825;
-  }
 }
 @media (max-width: 640px) {
   .vt-rail-shell {
@@ -357,8 +372,10 @@ html.vt-scene-carry .www-page .www-hero__img {
   bottom: 0;
   background: radial-gradient(circle at 100% 0, transparent 19.5px, var(--vt-rail-bg) 20px);
 }
+/* The top one is the frame's own corner while it moves (its ground, above); the bottom one, at the
+   window's foot, is drawn from the start, so the page's white coming in under the morph meets
+   the rail's ground in a rounded corner, as it will once the rail is there. */
 :root:active-view-transition .vt-rail-shell::before,
-:root:active-view-transition .vt-rail-shell::after,
 :root:active-view-transition .booth-rail::before,
 :root:active-view-transition .booth-rail::after {
   opacity: 0 !important;

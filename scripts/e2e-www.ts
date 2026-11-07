@@ -1053,6 +1053,18 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
       const w = window as unknown as { __vt: Array<Record<string, unknown>> }
       w.__vt = []
       addEventListener('pageshow', (e) => w.__vt.push({ at: 'pageshow', persisted: (e as PageTransitionEvent).persisted }))
+      // The server's page, marked as it is parsed: the app must take it over, not replace it. A
+      // boundary updated before it had hydrated was thrown away for the spinner, a full-window
+      // flash as the morph settled (7 Nov 2026).
+      document.addEventListener('DOMContentLoaded', () => {
+        const ssr = document.querySelector('.www-page') as (Element & { __ssr?: boolean }) | null
+        if (ssr) ssr.__ssr = true
+        const root = document.getElementById('root')
+        if (root)
+          new MutationObserver(() => {
+            if (root.querySelector('.animate-spin')) (window as unknown as { __spinner?: boolean }).__spinner = true
+          }).observe(root, { childList: true, subtree: true })
+      })
       addEventListener('pagereveal', (e) => {
         const vt = (e as Event & { viewTransition?: VT | null }).viewTransition
         w.__vt.push({ at: 'reveal', vt: !!vt })
@@ -1143,6 +1155,12 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
   await test('a search result opens its page in the same tab, and the row, the wordmark and the photograph move into it, the whole way', async () => {
     await search(page, 'cdw')
     const photo = await searchPhoto(page)
+    // The search page's frame and its photograph's size: the crop the hero has to land on.
+    const frame = await page.evaluate(() => {
+      const f = document.querySelector('.sh-scene')!.getBoundingClientRect()
+      const img = [...document.querySelectorAll('.sh-scene__layer.is-in .sh-scene__img')].pop() as HTMLImageElement
+      return [f.width, f.height, img.naturalWidth, img.naturalHeight]
+    })
     await page.locator(`[data-vt-slug="${slug}"]`).click()
     await page.waitForURL(`**${ACCOUNT.replace(/\/$/, '')}?search=1`, { timeout: 10000 })
     await page.locator('.www-page').waitFor({ timeout: 10000 })
@@ -1168,6 +1186,23 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
     expect(!ready.moves.some((m) => m.startsWith('::view-transition-new(vt-scene) -ua-')), 'the photograph cross-fades')
     expect(await page.evaluate(() => document.documentElement.classList.contains('vt-in')), 'the hero intro played under the morph')
     expect(ctx.pages().length === 1, 'opened in a new tab')
+    // The morph ends on the page: the hero draws the photograph at the crop the search page's
+    // image of it lands at (src/lib/view-transitions-boot.js, sceneZoom).
+    const hero = await page.evaluate(() => {
+      const p = document.querySelector('.www-page .www-hero__visual picture')!.getBoundingClientRect()
+      return { w: p.width, h: p.height, z: getComputedStyle(document.documentElement).getPropertyValue('--vt-scene-z').trim() }
+    })
+    const [fw, fh, nw, nh] = frame
+    const z = (Math.max(fw / nw, fh / nh) * Math.max(hero.w / fw, hero.h / fh)) / Math.max(hero.w / nw, hero.h / nh)
+    expect(z > 1.001 ? Math.abs(Number(hero.z) - z) < 0.002 : hero.z === '', `the hero's zoom is ${hero.z || 'none'}, the landing needs ${z.toFixed(4)}`)
+    // Once the app has started (the rail is its), the page on screen is still the server's.
+    await page.locator('.booth-rail.is-open').waitFor({ timeout: 10000 })
+    const kept = await page.evaluate(() => ({
+      ssr: (document.querySelector('.www-page') as (Element & { __ssr?: boolean }) | null)?.__ssr === true,
+      spinner: (window as unknown as { __spinner?: boolean }).__spinner === true,
+    }))
+    expect(kept.ssr, "the app replaced the server's page as it started")
+    expect(!kept.spinner, 'the spinner was drawn as the page started (a full-window flash)')
   })
   await test("the booth rail's room is there from the first frame: the rail slides into it and the page holds still", async () => {
     const ready = await lastReady(page)

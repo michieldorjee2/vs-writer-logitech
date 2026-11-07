@@ -429,7 +429,7 @@ check('the note never counts a staff browser', /if \(isStaffBrowser\(\)\) return
 const sheet = read('src/components/ShareSheet.tsx');
 check('Preview opens the personal link itself in a new tab (signed in, so never counted: share-note checks above)', /href=\{personal\.url\}\s+target="_blank"\s+rel="noopener noreferrer"/.test(sheet) && />\s*Preview\s*</.test(sheet));
 check('the note drops the overline and the company line, and opens with the page\'s own primary CTA', !/A note for|invite-note__org/.test(invite) && /<Button[^>]*variant="primary"[^>]*className="www-btn invite-note__open"/.test(invite));
-check('the note is only mounted without the booth tools', /const shareCode = hydrated && !fromSearch/.test(read('src/App.tsx')));
+check('the note is only mounted without the booth tools (the booth branch returns first)', /if \(searchParams\.has\('search'\)\) \{[\s\S]*?<FloatingSidebar[\s\S]*?\}\s*\/\/[^\n]*\n\s*const shareCode = shareCodeOf\(/.test(read('src/App.tsx')));
 const files = (dir: string): string[] =>
   readdirSync(join(root, dir)).flatMap((f) => (statSync(join(root, dir, f)).isDirectory() ? (f === 'node_modules' || f === 'vendor' || f === '__tests__' ? [] : files(join(dir, f))) : [join(dir, f)]));
 const browser = files('src').filter((f) => /\.(ts|tsx)$/.test(f));
