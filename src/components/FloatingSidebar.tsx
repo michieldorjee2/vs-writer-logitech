@@ -110,19 +110,17 @@ function EmployeeLinkRedirect() {
 
 /**
  * The rail folded away stays folded on the next page, and opened stays open (this browser only).
- * Until someone chooses, a phone starts folded: there the rail lies over the page rather than
- * beside it (booth-rail.css), so it waits one tap away.
+ * Until someone chooses, it is open, a phone included: there it is a bar along the bottom that the
+ * page makes room for (booth-rail.css), no longer a column over the page's copy.
  */
 const RAIL_KEY = 'opti.booth.rail';
-const PHONE = '(max-width: 640px)';
 function readRailCollapsed(): boolean {
   try {
-    const chosen = localStorage.getItem(RAIL_KEY);
-    if (chosen) return chosen === 'collapsed';
+    return localStorage.getItem(RAIL_KEY) === 'collapsed';
   } catch {
-    /* private window: the default below */
+    /* private window: open */
+    return false;
   }
-  return typeof window !== 'undefined' && Boolean(window.matchMedia?.(PHONE).matches);
 }
 function writeRailCollapsed(collapsed: boolean): void {
   try {
@@ -209,7 +207,8 @@ function RailButton({ i, label, icon, onClick, ariaLabel, modifier, pressed, on,
  * The booth rail: a full-height column down the left, the page set in beside it with rounded
  * corners, in the search page's surfaces (search-home.css: Axiom tokens, light or dark with the
  * system), spaced and coloured as Mark's own sidebar is when collapsed (rounded tiles 4 px apart,
- * the one in use on a soft wash), each tool's name under its icon. Top to bottom:
+ * the one in use on a soft wash), each tool's name under its icon. On a phone the same buttons
+ * float in a bar along the bottom, left to right (booth-rail.css). Top to bottom:
  *   • Search: back to /search.
  *   • Edit: feedback mode, routed to Mark, who edits the page live and reloads it when done.
  *   • X-ray: the per-section data overlay.

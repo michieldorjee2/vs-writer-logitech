@@ -51,8 +51,9 @@
   function onSearchPage() {
     return isSearchPath(pathOf(location.href));
   }
-  /* Whether the booth rail will open: FloatingSidebar.tsx's readRailCollapsed() (its RAIL_KEY and
-     PHONE), and only on a desktop, where the page moves over for it (booth-rail.css). */
+  /* Whether the booth rail will open beside the page: FloatingSidebar.tsx's readRailCollapsed()
+     (its RAIL_KEY), and only wider than a phone, where the page moves over for it. On a phone the
+     tools are a bar along the bottom (booth-rail.css), which needs no room beside the page. */
   function railOpens() {
     if (!/[?&]search(=|&|$)/.test(location.search)) return false;
     if (window.matchMedia && matchMedia('(max-width: 640px)').matches) return false;

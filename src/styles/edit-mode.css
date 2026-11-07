@@ -230,6 +230,24 @@ html.booth-page--rail .edit-tutorial {
 @keyframes edit-tutorial-in {
   from { opacity: 0; transform: translateX(-16px); }
 }
+/* A phone: the tools are a bar along the bottom (booth-rail.css), so the tutorial stands on it. */
+@media (max-width: 640px) {
+  .edit-tutorial,
+  html.booth-page--rail .edit-tutorial {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: var(--booth-bar-space, 16px);
+    width: auto;
+    max-height: calc(100dvh - var(--booth-bar-space, 16px) - 16px);
+    overflow-y: auto;
+    padding: 20px 18px 16px;
+    animation-name: edit-tutorial-up;
+  }
+  @keyframes edit-tutorial-up {
+    from { opacity: 0; transform: translateY(16px); }
+  }
+}
 .edit-tutorial__title {
   margin: 0 0 18px;
   font: 800 22px/1.1 var(--booth-display);
@@ -722,7 +740,7 @@ html.booth-page--rail .live-hud {
   from { opacity: 0; transform: translate(-50%, 8px); }
 }
 @media (max-width: 640px) {
-  html.booth-page--rail .live-hud { left: 50%; }
+  html.booth-page--rail .live-hud { left: 50%; bottom: var(--booth-bar-space, 24px); }
 }
 .live-hud__bar { display: flex; align-items: center; gap: 10px; }
 .live-hud__status { flex: 1; font-size: 15px; font-weight: 500; }

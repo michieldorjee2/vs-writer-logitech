@@ -2442,7 +2442,7 @@ test('opened from the search page with the booth rail open, a page makes the rai
   assert.ok(reveal('/logitech/ben-yu/?search=1', { rail: 'open' }), 'a person page, the rail left open')
   assert.ok(reveal('/cdw/?search=1', { storageThrows: true }), 'a private window: the rail opens')
   assert.ok(!reveal('/cdw/?search=1', { rail: 'collapsed' }), 'the rail folded away stays folded: no room')
-  assert.ok(!reveal('/cdw/?search=1', { phone: true }), 'a phone: the rail lies over the page')
+  assert.ok(!reveal('/cdw/?search=1', { phone: true }), 'a phone: the tools are a bar along the bottom, no room beside the page')
   assert.ok(!reveal('/cdw/', {}), 'no ?search: no rail')
   assert.ok(!reveal('/cdw/?search=1', { from: '/smartsheet/?search=1' }), 'not from the search page')
   assert.ok(!reveal('/cdw/?search=1', {}, false), 'no view transition (reduced motion): the rail slides in with the page as it always did')
@@ -2450,7 +2450,8 @@ test('opened from the search page with the booth rail open, a page makes the rai
   const boot = readFileSync('src/lib/view-transitions-boot.js', 'utf8')
   const rail = readFileSync('src/components/FloatingSidebar.tsx', 'utf8')
   const key = rail.match(/const RAIL_KEY = '([^']+)'/)?.[1]
-  const phone = rail.match(/const PHONE = '([^']+)'/)?.[1]
+  // A phone, where the tools turn into the bar along the bottom (booth-rail.css).
+  const phone = readFileSync('src/styles/booth-rail.css', 'utf8').match(/Phones: a floating bar along the bottom[\s\S]*?@media (\(max-width: \d+px\))/)?.[1]
   assert.ok(key && boot.includes(`localStorage.getItem('${key}') !== 'collapsed'`), `the boot script reads ${key}`)
   assert.ok(phone && boot.includes(`matchMedia('${phone}')`), `the boot script's phone is ${phone}`)
 })
