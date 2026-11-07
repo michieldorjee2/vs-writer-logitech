@@ -1295,7 +1295,7 @@ await test('an offer page is the www offer page, with or without ?design=classic
   }
 })
 
-console.log('\nspeed: the icon subset, no renderer preloads, the page made ready from the search page')
+console.log('\nspeed: the icon subset, no renderer preloads, the page fetched ahead from the search page')
 {
   await test('no renderer chunk is preloaded: the hero paints before hydration starts', async () => {
     for (const href of [url(ACCOUNT), url(ACCOUNT, 'search=1'), url(PERSON), url(OFFER)]) {
@@ -1347,9 +1347,9 @@ console.log('\nspeed: the icon subset, no renderer preloads, the page made ready
   })
   await ctx.close()
 
-  await test('the search page names the row a rep rests on for prerender (Speculation Rules, its own address)', async () => {
+  await test('the search page prefetches the row a rep rests on (Speculation Rules, its own address, never a prerender)', async () => {
     const search = await browser.newContext({ ...VIEWPORTS.desktop, serviceWorkers: 'block', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
-    // A signed-in Optimizely person's browser, as everyone on /search is: nothing a prerendered page loads sends to ODP.
+    // A signed-in Optimizely person's browser, as everyone on /search is.
     await search.addCookies([{ name: 'showcase_staff', value: '1', url: BASE }])
     const meta = (route: string) => ({ url: { default: route, hierarchical: route }, published: '2026-11-01T00:00:00Z' })
     const slug = ACCOUNT.replace(/^\/|\/$/g, '')
@@ -1375,8 +1375,10 @@ console.log('\nspeed: the icon subset, no renderer preloads, the page made ready
     await page.waitForSelector('script[type="speculationrules"]', { state: 'attached', timeout: 3000 })
     const rules = await page.locator('script[type="speculationrules"]').allTextContents()
     expect(rules.length === 1, `${rules.length} rule scripts`)
-    const urls = (JSON.parse(rules[0]) as { prerender: Array<{ source: string; urls: string[] }> }).prerender[0].urls
-    expect(urls[0] === `/${slug}?search=1`, `prerenders ${urls.join(', ')}`)
+    const parsed = JSON.parse(rules[0]) as { prefetch?: Array<{ source: string; urls: string[] }>; prerender?: unknown }
+    expect(!parsed.prerender, 'a prerender rule: the view transition needs the page to start after the click (src/lib/warm-pages.ts)')
+    const urls = parsed.prefetch?.[0]?.urls ?? []
+    expect(urls[0] === `/${slug}?search=1`, `prefetches ${urls.join(', ') || 'nothing'}`)
     await search.close()
   })
   await test('no errors, and nothing reached the real webhooks', async () => {

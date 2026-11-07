@@ -13,6 +13,10 @@ import './index.css'
  * Vite's normal CSS-asset pipeline (not Tailwind's) the file, which resolves and fingerprints
  * the woff2 correctly — the same reason Google Fonts is loaded via a `<link>` in index.html
  * rather than a CSS `@import` (see index.css's own first line).
+ *
+ * Since 6 Nov 2026 this import resolves to src/styles/material-symbols/rounded.css (an alias in
+ * vite.config.ts): the same face and class with only the icons the site draws (151 kB, not the
+ * package's 5.4 MB). A name only the CMS knows brings in the whole font (src/lib/icon-font.ts).
  */
 import 'material-symbols/rounded.css'
 import App from './App.tsx'

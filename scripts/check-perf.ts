@@ -6,10 +6,11 @@
  *      did, treats a Graph error as "ask one by one" rather than "no page", and a read started
  *      early is never an unhandled rejection.
  *   2. src/lib/warm-pages.ts: the address a search page row opens (the same as SearchHome's),
- *      and what getting it ready does: a Speculation Rules list of at most two pages, replaced as
- *      the rep moves on, or one request per page where the browser has no rules.
+ *      and what getting it ready does: a Speculation Rules prefetch list (never a prerender) of at
+ *      most two pages, replaced as the rep moves on, or one request per page where the browser has
+ *      no rules.
  *   3. Wiring, read from the sources: SearchHome calls the hook with its active row and opens rows
- *      at the address the hook prerenders; the server render preloads no renderer chunk; the chunk
+ *      at the address the hook prefetches; the server render preloads no renderer chunk; the chunk
  *      order is left as it is (see vite.config.ts).
  *
  * No network, no credentials.
@@ -20,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from '../server/reads.js';
-import { KEEP, pageHrefOf, prerenderRules, resetWarmPages, warmPage } from '../src/lib/warm-pages.js';
+import { KEEP, pageHrefOf, prefetchRules, resetWarmPages, warmPage } from '../src/lib/warm-pages.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f: string) => readFileSync(join(root, f), 'utf8');
@@ -134,9 +135,9 @@ function fakeDoc() {
     } as unknown as Pick<Document, 'createElement' | 'head'>,
   };
 }
-const urlsOf = (el: FakeEl) => (JSON.parse(el.textContent) as { prerender: Array<{ source: string; urls: string[] }> }).prerender[0].urls;
+const urlsOf = (el: FakeEl) => (JSON.parse(el.textContent) as { prefetch: Array<{ source: string; urls: string[] }> }).prefetch[0].urls;
 
-await check('prerender: one rules script, the latest page first, at most two', () => {
+await check('prefetch: one rules script, the latest page first, at most two', () => {
   resetWarmPages();
   const { head, doc } = fakeDoc();
   warmPage('/a?search=1', doc, true);
@@ -147,7 +148,7 @@ await check('prerender: one rules script, the latest page first, at most two', (
   assert(JSON.stringify(urlsOf(head[0])) === JSON.stringify(['/c?search=1', '/b?search=1']), JSON.stringify(urlsOf(head[0])));
   assert(KEEP === 2, `KEEP ${KEEP}`);
 });
-await check('prerender: settling on the same page again changes nothing', () => {
+await check('prefetch: settling on the same page again changes nothing', () => {
   resetWarmPages();
   const { head, doc } = fakeDoc();
   warmPage('/a?search=1', doc, true);
@@ -155,9 +156,13 @@ await check('prerender: settling on the same page again changes nothing', () => 
   warmPage('/a?search=1', doc, true);
   assert(head.length === 1 && head[0] === first, 'rules were rewritten');
 });
-await check('prerender rules are a list rule (rows are buttons, not links)', () => {
-  const rules = JSON.parse(prerenderRules(['/x?search=1']));
-  assert(rules.prerender[0].source === 'list' && rules.prerender[0].urls[0] === '/x?search=1', JSON.stringify(rules));
+await check('the rules are a prefetch list rule (rows are buttons, not links), never a prerender', () => {
+  const rules = JSON.parse(prefetchRules(['/x?search=1']));
+  assert(rules.prefetch[0].source === 'list' && rules.prefetch[0].urls[0] === '/x?search=1', JSON.stringify(rules));
+  // A prerendered page starts before the click and mounts its rail before the reveal: the view
+  // transition from the search page makes the rail's room and starts the app itself (src/lib/warm-pages.ts).
+  assert(!('prerender' in rules), 'prerender rules: the view transition from the search page needs the page to start after the click');
+  assert(!/prerender/.test(read('src/lib/warm-pages.ts').replace(/\/\*[\s\S]*?\*\//g, '')), 'src/lib/warm-pages.ts asks for a prerender');
 });
 await check('no Speculation Rules: each page requested once, same-origin, low priority', async () => {
   resetWarmPages();
@@ -182,7 +187,7 @@ await check('no Speculation Rules: each page requested once, same-origin, low pr
 });
 
 console.log('3. wiring');
-await check("SearchHome calls the hook with its active row, and its rows go where the hook prerenders", () => {
+await check("SearchHome calls the hook with its active row, and its rows go where the hook prefetches", () => {
   const src = read('src/components/SearchHome.tsx');
   assert(/useWarmPage\(navRows\[activeIdx\]\)/.test(src), 'useWarmPage(navRows[activeIdx]) not found');
   assert(src.includes('const href = `/${slug}?search=1`;'), "open()'s address changed: update pageHrefOf in src/lib/warm-pages.ts to match");

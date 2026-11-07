@@ -1,24 +1,30 @@
 /**
- * The search page gets the page a rep is about to open ready before they open it
+ * The search page fetches the page a rep is about to open before they open it
  * (src/components/SearchHome.tsx, `useWarmPage`).
  *
  * The row the pointer rests on, or the arrow keys or the search box have made the active one,
  * is the page most likely opened next. A moment after the rep settles on it (or at once, on a
  * mouse press) its page is:
- *   - prerendered, where the browser has Speculation Rules (Chrome, Edge): fetched, drawn and
- *     hydrated out of sight, so the click shows it at once. The view transition into it still
- *     runs: a prerendered page gets `pagereveal` when it is shown.
+ *   - prefetched, where the browser has Speculation Rules (Chrome, Edge): the HTML is fetched and
+ *     held, and the click's navigation uses it, so the page starts drawing at once.
  *   - requested once, elsewhere (Safari, Firefox): the browser does not keep the response, but
  *     the edge cache now holds it, so the click's own request is a hit instead of a render.
  * The rows are <button>s that call location.assign, not links, so Speculation Rules' document
  * rules cannot find them: this writes a list rule with the one or two addresses instead, and
- * replaces it as the rep moves on (Chrome drops a prerender no rule names any more).
+ * replaces it as the rep moves on.
  *
- * Safe to run early. Only signed-in Optimizely people reach /search, and their browsers carry the
- * staff mark (src/lib/staff-marker.ts): a page they load sends nothing to ODP and has the
- * Optimizely snippet opted out (index.html), and useOdpTracking records no visit. What the booth
- * rail reads on load (/api/auth/me, page activity, share links) are GETs. Nothing a page does
- * while it loads writes anything.
+ * Prefetched, never prerendered. A prerendered page runs before the click, and the view
+ * transition from the search page needs the page's start for itself: the booth rail's room is
+ * made as the page is revealed, before the rail mounts (src/lib/view-transitions-boot.js), and
+ * the app hydrates only once the morph is over (src/lib/after-view-transition.ts), because
+ * hydration landing in the morph cancelled it (#46). A prerender has mounted its rail before it
+ * is revealed, and one shown while still starting would hydrate during the morph. Chrome also
+ * turns prerendering off under test automation, so no check could ever watch that path. The
+ * fetch is where the time was (the document's TTFB from the click, 778 ms to 4 ms locally on
+ * 6 Nov 2026); the rest of the page draws during the morph.
+ *
+ * Fetches only GET a page's HTML, with the rep's cookies (same-origin): nothing runs, nothing is
+ * recorded.
  */
 import { useEffect, useRef } from 'react';
 
@@ -32,7 +38,7 @@ export type PageRow = {
 /**
  * The address SearchHome sends a row to in the same tab: a company or person row to
  * `/${slug}?search=1` (`open()`), an offer row to its own route (`pick()`). Keep them the same: a
- * prerendered page is shown only for exactly the address it was made for. Rows that open a new
+ * prefetched page is used only for exactly the address it was fetched for. Rows that open a new
  * tab (builds) or ask Mark for a page have none.
  */
 export function pageHrefOf(row: PageRow | null | undefined): string | null {
@@ -42,36 +48,36 @@ export function pageHrefOf(row: PageRow | null | undefined): string | null {
   return slug ? `/${slug}?search=1` : null;
 }
 
-/** How long a row stays the active one before its page is made ready: past a pointer sweeping across the list. */
+/** How long a row stays the active one before its page is fetched: past a pointer sweeping across the list. */
 export const SETTLE_MS = 120;
-/** Prerendered at once, at most: the last two rows settled on. */
+/** Prefetched at once, at most: the last two rows settled on. */
 export const KEEP = 2;
 
 type Doc = Pick<Document, 'createElement' | 'head'>;
 
 /** What has been asked for, per page (a module: one search page per document). */
-const state = { rules: null as HTMLScriptElement | null, prerendering: [] as string[], requested: new Set<string>() };
+const state = { rules: null as HTMLScriptElement | null, prefetching: [] as string[], requested: new Set<string>() };
 
-export function canPrerender(): boolean {
+export function canSpeculate(): boolean {
   return typeof HTMLScriptElement !== 'undefined' && typeof HTMLScriptElement.supports === 'function' && HTMLScriptElement.supports('speculationrules');
 }
 
-/** The Speculation Rules list for `hrefs`, as the <script type="speculationrules"> text. */
-export function prerenderRules(hrefs: string[]): string {
-  return JSON.stringify({ prerender: [{ source: 'list', urls: hrefs }] });
+/** The Speculation Rules list for `hrefs`, as the <script type="speculationrules"> text. Prefetch only (see above). */
+export function prefetchRules(hrefs: string[]): string {
+  return JSON.stringify({ prefetch: [{ source: 'list', urls: hrefs }] });
 }
 
-/** Get the page at `href` ready: prerendered where the browser can, otherwise requested once to warm the edge cache. */
-export function warmPage(href: string, doc: Doc = document, prerender = canPrerender()): void {
+/** Get the page at `href` ready: prefetched where the browser can, otherwise requested once to warm the edge cache. */
+export function warmPage(href: string, doc: Doc = document, speculate = canSpeculate()): void {
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   if (connection?.saveData) return;
-  if (prerender) {
-    if (state.prerendering[0] === href) return;
-    state.prerendering = [href, ...state.prerendering.filter((h) => h !== href)].slice(0, KEEP);
+  if (speculate) {
+    if (state.prefetching[0] === href) return;
+    state.prefetching = [href, ...state.prefetching.filter((h) => h !== href)].slice(0, KEEP);
     const rules = doc.createElement('script');
     rules.type = 'speculationrules';
-    rules.textContent = prerenderRules(state.prerendering);
-    // The new list first, then the old one out: an address on both is never left unnamed, so its prerender carries on.
+    rules.textContent = prefetchRules(state.prefetching);
+    // The new list first, then the old one out: an address on both is never left unnamed, so its fetch carries on.
     doc.head.append(rules);
     state.rules?.remove();
     state.rules = rules;
@@ -87,7 +93,7 @@ export function warmPage(href: string, doc: Doc = document, prerender = canPrere
 /**
  * Get the active row's page ready once the rep settles on it. `row` is SearchHome's active row
  * (`navRows[activeIdx]`), which a hovered row, the arrow keys and typing all move. Waits for the
- * rep to do one of those, so a search page merely opened makes nothing ready.
+ * rep to do one of those, so a search page merely opened fetches nothing.
  */
 export function useWarmPage(row: PageRow | null | undefined): void {
   const href = pageHrefOf(row);
@@ -126,6 +132,6 @@ export function useWarmPage(row: PageRow | null | undefined): void {
 /** For the checks: forget what was asked for. */
 export function resetWarmPages(): void {
   state.rules = null;
-  state.prerendering = [];
+  state.prefetching = [];
   state.requested.clear();
 }
