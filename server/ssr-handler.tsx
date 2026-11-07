@@ -934,6 +934,23 @@ function renderExperienceRoute(page: ReactElement): string {
   );
 }
 
+/*
+ * The edge cache of a page's HTML. A page is purged from it whenever the CMS publishes or deletes
+ * it (api/cms-published.ts, by the tag below), so it can live there far longer than a page that
+ * nothing purges: an hour fresh, then served once more while it re-renders for up to a day. A
+ * deploy empties the cache too. Pages without a key (nothing could purge them) and the not-found
+ * shell keep SHORT_CACHE_CONTROL.
+ */
+export const PAGE_CACHE_CONTROL = 'public, s-maxage=3600, stale-while-revalidate=86400';
+const SHORT_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+
+/** Tag the response with its page, for api/_lib/purge-page.ts. `Vercel-Cache-Tag` is the header
+ *  Vercel's CDN reads; `Cache-Tag` was set alone until 7 Nov 2026, which no purge could reach. */
+function setPageTag(res: { setHeader(name: string, value: string): unknown }, key: string) {
+  res.setHeader('Vercel-Cache-Tag', `page:${key}`);
+  res.setHeader('Cache-Tag', `page:${key}`);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const slug = url.pathname.replace(/^\/|\/$/g, '');
@@ -1107,9 +1124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Cache-Control',
         wantsFresh ? 'no-store' : signupCacheControl(item, 'public, s-maxage=60, stale-while-revalidate=300'),
       );
-      if (!wantsFresh && item._metadata?.key) {
-        res.setHeader('Cache-Tag', `page:${item._metadata.key}`);
-      }
+      if (!wantsFresh && item._metadata?.key) setPageTag(res, item._metadata.key);
       if (item.noIndex !== false) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
@@ -1189,20 +1204,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     /* `?refresh=…` is the deterministic cache-buster the
      * FloatingSidebar toast appends right after a republish. Mark
      * those responses uncacheable so the busted entry doesn't
-     * persist next to the canonical one. Everything else gets the
-     * standard 60s + 5min SWR window, *plus* a Cache-Tag so
-     * /api/edit-status can request a tag-purge — best-effort, since
-     * Vercel tag eviction is eventually consistent. */
+     * persist next to the canonical one. Everything else is kept at
+     * the edge for PAGE_CACHE_CONTROL, with the page's tag: every CMS
+     * publish or delete of the page purges it (api/cms-published.ts),
+     * as does Edit mode's save (api/edit-status.ts). */
     const wantsFresh = url.searchParams.has('refresh');
-    res.setHeader(
-      'Cache-Control',
-      wantsFresh
-        ? 'no-store'
-        : 'public, s-maxage=60, stale-while-revalidate=300',
-    );
-    if (!wantsFresh && page._metadata?.key) {
-      res.setHeader('Cache-Tag', `page:${page._metadata.key}`);
-    }
+    res.setHeader('Cache-Control', wantsFresh ? 'no-store' : page._metadata?.key ? PAGE_CACHE_CONTROL : SHORT_CACHE_CONTROL);
+    if (!wantsFresh && page._metadata?.key) setPageTag(res, page._metadata.key);
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     return res.status(200).send(html);
   } catch (err) {
