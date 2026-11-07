@@ -399,7 +399,7 @@ html.activity-open body {
 
 @media (max-width: 640px) {
   .activity-view {
-    padding: 12px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
     place-items: start center;
   }
 }

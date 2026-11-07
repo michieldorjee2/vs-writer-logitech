@@ -436,6 +436,26 @@ html.vt-scene-carry .www-page .www-hero__img {
     transform: translateX(-16px) scale(0.92);
   }
 }
+/* A phone: the tools are a bar along the bottom (booth-rail.css), which drops away instead. */
+@media (max-width: 640px) {
+  ::view-transition-old(vt-rail):only-child {
+    animation-name: vt-bar-out;
+  }
+  ::view-transition-new(vt-rail):only-child {
+    animation-name: vt-bar-in;
+  }
+}
+@keyframes vt-bar-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(100% + 24px));
+  }
+}
+@keyframes vt-bar-in {
+  from {
+    transform: translateY(calc(100% + 24px));
+  }
+}
 
 /* Opened from the search page with the rail open: the boot script makes its room before the first
  * paint, so the hero's parts land where they stay instead of shifting over when the rail mounts.

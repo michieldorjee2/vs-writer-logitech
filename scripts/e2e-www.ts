@@ -1309,6 +1309,87 @@ console.log('\nview transitions: the search page and the pages it opens, both wa
   await vtBrowser.close()
 }
 
+console.log('\nthe booth tools on a phone: a bar along the bottom, clear of the page and its parts')
+{
+  // Signed in, on a phone, no choice made yet: the tools are up (src/styles/booth-rail.css).
+  const ctx = await browser.newContext({ ...VIEWPORTS.phone, serviceWorkers: 'block', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
+  await ctx.route('**/api/auth/me', (route) => route.fulfill({ json: { email: 'e2e@optimizely.com', name: 'E2E' } }))
+  await ctx.route('**/api/edit-status**', (route) => route.fulfill({ json: { changed: false, published: '2026-01-01T00:00:00.000Z' } }))
+  await ctx.route('**/api/page-activity**', (route) => route.fulfill({ status: 404, json: { error: 'not here' } }))
+  await ctx.route('**/api/share-links**', (route) => route.fulfill({ json: { links: [] } }))
+  await ctx.route('**/api/page-visit', (route) => route.fulfill({ status: 204, body: '' }))
+  const escaped: string[] = []
+  for (const pattern of ['**/api/cta-ping', 'https://webhook.opal.optimizely.com/**', 'https://webhook.mark.optimizely.com/**']) {
+    await ctx.route(pattern, (route) => {
+      escaped.push(route.request().url())
+      return route.fulfill({ status: 202, json: { ok: true } })
+    })
+  }
+  const page = await ctx.newPage()
+  await page.goto(url(ACCOUNT, 'search=1'), { waitUntil: 'domcontentloaded' })
+  await page.locator('.booth-rail.is-open').waitFor({ timeout: 15000 })
+  await page.waitForTimeout(1200) // the bar's slide and its buttons' cascade
+  const bar = () =>
+    page.evaluate(() => {
+      const r = document.querySelector('.booth-rail')!.getBoundingClientRect()
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height, vw: innerWidth, vh: innerHeight }
+    })
+  await test('phone: the tools float in a bar along the bottom, inside the window, and the page keeps its width', async () => {
+    const b = await bar()
+    expect(b.height <= 64 && b.bottom <= b.vh - 12 && b.top > b.vh / 2, `the bar is not along the bottom: ${JSON.stringify(b)}`)
+    expect(b.left >= 8 && b.right <= b.vw - 8, `the bar runs off the window: ${JSON.stringify(b)}`)
+    const heroLeft = await page.evaluate(() => Math.round(document.querySelector('.www-hero h1')!.getBoundingClientRect().left))
+    expect(heroLeft < 40, `the page's copy starts at ${heroLeft} px: something still sits beside it`)
+    const pad = await page.evaluate(() => parseFloat(getComputedStyle(document.body).paddingBottom))
+    expect(pad >= b.height + 12, `the page ends under the bar (padding-bottom ${pad} px)`)
+  })
+  await test('phone: the sticky ask stands above the bar', async () => {
+    await page.mouse.wheel(0, 1600)
+    await page.locator('.www-sticky--visible').waitFor({ timeout: 8000 })
+    await page.waitForTimeout(600)
+    const b = await bar()
+    const sticky = await page.evaluate(() => document.querySelector('.www-sticky')!.getBoundingClientRect().bottom)
+    expect(sticky <= b.top - 4, `the sticky ask (bottom ${sticky}) runs into the bar (top ${b.top})`)
+  })
+  await test("phone: Edit's tutorial stands above the bar, and the bar keeps Close, Edit and Send in a row", async () => {
+    await page.mouse.wheel(0, -4000)
+    await page.locator('.booth-rail__btn--edit').click()
+    await page.locator('.edit-tutorial').waitFor({ timeout: 8000 })
+    await page.waitForTimeout(900)
+    const b = await bar()
+    const tut = await page.evaluate(() => {
+      const r = document.querySelector('.edit-tutorial')!.getBoundingClientRect()
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }
+    })
+    expect(tut.bottom <= b.top - 4 && tut.top >= 0 && tut.left >= 8 && tut.right <= b.vw - 8, `the tutorial ${JSON.stringify(tut)} meets the bar ${JSON.stringify(b)}`)
+    const row = await page.evaluate(() =>
+      ['.booth-rail__btn--back', '.booth-rail__btn--edit', '.booth-rail__btn--send'].map((sel) => {
+        const r = document.querySelector(sel)?.getBoundingClientRect()
+        return r ? Math.round(r.top) : null
+      }),
+    )
+    expect(row.every((t) => t !== null && t === row[0]), `Close, Edit and Send are not in one row: ${row}`)
+    await page.locator('.edit-tutorial__ok').click()
+    await page.locator('.booth-rail__btn--back').click()
+  })
+  await test('phone: folded away, the bar slides off the window and one button brings it back', async () => {
+    await page.waitForTimeout(600)
+    await page.locator('.booth-rail__fold:not(.booth-rail__help)').click()
+    await page.locator('.booth-rail-mini.is-shown').waitFor({ timeout: 8000 })
+    await page.waitForTimeout(800)
+    const b = await bar()
+    expect(b.top >= b.vh, `the folded bar is still on the window: ${JSON.stringify(b)}`)
+    const pad = await page.evaluate(() => parseFloat(getComputedStyle(document.body).paddingBottom))
+    expect(pad === 0, `the page keeps the bar's room when it is folded (${pad} px)`)
+    await page.locator('.booth-rail-mini').click()
+    await page.locator('.booth-rail.is-open').waitFor({ timeout: 8000 })
+  })
+  await test('phone: nothing reached the real webhooks', async () => {
+    expect(!escaped.length, escaped.join(', '))
+  })
+  await ctx.close()
+}
+
 console.log('\neach account page follows its own pitch; no address switches it')
 const fetchHtml = async (href: string) => (await fetch(href, { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
 const isAp = (html: string) => /class="www-page[^"]*\bwww-ap\b/.test(html)

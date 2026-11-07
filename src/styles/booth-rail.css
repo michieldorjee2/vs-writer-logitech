@@ -443,21 +443,129 @@ html.booth-page--rail .www-page .www-sticky {
   stroke: var(--booth-quiet);
 }
 
-/* ------------ Phones ------------ */
+/* ------------ Phones: a floating bar along the bottom ------------
+ * A full-height rail took a fifth of a phone's width and lay over the page's copy, and Edit's and
+ * X-ray's own parts landed on top of both (Michiel, 7 Nov). On a phone the tools float in a bar
+ * along the bottom instead, centred and sized to what is in it, the same buttons in a row: it
+ * slides up into view and down out of it, its buttons cascade in from below, and a tool folded
+ * out (Edit, X-ray) gives its width back. The page keeps its full width and gains the bar's height
+ * at its foot, so nothing ends under it; the parts of the page and of the tools that sit at the
+ * window's foot (the sticky ask, Mark's status card, the Edit tutorial) stand above it.
+ *
+ * Above the window's foot by 12 px and the phone's own safe area (an iPhone's home indicator or
+ * toolbar, where the page asks for it: env() is 0 otherwise, and Safari keeps fixed parts clear
+ * of its bars itself). */
 
 @media (max-width: 640px) {
+  :root {
+    --booth-bar-h: 60px;
+    --booth-bar-gap: calc(12px + env(safe-area-inset-bottom, 0px));
+    /* Where anything else at the window's foot sits while the bar is up: above it. */
+    --booth-bar-space: calc(var(--booth-bar-h) + var(--booth-bar-gap) + 12px);
+  }
   html.booth-page--rail body {
     padding-left: 0;
+    padding-bottom: var(--booth-bar-space);
   }
   html.booth-page--rail .www-page .www-sticky {
     left: 50%;
+    bottom: var(--booth-bar-space);
+  }
+
+  .booth-rail {
+    top: auto;
+    bottom: var(--booth-bar-gap);
+    left: 50%;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    height: var(--booth-bar-h);
+    flex-direction: row;
+    align-items: center;
+    padding: 0 5px;
+    border-radius: 18px;
+    box-shadow:
+      0 18px 40px -14px rgb(8 37 26 / 0.5),
+      0 0 0 1px var(--booth-rail-rule);
+    transform: translate(-50%, calc(100% + var(--booth-bar-gap) + 16px));
+  }
+  .booth-rail.is-open {
+    transform: translateX(-50%);
   }
   .booth-rail::before,
   .booth-rail::after {
     display: none;
   }
-  .booth-rail.is-open {
-    box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
+
+  .booth-rail__items,
+  .booth-rail__slot,
+  .booth-rail__foot {
+    flex-direction: row;
+  }
+  .booth-rail__items > * + * {
+    margin-top: 0;
+    margin-left: 2px;
+  }
+  .booth-rail__divider {
+    width: 1px;
+    height: 24px;
+    margin: 0 5px !important;
+  }
+
+  .booth-rail__btn {
+    width: 50px;
+    height: 48px;
+    font-size: 10px;
+    gap: 4px;
+  }
+  .booth-rail__fold {
+    width: 38px;
+    height: 48px;
+    margin-left: 2px;
+  }
+  /* The fold button points down, where the bar goes. */
+  .booth-rail__fold:not(.booth-rail__help) svg {
+    rotate: -90deg;
+  }
+
+  /* The cascade comes up from below, and a tool folded out gives its width back. */
+  .booth-rail__btn,
+  .booth-rail__fold {
+    transform: translateY(16px);
+  }
+  .booth-rail.is-open .booth-rail__btn,
+  .booth-rail.is-open .booth-rail__fold {
+    transition:
+      background 160ms ease,
+      color 160ms ease,
+      width 420ms var(--booth-ease),
+      margin 420ms var(--booth-ease),
+      transform 560ms var(--booth-ease) calc(120ms + var(--i, 0) * 55ms),
+      opacity 360ms ease calc(120ms + var(--i, 0) * 55ms);
+  }
+  .booth-rail.is-open .booth-rail__btn.is-away,
+  .booth-rail.is-open .booth-rail__fold.is-away {
+    width: 0;
+    height: 48px;
+    margin-left: 0;
+    transform: translateY(16px);
+    transition:
+      width 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
+      margin 360ms var(--booth-ease) calc(var(--i, 0) * 30ms),
+      opacity 160ms ease calc(var(--i, 0) * 30ms),
+      transform 220ms var(--booth-ease-out) calc(var(--i, 0) * 30ms);
+  }
+  /* Edit's Send grows in beside it. */
+  @keyframes booth-slot-in {
+    from { width: 0; opacity: 0; transform: translateY(16px); overflow: hidden; }
+    to { overflow: hidden; }
+  }
+
+  /* Folded: the one button sits at the bottom left, clear of the safe area too. */
+  .booth-rail-mini {
+    left: 12px;
+    bottom: var(--booth-bar-gap);
+    transform: translateY(16px) scale(0.92);
   }
 }
 
