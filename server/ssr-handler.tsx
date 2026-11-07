@@ -902,8 +902,8 @@ function sendBuildView(res: VercelResponse, build: BuildRecord): void {
  *
  * The SHAPE of the children matters too, not just the wrappers. useId() encodes a
  * component's position, and React counts a parent's children ARRAY: PageLoader renders
- * `{body}{fromSearch && <FloatingSidebar/>}` — two slots, even when the second is `false`
- * — while the /vb/ route renders one. Give the page one slot where the browser gives it
+ * `{body}<PageExtras/>` — two slots (PageExtras draws nothing until hydration is done) —
+ * while the /vb/ route renders one. Give the page one slot where the browser gives it
  * two and every useId() below it differs (OpalStamp's ids, on every retail page). So there
  * is one helper per route, each mirroring that route's element in App.tsx exactly.
  *
@@ -912,13 +912,13 @@ function sendBuildView(res: VercelResponse, build: BuildRecord): void {
  * rendered, never the fallback — so it is null rather than a copy of the client's spinner.
  */
 
-/** Mirrors App.tsx's PageLoader: `<Suspense>{body}{fromSearch && <FloatingSidebar/>}</Suspense>`. */
+/** Mirrors App.tsx's PageLoader: `<Suspense>{body}<PageExtras/></Suspense>`. */
 function renderPageRoute(page: ReactElement): string {
   return renderToString(
     <main>
       <Suspense fallback={null}>
         {page}
-        {/* FloatingSidebar's slot: booth-only, never server-rendered, but it is a slot. */}
+        {/* PageExtras' slot (the booth sidebar, a personal link's note): browser-only, but a slot. */}
         {false}
       </Suspense>
     </main>,
