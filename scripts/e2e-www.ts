@@ -33,6 +33,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { ABM_XRAY_DEFAULTS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, PERSON_EDIT, PERSON_XRAY_DEFAULTS, TAKEOUT_EDIT } from '../src/lib/xray-defaults'
 
+/** React's mark on a boundary the server sent unfinished, for the browser to draw (#419). */
+const BAILED_OUT = '<!--$!-->'
 const BASE = (process.env.E2E_BASE || 'http://127.0.0.1:5199').replace(/\/$/, '')
 /** A page that pitches a CMS takeout: the takeout template. */
 const ACCOUNT = process.env.E2E_ACCOUNT || '/cdw/'
@@ -239,6 +241,7 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
     await test('server-rendered and hydrated without errors', async () => {
       const html = await (await fetch(url(AP_ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
       expect(/class="www-page[^"]*\bwww-ap\b/.test(html), 'the server did not render the agent platform page')
+      expect(!html.includes(BAILED_OUT), 'the server left part of the page for the browser to finish (React #419)')
       expect(!watch.errors.length, watch.errors.join('\n'))
     })
     await test('the tab title is the template\'s, before and after hydration (no takeout pitch)', async () => {
@@ -380,6 +383,9 @@ for (const vp of Object.keys(VIEWPORTS) as Array<keyof typeof VIEWPORTS>) {
   await test('server-rendered and hydrated without errors', async () => {
     const html = await (await fetch(url(ACCOUNT), { headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {} })).text()
     expect(html.includes('class="www-page') && html.includes('id="comparison"'), 'the server did not render the takeout page')
+    // Its hero's stacked number is a lazy chunk on the server too: a fresh instance's first render
+    // left it for the browser, and the edge cache kept that copy (7 Nov 2026).
+    expect(!html.includes(BAILED_OUT), 'the server left part of the page for the browser to finish (React #419)')
     expect(!watch.errors.length, watch.errors.join('\n'))
   })
   await test('every section the ODP tracking observes is on the page', async () => {

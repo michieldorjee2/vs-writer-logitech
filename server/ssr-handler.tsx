@@ -28,6 +28,7 @@ import { EXPERIENCE_QUERIES, normalizeExperienceItem } from '../src/lib/experien
 import { authEnabled, currentIdentity, safeNext, signInPath } from '../api/_lib/auth';
 import { badgeRootAttr } from '../api/_lib/badge-mode';
 import { renderLoginPage } from './login-page';
+import { renderSettled } from './render-settled';
 import SearchHome from '../src/components/SearchHome';
 import { buildForRoute, buildStore } from '../api/_lib/page-builds-store';
 import type { BuildRecord } from '../src/lib/page-builds';
@@ -910,27 +911,34 @@ function sendBuildView(res: VercelResponse, build: BuildRecord): void {
  * Keep these in step with App.tsx: a wrapper or a sibling added there without being added
  * here breaks hydration again. The fallback is irrelevant on the server — content is
  * rendered, never the fallback — so it is null rather than a copy of the client's spinner.
+ *
+ * Both render through renderSettled (./render-settled.ts): a lazy chunk inside the page that
+ * has not loaded yet on a fresh instance is waited for, not left for the browser (React #419).
  */
 
 /** Mirrors App.tsx's PageLoader: `<Suspense>{body}<PageExtras/></Suspense>`. */
-function renderPageRoute(page: ReactElement): string {
-  return renderToString(
-    <main>
-      <Suspense fallback={null}>
-        {page}
-        {/* PageExtras' slot (the booth sidebar, a personal link's note): browser-only, but a slot. */}
-        {false}
-      </Suspense>
-    </main>,
+function renderPageRoute(page: ReactElement): Promise<string> {
+  return renderSettled(() =>
+    renderToString(
+      <main>
+        <Suspense fallback={null}>
+          {page}
+          {/* PageExtras' slot (the booth sidebar, a personal link's note): browser-only, but a slot. */}
+          {false}
+        </Suspense>
+      </main>,
+    ),
   );
 }
 
 /** Mirrors App.tsx's /vb/:slug route element: `<Suspense><VisualBuilderPage/></Suspense>`. */
-function renderExperienceRoute(page: ReactElement): string {
-  return renderToString(
-    <main>
-      <Suspense fallback={null}>{page}</Suspense>
-    </main>,
+function renderExperienceRoute(page: ReactElement): Promise<string> {
+  return renderSettled(() =>
+    renderToString(
+      <main>
+        <Suspense fallback={null}>{page}</Suspense>
+      </main>,
+    ),
   );
 }
 
@@ -1100,8 +1108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const preview = url.searchParams.get('ctx') === 'edit';
       // An offer in the www offer design, any other experience from its composition. Mirrors ExperienceBody in VisualBuilderPage.tsx.
       const appHtml = isOfferExperience(item)
-        ? renderExperienceRoute(<WwwOfferPage experience={item} />)
-        : renderExperienceRoute(
+        ? await renderExperienceRoute(<WwwOfferPage experience={item} />)
+        : await renderExperienceRoute(
             <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
               <VisualBuilderExperienceSSR experience={item} locale="en" preview={preview} />
             </div>,
@@ -1158,18 +1166,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'person':
         // The www design (src/www/PersonPage.tsx). The CMS editor's hooks come from its own
         // preview route (/preview), never from the address, exactly as on account pages.
-        appHtml = renderPageRoute(<WwwPersonPage page={page} />);
+        appHtml = await renderPageRoute(<WwwPersonPage page={page} />);
         break;
       case 'retail':
-        appHtml = renderPageRoute(<RetailCustomerPage page={page} />);
+        appHtml = await renderPageRoute(<RetailCustomerPage page={page} />);
         break;
       case 'finserv':
-        appHtml = renderPageRoute(<FinServPageServer page={page} />);
+        appHtml = await renderPageRoute(<FinServPageServer page={page} />);
         break;
       default:
         // The template the page's own pitch calls for (src/www/account-template.ts). The agent
         // platform template's <head> replaces the stored title and description (N2).
-        appHtml = renderPageRoute(<AccountRoute page={page} search={url.search} />);
+        appHtml = await renderPageRoute(<AccountRoute page={page} search={url.search} />);
         if (accountTemplateOf(page) === 'agent-platform') headSource = agentPlatformHead(page);
     }
 

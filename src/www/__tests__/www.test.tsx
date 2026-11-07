@@ -29,6 +29,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
+import { lazy, Suspense } from 'react'
 import { renderToString } from 'react-dom/server'
 import type { CompetitorComparisonPage, PersonPage as PersonPageData } from '../../lib/graph-types'
 import AccountPage, { connectProps } from '../AccountPage'
@@ -62,6 +63,7 @@ import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, mea
 import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
 import ctaPingHandler, { accountSource, buildPing, canonicalJson, checkOf, personSource, pingRouteOf, type CtaPing } from '../../../api/cta-ping'
 import previewHandler, { concreteType } from '../../../api/preview'
+import { BAILED_OUT, renderSettled } from '../../../server/render-settled'
 import { agentPlatformHead, competitorMatcher, deriveState, fromLegacyPage, NOT_SHOWN, personMatcher, USED_FIELDS } from '../agent-platform/content'
 import { readStack, stackTiles } from '../agent-platform/stack'
 import { DEFAULT_TEAMS, IDENTITY_SENTENCE, THEME_ORDER, WHO_WE_ARE } from '../agent-platform/library'
@@ -2612,6 +2614,29 @@ test("hydration never touches the page's boundary: what only the browser draws r
   assert.match(extras, /<Suspense fallback=\{null\}>\s*<InviteNote /)
   // The server mirrors the two slots.
   assert.match(readFileSync('server/ssr-handler.tsx', 'utf8'), /<Suspense fallback=\{null\}>\s*\{page\}\s*\{\/\*[^*]*PageExtras[^*]*\*\/\}\s*\{false\}\s*<\/Suspense>/)
+})
+
+testAsync("a fresh server waits for a lazy chunk it hasn't loaded yet instead of leaving that part to the browser (React #419)", async () => {
+  // A lazy component nothing has rendered yet: its chunk starts loading only now, as the stacked
+  // number's does on a new instance. renderToString does not wait for it.
+  const number = () => <b>446%</b>
+  const heading = (Part: ReturnType<typeof lazy>) => <main><Suspense fallback={<i>446</i>}><Part /></Suspense></main>
+  const Cold = lazy(() => Promise.resolve({ default: number }))
+  assert.ok(renderToString(heading(Cold)).includes(BAILED_OUT), "a plain render of a fresh lazy chunk didn't bail out, so this test proves nothing")
+  // Through renderSettled: the full content, no bailout. Also for a chunk that takes 30 ms.
+  for (const Part of [lazy(() => Promise.resolve({ default: number })), lazy(() => new Promise<{ default: typeof number }>((r) => setTimeout(() => r({ default: number }), 30)))]) {
+    const html = await renderSettled(() => renderToString(heading(Part)))
+    assert.ok(!html.includes(BAILED_OUT), `still bailed out: ${html}`)
+    assert.match(html, /<b>446%<\/b>/)
+  }
+  // A part that never arrives is sent as before, and the server gives up in well under a second.
+  const t0 = Date.now()
+  const never = await renderSettled(() => renderToString(heading(lazy(() => new Promise<{ default: typeof number }>(() => {})))))
+  assert.ok(never.includes(BAILED_OUT) && Date.now() - t0 < 500, `took ${Date.now() - t0} ms`)
+  // Every page render on the server goes through it.
+  const ssr = readFileSync('server/ssr-handler.tsx', 'utf8')
+  assert.equal((ssr.match(/return renderSettled\(\(\) =>\s*renderToString\(/g) || []).length, 2, 'renderPageRoute and renderExperienceRoute render through renderSettled')
+  assert.ok(!/= render(Page|Experience)Route\(/.test(ssr) && !/\? render(Page|Experience)Route\(/.test(ssr), 'a page render is not awaited')
 })
 
 testAsync('the app starts once the transition the page arrived by is over (it cancelled the morph), or at once without one', async () => {
