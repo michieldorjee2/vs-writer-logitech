@@ -95,7 +95,8 @@ await check('the render asks once, then reads one page, and falls back to one by
   assert(/const answer = await queryGraph\(authKey, query, variables\);\s+let found: Candidate \| null;\s+try \{\s+found = firstCandidateFound\(candidates, answer\);/.test(ssr), 'one question; only its errors (not a network failure) fall back');
   assert(/return found \? readPage\(authKey, found, finservQuery\) : null;/.test(ssr), 'then the one page');
   assert(/for \(const c of candidates\) \{[\s\S]{0,300}await readPage\(authKey, c, finservQuery\)/.test(ssr), 'the fallback');
-  assert(/signal: AbortSignal\.timeout\(GRAPH_TIMEOUT_MS\)/.test(ssr), 'Graph reads are bounded');
+  assert(/signal: AbortSignal\.timeout\(timeoutMs\)/.test(ssr), 'Graph reads are bounded');
+  assert(/err\.name === 'TimeoutError'[\s\S]{0,200}postGraph\(authKey, query, variables, GRAPH_TIMEOUT_MS \* 2\)/.test(ssr), 'a stalled read is asked once more');
 });
 await check('a read started early fails only when awaited, never unhandled before', async () => {
   const read = startRead(failAfter(5, 'boom'));

@@ -349,20 +349,32 @@ type FetchedPage =
   | (CompetitorComparisonPage & { __template?: undefined });
 
 /*
- * A Graph read that has not answered by now is not going to: one that stalled (6 Nov 2026, a
- * connection that never sent headers) held the whole render until undici gave up at 300 s, the
- * function's own limit. Failing it fails the page as any Graph error does (the shell, uncached).
+ * Graph reads are bounded, and a stalled one is asked once more. A read that stalls (6 Nov 2026:
+ * a connection that never sent headers) held the whole render until undici gave up at 300 s, the
+ * function's own limit; asked again, on a new connection, it usually answers at once. A second
+ * stall fails the page as any Graph error does (the shell, uncached). Reads only: safe to repeat.
  */
-const GRAPH_TIMEOUT_MS = 8000;
+const GRAPH_TIMEOUT_MS = 4000;
 
-async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
-  const res = await fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
+function postGraph(authKey: string, query: string, variables: Record<string, unknown>, timeoutMs: number) {
+  return fetch(`${GRAPH_ENDPOINT}?auth=${authKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-  });
-  const json = await res.json();
+    signal: AbortSignal.timeout(timeoutMs),
+  }).then(async (res) => ({ res, json: await res.json() }));
+}
+
+async function queryGraph(authKey: string, query: string, variables: Record<string, unknown>) {
+  let answer: { res: Response; json: unknown };
+  try {
+    answer = await postGraph(authKey, query, variables, GRAPH_TIMEOUT_MS);
+  } catch (err) {
+    if (!(err instanceof Error && err.name === 'TimeoutError')) throw err;
+    console.warn(`[graph] ${/query\s+(\w+)/.exec(query)?.[1] ?? 'anonymous'} stalled; asking once more`);
+    answer = await postGraph(authKey, query, variables, GRAPH_TIMEOUT_MS * 2);
+  }
+  const { res, json } = answer;
   // A selection on a field Graph does not know fails the WHOLE query: `data`
   // comes back null, and every caller below reads that as "no such page". That
   // is how one schema drift 404'd all 2,676 account pages for days without
