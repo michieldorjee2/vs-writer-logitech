@@ -272,6 +272,8 @@ A page's HTML is kept at Vercel's edge for an hour, then served once more while 
 
 Pages are tagged with `Vercel-Cache-Tag`, the header Vercel's CDN reads. Until 7 November they carried only `Cache-Tag`, which production returned to the browser as is (a header Vercel reads is not passed on), so Edit mode's purge most likely never reached a page; the 60-second cache hid it. A page without a key and the not-found shell keep the 60-second cache, as do offer experiences (their sign-up form changes outside the CMS). A deploy empties the cache too. `npm run check:cms-purge` covers the handshake, the token, the wait and the tags, with Graph and Vercel stubbed.
 
+What the edge keeps must be the whole page, so the server never sends a part unfinished. `renderToString` doesn't wait for a lazy chunk, and the www heading's stacked number (`StackedTextIsland`, `CurvedLineIsland`) is one on the server too. A fresh instance's first render of such a page sent the plain number marked `<!--$!-->`, and the browser threw React #419 and drew it itself. On 7 Nov 2026, right after a deploy, the edge served that first render of `/cdw/` to everyone. Page renders now go through `renderSettled` (`server/render-settled.ts`). A render that left a part unfinished waits for the chunks it started and renders again, for about 75 ms at most. The e2e's server-render checks fail on a page that contains the mark.
+
 ## Related
 
 - [[_MOCs/Web Apps]]
