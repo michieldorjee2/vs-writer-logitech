@@ -7,6 +7,7 @@ import { agentPlatformHead } from './www/agent-platform/content';
 import { accountTemplateOf } from './www/account-template';
 import { SHARE_PARAM, shareCodeOf } from './lib/share-links';
 import { watchIconFont } from './lib/icon-font';
+import { heroPainted } from './lib/hero-painted';
 import type {
     FinServPage as FinServPageData,
     PersonPage as PersonPageData,
@@ -19,7 +20,8 @@ import type {
  */
 const RetailCustomerPage = lazy(() => import('./components/RetailCustomerPage'));
 const FinServPage = lazy(() => import('./components/FinServPage'));
-const PersonPage = lazy(() => import('./www/PersonPage'));
+/* After the hero's first paint: loading the renderer earlier held that paint back (src/lib/hero-painted.ts). */
+const PersonPage = lazy(() => heroPainted().then(() => import('./www/PersonPage')));
 /*
  * Booth-only sales sidebar. Gated on `?search=1` in the URL — visitors
  * arriving through any normal channel never even download this chunk
@@ -36,7 +38,7 @@ const InviteNote = lazy(() => import('./components/InviteNote'));
  */
 const VisualBuilderPage = lazy(() => import('./components/VisualBuilderPage'));
 /* Every account page, in the template its own pitch calls for (src/www/account-template.ts). See src/www. */
-const AccountRoute = lazy(() => import('./www/AccountRoute'));
+const AccountRoute = lazy(() => heroPainted().then(() => import('./www/AccountRoute')));
 /* The CMS's preview of a page, an offer or a block (?key=…&ver=…&ctx=edit). See CmsPreview.tsx. */
 const CmsPreview = lazy(() => import('./components/CmsPreview'));
 
