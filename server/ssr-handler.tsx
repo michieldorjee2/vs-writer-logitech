@@ -1163,8 +1163,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- Build SEO head tags ----
-    // No preload of the renderer's lazy chunk: measured 6 Nov 2026, it let hydration start before
-    // the hero image painted and moved mobile LCP from 3.6 s to 5.9 s (Lighthouse, median of 3).
+    // No preload of the renderer's lazy chunk: anything that starts the app before the hero image
+    // has painted holds that paint back (see the chunk note in vite.config.ts). With the preloads
+    // and the chunk change together, mobile LCP went from 3.6 s to 5.9 s (6 Nov 2026).
     const headHtml = buildHeadHtml(headSource);
 
     // ---- Embed page data for client hydration (avoids double-fetch) ----

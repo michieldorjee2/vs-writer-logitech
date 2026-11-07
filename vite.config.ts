@@ -634,19 +634,20 @@ export default defineConfig(({ mode }) => {
            * page, the search page included, loaded vendor-motion to render JSX at all, and react-dom's
            * client fell into a shared chunk. The router has its own chunk: the search page does not route.
            *
-           * Groups with priorities, not a `manualChunks` function: under Vite 8 (Rolldown) that
-           * function became groups taken in the order met, and a group takes its modules'
-           * dependencies with it, so vendor-motion took React itself. Every entry, the search page
-           * included, then imported vendor-motion (157 kB, the modulepreload list leaves it out) one
-           * request after its own script, before anything could run. React's group goes first.
+           * Under Vite 8 (Rolldown) this function does it again: a group takes its modules'
+           * dependencies, so vendor-motion takes React itself and every entry loads it one request
+           * after its own script. Don't fix that alone. Done with `codeSplitting` groups (React's
+           * first) on 6 Nov 2026, React then started before the hero image's first paint and held
+           * it: mobile LCP 3.6 s -> 6.6 s on an account page, preview against preview. Fix it with a
+           * start-up gate (src/main.tsx) that waits for the hero to paint.
            */
-          codeSplitting: {
-            groups: [
-              { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|scheduler)\//, priority: 4 },
-              { name: 'vendor-router', test: /\/node_modules\/(react-router|react-router-dom|@remix-run\/router)\//, priority: 3 },
-              { name: 'vendor-motion', test: /\/node_modules\/(framer-motion|motion-dom|motion-utils)\//, priority: 2 },
-              { name: 'vendor-utils', test: /\/node_modules\/(react-use|react-use-measure)\//, priority: 1 },
-            ],
+          manualChunks(id) {
+            if (!id.includes('/node_modules/')) return undefined
+            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+            if (/\/node_modules\/(react-router|react-router-dom|@remix-run\/router)\//.test(id)) return 'vendor-router'
+            if (/\/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'vendor-motion'
+            if (/\/node_modules\/(react-use|react-use-measure)\//.test(id)) return 'vendor-utils'
+            return undefined
           },
         },
       },
