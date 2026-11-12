@@ -8,6 +8,8 @@ import { isFinServDemoSlug, synthFinServPageFromDemo } from '../src/lib/finserv-
 import AccountRoute from '../src/www/AccountRoute';
 import { accountTemplateOf } from '../src/www/account-template';
 import WwwOfferPage from '../src/www/OfferPage';
+import OfferEndedPage from '../src/www/OfferEndedPage';
+import { isEndedOffer } from '../src/lib/offer-ended';
 import { isOfferExperience } from '../src/www/design';
 import { agentPlatformHead } from '../src/www/agent-platform/content';
 import { resolveUrl } from '../src/lib/graph-types';
@@ -37,6 +39,7 @@ import { isOfferId, OFFER_COOKIE, type ShownOffer } from '../src/lib/offer-looks
 import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
 import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 import { withParentAccount } from '../api/_lib/parent-account';
+import { endedCacheControl, withOfferEnded } from '../api/_lib/offer-ended';
 import { withPageCopy } from '../api/_lib/page-copy';
 import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from './reads';
 import { graphOp, postGraphRead } from '../api/_lib/graph-read';
@@ -673,7 +676,10 @@ async function fetchExperienceContent(authKey: string, expSlug: string): Promise
       const json = await queryGraph(authKey, query, { slug: s });
       const items = (json as { data?: Record<string, { items?: unknown[] }> })?.data?.[typeName]?.items;
       if (items && items.length > 0) {
-        return (await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...(items[0] as object), __typename: typeName, __template: template })))) as ExperienceItem;
+        // Outermost, withOfferEnded: an ended offer's page is its stand-in (src/lib/offer-ended.ts).
+        return (await withOfferEnded(
+          await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...(items[0] as object), __typename: typeName, __template: template }))),
+        )) as ExperienceItem;
       }
     }
   }
@@ -1106,8 +1112,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const preview = url.searchParams.get('ctx') === 'edit';
-      // An offer in the www offer design, any other experience from its composition. Mirrors ExperienceBody in VisualBuilderPage.tsx.
-      const appHtml = isOfferExperience(item)
+      // An ended offer's stand-in, an offer in the www offer design, any other experience from its
+      // composition. Mirrors ExperienceBody in VisualBuilderPage.tsx.
+      const ended = isEndedOffer(item);
+      const appHtml = ended
+        ? await renderExperienceRoute(<OfferEndedPage experience={item} />)
+        : isOfferExperience(item)
         ? await renderExperienceRoute(<WwwOfferPage experience={item} />)
         : await renderExperienceRoute(
             <div className="vb-experience bg-primary-1 text-secondary-darkfir flex min-h-screen w-full flex-col">
@@ -1130,13 +1140,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const wantsFresh = url.searchParams.has('refresh');
       res.setHeader(
         'Cache-Control',
-        wantsFresh ? 'no-store' : signupCacheControl(item, 'public, s-maxage=60, stale-while-revalidate=300'),
+        wantsFresh ? 'no-store' : endedCacheControl(item, signupCacheControl(item, 'public, s-maxage=60, stale-while-revalidate=300')),
       );
       if (!wantsFresh && item._metadata?.key) setPageTag(res, item._metadata.key);
       if (item.noIndex !== false) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
-      return res.status(200).send(html);
+      // 410 Gone: the offer is over, and the address is kept for the stand-in.
+      return res.status(ended ? 410 : 200).send(html);
     } catch (err) {
       console.error('[ssr] vb handler error:', err);
       res.setHeader('Content-Type', 'text/html');

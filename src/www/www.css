@@ -348,6 +348,17 @@ body:has(.www-page) {
     min-height: 0;
   }
 }
+/* An ended offer's page is the hero alone (OfferEndedPage.tsx), with no scene below to peek in:
+   the hero fills the window, the photograph taking what the copy leaves on a phone. */
+.www-page.www-offer--ended .www-hero__card {
+  min-height: calc(100 * var(--www-svh, 1svh));
+  grid-template-rows: auto 1fr;
+}
+@media (min-width: 992px) {
+  .www-page.www-offer--ended .www-hero__card {
+    grid-template-rows: none;
+  }
+}
 /* The extruded run's top layer sits 0.25em up and right of its base (StackedHeading: four steps
    of 0.063em), so the words after it start after the top layer instead of under it. The run
    also takes more room above it and between its own lines, so its top layer clears the line

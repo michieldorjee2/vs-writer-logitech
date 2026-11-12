@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import VisualBuilderExperience from '../cms/rendering/visual-builder';
 import WwwOfferPage from '../www/OfferPage';
+import OfferEndedPage from '../www/OfferEndedPage';
 import { isOfferExperience } from '../www/design';
+import { isEndedOffer } from '../lib/offer-ended';
 import type { SafeVisualBuilderExperience } from '@/lib/optimizely/types/experience';
 
 /**
@@ -157,9 +159,11 @@ export default function VisualBuilderPage() {
 /**
  * One experience's page: an offer (the offer blueprint's pages) in the www offer design, any other
  * experience drawn from its composition. The /vb/ route and the CMS preview (CmsPreview.tsx) both
- * draw through this, and server/ssr-handler.tsx mirrors it.
+ * draw through this, and server/ssr-handler.tsx mirrors it. An offer that has ended is served as
+ * its stand-in (../lib/offer-ended.ts), drawn by OfferEndedPage.
  */
 export function ExperienceBody({ experience, preview }: { experience: Experience; preview: boolean }) {
+  if (isEndedOffer(experience)) return <OfferEndedPage experience={experience} />;
   if (isOfferExperience(experience)) return <WwwOfferPage experience={experience} />;
 
   return (

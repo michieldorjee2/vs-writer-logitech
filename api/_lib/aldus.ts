@@ -125,6 +125,22 @@ export async function signupFormFor(offerId: string, signal: AbortSignal): Promi
   return form === 'email' ? 'email' : 'link';
 }
 
+/**
+ * Whether an offer has ended (aldus-ui GET …/offers/{id}, hasEnded): ended by hand, or Active or
+ * Paused past its last day. Null when Aldus UI has no such offer (or no such route yet). Throws
+ * when it can't say.
+ */
+export async function offerEndedFor(offerId: string, signal: AbortSignal): Promise<boolean | null> {
+  try {
+    const { ended } = await call<{ ended?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}`, { signal });
+    if (typeof ended !== 'boolean') throw new Error('Aldus UI answered without `ended`');
+    return ended;
+  } catch (err) {
+    if ((err as { status?: unknown } | null)?.status === 404) return null;
+    throw err;
+  }
+}
+
 export type SignupEntry = {
   email: string;
   route: string;
