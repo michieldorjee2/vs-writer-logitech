@@ -95,6 +95,17 @@ export async function withParentAccount<T>(item: T): Promise<T> {
   }
 }
 
+/** The offer page's parent account page (its address, logo and domain), or null. Held as `withParentAccount`'s lookup is. Never throws. */
+export async function parentAccountFor(item: unknown): Promise<ParentAccount | null> {
+  try {
+    const page = item as Experience | null;
+    if (!page || typeof page.companyName !== 'string') return null;
+    return await parentOf(page.companyName, page.salesforceAccountID ?? null);
+  } catch {
+    return null;
+  }
+}
+
 /** For the check: forget what was held. */
 export function forgetParentAccounts(): void {
   held.clear();

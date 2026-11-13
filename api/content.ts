@@ -8,6 +8,7 @@ import { publicPersonPage } from '../src/www/person-content.js';
 import type { CompetitorComparisonPage, FinServPage, PersonPage, RetailCustomerPage } from '../src/lib/graph-types.js';
 import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
 import { withParentAccount } from './_lib/parent-account.js';
+import { endedCacheControl, withOfferEnded } from './_lib/offer-ended.js';
 import { withPageCopy } from './_lib/page-copy.js';
 import { graphOp, postGraphRead } from './_lib/graph-read.js';
 
@@ -154,8 +155,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const json = await queryGraph(authKey, query, { slug: s });
           const items = graphItems<Record<string, unknown>>(json, typeName);
           if (items && items.length > 0) {
-            const shown = await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template })));
-            res.setHeader('Cache-Control', signupCacheControl(shown, 's-maxage=60, stale-while-revalidate=300'));
+            // Outermost, withOfferEnded: an ended offer's page is its stand-in (src/lib/offer-ended.ts), drawn by ExperienceBody.
+            const shown = await withOfferEnded(
+              await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...items[0], __typename: typeName, __template: template }))),
+            );
+            res.setHeader('Cache-Control', endedCacheControl(shown, signupCacheControl(shown, 's-maxage=60, stale-while-revalidate=300')));
             res.setHeader('X-Robots-Tag', 'noindex, nofollow');
             return res.status(200).json(shown);
           }

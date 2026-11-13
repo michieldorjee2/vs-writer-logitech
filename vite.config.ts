@@ -398,10 +398,14 @@ function graphDevProxy(authKey: string, devEmail: string | null, env: Record<str
                     for (const [k, v] of Object.entries(env)) if (!(k in process.env)) process.env[k] = v
                     const { withOfferSignup } = await server.ssrLoadModule('/api/_lib/offer-signup.ts')
                     const { withParentAccount } = await server.ssrLoadModule('/api/_lib/parent-account.ts')
+                    // And an ended offer's stand-in, outermost, as api/content.ts (api/_lib/offer-ended.ts).
+                    const { withOfferEnded } = await server.ssrLoadModule('/api/_lib/offer-ended.ts')
                     return jsonResponse(
                       res,
                       200,
-                      await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...item, __typename: typeName, __template: template }))),
+                      await withOfferEnded(
+                        await withOfferSignup(await withParentAccount(normalizeExperienceItem({ ...item, __typename: typeName, __template: template }))),
+                      ),
                     )
                   }
                 }
