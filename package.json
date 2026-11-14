@@ -29,10 +29,11 @@
     "check:search-fixes": "tsx scripts/check-search-fixes.ts",
     "check:account-match": "tsx scripts/check-account-match.ts",
     "check:page-activity": "tsx scripts/check-page-activity.ts",
+    "check:page-photos": "tsx scripts/check-page-photos.ts",
     "check:cta-ping": "python3 mark/cta-ping/test_step.py",
     "check:share-links": "tsx scripts/check-share-links.ts",
     "check:share-teams": "python3 mark/share-teams/test_step.py",
-    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:offer-ended && npm run check:badge && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:cta-ping && npm run check:share-links && npm run check:share-teams && npm run check:icons && npm run check:perf && npm run check:cms-purge && npm run check:www"
+    "check": "tsc -b && npm run typecheck:server && eslint . && npm run check:limitless && npm run check:signup && npm run check:offer-ended && npm run check:badge && npm run check:from-search && npm run check:search-fixes && npm run check:account-match && npm run check:page-activity && npm run check:page-photos && npm run check:cta-ping && npm run check:share-links && npm run check:share-teams && npm run check:icons && npm run check:perf && npm run check:cms-purge && npm run check:www"
   },
   "dependencies": {
     "@optimizely-opal/opal-agent-sdk": "0.11.0",

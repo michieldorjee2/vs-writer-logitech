@@ -84,8 +84,16 @@ function md5(str: string): string {
   return out;
 }
 
+/**
+ * The Gravatar hash of an address: MD5 of it, trimmed and lower-cased, 32 hex characters. Also the
+ * opaque per-person key of the Teams photo route (src/lib/page-photos.ts): it is already in every
+ * page's Gravatar request, so it tells nobody anything the page does not.
+ */
+export function emailHash(email: string): string {
+  return md5(email.trim().toLowerCase());
+}
+
 /** Build a Gravatar URL. Returns 404 if no avatar is set. */
 export function gravatarUrl(email: string, size = 80): string {
-  const hash = md5(email.trim().toLowerCase());
-  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=404`;
+  return `https://www.gravatar.com/avatar/${emailHash(email)}?s=${size}&d=404`;
 }

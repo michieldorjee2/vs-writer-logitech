@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { SIGN_OUT_ACTION, type Identity } from '../lib/auth';
 import { gravatarUrl } from '../lib/gravatar';
+import { optimizelyAddress } from '../lib/page-photos';
 import { clearOfflineCopies } from '../lib/home-offline';
 import type { RunningOffer } from '../lib/offer-looks';
 
@@ -11,26 +12,34 @@ function initialsOf(identity: Identity): string {
   return letters.toUpperCase();
 }
 
+/** The signed-in person's own Teams photo (api/me-photo.ts): their address is the session's, so nothing in this URL names anyone. */
+const OWN_PHOTO = '/api/me-photo';
+
 /**
- * The person's Gravatar over their initials. The initials are always drawn, so
- * the corner never sits empty while the photo loads; Gravatar answers 404 for
- * an address with no photo (`d=404`), and the initials are what stays.
+ * The person's photo over their initials: Gravatar, then their Microsoft Teams photo (someone from
+ * Optimizely, which everyone signed in here is), then the initials. The initials are always drawn,
+ * so the corner never sits empty while a photo loads; each step is the image's own `error`, and the
+ * initials are what stays when none has one.
  */
 function Avatar({ identity, size }: { identity: Identity; size: number }) {
-  const [photo, setPhoto] = useState<'loading' | 'shown' | 'none'>('loading');
+  const sources = [gravatarUrl(identity.email, size * 2), ...(optimizelyAddress(identity.email) ? [OWN_PHOTO] : [])];
+  const [step, setStep] = useState(0);
+  const [shown, setShown] = useState(false);
+  const src = sources[step];
   return (
     <span className="search-page__avatar-face" aria-hidden="true">
-      {photo !== 'shown' && initialsOf(identity)}
-      {photo !== 'none' && (
+      {!shown && initialsOf(identity)}
+      {src && (
         <img
+          key={src}
           className="search-page__avatar-photo"
-          src={gravatarUrl(identity.email, size * 2)}
+          src={src}
           alt=""
           width={size}
           height={size}
-          hidden={photo === 'loading'}
-          onLoad={() => setPhoto('shown')}
-          onError={() => setPhoto('none')}
+          hidden={!shown}
+          onLoad={() => setShown(true)}
+          onError={() => setStep((s) => s + 1)}
         />
       )}
     </span>

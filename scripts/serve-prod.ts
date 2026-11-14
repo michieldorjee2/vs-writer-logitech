@@ -34,6 +34,8 @@ type Handler = (req: unknown, res: unknown) => Promise<unknown> | unknown
 const ssr: Handler = (await import(path.join(ROOT, 'api/ssr.ts'))).default
 const content: Handler = (await import(path.join(ROOT, 'api/content.ts'))).default
 const preview: Handler = (await import(path.join(ROOT, 'api/preview.ts'))).default
+// The Teams photo route (README, "Teams photos on pages"): off unless PAGE_PEOPLE_PHOTOS=on, and the wiki is WIKI_URL (a stand-in, locally).
+const pagePhoto: Handler = (await import(path.join(ROOT, 'api/page-photo.ts'))).default
 
 /*
  * SERVE_SIGNED_IN=<email>: the search page as that person sees it, for looking at it and for
@@ -95,9 +97,9 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/offers') return json(res, { offers: [] })
       if (url.pathname === '/api/page-builds') return json(res, { builds: [] })
     }
-    if (url.pathname === '/api/content' || url.pathname === '/api/preview') {
+    if (url.pathname === '/api/content' || url.pathname === '/api/preview' || url.pathname === '/api/page-photo') {
       const [a, b] = adapt(req, res, url)
-      return await (url.pathname === '/api/content' ? content : preview)(a, b)
+      return await (url.pathname === '/api/content' ? content : url.pathname === '/api/preview' ? preview : pagePhoto)(a, b)
     }
     const file = path.join(DIST, decodeURIComponent(url.pathname))
     if (file.startsWith(DIST) && url.pathname !== '/' && fs.existsSync(file) && fs.statSync(file).isFile()) {

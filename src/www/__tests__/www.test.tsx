@@ -25,6 +25,8 @@
  *   8. the person page (src/www/PersonPage.tsx): every stored field shown or deliberately not,
  *      nothing from Salesforce on the page, one ask, its X-ray and Edit hooks, its CMS preview
  *   9. the CTA ping: the browser sends only the page and button, the server reads the team itself
+ *  10. Teams photos: every card that names someone from Optimizely draws Gravatar first and never
+ *      asks Gravatar about anyone else it did not already; the server draws only the first step
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -58,6 +60,8 @@ import { CmsEditProvider } from '../cms-edit'
 import { inCmsPreview } from '../../lib/cms-preview'
 import { postSignup } from '../../lib/offer-signup'
 import { connectStep, sendCtaPing } from '../../lib/cta-ping'
+import GravatarAvatar from '../../components/GravatarAvatar'
+import { emailHash } from '../../lib/gravatar'
 import PersonPage, { personConnectProps } from '../PersonPage'
 import { PERSON_FIELDS, askLabelOf, bookingUrlOf, formatDate, keyNumberText, measuresOf, peerProofOf, publicPersonPage } from '../person-content'
 import { accountExecutiveOf, toldFirstName } from '../../lib/account-rep'
@@ -3000,6 +3004,77 @@ testAsync('the browser never holds the Mark webhook or its key', async () => {
     assert.ok(!/webhook\.(mark|opal)\.optimizely\.com|CTA_PING_WEBHOOK/.test(src), file)
   }
   assert.ok(!/fireDemoWebhook|abm-demo-webhook/.test(readFileSync('src/www/ConnectModal.tsx', 'utf8')))
+})
+
+/* ------------------------------------------------------- Teams photos on pages */
+
+/** The Gravatar hashes an HTML string asks Gravatar for: who the page told Gravatar about. */
+const gravatarKeys = (html: string) => [...html.matchAll(/<img[^>]*src="https:\/\/www\.gravatar\.com\/avatar\/([0-9a-f]{32})/g)].map((m) => m[1])
+
+test('the avatar: Gravatar for Optimizely, initials when it never asked Gravatar about anyone else', () => {
+  const ours = renderToString(<GravatarAvatar email="Pat.Example@optimizely.com" initials="PE" className="a" others="initials" />)
+  assert.deepEqual(gravatarKeys(ours), [emailHash('pat.example@optimizely.com')])
+  assert.ok(!ours.includes('/api/page-photo'), 'the server draws the first step only: the Teams photo needs the page, and exists once Gravatar has failed')
+  assert.ok(ours.includes('aria-hidden="true"') && ours.includes('loading="lazy"'))
+  const theirs = renderToString(<GravatarAvatar email="cust@example.test" initials="CU" className="a" others="initials" />)
+  assert.deepEqual(gravatarKeys(theirs), [], 'a customer is not sent to Gravatar for the first time because a card learned to draw photos')
+  assert.ok(theirs.includes('>CU<') && !theirs.includes('<img'))
+  const always = renderToString(<GravatarAvatar email="cust@example.test" initials="CU" className="a" />)
+  assert.deepEqual(gravatarKeys(always), [emailHash('cust@example.test')], 'the cards that always asked Gravatar still do')
+  assert.ok(renderToString(<GravatarAvatar email={null} initials="NO" />).includes('>NO<'))
+})
+
+test('the account page draws its team as it always did: Gravatar for every address, placeholders left out', () => {
+  assert.deepEqual(gravatarKeys(accountHtml), [emailHash('f-team@example.test')])
+})
+
+test('the agent platform team card: Gravatar for the named rep at Optimizely, initials for an address that is not, as before', () => {
+  // The card names one person: the account executive (rule N4).
+  const rep = (Email: string | null) =>
+    stackPage({ teamMembers: [{ Initials: 'PE', Name: 'Pat Example', Role: 'Account Executive', Email }] })
+  const ours = renderToString(<AgentPlatformPage page={rep('pat@optimizely.com')} />)
+  assert.deepEqual(gravatarKeys(ours), [emailHash('pat@optimizely.com')])
+  assert.ok(!ours.includes('/api/page-photo'))
+  const theirs = renderToString(<AgentPlatformPage page={rep('pat@example.test')} />)
+  assert.deepEqual(gravatarKeys(theirs), [], 'an address that is not Optimizely\'s is not sent to Gravatar by this card')
+  assert.ok(theirs.includes('>PE<'), 'initials, as before')
+  const none = renderToString(<AgentPlatformPage page={rep(null)} />)
+  assert.deepEqual(gravatarKeys(none), [])
+  assert.ok(none.includes('>PE<'))
+})
+
+test('the offer page hosts: Gravatar for a host at Optimizely whose card holds an address, initials for everyone else', () => {
+  const offer = fullOffer()
+  const hosts = offer.composition.nodes.find((n) => n.displayName === 'Who runs it')!
+  hosts.rows = [
+    ...hosts.rows.slice(0, 2),
+    { columns: [{ elements: [el('AbmTeamMemberElement', { Initials: 'HO', Name: 'Host Ours', Role: 'Host', Email: 'Host.Ours@optimizely.com' })] }] },
+    { columns: [{ elements: [el('AbmTeamMemberElement', { Initials: 'PA', Name: 'Partner', Role: 'Speaker', Email: 'partner@example.test' })] }] },
+    { columns: [{ elements: [el('AbmTeamMemberElement', { Initials: 'NA', Name: 'No Address', Role: 'Host', Email: null })] }] },
+  ]
+  const html = renderToString(<OfferPage experience={offer} />)
+  assert.deepEqual(gravatarKeys(html), [emailHash('host.ours@optimizely.com')])
+  assert.ok(!html.includes(emailHash('partner@example.test')), "a partner's address is never sent to Gravatar")
+  assert.ok(!html.includes('/api/page-photo'))
+  for (const initials of ['PA', 'NA']) assert.ok(html.includes(`>${initials}<`), `${initials} still drawn as initials`)
+  // The card still names, and links, the host as it did.
+  assert.ok(html.includes('href="mailto:Host.Ours@optimizely.com"') && html.includes('Host Ours'))
+})
+
+test('the person page: the team and the signer of the note, Gravatar for who is at Optimizely, initials otherwise', () => {
+  // The fixture's note is signed by Caleb Ping, who is on the team with an address.
+  const key = emailHash('caleb.ping@optimizely.com')
+  assert.deepEqual(gravatarKeys(personHtml), [key, key], 'the signature tile and the team card')
+  assert.ok(!personHtml.includes('/api/page-photo'))
+  // A signer who is not on the team has no address to look up: the initials, as before.
+  const stranger = renderToString(<PersonPage page={fullPersonPage({ noteSignedBy: 'Someone Else' })} />)
+  assert.deepEqual(gravatarKeys(stranger), [key], 'only the team card')
+  assert.ok(stranger.includes('>PQ<'))
+  // The name is matched without regard to case and spacing, and only against people the page draws.
+  const spaced = renderToString(<PersonPage page={fullPersonPage({ noteSignedBy: '  caleb PING ' })} />)
+  assert.deepEqual(gravatarKeys(spaced), [key, key])
+  const role = renderToString(<PersonPage page={fullPersonPage({ noteSignedBy: 'Account Executive', noteSignedByInitials: 'AX' })} />)
+  assert.deepEqual(gravatarKeys(role), [key], 'a role title is not a person')
 })
 
 /* -------------------------------------------------------------------- result */

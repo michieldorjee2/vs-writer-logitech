@@ -59,6 +59,12 @@ const initialsOf = (name: string) =>
     .join('')
     .toUpperCase()
 
+/** The team member the note is signed by, by name: the signature carries no address of its own, the team card does. */
+function signerOf(page: PersonPageData) {
+  const name = page.noteSignedBy?.trim().toLowerCase()
+  return name ? teamOf(page).find((m) => m.Name?.trim().toLowerCase() === name) ?? null : null
+}
+
 /** What the connect panel shows: the team, and a booking link only when there is one. */
 export function personConnectProps(page: PersonPageData): { people: ConnectPerson[]; scheduleUrl: string | null } {
   return {
@@ -158,6 +164,7 @@ function Hero({ page, company, person }: { page: PersonPageData; company: string
 function Note({ page }: { page: PersonPageData }) {
   const field = useShowsField()
   if (!page.noteBody) return null
+  const signer = signerOf(page)
   return (
     <Scene id="note" tone="neutral" compact>
       <div className="mx-auto max-w-[860px]" data-xray="person-opening">
@@ -170,7 +177,12 @@ function Note({ page }: { page: PersonPageData }) {
         {page.noteSignedBy && (
           <Reveal i={2} className="mt-8 flex items-center gap-4">
             <span {...field('noteSignedByInitials')}>
-              <Initials initials={page.noteSignedByInitials || initialsOf(page.noteSignedBy)} />
+              {signer?.Email ? (
+                // The signer is on the team (their address is the team card's): Gravatar, then Teams, for one at Optimizely.
+                <GravatarAvatar email={signer.Email} initials={page.noteSignedByInitials || initialsOf(page.noteSignedBy)} className="www-initials" others="initials" />
+              ) : (
+                <Initials initials={page.noteSignedByInitials || initialsOf(page.noteSignedBy)} />
+              )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="font-nudge block text-2xl leading-tight font-extrabold" {...field('noteSignedBy')}>
