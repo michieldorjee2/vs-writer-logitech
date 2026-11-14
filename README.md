@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-13
+updated: 2026-11-14
 ---
 
 # vs-writer-logitech
@@ -98,11 +98,17 @@ DEV_AUTH_EMAIL=        # local dev only: the dev server's stand-in for a signed-
 
 Unset `OPTIID_RELAY_SECRET` means no gate, and no identity unless `DEV_AUTH_EMAIL` is set — a deploy that forgot the secret cannot edit or create anything. The Vite dev server has no Opti ID round trip, so set `DEV_AUTH_EMAIL` in `.env.local` to work on the signed-in UI and leave it out to see the signed-out one.
 
+## LinkedIn photos on stakeholder cards
+
+The account page's "people we'd love to meet" cards draw the person's **LinkedIn profile photo**, when LinkedIn shows it to the public and it is provably theirs, else the initials as before. The photos are **external content in the Limitless CMS**: the Mark Down wiki finds and verifies them (the photo is tied by LinkedIn to the exact profile address on the card, and the profile shows the card's name and the page's company: wiki DECISIONS.md D44), the Limitless 1:1 OCP app syncs the verified people into this CMS's Graph as `LimitlessLinkedInPerson` (wiki D45; the OCP data sync "LinkedIn people (Limitless CMS, webhook)"), and the CMS lists it as a connected content type.
+
+`api/_lib/stakeholder-photos.ts` (`withStakeholderPhotos`, beside `withPageCopy`, in the server render, `/api/content` and `/api/preview`) asks Graph once per page, as its own request, for the profiles its cards link to (`src/lib/linkedin-photos.ts`), and sets `PhotoUrl` on a card only when the name LinkedIn shows is the card's name. Any failure is the page as it was. `PersonPhoto` (src/www/ui.tsx) draws it on the initials tile, lazily, with no referrer, and falls back to the initials if it does not load. `photo_url` is a public, content-addressed wiki address, cached for a year; a withdrawn photo 404s at once and leaves Graph on the next sync.
+
 ## Teams photos on pages
 
 Someone from Optimizely named on a page is drawn **Gravatar first, then their Microsoft Teams photo, then their initials**. Customers and every other non-`@optimizely.com` address are drawn exactly as before: their address goes nowhere it did not go already (a card that never asked Gravatar about anyone still does not, `others="initials"`), and never to the wiki or Limitless. Michiel decided (13 Nov 2026) that Optimizely people's Teams photos may show on these customer-facing pages. It ships off: nothing changes until `PAGE_PEOPLE_PHOTOS=on` is set here, as Limitless has its own switch of the same name (exactly `on`; `On` and `true` are off, as `OFFER_SIGNUP_FORM` is).
 
-Where it is drawn, all through `src/components/GravatarAvatar.tsx`: the account page's team list and the connect panel (both templates), the agent platform page's team card, the person page's team list and the signature of its note (matched to the team card by name, since the signature carries no address), the offer page's hosts, and the profile menu on `/search` (the signed-in person's own). Not covered: customers' stakeholder cards (no address, and not ours), and the generic Visual Builder renderer in `src/cms` (the few non-offer `/vb/` pages), which never drew photos.
+Where it is drawn, all through `src/components/GravatarAvatar.tsx`: the account page's team list and the connect panel (both templates), the agent platform page's team card, the person page's team list and the signature of its note (matched to the team card by name, since the signature carries no address), the offer page's hosts, and the profile menu on `/search` (the signed-in person's own). Customers' stakeholder cards have their own source, below (LinkedIn photos). Not covered: the generic Visual Builder renderer in `src/cms` (the few non-offer `/vb/` pages), which never drew photos.
 
 **In the browser** each step is the image's own `error`: the server draws only Gravatar, as it always did, so the markup the browser hydrates is the markup it was sent. When Gravatar has none, the avatar asks `/api/page-photo?p=<page>&k=<key>` for the page the visitor is on; when that has none, the initials stay. Rendering never waits on a photo, and a failed one is the initials exactly as a missing Gravatar always was. `k` is the person's Gravatar hash, an opaque key and nothing more (it is already in the page's Gravatar request); no address is in any URL.
 
