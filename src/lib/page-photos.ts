@@ -11,7 +11,7 @@
  * an opaque key and nothing more: the server finds it among the people that page names, and serves
  * nobody else. The address is in no URL.
  */
-import { emailHash, gravatarUrl } from './gravatar';
+import { emailHash, gravatarUrl } from './gravatar.js';
 
 export const PAGE_PHOTO_PATH = '/api/page-photo';
 
