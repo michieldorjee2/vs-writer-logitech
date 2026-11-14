@@ -10,6 +10,7 @@ import { signupCacheControl, withOfferSignup } from './_lib/offer-signup.js';
 import { withParentAccount } from './_lib/parent-account.js';
 import { endedCacheControl, withOfferEnded } from './_lib/offer-ended.js';
 import { withPageCopy } from './_lib/page-copy.js';
+import { withStakeholderPhotos } from './_lib/stakeholder-photos.js';
 import { graphOp, postGraphRead } from './_lib/graph-read.js';
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
@@ -245,7 +246,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
-    const page = await withPageCopy(items[0]);
+    const page = await withStakeholderPhotos(await withPageCopy(items[0]));
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');

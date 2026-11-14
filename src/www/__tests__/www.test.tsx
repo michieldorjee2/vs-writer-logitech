@@ -44,6 +44,8 @@ import { fitVars, plain, richToStacked } from '../ui'
 import { hasOwnLogo, parentAccountUrls, pickParentAccount, salesforceIds } from '../../lib/parent-account'
 import { forgetParentAccounts, parentAccountsOf, parentKey, withParentAccount } from '../../../api/_lib/parent-account'
 import { forgetOfferPages, offerPagesByOffer } from '../../../api/_lib/offer-pages'
+import { withStakeholderPhotos } from '../../../api/_lib/stakeholder-photos'
+import { attachPhotos, isWikiPhoto, linkedInSlug, sameName } from '../../lib/linkedin-photos'
 import { withPages } from '../../../api/_lib/offers'
 import { ABM_XRAY_DEFAULTS, ABM_XRAY_LEGACY_IDS, AGENT_PLATFORM_EDIT, AGENT_PLATFORM_XRAY, PERSON_EDIT, PERSON_XRAY_DEFAULTS, TAKEOUT_EDIT } from '../../lib/xray-defaults'
 import { buildSuggestedEdit, AGENT_PLATFORM_TEMPLATE_LINE } from '../../lib/edit-payload'
@@ -3075,6 +3077,76 @@ test('the person page: the team and the signer of the note, Gravatar for who is 
   assert.deepEqual(gravatarKeys(spaced), [key, key])
   const role = renderToString(<PersonPage page={fullPersonPage({ noteSignedBy: 'Account Executive', noteSignedByInitials: 'AX' })} />)
   assert.deepEqual(gravatarKeys(role), [key], 'a role title is not a person')
+})
+
+
+/* ------------------------------------------------- stakeholder LinkedIn photos */
+
+const WIKI_PHOTO = 'https://md.optimizely.com/api/auth/people/linkedin/p/0123456789abcdef0123456789abcdef.jpg'
+
+test('LinkedIn photos: which profile a card links to, and whether the name is the same person', () => {
+  assert.equal(linkedInSlug('https://uk.linkedin.com/in/Pat-Doe-123/?trk=x'), 'pat-doe-123')
+  assert.equal(linkedInSlug('https://www.linkedin.com/in/jolanda-b-%E2%9C%94%EF%B8%8F-4b538a14'), 'jolanda-b-✔️-4b538a14')
+  assert.equal(linkedInSlug('https://www.linkedin.com/company/acme'), null)
+  assert.equal(linkedInSlug('https://btlaw.com/en/people/pat'), null)
+  assert.ok(sameName('Mary Reinke', 'Mary Reinke, MBA, MS'))
+  assert.ok(sameName('Xavier Brassard-Bedard', 'Xavier Brassard-Bédard'))
+  assert.ok(sameName('Karl Sunde', 'Karl Kristian Sunde'))
+  assert.ok(!sameName('Pat Doe', 'Pat Roe'))
+  assert.ok(!sameName('Robert Smith', 'Bob Smith'))
+  assert.ok(isWikiPhoto(WIKI_PHOTO))
+  assert.ok(!isWikiPhoto('https://media.licdn.com/dms/image/v2/x/profile-displayphoto-shrink_200_200/0/1'))
+  assert.ok(!isWikiPhoto('http://md.optimizely.com/api/auth/people/linkedin/p/0123456789abcdef0123456789abcdef.jpg'))
+  const cards = [
+    { Name: 'Pat Doe', LinkedInUrl: { default: 'https://www.linkedin.com/in/pdoe' } },
+    { Name: 'Sam Roe', LinkedInUrl: { default: 'https://www.linkedin.com/in/sroe' } },
+    { Name: 'No Link', LinkedInUrl: null },
+  ]
+  const out = attachPhotos(cards, [
+    { id: 'pdoe', name: 'Pat Doe', photo_url: WIKI_PHOTO },
+    { id: 'sroe', name: 'Someone Else', photo_url: WIKI_PHOTO },
+  ])
+  assert.equal(out[0].PhotoUrl, WIKI_PHOTO)
+  assert.equal(out[1].PhotoUrl, undefined, 'a card whose name LinkedIn does not show gets no face')
+  assert.equal(out[2].PhotoUrl, undefined)
+})
+
+test("LinkedIn photos: a stakeholder card draws the photo over its initials tile, or the initials", () => {
+  const card = { Initials: 'PD', Name: 'Pat Doe', Role: 'CMO', LinkedInUrl: { default: 'https://www.linkedin.com/in/pdoe' }, AvatarColor: null, PersonSlug: null }
+  const withPhoto = renderToString(<AccountPage page={{ ...account, stakeholders: [{ ...card, PhotoUrl: WIKI_PHOTO }] } as CompetitorComparisonPage} />)
+  assert.ok(withPhoto.includes(`src="${WIKI_PHOTO}"`), 'the photo is drawn')
+  assert.ok(/<img[^>]*alt=""[^>]*loading="lazy"|<img[^>]*loading="lazy"[^>]*alt=""/.test(withPhoto), 'decorative and lazy')
+  assert.ok(/referrerPolicy="no-referrer"|referrerpolicy="no-referrer"/.test(withPhoto))
+  const without = renderToString(<AccountPage page={{ ...account, stakeholders: [card] } as CompetitorComparisonPage} />)
+  assert.ok(!without.includes('/api/auth/people/linkedin/p/'))
+  assert.ok(without.includes('>PD<'), 'initials as before')
+})
+
+testAsync('LinkedIn photos: added to the account page from Graph, and any failure is the page as it was', async () => {
+  const realFetch = globalThis.fetch
+  const page = { stakeholders: [
+    { Initials: 'PD', Name: 'Pat Doe', LinkedInUrl: { default: 'https://www.linkedin.com/in/pdoe' } },
+    { Initials: 'SR', Name: 'Sam Roe', LinkedInUrl: { default: 'https://www.linkedin.com/in/sroe' } },
+  ] }
+  let asked: { query?: string; variables?: { ids?: string[] } } = {}
+  try {
+    globalThis.fetch = (async (_url: unknown, init?: { body?: string }) => {
+      asked = JSON.parse(String(init?.body))
+      return new Response(JSON.stringify({ data: { LimitlessLinkedInPerson: { items: [{ id: 'pdoe', name: 'Pat Doe', photo_url: WIKI_PHOTO }] } } }), { status: 200 })
+    }) as typeof fetch
+    const out = await withStakeholderPhotos(page, 'test-key')
+    assert.deepEqual(asked.variables?.ids, ['pdoe', 'sroe'])
+    assert.ok(asked.query?.includes('LimitlessLinkedInPerson'))
+    assert.equal((out.stakeholders[0] as { PhotoUrl?: string }).PhotoUrl, WIKI_PHOTO)
+    assert.equal((out.stakeholders[1] as { PhotoUrl?: string }).PhotoUrl, undefined)
+    globalThis.fetch = (async () => new Response(JSON.stringify({ errors: [{ message: 'Unknown type' }] }), { status: 200 })) as typeof fetch
+    assert.deepEqual(await withStakeholderPhotos(page, 'test-key'), page, 'a Graph error is the page as it was')
+    globalThis.fetch = (async () => { throw new Error('down') }) as typeof fetch
+    assert.deepEqual(await withStakeholderPhotos(page, 'test-key'), page, 'Graph down is the page as it was')
+    assert.deepEqual(await withStakeholderPhotos(page, undefined), page, 'no key, nothing asked')
+  } finally {
+    globalThis.fetch = realFetch
+  }
 })
 
 /* -------------------------------------------------------------------- result */

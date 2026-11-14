@@ -212,6 +212,9 @@ export interface CompetitorComparisonPage {
         Role: string;
         LinkedInUrl: { default: string | null } | null;
         AvatarColor: string | null;
+        /** Their LinkedIn photo, when the Limitless CMS's Graph has a verified one for the card's
+         *  profile and name (api/_lib/stakeholder-photos.ts). Added by the server, not the CMS. */
+        PhotoUrl?: string | null;
         /* Engagement fields, sourced from Salesforce by the account_page
            agent. All optional — pages written before these existed simply
            render the card as it always looked. */

@@ -512,6 +512,38 @@ export function Card({
   )
 }
 
+/**
+ * A stakeholder's LinkedIn photo on the initials tile, or the initials when there is none or it
+ * fails to load (src/lib/linkedin-photos.ts). The tile keeps its size and shape either way, so a
+ * card with a photo and one without line up.
+ */
+export function PersonPhoto({ url, initials, className }: { url?: string | null; initials: string; className?: string }) {
+  const [failed, setFailed] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+  // A photo that failed before hydration left no event for React to hear.
+  useEffect(() => {
+    const img = imgRef.current
+    if (img && img.complete && img.naturalWidth === 0) setFailed(true)
+  }, [url])
+  if (!url || failed) return <Initials initials={initials} className={className} />
+  return (
+    <span aria-hidden="true" className={cn('www-initials', 'overflow-hidden', className)}>
+      <img
+        ref={imgRef}
+        src={url}
+        alt=""
+        width={96}
+        height={96}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        style={{ width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover' }}
+      />
+    </span>
+  )
+}
+
 /** Initials on a Neutral 3 tile (Dark Fir type): the brand's accessible pairing. */
 export function Initials({ initials, className }: { initials: string; className?: string }) {
   return (
