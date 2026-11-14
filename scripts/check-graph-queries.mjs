@@ -44,6 +44,8 @@ const FILES = [
   'api/offer-signup.ts',
   // Who is on a page, for the Teams photo route (api/page-photo.ts).
   'src/lib/page-photos-query.ts',
+  // The stakeholder cards' LinkedIn photos (external content synced into this Graph).
+  'src/lib/linkedin-photos.ts',
   // The account pages the search page's account picker already has (api/page-builds/match.ts).
   'api/_lib/account-lookups.ts',
 ];

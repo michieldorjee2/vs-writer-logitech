@@ -44,7 +44,7 @@ import {
   Eyebrow,
   Heading,
   HeroFrame,
-  Initials,
+  PersonPhoto,
   Reveal,
   Scene,
   Steps,
@@ -186,7 +186,7 @@ function Intel({ page, company, companySlug }: { page: CompetitorComparisonPage;
             {people.map((p, i) => (
               <li key={i}>
                 <Card xray="stakeholders" className="flex h-full items-start gap-4">
-                  <Initials initials={p.Initials} />
+                  <PersonPhoto url={p.PhotoUrl} initials={p.Initials} />
                   <div className="min-w-0 flex-1">
                     <p className="font-nudge text-2xl leading-tight font-extrabold">{p.Name}</p>
                     <p className="www-small">{p.Role}</p>

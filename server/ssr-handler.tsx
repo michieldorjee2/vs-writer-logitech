@@ -41,6 +41,7 @@ import { signupCacheControl, withOfferSignup } from '../api/_lib/offer-signup';
 import { withParentAccount } from '../api/_lib/parent-account';
 import { endedCacheControl, withOfferEnded } from '../api/_lib/offer-ended';
 import { withPageCopy } from '../api/_lib/page-copy';
+import { withStakeholderPhotos } from '../api/_lib/stakeholder-photos';
 import { firstCandidateFound, startRead, whichPageQuery, type Candidate } from './reads';
 import { graphOp, postGraphRead } from '../api/_lib/graph-read';
 
@@ -398,7 +399,8 @@ async function readPage(authKey: string, c: Candidate, finservQuery: string | nu
     case 'account': {
       const items = graphItems<CompetitorComparisonPage>(await queryGraph(authKey, PAGE_QUERY, { slug: c.slug }), 'CompetitorComparisonPage');
       // The page's own copy on the agent platform template (api/_lib/page-copy.ts).
-      return items?.length ? withPageCopy(items[0]) : null;
+      // Its stakeholders' LinkedIn photos, from this CMS's Graph (api/_lib/stakeholder-photos.ts).
+      return items?.length ? withStakeholderPhotos(await withPageCopy(items[0]), authKey) : null;
     }
   }
 }
