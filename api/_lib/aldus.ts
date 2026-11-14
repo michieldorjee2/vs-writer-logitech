@@ -3,14 +3,15 @@
  * the running offers, saving or clearing one offer's look, whether a
  * signed-in person gets the search page's links back to Limitless (aldus-ui
  * lib/offers/showcase-viewer.ts), an offer's sign-up choice and adding one
- * sign-up (lib/offers/signup.ts), and asking for one page of an offer that
- * takes pages from search (askOfferPage). Its own token, which may do
- * nothing else.
+ * sign-up (lib/offers/signup.ts), asking for one page of an offer that
+ * takes pages from search (askOfferPage), and an offer host's Teams photo
+ * (hostPhoto). Its own token, which may do nothing else.
  *
  * Env: ALDUS_UI_URL, ALDUS_SHOWCASE_TOKEN. Unset: no offers, no links, and
  * the search page is the usual one.
  */
 import type { ShowcaseLook } from '../../src/lib/offer-looks.js';
+import { FETCH_TIMEOUT_MS, photoFrom, type PhotoAnswer } from './photo-bytes.js';
 
 export type AldusOffer = {
   id: string;
@@ -185,4 +186,30 @@ export async function askOfferPage(
     signal: AbortSignal.timeout(100_000),
   });
   return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+/**
+ * An offer host's Teams photo (aldus-ui lib/offers/host-photos.ts), as Limitless serves it to this
+ * site and nothing else: `GET /api/machine/showcase/offers/{id}/hosts/{key}/photo`, the token first.
+ * `key` is the first 32 hex characters of the SHA-256 of the host's lower-cased address
+ * (api/_lib/teams-photo.ts hostKey); Limitless finds it among the hosts the offer itself holds and
+ * answers for nobody else, an offer that has ended, or a host outside Optimizely. 404 is none (every
+ * `code` of it: off until its PAGE_PEOPLE_PHOTOS is "on", no such offer or host, ended, no photo);
+ * anything else that is not a photo is a failure. Never throws.
+ */
+export async function hostPhoto(offerId: string, key: string): Promise<PhotoAnswer> {
+  const base = (process.env.ALDUS_UI_URL || '').replace(/\/+$/, '');
+  let response: Response;
+  try {
+    response = await fetch(`${base}/api/machine/showcase/offers/${encodeURIComponent(offerId)}/hosts/${encodeURIComponent(key)}/photo`, {
+      headers: { Authorization: `Bearer ${process.env.ALDUS_SHOWCASE_TOKEN}`, Accept: 'image/jpeg,image/png,image/webp' },
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    console.warn(`[page-photo] limitless: ${err instanceof Error ? err.name : 'network'}`);
+    return 'failed';
+  }
+  return photoFrom(response, 'limitless');
 }

@@ -42,6 +42,8 @@ const FILES = [
   'vite.config.ts',
   // The offer page a sign-up names (the email form's endpoint).
   'api/offer-signup.ts',
+  // Who is on a page, for the Teams photo route (api/page-photo.ts).
+  'src/lib/page-photos-query.ts',
   // The account pages the search page's account picker already has (api/page-builds/match.ts).
   'api/_lib/account-lookups.ts',
 ];

@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-07
+updated: 2026-11-13
 ---
 
 # vs-writer-logitech
@@ -54,6 +54,7 @@ Four things it covers that the build does not:
 - **`check:limitless`** holds the search page's links back to Limitless to the people aldus-ui names, then reruns itself against mutants of the guarded files, each of which must fail it.
 - **`check:page-activity`** holds the Report (below): keys, element paths, who counts as a visitor, the report and what its card shows, the account stage from ODP, and both endpoints against stand-ins for ODP and Redis that refuse what the real ones refuse.
 - **`check:signup`** holds the offer page's email form (below): the render-time swap, the close band with and without it, the data-layer wrap and `POST /api/offer-signup`, all against stand-ins for the network.
+- **`check:page-photos`** holds the Teams photos (below): who counts as Optimizely's, the URL that carries a person, the wiki's request token against a vector made by the wiki's own verifier library, `GET /api/page-photo` and `/api/me-photo` against stand-ins for Graph, the wiki and Limitless that refuse what the real ones refuse (anyone not on the page, customers, placeholders, a wrong secret, bad images, failures, the rate limit), and it reruns its guards as mutants. The avatars' markup is held by `check:www`.
 - **`check:cta-ping`** runs Mark's code step for the one-click ask (`mark/cta-ping/test_step.py`, Python 3, no network) against stand-ins for Teams and Google Sheets.
 - **`check:share-links`** holds personal links (below): what a rep types, the codes, all four endpoints against stand-ins for Redis, ODP, Mark and the webhook, the CTA ping's personal-link part, and both Mark steps' fixtures. **`check:share-teams`** runs the Teams step (`mark/share-teams/test_step.py`).
 
@@ -85,7 +86,7 @@ What each surface does:
 - **Edit and "add new"** send the signed-in address. `api/opal-edit-stream`, `opal-feedback`, `opal-create-page` and `opal-create-person-page` take the email from the session and ignore one in the body; there is no email prompt anymore.
 - **`/api/search-index` and `/api/edit-status`** answer 401 without a session. The index is now cached in function memory for five minutes instead of at the edge.
 - **Only `@optimizely.com` identities** get a session; anyone else lands on `/login?error=not_optimizely`.
-- **Log out** is a POST to `/api/auth/logout` from the search page's profile menu, which shows the person's Gravatar (initials when they have none). It lands on `/login`, not `/search`, which would sign the person straight back in while Okta still remembers them.
+- **Log out** is a POST to `/api/auth/logout` from the search page's profile menu, which shows the person's Gravatar, then their Teams photo (below), then their initials. It lands on `/login`, not `/search`, which would sign the person straight back in while Okta still remembers them.
 - **Limitless admins** also get Open Limitless in that menu and a pencil on the offer the page runs as (each opens aldus-ui in a new tab). aldus-ui says who: `/api/offers` asks its `POST /api/machine/showcase/viewer` with `ALDUS_SHOWCASE_TOKEN` about the session's email, and with `ALDUS_UI_URL` or the token unset nobody gets the links (`npm run check:limitless`).
 
 ```bash
@@ -96,6 +97,36 @@ DEV_AUTH_EMAIL=        # local dev only: the dev server's stand-in for a signed-
 ```
 
 Unset `OPTIID_RELAY_SECRET` means no gate, and no identity unless `DEV_AUTH_EMAIL` is set — a deploy that forgot the secret cannot edit or create anything. The Vite dev server has no Opti ID round trip, so set `DEV_AUTH_EMAIL` in `.env.local` to work on the signed-in UI and leave it out to see the signed-out one.
+
+## Teams photos on pages
+
+Someone from Optimizely named on a page is drawn **Gravatar first, then their Microsoft Teams photo, then their initials**. Customers and every other non-`@optimizely.com` address are drawn exactly as before: their address goes nowhere it did not go already (a card that never asked Gravatar about anyone still does not, `others="initials"`), and never to the wiki or Limitless. Michiel decided (13 Nov 2026) that Optimizely people's Teams photos may show on these customer-facing pages. It ships off: nothing changes until `PAGE_PEOPLE_PHOTOS=on` is set here, as Limitless has its own switch of the same name (exactly `on`; `On` and `true` are off, as `OFFER_SIGNUP_FORM` is).
+
+Where it is drawn, all through `src/components/GravatarAvatar.tsx`: the account page's team list and the connect panel (both templates), the agent platform page's team card, the person page's team list and the signature of its note (matched to the team card by name, since the signature carries no address), the offer page's hosts, and the profile menu on `/search` (the signed-in person's own). Not covered: customers' stakeholder cards (no address, and not ours), and the generic Visual Builder renderer in `src/cms` (the few non-offer `/vb/` pages), which never drew photos.
+
+**In the browser** each step is the image's own `error`: the server draws only Gravatar, as it always did, so the markup the browser hydrates is the markup it was sent. When Gravatar has none, the avatar asks `/api/page-photo?p=<page>&k=<key>` for the page the visitor is on; when that has none, the initials stay. Rendering never waits on a photo, and a failed one is the initials exactly as a missing Gravatar always was. `k` is the person's Gravatar hash, an opaque key and nothing more (it is already in the page's Gravatar request); no address is in any URL.
+
+**On the server** (`api/page-photo.ts`) the route serves only people who are on the page it is asked about. It reads that page from Graph itself (`api/_lib/page-people.ts`: an account page's `teamMembers`, a person page's `team`, an offer page's hosts, each as the page draws them) and looks for the key among the `@optimizely.com` addresses there; a key that is not one of them, a customer, a placeholder the page does not draw, a colleague by address, another page's person: all 404, and the wiki and Limitless are not asked. Whoever can write a page's content therefore decides who is on it, as for its text. The request must be exactly `p` (a canonical route) and `k` (32 hex), a GET or HEAD; anything else is a 400 before anything is read.
+
+Where the bytes come from, per page type:
+
+| Page | People from | Photo from | Authenticated with |
+|---|---|---|---|
+| Account page (`/<company>/`) | `teamMembers` in Graph | the wiki's people directory | Showcase's relay secret (`OPTIID_RELAY_SECRET`, the wiki's `AUTH_RELAY_SECRET_SHOWCASE`): a one-minute HS256 request token, key `HMAC-SHA256(secret, "mark-down/people-api/v1")`, `typ` `people-call+jwt`, `iss` `showcase`, `aud` `<wiki>/api/auth/people` |
+| Person page (`/<company>/<person>/`) | `team` in Graph | the wiki | the same |
+| Offer page (`/vb/<slug>`) | its hosts in the composition, and `componentPlan.offerId` | Limitless's `GET /api/machine/showcase/offers/{id}/hosts/{key}/photo` (`key` is the first 32 hex of the SHA-256 of the host's address, made here from the card's Email; Limitless checks the host is one of the offer's, again) | `ALDUS_SHOWCASE_TOKEN` (Limitless's `SHOWCASE_MACHINE_TOKEN`) |
+| Profile menu on `/search` (`api/me-photo.ts`) | the session: nobody else can be named | the wiki | the same relay secret |
+
+Showcase asks the wiki's photo route (`/api/auth/people/photo?email=`), which answers an app's request token with the image, so the wiki's signed photo link, good for an hour or two, is never made, held, or put in a page or a cache. The image is fetched on the server (3 s, no redirects, JPEG/PNG/WebP only, at most 256 KB counted as it arrives) and re-served from this origin. A 404 is none; anything else that is not a photo (the wiki or Limitless down, a refused token, HTML, SVG) is a 502 that nothing caches, and the avatar draws initials. Only `@optimizely.com` addresses reach `optimizelyAddress` (`src/lib/page-photos.ts`), the one gate before either.
+
+**Caching** (public page, public image): `public, max-age=300, s-maxage=900` and an ETag, so a changed or removed photo shows within the hour (Limitless keeps one up to 30 minutes, this site's edge 15, a browser 5; the wiki's own copy is current). The answer is the same image the page shows everyone and has nothing of the viewer in it, so a shared cache is right; it carries the page's own cache tag (`page:<key>`), so a CMS publish or delete of the page empties its photos with it. A refusal is cached for minutes (`public, s-maxage=300`), "off" for one, a failure not at all. `me-photo` is `private` and `Vary: Cookie`. **Bounded**: 90 asks a minute per address and 30 for the signed-in person (the shared Redis counter when there is one, else the instance's own, and a counter that fails is the instance's own), at most 120 calls a minute to the wiki per instance, photos kept per instance for ten minutes (none: five, a failure: never), two asks for one person at once share one call, and a page names at most 24 people.
+
+```bash
+PAGE_PEOPLE_PHOTOS=    # exactly "on" to show Teams photos; set with aldus-ui's PAGE_PEOPLE_PHOTOS=on
+# Nothing else: the wiki is asked with OPTIID_RELAY_SECRET and WIKI_URL (Sign-in), Limitless with ALDUS_UI_URL and ALDUS_SHOWCASE_TOKEN.
+```
+
+Known gap on 13 Nov 2026: no live offer page has a host's address on its card (`Email` is null on all 17 hosts of the 7 offers), so offer hosts stay initials until the offer's writer puts each host's `@optimizely.com` address in the host element (it is also the card's mailto link). The route and the card are ready for it and held by `check:page-photos` against a stand-in for Limitless.
 
 ## Edit mode (live)
 

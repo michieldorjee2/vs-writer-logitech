@@ -28,8 +28,11 @@
  * the review layer and state switch, the offer FAQ, X-ray mode outlining every section, Edit mode
  * rewriting the page in place from a (mocked) Mark stream, the old ?design=classic and
  * ?template=takeout switches changing nothing, and the CMS preview: both pages in the CMS editor
- * with its editing hooks, a save refreshing the draft in place, and nothing sent from it; and the
- * view transitions between the search page and the pages it opens, both ways.
+ * with its editing hooks, a save refreshing the draft in place, and nothing sent from it; the
+ * view transitions between the search page and the pages it opens, both ways; and the Teams photos
+ * (README, "Teams photos on pages"): with no Gravatar, the team of an account page, a person page
+ * and the connect panel, and the profile menu, draw the Teams photo, asked by page and opaque key
+ * and never by address; with neither, the initials; with a Gravatar, the Teams route is not asked.
  */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import fs from 'node:fs'
@@ -1556,6 +1559,110 @@ console.log('\nspeed: the icon subset, no renderer preloads, the page fetched ah
   await test('no errors, and nothing reached the real webhooks', async () => {
     expect(!watch.errors.length, watch.errors.join('\n'))
     expect(!watch.escaped.length, `requests escaped: ${watch.escaped.join(', ')}`)
+  })
+}
+
+console.log('\nTeams photos: Gravatar, then Teams, then initials')
+{
+  // 1x1 PNG. Everything is answered here: Gravatar, and this site's own photo route.
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+  type Who = { gravatar: boolean; teams: boolean }
+  async function teamsPage(href: string, who: Who, openPanel = false) {
+    const { ctx, watch } = await newContext(browser, 'desktop')
+    const asked: string[] = []
+    const requests: string[] = []
+    ctx.on('request', (r) => requests.push(r.url()))
+    await ctx.route('https://www.gravatar.com/**', (r) => (who.gravatar ? r.fulfill({ status: 200, contentType: 'image/png', body: PNG }) : r.fulfill({ status: 404, body: '' })))
+    await ctx.route('**/api/page-photo**', (r) => {
+      asked.push(new URL(r.request().url()).pathname + new URL(r.request().url()).search)
+      return who.teams ? r.fulfill({ status: 200, contentType: 'image/png', body: PNG }) : r.fulfill({ status: 404, json: { code: 'no-photo' } })
+    })
+    const page = await open(ctx, watch, url(href))
+    if (openPanel) {
+      await page.locator('#hero-connect-btn, #cta-connect-btn').first().click()
+      await page.waitForSelector('.www-modal__tile--person', { timeout: 8000 })
+    } else {
+      await page.evaluate(async () => {
+        for (let y = 0; y < document.body.scrollHeight; y += innerHeight * 0.6) {
+          scrollTo(0, y)
+          await new Promise((r) => setTimeout(r, 120))
+        }
+        scrollTo(0, document.body.scrollHeight)
+      })
+    }
+    await page.waitForTimeout(1500)
+    return { ctx, watch, page, asked, requests }
+  }
+  /** Each team card's face: the photo it shows (and whether it drew), and its initials. */
+  const faces = (page: Page, selector: string) =>
+    page.$$eval(selector, (els) =>
+      els.map((e) => {
+        const img = e.querySelector('img')
+        return { src: img?.getAttribute('src') ?? null, drawn: img ? img.complete && img.naturalWidth > 0 : false, text: (e.textContent || '').trim() }
+      }),
+    )
+  const routeOf = (href: string) => href.replace(/^\/|\/$/g, '')
+  const wellFormed = (asked: string[], href: string) =>
+    asked.length > 0 && asked.every((a) => new RegExp(`^/api/page-photo\\?p=${encodeURIComponent(routeOf(href))}&k=[0-9a-f]{32}$`).test(a))
+  // Only this site and Gravatar are ever asked about a person (a font CDN's `family=Figtree:wght@300..700` is not one).
+  const noAddress = (requests: string[]) =>
+    requests.filter((u) => {
+      const { origin, pathname, search } = new URL(u)
+      return (origin === BASE || origin === 'https://www.gravatar.com') && /@|%40/.test(`${pathname}${search}`)
+    })
+
+  for (const [label, href, faceSelector, panel] of [
+    ['the takeout account page', ACCOUNT, '.www-person .www-avatar', false],
+    ['the person page', PERSON, '.www-person .www-avatar', false],
+    ['the agent platform page, in the connect panel', AP_ACCOUNT, '.www-modal__tile--person .www-avatar', true],
+  ] as const) {
+    await test(`${label}: with no Gravatar, the team's Teams photos, asked by page and opaque key and never by address`, async () => {
+      const { ctx, watch, page, asked, requests } = await teamsPage(href, { gravatar: false, teams: true }, panel)
+      const f = await faces(page, faceSelector)
+      expect(f.length > 0, 'no team faces on the page')
+      const drawn = f.filter((x) => x.src?.startsWith('/api/page-photo'))
+      expect(drawn.length > 0 && drawn.every((x) => x.drawn), `Teams photos: ${JSON.stringify(f)}`)
+      expect(wellFormed(asked, href), `asked: ${asked.join(' ')}`)
+      expect(!noAddress(requests).length, `an address in a request: ${noAddress(requests).join(' ')}`)
+      expect(!watch.errors.length && !watch.escaped.length, watch.errors.concat(watch.escaped).join('\n'))
+      await ctx.close()
+    })
+  }
+  await test('with neither a Gravatar nor a Teams photo, the initials stay and no broken image is left', async () => {
+    const { ctx, page, asked } = await teamsPage(ACCOUNT, { gravatar: false, teams: false })
+    const f = await faces(page, '.www-person .www-avatar')
+    expect(asked.length > 0, 'the Teams route was never tried')
+    expect(f.length > 0 && f.every((x) => !x.src && x.text.length > 0), JSON.stringify(f))
+    await ctx.close()
+  })
+  await test('with a Gravatar, the Teams route is not asked', async () => {
+    const { ctx, page, asked } = await teamsPage(ACCOUNT, { gravatar: true, teams: true })
+    const f = await faces(page, '.www-person .www-avatar')
+    expect(asked.length === 0, `asked: ${asked.join(' ')}`)
+    expect(f.length > 0 && f.every((x) => x.src?.includes('gravatar.com') && x.drawn), JSON.stringify(f))
+    await ctx.close()
+  })
+  await searchTest('the profile menu: no Gravatar, so the signed-in person\'s own Teams photo; and the initials when there is none', async () => {
+    for (const teams of [true, false]) {
+      const search = await browser.newContext({ ...VIEWPORTS.desktop, serviceWorkers: 'block', extraHTTPHeaders: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : undefined })
+      await search.addCookies([{ name: 'showcase_staff', value: '1', url: BASE }])
+      await search.route('https://www.gravatar.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+      await search.route('**/api/me-photo', (r) => (teams ? r.fulfill({ status: 200, contentType: 'image/png', body: PNG }) : r.fulfill({ status: 404, json: { code: 'no-photo' } })))
+      await search.route('**/api/auth/me', (r) => r.fulfill({ json: { email: 'e2e@optimizely.com', name: 'E2E Person' } }))
+      await search.route('**/api/home-index', (r) => r.fulfill({ json: { companies: [], total: 0, people: [], mine: [], viewer: 'e2e@optimizely.com' } }))
+      await search.route('**/api/offers', (r) => r.fulfill({ json: { offers: [] } }))
+      await search.route('**/api/page-builds', (r) => r.fulfill({ json: { builds: [] } }))
+      const page = await search.newPage()
+      await page.goto(url('/search'), { waitUntil: 'domcontentloaded' })
+      await page.locator('.search-page__greeting').click()
+      await page.waitForTimeout(800)
+      const face = await page.$eval('.search-page__profile-menu .search-page__avatar-face', (e) => {
+        const img = e.querySelector('img')
+        return { src: img?.getAttribute('src') ?? null, drawn: img ? img.complete && img.naturalWidth > 0 && !img.hidden : false, text: (e.textContent || '').trim() }
+      })
+      expect(teams ? face.src === '/api/me-photo' && face.drawn && !face.text : !face.src && face.text === 'EP', JSON.stringify(face))
+      await search.close()
+    }
   })
 }
 

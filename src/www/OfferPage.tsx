@@ -17,9 +17,10 @@ import { PortraitTextQuoteCard } from '../vendor/www/components/block/portrait-t
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../vendor/www/components/_ui/accordion'
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { cn } from '../vendor/www/lib/utils'
-import { AccountMark, Card, Colophon, Eyebrow, Heading, HeroFrame, Initials, Paragraphs, Reveal, Scene, Steps, StickyCta, WwwPage, plain } from './ui'
+import { AccountMark, Card, Colophon, Eyebrow, Heading, HeroFrame, Paragraphs, Reveal, Scene, Steps, StickyCta, WwwPage, plain } from './ui'
 import { list, nodeKeyOf, readOffer, str, type ElementData, type OfferSection } from './offer-content'
 import { useCmsEdit } from './cms-edit'
+import GravatarAvatar from '../components/GravatarAvatar'
 import OfferSignupForm from '../components/offer-signup/OfferSignupForm'
 import { SCENE } from './account-helpers'
 
@@ -172,7 +173,8 @@ function OfferScene({ section, company, logo }: { section: OfferSection; company
               {list(v.hosts).map((h, i) => (
                 <Reveal key={i} as="li" i={3 + i} {...b(h)}>
                   <Card className="flex items-center gap-5">
-                    <Initials initials={str(h, 'Initials') || initialsOf(str(h, 'Name'))} className="size-16 text-2xl" />
+                    {/* Gravatar, then their Teams photo, for a host at Optimizely whose card holds an address; anyone else, and every host without one, is initials as always. */}
+                    <GravatarAvatar email={str(h, 'Email')} initials={str(h, 'Initials') || initialsOf(str(h, 'Name'))} className="www-initials size-16 text-2xl" others="initials" />
                     <div className="min-w-0">
                       <p className="www-h3">{str(h, 'Name')}</p>
                       <p className="www-body mt-1">{str(h, 'Role')}</p>

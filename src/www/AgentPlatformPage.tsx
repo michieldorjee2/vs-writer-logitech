@@ -28,6 +28,7 @@ import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { cn } from '../vendor/www/lib/utils'
 import type { CSSProperties, ReactNode } from 'react'
 import { AccountMark, Colophon, CountUp, Eyebrow, Heading, HeroFrame, Reveal, Scene, StickyCta, WwwPage } from './ui'
+import GravatarAvatar from '../components/GravatarAvatar'
 import { ConnectProvider, useConnect } from './ConnectModal'
 import { SCENE } from './account-helpers'
 import { FIRST_90_DAYS, PLATFORM_LAYER, PROOF_ASSETS, PROOF_STORIES, STATES, THEMES, TRUST_CENTER, WHO_WE_ARE, showsWhoWeAre } from './agent-platform/library'
@@ -628,7 +629,7 @@ function Close({ c, t }: { c: AgentPlatformContent; t: T }) {
                 <ul className="flex flex-col gap-3" role="list">
                   {people.map((p) => (
                     <li key={p.name} data-xray="team-members" className="flex items-center gap-3">
-                      <span className="www-avatar">{p.initials}</span>
+                      <GravatarAvatar email={p.email} initials={p.initials} className="www-avatar" others="initials" />
                       <span>
                         <span className="font-nudge block text-2xl leading-tight font-extrabold">{p.name}</span>
                         <span className="www-small block text-white/70">{p.role}</span>
