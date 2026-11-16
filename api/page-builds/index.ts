@@ -7,6 +7,8 @@ import { buildForSite, buildStore, buildsForRep } from '../_lib/page-builds-stor
 import { startAccountBuild, startPersonBuild, summarize, summaryOf } from '../_lib/page-builds.js';
 import { validateCompanyName, validateCompanyWebsite, validateText, websiteDomain } from '../_lib/validate-input.js';
 import { nameFromWebsite } from '../../src/lib/page-builds.js';
+import { personNameProblem } from '../../src/lib/person-name.js';
+import { alertBuildFailed } from '../_lib/build-alerts.js';
 
 /**
  * The search page's page builds (replaces the opal-create-page webhooks).
@@ -86,6 +88,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const title = typeof body.personTitle === 'string' && body.personTitle.trim() ? validateText(body.personTitle, 'personTitle', 160) : null;
       if (title && !title.ok) return res.status(400).json({ error: title.error });
       const company = (body.company ?? {}) as Record<string, unknown>;
+      // A company or a website as the person is refused here, not built: Mark would build
+      // every stakeholder on the company page instead, or nothing (src/lib/person-name.ts).
+      const companyText = [company.name, company.website, company.route].find((v): v is string => typeof v === 'string' && v.trim() !== '');
+      const notAPerson = personNameProblem(person.value, companyText);
+      if (notAPerson) return res.status(400).json({ error: 'not_a_person', message: notAPerson });
 
       // The company has a page: build the person under it.
       if (typeof company.route === 'string' && /^[a-z0-9-]+$/.test(company.route)) {
@@ -170,6 +177,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "kind must be 'account' or 'person'" });
   } catch (err) {
     console.error('[page-builds] start', err);
+    // The rep sees "Couldn't reach Mark"; Michiel gets the reason by email.
+    await alertBuildFailed({
+      what: body.kind === 'person' ? `a person page (${String(body.personName ?? '?')})` : `an account page (${String(body.website ?? body.name ?? body.lookup ?? '?')})`,
+      email: identity.email,
+      stage: 'start',
+      reason: err instanceof Error ? err.message : String(err),
+    });
     const status = err instanceof MarkError && err.status === 503 ? 503 : 502;
     return res.status(status).json({ error: "Couldn't reach Mark. Try again." });
   }

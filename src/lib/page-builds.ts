@@ -307,6 +307,13 @@ export function pageWrittenIn(chunks: MarkChunk[]): boolean {
 }
 
 /** The one line under the name in the list. */
+/**
+ * Whether a build's view stands in front of its address, ahead of whatever page is there:
+ * only while it is still running or waiting. A failed build is shown only where no page is
+ * (server/ssr-handler.tsx), so a page that exists is never hidden behind a failure.
+ */
+export const buildHoldsAddress = (build: Pick<BuildRecord, 'status'>): boolean => build.status === 'running' || build.status === 'waiting';
+
 export function statusLineOf(record: BuildRecord, steps: BuildStep[], events: BuildEvent[]): string {
   if (record.status === 'waiting') return 'Waiting for the company page…';
   if (record.status === 'done') return 'Ready';

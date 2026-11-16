@@ -24,6 +24,13 @@ import {
 } from '../../src/lib/page-builds.js';
 import { ACCOUNT_WORKFLOW_ID, PERSON_WORKFLOW_ID, getAgentMemoryId, getExecution, getMemoryChunks, startWorkflow } from './mark.js';
 import { addBuild, routeTaken, saveBuild, getBuild, type BuildStore } from './page-builds-store.js';
+import { alertBuildFailed } from './build-alerts.js';
+
+/** A build still running after this long gets one "stalled" email (an account build takes ~15 min, a person ~6). */
+export const STALL_MS = 60 * 60 * 1000;
+
+/** What an alert calls the build: "Cecilia Jeppsson at IKEA", or the company. */
+const alertName = (r: BuildRecord) => (r.kind === 'person' && r.companyName ? `${r.name} at ${r.companyName}` : r.name);
 
 const GRAPH_ENDPOINT = 'https://cg.optimizely.com/content/v2';
 
@@ -178,6 +185,10 @@ export async function refreshBuild(store: BuildStore, record: BuildRecord): Prom
     if (!settled || settled.status === 'failed') {
       record = { ...record, status: 'failed', error: `The ${settled?.name ?? 'company'} page could not be built, so this one was not started.`, finishedAt: Date.now() };
       await saveBuild(store, record);
+      await alertBuildFailed(
+        { what: alertName(record), kind: record.kind, email: record.email, stage: 'waiting', reason: settled?.error ?? record.error ?? '', buildId: record.id, route: record.route, startedAt: record.startedAt },
+        store,
+      );
     } else if (settled.status === 'done') {
       // Several browsers poll; only the first to see the company finish starts the person.
       const first = await store.set(`pb:starting:${record.id}`, 1, { nx: true, ex: 600 });
@@ -208,6 +219,38 @@ export async function refreshBuild(store: BuildStore, record: BuildRecord): Prom
       record = { ...record, status: 'failed', finishedAt: Date.now(), error: failedBuildError(execution, record.kind) };
     }
     await saveBuild(store, record);
+    if (record.status === 'failed') {
+      await alertBuildFailed(
+        {
+          what: alertName(record),
+          kind: record.kind,
+          email: record.email,
+          stage: 'run',
+          reason: record.error ?? '',
+          buildId: record.id,
+          route: record.route,
+          executionId: record.executionId,
+          startedAt: record.startedAt,
+        },
+        store,
+      );
+    }
+  } else if (record.status === 'running' && Date.now() - record.startedAt > STALL_MS) {
+    // Still going after an hour: say so once. The build is left running; it may yet finish.
+    await alertBuildFailed(
+      {
+        what: alertName(record),
+        kind: record.kind,
+        email: record.email,
+        stage: 'stalled',
+        reason: `Mark's run is still '${execution.status}' after ${Math.round((Date.now() - record.startedAt) / 60000)} minutes.`,
+        buildId: record.id,
+        route: record.route,
+        executionId: record.executionId,
+        startedAt: record.startedAt,
+      },
+      store,
+    );
   }
   return { record, execution };
 }
@@ -215,13 +258,55 @@ export async function refreshBuild(store: BuildStore, record: BuildRecord): Prom
 /** The line the rep sees when a finished run built no page. */
 export function failedBuildError(execution: MarkExecution, kind: BuildRecord['kind']): string {
   // The workflow's own reason is kept whole: its second sentence says what to do about it.
-  const problem = requestProblemOf(execution);
+  const problem = requestProblemOf(execution) ?? (kind === 'person' ? personProblemOf(execution) : null);
   if (problem) return problem.replace(/\s+/g, ' ').slice(0, 300);
   const steps = flattenSteps(execution.step_executions);
   const page = steps.find((s) => s.step_id === pageStepId(kind));
   const refused = steps.find((s) => s.step_id === ACCOUNT_REFUSED_STEP);
   const why = refused ? responseText(refused.result?.response) : execution.error_message || page?.error_message || '';
   return firstSentence(why) || 'Mark finished without building the page.';
+}
+
+/** The JSON object in an agent's answer (which may come fenced, or with a line before it). */
+function jsonIn(response: unknown): Record<string, unknown> | null {
+  if (response && typeof response === 'object') return response as Record<string, unknown>;
+  if (typeof response !== 'string') return null;
+  const start = response.indexOf('{');
+  const end = response.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(response.slice(start, end + 1)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** The person workflow's steps that say why nothing was built. */
+const PERSON_LOOKUP_STEPS = ['b1a1fdce-0865-4851-b693-aae8f4592211', 'b2000000-0000-4000-8000-000000000003'];
+const PERSON_REPORT_STEP = 'b2000000-0000-4000-8000-000000000006';
+
+/**
+ * Why the person workflow built no page, in its own words: the run report's
+ * `stopped_reason` (a company or website given as the person, a page that could not be
+ * read), the stakeholder lookup's own reason, or the person agent's `ERROR:` line.
+ */
+export function personProblemOf(execution: MarkExecution): string | null {
+  const steps = flattenSteps(execution.step_executions);
+  const report = jsonIn(steps.find((s) => s.step_id === PERSON_REPORT_STEP)?.result?.response);
+  if (typeof report?.stopped_reason === 'string' && report.stopped_reason.trim()) return report.stopped_reason.trim();
+  for (const id of PERSON_LOOKUP_STEPS) {
+    const lookup = jsonIn(steps.find((s) => s.step_id === id)?.result?.response);
+    const status = typeof lookup?.status === 'string' ? lookup.status : '';
+    if (!status || status === 'ok') continue;
+    if (typeof lookup?.reason === 'string' && lookup.reason.trim()) return lookup.reason.trim();
+    if (status === 'no_page') return 'The company has no account page to hang the person page off.';
+    return `Mark could not read the company page (${status}).`;
+  }
+  const page = responseText(steps.find((s) => s.step_id === pageStepId('person'))?.result?.response);
+  const line = /^(?:ERROR|REASON):\s*(.+)$/m.exec(page);
+  if (line) return line[1].trim();
+  if (report?.needs_attention === true && typeof report.summary === 'string' && report.summary.trim()) return report.summary.trim();
+  return null;
 }
 
 function firstSentence(text: string): string {

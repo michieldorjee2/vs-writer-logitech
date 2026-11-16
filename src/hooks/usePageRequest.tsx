@@ -4,6 +4,7 @@ import { domainOf, type AccountChoice, type AccountMatch } from '../lib/account-
 import { askAnswerOf, askNote } from '../lib/offer-from-search';
 import type { FromSearch } from '../lib/offer-looks';
 import type { BuildSummary } from '../lib/page-builds';
+import { looksLikePersonName, personNameProblem } from '../lib/person-name';
 import { looksLikeWebsite } from '../lib/search-entries';
 import { useBadgeCard } from './useBadgeCard';
 
@@ -149,7 +150,9 @@ export function usePageRequest({
       // An offer page for a company the index knows starts with its domain.
       const known = nextKind === 'offer' && !looksLikeWebsite(q) ? (findCompany(q)?.domain ?? '') : '';
       setCompany(nextKind === 'account' ? q : nextKind === 'offer' ? (looksLikeWebsite(q) ? q : known) : '');
-      setPerson(nextKind === 'person' ? q : '');
+      // The search text is the person only when it reads as a name and is no company the
+      // index knows: carrying "IKEA" into the name field is how IKEA became a person.
+      setPerson(nextKind === 'person' && looksLikePersonName(q) && !findCompany(q) ? q : '');
       setOfferRef(nextKind === 'offer' ? (offer ?? null) : null);
       setCompanyRef(null);
       setMatches(null);
@@ -205,6 +208,14 @@ export function usePageRequest({
           setKind(sentKind);
           setPhase('sent');
           return true;
+        }
+        // Refused as asked (a company or a website as the person's name): say why, and stay put.
+        if (r.status === 400) {
+          const answer = (await r.json().catch(() => null)) as { message?: string } | null;
+          if (answer?.message) {
+            setError(answer.message);
+            return false;
+          }
         }
         if (!r.ok) throw new Error(`${r.status}`);
         const started = (await r.json()) as { build: BuildSummary; company?: BuildSummary };
@@ -312,7 +323,8 @@ export function usePageRequest({
 
     if (phase === 'person' && companyRef) {
       const who = person.trim();
-      if (!who) return setError("Enter the person's name");
+      const problem = personNameProblem(who, 'website' in companyRef ? companyRef.website : companyRef.name);
+      if (problem) return setError(problem);
       return send({ kind: 'person', personName: who, company: companyRef }, personNote);
     }
   }, [phase, kind, company, person, companyRef, findCompany, send, offerRef, askOffer, lookUp, choose, activePick]);
