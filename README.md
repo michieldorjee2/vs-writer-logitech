@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-14
+updated: 2026-11-16
 ---
 
 # vs-writer-logitech
@@ -41,7 +41,7 @@ npm run dev
 ## Checks
 
 ```bash
-npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:icons, check:perf, check:www
+npm run check          # everything that needs no network: both type-checks, lint, check:limitless, check:signup, check:cta-ping, check:share-links, check:share-teams, check:page-builds, check:icons, check:perf, check:www
 npm run check:graph    # every shipped GraphQL query against the live schema (needs GRAPH_AUTH_KEY)
 ```
 
@@ -303,6 +303,16 @@ The server render asks Graph which page an address is, once. A slug can be a per
 The search page fetches the next page ahead. The row a rep rests on (hover, arrow keys, or the top result as they type) is prefetched with a Speculation Rules list rule, at most two at a time, or requested once to warm the edge cache where the browser has no Speculation Rules (`src/lib/warm-pages.ts`). Prefetched, never prerendered: a prerendered page runs before the click, but the view transition from the search page makes the booth rail's room as the page is revealed and starts the app only once the morph is over (see View transitions), and Chrome turns prerendering off under automation, so no check could watch it. A prefetch only GETs the HTML; nothing runs. `npm run check:perf` covers the reads, the warming and the wiring.
 
 The chunk order is left as it is, on purpose: today it is what keeps React off the main thread until the hero has painted. Under Vite 8 the `manualChunks` function in `vite.config.ts` lets `vendor-motion` take React itself, so every entry, the search page included, loads 157 kB of framer-motion one request after its own script. Fixing that alone (Rolldown `codeSplitting` groups, React's first) let React start before the hero image's first paint, which then waited for it: mobile LCP 3.6 s to 6.6 s on an account page, 3.6 s to 6.1 s on a person page, while the offer page (still behind framer-motion) did not move. Preloading the renderers' lazy chunks does the same thing. Both wait for a start-up gate (`src/main.tsx`, `src/lib/after-view-transition.ts`) that also waits for the hero to paint; `check:perf` fails if the chunk order changes without that.
+
+## Page builds: when one fails
+
+A rep asks for a page from the search page; Mark builds it while the page's own address shows the build (`api/_lib/page-builds.ts`, `src/components/BuildView.tsx`). Three things keep a failure from going unseen, all added on 16 Nov 2026 after the IKEA person page failed for every rep for three days (the CMS retired the API Mark's page tools called) and nobody was told:
+
+- **An email for every failure.** A build that cannot start, finishes without a page, never starts because its company page failed, or is still running after an hour sends one email with who asked, why, the address and Mark's run (`api/_lib/build-alerts.ts`), to the `OPAL_PAT`'s owner in production (or `BUILD_ALERT_EMAIL`, comma-separated, `off` for nobody). It goes from the same owner's own Outlook through Mark's `outlook_mail_send`, called directly on the tools service (client type `mcp`: with `web` the tool only stages a review card). One per build, held by a `pb:alerted:<id>` key.
+- **A sweep every 10 minutes** (`api/page-builds/sweep.ts`, Vercel Cron in `vercel.json`, bearer `CRON_SECRET`). A build moves on only when someone looks at it, so the sweep looks at every open build (`pb:open`), even when the rep closed the tab: failures are settled and emailed, and a person page waiting for its company starts.
+- **A failed build never hides a page.** Only a running or waiting build stands in front of its address; a failed one is shown only where there is no page (`buildHoldsAddress`, `server/ssr-handler.tsx`).
+
+And the commonest bad request is refused before it reaches Mark: a company or a website as the person's name (9 of 11 person requests between 22 Oct and 16 Nov). The search bar no longer carries the search text into the name field unless it reads as a person's name, and both the bar and `POST /api/page-builds` refuse a website, the company itself or a single word (`src/lib/person-name.ts`). Mark's person workflow refuses it too, and now builds only the person named. `npm run check:page-builds` covers all of it.
 
 ## Cache: a CMS publish empties the page's edge cache
 

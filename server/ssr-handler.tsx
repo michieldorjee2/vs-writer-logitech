@@ -33,7 +33,7 @@ import { renderLoginPage } from './login-page';
 import { renderSettled } from './render-settled';
 import SearchHome from '../src/components/SearchHome';
 import { buildForRoute, buildStore } from '../api/_lib/page-builds-store';
-import type { BuildRecord } from '../src/lib/page-builds';
+import { buildHoldsAddress, type BuildRecord } from '../src/lib/page-builds';
 import { randomScene } from '../src/lib/home-scenes';
 import { isOfferId, OFFER_COOKIE, type ShownOffer } from '../src/lib/offer-looks';
 import { aldusConfigured, runningOffers } from '../api/_lib/aldus';
@@ -1091,7 +1091,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader = ((name: string, value: number | string | readonly string[]) =>
       name.toLowerCase() === 'cache-control' ? res : setHeader(name, value)) as typeof res.setHeader;
-    if (build.status !== 'done' && url.searchParams.get('view') !== 'page' && currentIdentity(req, res)) {
+    // Only a build still under way stands in front of the address. A failed one does not: Mark
+    // may have built the page after all, or it may have been built another way since (the IKEA
+    // person page on 16 Nov was live while its failed build kept showing reps the failure). A
+    // failed build is shown only where there is no page, below.
+    if (buildHoldsAddress(build) && url.searchParams.get('view') !== 'page' && currentIdentity(req, res)) {
       return sendBuildView(res, build);
     }
   }

@@ -82,5 +82,8 @@
     { "source": "/opensearch.xml", "destination": "/opensearch.xml" },
     { "source": "/s/:code", "destination": "/api/share-go?code=:code" },
     { "source": "/((?!api/|_vercel/).*)", "destination": "/api/ssr" }
+  ],
+  "crons": [
+    { "path": "/api/page-builds/sweep", "schedule": "*/10 * * * *" }
   ]
 }
