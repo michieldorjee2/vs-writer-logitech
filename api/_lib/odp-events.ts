@@ -3,8 +3,8 @@
  * `events` query requires an identifier). Many visitors go in one request as aliases. Also the
  * page's Salesforce account as ODP holds it (synced from Salesforce), for its stage.
  *
- * Server-only: ODP_PRIVATE_KEY is a full-access account key. It is read here and nowhere else, is
- * never logged, and never reaches the browser.
+ * Server-only: ODP_PRIVATE_KEY is a full-access account key. It is read here and nowhere else (the
+ * form on an offer's CTA asks ODP through odpPoster), is never logged, and never reaches the browser.
  *
  * What ODP refuses, and what this file therefore never sends (probed 4 Nov 2026):
  *   - a vuid with dashes ("could not resolve any of the supplied identifiers"): ids are 32 hex;
@@ -38,6 +38,25 @@ type Conn = { edges?: Array<{ node: Node }>; pageInfo?: { hasNextPage?: boolean;
 
 export interface OdpClient {
   query(query: string): Promise<{ data?: Record<string, Conn> | null; errors?: Array<{ message?: string; path?: unknown[] }> }>;
+}
+
+/**
+ * A POST to ODP's REST or GraphQL API with the account key, for the other server file that asks ODP
+ * something (api/_lib/cta-form.ts: a visitor's profile, tying a browser to an email), so the key is
+ * still read only here. Null when ODP_PRIVATE_KEY is unset. Only paths under /v3/.
+ */
+export type OdpPost = (path: `/v3/${string}`, body: unknown, timeoutMs: number) => Promise<Response>;
+export function odpPoster(): OdpPost | null {
+  const key = process.env.ODP_PRIVATE_KEY;
+  if (!key) return null;
+  const base = (process.env.ODP_API_BASE || 'https://api.zaius.com').replace(/\/+$/, '');
+  return (path, body, timeoutMs) =>
+    fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
 }
 
 export function odpClient(): OdpClient | null {

@@ -23,6 +23,8 @@ import { useCmsEdit } from './cms-edit'
 import GravatarAvatar from '../components/GravatarAvatar'
 import OfferSignupForm from '../components/offer-signup/OfferSignupForm'
 import { SCENE } from './account-helpers'
+import { ctaFormMarkerOf } from '../lib/cta-form'
+import { CtaFormProvider, useCtaGate } from './CtaForm'
 
 interface Experience {
   companyName?: string | null
@@ -40,20 +42,28 @@ export default function OfferPage({ experience }: { experience: Experience }) {
   const ctaHref = str(hero?.values.offerCta, 'ButtonUrl') || '#signup'
 
   return (
-    <WwwPage className="www-offer">
-      <div id="main-content">
-        {sections.map((s, i) => (
-          <OfferScene key={i} section={s} company={company} logo={logo} />
-        ))}
-      </div>
-      <StickyCta
-        text={plain(str(hero?.values.offerEyebrow, 'Text')) || plain(str(hero?.values.offerHeadline, 'Text'))}
-        href={ctaHref}
-        label={ctaText}
-        endId="signup"
-      />
-    </WwwPage>
+    // The offer chose the form on its CTA in Limitless (src/lib/cta-form.ts): the data layer marked
+    // the page, and every CTA link below asks through it. Unmarked, the provider adds nothing.
+    <CtaFormProvider marker={ctaFormMarkerOf(experience)}>
+      <WwwPage className="www-offer">
+        <div id="main-content">
+          {sections.map((s, i) => (
+            <OfferScene key={i} section={s} company={company} logo={logo} />
+          ))}
+        </div>
+        <OfferStickyCta
+          text={plain(str(hero?.values.offerEyebrow, 'Text')) || plain(str(hero?.values.offerHeadline, 'Text'))}
+          href={ctaHref}
+          label={ctaText}
+        />
+      </WwwPage>
+    </CtaFormProvider>
   )
+}
+
+function OfferStickyCta({ text, href, label }: { text: string; href: string; label: string }) {
+  const gate = useCtaGate()
+  return <StickyCta text={text} href={href} label={label} endId="signup" onLinkClick={gate?.(label)} />
 }
 
 function OfferScene({ section, company, logo }: { section: OfferSection; company: string; logo: string | null }) {
@@ -320,6 +330,7 @@ function OfferHero({
   attrs: Record<string, string>
 }) {
   const cms = useCmsEdit()
+  const gate = useCtaGate()
   const b = (el: ElementData | ElementData[] | undefined) => cms.block(nodeKeyOf(el))
   const highlights = list(v.offerHighlights)
   const second = v.offerSecondaryCta as ElementData | undefined
@@ -349,7 +360,12 @@ function OfferHero({
             <Reveal i={3} className="flex flex-wrap gap-3">
               {str(v.offerCta, 'ButtonText') && (
                 <Button asChild variant="primary" className="www-btn">
-                  <a href={str(v.offerCta, 'ButtonUrl') || '#signup'} {...external(str(v.offerCta, 'ButtonUrl'))} {...b(v.offerCta)}>
+                  <a
+                    href={str(v.offerCta, 'ButtonUrl') || '#signup'}
+                    {...external(str(v.offerCta, 'ButtonUrl'))}
+                    {...b(v.offerCta)}
+                    onClick={gate?.(str(v.offerCta, 'ButtonText'))}
+                  >
                     {str(v.offerCta, 'ButtonText')}
                   </a>
                 </Button>
@@ -481,6 +497,7 @@ function SignUp({
   attrs: Record<string, string>
   closeAttrs: Record<string, string>
 }) {
+  const gate = useCtaGate()
   if (!close && !leftovers) return null
   const url = str(close, 'ScheduleUrl')
   // The offer chose the email form in Limitless (src/lib/offer-signup.ts tags the close band with
@@ -509,7 +526,7 @@ function SignUp({
               str(close, 'ButtonText') && (
                 <Reveal i={2} className="mt-10">
                   <Button asChild variant="primary" className="www-btn">
-                    <a href={url || '#'} {...external(url)}>
+                    <a href={url || '#'} {...external(url)} onClick={gate?.(str(close, 'ButtonText'))}>
                       {str(close, 'ButtonText')}
                     </a>
                   </Button>

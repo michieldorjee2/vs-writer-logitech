@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-16
+updated: 2026-11-17
 ---
 
 # vs-writer-logitech
@@ -270,6 +270,36 @@ Env (Production already has `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`, `GRAPH_AUTH_
 Until a webhook is set, nobody who signs up hears anything more: someone imports the offer's CSV from Limitless into the event's registration, which sends the details. Removing someone's sign-up (an erasure request) is done in Limitless's store; aldus-ui `docs/offers-section.md` §22 says how.
 
 Never submit the form on a preview whose `ALDUS_UI_URL` is production Limitless: the sign-up lands in production's list. Locally, set `ALDUS_UI_URL` to a local aldus-ui.
+
+## Offer pages: the form on the CTA
+
+An offer can put optimizely.com's contact form (Marketo form 1054, the website's `/contact`) behind its pages' buttons: the hero's main button, the sticky bar and the closing section's button. It is set per offer in Limitless, "Form on CTA" on the offer screen (aldus-ui `lib/offers/cta-form.ts`), with two switches, both off by default: **Show form on CTA**, and **Always show form**. Nothing is written to the CMS and no page is regenerated. With both this and the email sign-up form chosen, this one wins: the closing section keeps its button.
+
+What a click does (`src/lib/cta-form.ts`, `src/www/CtaForm.tsx`):
+
+1. On load the page waits for the ODP tag's visitor id and asks `POST /api/cta-form` (`step: status`) whether ODP knows that visitor (a profile with an email). A visitor ODP knows, with every required field, clicks straight through, as today; the form is submitted for them in the background.
+2. Anyone else gets a panel asking for their work email (the website's own rule: no gmail, outlook, proton…), with the website's consent checkbox and privacy line.
+3. With the email, the server asks ODP again (`step: lookup`), ties the browser's ODP id to that email, and the panel asks only for the required fields ODP doesn't hold. A visitor ODP knows by their browser but who lacks a field skips the email and sees just that field.
+4. "Always show form": a known visitor sees the whole form, filled in from their own profile.
+
+After a submit the panel thanks them and offers the button's own destination as a link (a link opened after a network wait would be blocked as a pop-up). A submit is remembered for that page for the tab's session. The CMS preview never submits.
+
+The server (`api/cta-form.ts`, `api/_lib/cta-form.ts`) posts each submission exactly as the website's server does (OptimizelyHeadless `app/actions/form-submission.ts`): a JSON POST of the filled fields, the website's hidden tracking fields (`gAID`, `optimizelyenduserid`, `utm_*`, `UTM_Partner__c`, `msclkid`, `li_fat_id`, `Google_Click_ID__c`), `FormID: "1054"`, `pageURL`, `queryString`, `userAgentString`, `page_key` (this page's CMS key), `form_key` (the website's form) and `PageName`, to the form's SubmitUrl, the `optisaasformproxy` OCP function, which hands it to ODP and Marketo. No new integration. It is the same form for every offer, as on the website: Marketo tells sign-ups apart by the URL they were submitted from, and `pageURL` is the offer page's own address (`https://showcase.optimizely.com/vb/<page>` and its query string), so each offer page's submissions can be split out there. The option lists (252 countries, US states, Canadian provinces), the work-email rule and the consent wording are copied from the live website form into `src/lib/contact-form-options.ts`; regenerate that file if the website's form changes.
+
+What it guards: only a JSON post from the page's own site; only for an offer page in Graph whose offer has the form on in Limitless (else 404, so it can't post the website's form for anything else); rate limits per address and per email while `KV_REST_API_*` is set; a honeypot. Profile values reach a browser only for that browser's own ODP id, and only on an offer with "Always show form"; an email typed into the panel gets back field names, never what ODP holds. Consent and the free-text question never come from a profile. Nothing logs an email, an ODP id or a value.
+
+Env:
+
+- `OFFER_CTA_FORM`: **`on` in Production since 17 Nov 2026.** `on` lets offers that chose it show the form; unset, `/api/cta-form` answers 404 and no page changes.
+- `ODP_PRIVATE_KEY`: the visitor lookups; unset, every visitor is treated as unknown and asked.
+- `CTA_FORM_SUBMIT_URL`: **unset** = the website's own endpoint. Only an https URL on function.zaius.app is accepted (503 otherwise).
+- `ALDUS_UI_URL`, `ALDUS_SHOWCASE_TOKEN`, `GRAPH_AUTH_KEY`, `KV_REST_API_*`: as for the email form.
+
+```bash
+npm run check:cta-form   # the rules, the marker, every step of /api/cta-form, the exact body sent
+```
+
+Every submit is real: it reaches ODP and Marketo like a /contact submission. Test with your own address.
 
 ## Search page: badge scanning
 

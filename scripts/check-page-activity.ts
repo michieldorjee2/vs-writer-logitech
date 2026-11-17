@@ -446,7 +446,9 @@ check('the tracking hook sends nothing for a marked browser, and only the page\'
 /* ---------- 9. Wiring ---------- */
 
 const files = (dir: string): string[] => readdirSync(join(root, dir)).flatMap((f) => (statSync(join(root, dir, f)).isDirectory() ? (f === 'node_modules' || f === 'vendor' ? [] : files(join(dir, f))) : [join(dir, f)]));
-const keyReaders = [...files('src'), ...files('api'), ...files('server')].filter((f) => /\.(ts|tsx)$/.test(f) && read(f).includes('ODP_PRIVATE_KEY'));
+// server/*-check.ts(x) are the check harnesses scripts/check-*.mjs bundle and run (one sets a stand-in
+// key to drive the form on an offer's CTA); nothing deployed imports them.
+const keyReaders = [...files('src'), ...files('api'), ...files('server')].filter((f) => /\.(ts|tsx)$/.test(f) && !/^server\/[^/]+-check\.tsx?$/.test(f) && read(f).includes('ODP_PRIVATE_KEY'));
 check('the ODP key is read in one server file and nowhere in the browser code', keyReaders.join() === 'api/_lib/odp-events.ts', keyReaders);
 const hook = read('src/hooks/useOdpTracking.ts');
 check('the booth tools are all named as chrome', /\.booth-rail\b/.test(read('src/lib/activity-dom.ts')) && /\.activity-view/.test(read('src/lib/activity-dom.ts')));

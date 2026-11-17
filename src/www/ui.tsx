@@ -12,7 +12,7 @@
  * StackedHeading, StatBlock, TableBlock, the logo carousel, the quote and arrow cards, the
  * accordion). The composition and the scale are ours.
  */
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { StackedHeading } from '../vendor/www/components/element/stacked-heading-element'
 import { Button } from '../vendor/www/components/_ui/button'
 import OptimizelyWordmark from '../components/OptimizelyWordmark'
@@ -651,12 +651,15 @@ export function StickyCta({
   label = 'Talk to your team',
   endId = 'cta',
   onAction,
+  onLinkClick,
 }: {
   text: string
   href?: string
   label?: string
   endId?: string
   onAction?: () => void
+  /** The link's click, when the page puts something in front of it (the offer's form on its CTA, CtaForm.tsx). */
+  onLinkClick?: (event: MouseEvent<HTMLAnchorElement>) => void
 }) {
   const [visible, setVisible] = useState(false)
   useEffect(() => {
@@ -685,7 +688,7 @@ export function StickyCta({
         </Button>
       ) : (
         <Button asChild variant="primary" size="sm" className="www-btn shrink-0" tabIndex={visible ? 0 : -1}>
-          <a href={href} id="sticky-connect-btn">
+          <a href={href} id="sticky-connect-btn" onClick={onLinkClick}>
             {label}
           </a>
         </Button>
