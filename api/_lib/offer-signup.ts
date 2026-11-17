@@ -12,9 +12,13 @@
  * costs at most 1.5 s once per offer per few seconds and never fails a page: a failure is held
  * 5 s (an answer 30 s), and the page it served is edge-cached 10 s (`signupCacheControl`), so
  * an offer with the form on isn't shown with the link for the page cache's six minutes.
+ *
+ * The same answer carries the offer's form on its CTA (src/lib/cta-form.ts), behind its own
+ * switch, OFFER_CTA_FORM=on: chosen, the page gets the `CtaForm` marker instead of the email form.
  */
+import { injectCtaForm } from '../../src/lib/cta-form.js';
 import { injectSignupForm } from '../../src/lib/offer-signup.js';
-import { aldusConfigured, signupFormFor } from './aldus.js';
+import { aldusConfigured, type CtaFormChoice, offerFormsFor } from './aldus.js';
 import { offerIdOf } from './offer-pages.js';
 
 const HOLD_MS = 30_000;
@@ -27,39 +31,64 @@ export const UNSURE_CACHE_CONTROL = 'public, s-maxage=10';
 /** The email form can be drawn here: OFFER_SIGNUP_FORM=on and Limitless configured. */
 export const signupFormsOn = (): boolean => process.env.OFFER_SIGNUP_FORM === 'on' && aldusConfigured();
 
+/**
+ * The form on the CTA can be drawn here (src/lib/cta-form.ts): OFFER_CTA_FORM exactly "on" and
+ * Limitless configured. Its own switch, so turning it on never turns the email form on, or back.
+ */
+export const ctaFormsOn = (): boolean => process.env.OFFER_CTA_FORM === 'on' && aldusConfigured();
+
+type Choice = { form: 'link' | 'email'; ctaForm: CtaFormChoice; failed: boolean };
+const NO_CTA_FORM: CtaFormChoice = { on: false, alwaysShow: false };
+
 /** Per instance. */
-const held = new Map<string, { at: number; form: 'link' | 'email'; failed: boolean }>();
+const held = new Map<string, Choice & { at: number }>();
 /** The experiences served with the link because the choice couldn't be read. */
 const unsure = new WeakSet<object>();
 
-/** The offer's choice, and whether reading it failed ("link" then). */
-async function choiceOf(offerId: string): Promise<{ form: 'link' | 'email'; failed: boolean }> {
+/** The offer's choices, and whether reading them failed ("link" and no CTA form then). */
+async function choiceOf(offerId: string): Promise<Choice> {
   const hit = held.get(offerId);
   if (hit && Date.now() - hit.at < (hit.failed ? FAILED_HOLD_MS : HOLD_MS)) return hit;
-  let form: 'link' | 'email' = 'link';
-  let failed = false;
+  let answer: Choice;
   try {
-    form = await signupFormFor(offerId, AbortSignal.timeout(TIMEOUT_MS));
+    answer = { ...(await offerFormsFor(offerId, AbortSignal.timeout(TIMEOUT_MS))), failed: false };
   } catch (err) {
-    failed = true;
+    answer = { form: 'link', ctaForm: NO_CTA_FORM, failed: true };
     console.warn('[offer-signup] choice unread, showing the link:', err instanceof Error ? err.message : err);
   }
-  const answer = { at: Date.now(), form, failed };
-  held.set(offerId, answer);
+  held.set(offerId, { ...answer, at: Date.now() });
   return answer;
 }
 
-/** The experience with the email form in, when its offer chose it; otherwise as given. Never throws. */
+/**
+ * The offer's form on its CTA, read as the page was (the same memo): api/cta-form.ts asks it
+ * before it answers anything about a visitor, so the endpoint works only for an offer that chose
+ * the form. Off while OFFER_CTA_FORM isn't "on", and when the choice can't be read.
+ */
+export async function ctaFormChoiceOf(offerId: string): Promise<CtaFormChoice> {
+  if (!ctaFormsOn()) return NO_CTA_FORM;
+  const { ctaForm, failed } = await choiceOf(offerId);
+  return failed ? NO_CTA_FORM : ctaForm;
+}
+
+/**
+ * The experience with the offer's form in, when it chose one; otherwise as given. Never throws.
+ * The form on the CTA (OFFER_CTA_FORM) wins over the email form (OFFER_SIGNUP_FORM): with both
+ * chosen, the close band keeps its button and every CTA opens the contact form.
+ */
 export async function withOfferSignup<T>(item: T): Promise<T> {
   try {
-    if (!signupFormsOn()) return item;
+    const signupOn = signupFormsOn();
+    const ctaOn = ctaFormsOn();
+    if (!signupOn && !ctaOn) return item;
     const page = item as { __typename?: unknown; componentPlan?: unknown } | null;
     if (!page || page.__typename !== 'ABMExperience') return item;
     const offerId = offerIdOf(typeof page.componentPlan === 'string' ? page.componentPlan : null);
     if (!offerId) return item;
-    const { form, failed } = await choiceOf(offerId);
+    const { form, ctaForm, failed } = await choiceOf(offerId);
     if (failed) unsure.add(page);
-    return form === 'email' ? injectSignupForm(item, offerId) : item;
+    if (ctaOn && ctaForm.on) return injectCtaForm(item, offerId, ctaForm.alwaysShow);
+    return signupOn && form === 'email' ? injectSignupForm(item, offerId) : item;
   } catch (err) {
     console.warn('[offer-signup] left the page as it is:', err instanceof Error ? err.message : err);
     return item;

@@ -162,6 +162,8 @@ function pageBuildsDev(env: Record<string, string>): Plugin {
           [/^\/api\/offers$/, '/api/offers/index.ts'],
           [/^\/api\/offers\/([^/]+)\/look$/, '/api/offers/[id]/look.ts'],
           [/^\/api\/offer-signup$/, '/api/offer-signup.ts'],
+          // The form on an offer's CTA: the function itself, so dev checks pages and ODP as production does.
+          [/^\/api\/cta-form$/, '/api/cta-form.ts'],
           // The one-click ask. Sends nothing in dev: the Mark webhook is set on Production only.
           [/^\/api\/cta-ping$/, '/api/cta-ping.ts'],
           [/^\/api\/offers\/([^/]+)\/pages$/, '/api/offers/[id]/pages.ts'],

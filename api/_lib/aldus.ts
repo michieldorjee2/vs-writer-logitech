@@ -120,10 +120,26 @@ export async function saveLook(offerId: string, look: Omit<ShowcaseLook, 'madeAt
   return saved;
 }
 
+/** The form on an offer's CTA (aldus-ui lib/offers/cta-form.ts): both switches off unless Limitless says exactly `true`. */
+export type CtaFormChoice = { on: boolean; alwaysShow: boolean };
+
+/**
+ * How people sign up on an offer's pages (aldus-ui lib/offers/signup.ts), and the form on its
+ * CTA (lib/offers/cta-form.ts), in one answer. An Aldus UI from before the CTA form answers
+ * without `ctaForm`: off. Throws when Aldus UI can't say.
+ */
+export async function offerFormsFor(offerId: string, signal: AbortSignal): Promise<{ form: 'link' | 'email'; ctaForm: CtaFormChoice }> {
+  const { form, ctaForm } = await call<{ form?: unknown; ctaForm?: { on?: unknown; alwaysShow?: unknown } | null }>(
+    `/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`,
+    { signal },
+  );
+  const on = ctaForm?.on === true;
+  return { form: form === 'email' ? 'email' : 'link', ctaForm: { on, alwaysShow: on && ctaForm?.alwaysShow === true } };
+}
+
 /** How people sign up on an offer's pages (aldus-ui lib/offers/signup.ts). Throws when Aldus UI can't say. */
 export async function signupFormFor(offerId: string, signal: AbortSignal): Promise<'link' | 'email'> {
-  const { form } = await call<{ form?: unknown }>(`/api/machine/showcase/offers/${encodeURIComponent(offerId)}/signup`, { signal });
-  return form === 'email' ? 'email' : 'link';
+  return (await offerFormsFor(offerId, signal)).form;
 }
 
 /**
