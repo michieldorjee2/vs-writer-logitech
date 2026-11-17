@@ -1,11 +1,12 @@
 /**
- * optimizely.com's contact form (Marketo form 1054, CMS "[General] 1054 Contact Form",
- * www.optimizely.com/contact): the option lists and rules the offer pages' CTA form copies, so a
+ * optimizely.com's lead form (Marketo form 1002, CMS "[General] 1002 Resources form", key
+ * 8df6340c…, version 99580): the option lists and rules the offer pages' CTA form copies, so a
  * submission from a Limitless page reads exactly like one from the website.
  *
- * Generated 17 Nov 2026 from the live /contact page's form data (OptiFormsSelectionElement
- * Options, the email field's regularexpressionvalidator, the consent choice's label). Every
- * option's value equals its label there. If the website's form changes, regenerate; don't hand-edit.
+ * Taken 17 Nov 2026 from the form's published composition in the website's Graph
+ * (OptiFormsSelectionElement Options, the email field's regularexpressionvalidator, the consent
+ * choice's label). Every option's value equals its label there except one province: "Québec" is
+ * submitted as "Quebec" (optionLabel). If the website's form changes, take them again; don't hand-edit.
  */
 
 /** Country (required): 252 options. */
@@ -331,7 +332,7 @@ export const PROVINCES: readonly string[] = [
   "Nunavut",
   "Ontario",
   "Prince Edward Island",
-  "Québec",
+  "Quebec",
   "Saskatchewan",
   "Yukon",
 ]
@@ -340,7 +341,11 @@ export const PROVINCES: readonly string[] = [
  * The website's work-email rule (its regularexpressionvalidator, verbatim): refuses free mail
  * domains (gmail, yahoo, hotmail, outlook, icloud, proton…).
  */
-export const WORK_EMAIL_PATTERN = "\\b[\\w\\.-]+@(?!(gmail|googlemail|yahoo|hotmail|qq|icloud|work|outlook|gamil|yoo|ymail|mail|126|hmail|aol|live\\.com|me|student|email|proton|gaimel|sharklaser)\\b)[\\w\\.-]+\\.\\w{2,18}\\b"
+export const WORK_EMAIL_PATTERN = "\\b[\\w\\.-]+@(?!(gmail|googlemail|yahoo|hotmail|qq|icloud|work|outlook|gamil|yoo|ymail|126|hmail|aol|live\\.com|me|student|email|proton|gaimel|sharklaser)\\b)[\\w\\.-]+\\.\\w{2,7}\\b"
+
+/** The words an option shows where they differ from what it submits (the website's labels). */
+const LABELS: Readonly<Record<string, string>> = { Quebec: 'Québec' }
+export const optionLabel = (value: string): string => LABELS[value] ?? value
 
 /** The consent checkbox's words (Marketing_Consent__c, value "yes"). */
 export const CONSENT_LABEL = "I'd like to receive email invitations to Optimizely events and webinars, industry insights, and information about Optimizely products."

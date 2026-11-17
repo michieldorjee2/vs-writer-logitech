@@ -20,7 +20,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { MaterialIcon } from '../vendor/www/components/element/icon-element'
 import { inCmsPreview } from '../lib/cms-preview'
 import { normalizeVuid } from '../lib/page-activity'
-import { COUNTRIES, CONSENT_LABEL } from '../lib/contact-form-options'
+import { COUNTRIES, CONSENT_LABEL, optionLabel } from '../lib/contact-form-options'
 import {
   ALL_FIELDS,
   AUTOCOMPLETE,
@@ -261,7 +261,8 @@ function CtaPanel({
       setProblems({ email: problem })
       return
     }
-    setMode({ kind: 'sending' })
+    // Looking the email up sends nothing yet: "One moment…", not "Sending…".
+    setMode({ kind: 'checking' })
     setError(false)
     const missing = await postCtaLookup(window.location, typed, ownId ? vuid : null, honeypot.current?.value ?? '')
     if (!missing) {
@@ -420,7 +421,6 @@ function Field({
   if (name === 'country') return <Select name="country" label={FIELD_LABELS.country} options={COUNTRIES} value={value} problem={problem} onChange={onChange} required />
   if (name === 'state' || name === 'Marketing_Consent__c') return null
   const label = FIELD_LABELS[name]
-  const long = name === 'Other_Additional_Information__c'
   const required = REQUIRED.includes(name)
   const common = {
     id,
@@ -435,22 +435,17 @@ function Field({
     autoFocus,
   }
   return (
-    <div className={long ? 'www-form__field www-form__field--wide' : 'www-form__field'}>
+    <div className="www-form__field">
       <label htmlFor={id} className="www-form__label">
         {label}
         {required && <span aria-hidden="true"> *</span>}
       </label>
-      {long ? (
-        <textarea {...common} rows={3} maxLength={2000} />
-      ) : (
-        <input
-          {...common}
-          type={name === 'email' ? 'email' : name === 'phone' ? 'tel' : 'text'}
-          inputMode={name === 'email' ? 'email' : name === 'phone' ? 'tel' : undefined}
-          placeholder={name === 'phone' ? W.phonePlaceholder : undefined}
-          maxLength={name === 'email' ? 254 : 255}
-        />
-      )}
+      <input
+        {...common}
+        type={name === 'email' ? 'email' : 'text'}
+        inputMode={name === 'email' ? 'email' : undefined}
+        maxLength={name === 'email' ? 254 : 255}
+      />
       {problem && (
         <span id={`${id}-problem`} className="www-form__problem">
           {W[problem]}
@@ -498,7 +493,7 @@ function Select({
         <option value="">{required ? '' : '—'}</option>
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {optionLabel(o)}
           </option>
         ))}
       </select>
