@@ -74,7 +74,7 @@ export async function ctaFormChoiceOf(offerId: string): Promise<CtaFormChoice> {
 /**
  * The experience with the offer's form in, when it chose one; otherwise as given. Never throws.
  * The form on the CTA (OFFER_CTA_FORM) wins over the email form (OFFER_SIGNUP_FORM): with both
- * chosen, the close band keeps its button and every CTA opens the contact form.
+ * chosen, the close band keeps its button and every CTA opens the lead form.
  */
 export async function withOfferSignup<T>(item: T): Promise<T> {
   try {

@@ -9,7 +9,7 @@
  *                                    { missing }. Never a value. Ties the ODP id to the email.
  *   submit  { route, query, fields, tracking, email?, vuid? }
  *                                    Fills what wasn't typed from ODP (the email's profile, or the
- *                                    ODP id's), posts the website's contact form → 201; still
+ *                                    ODP id's), posts the website's lead form → 201; still
  *                                    missing something → 422 { missing, problems }.
  *
  * Public, like api/offer-signup.ts, so it trusts nothing it is sent:
@@ -126,9 +126,9 @@ async function identify(vuid: string | null, email: string): Promise<void> {
   }
 }
 
-/** Contact without the fields a profile must never supply: consent and the free-text question are only ever the visitor's own. */
+/** Contact without the field a profile must never supply: consent is only ever the visitor's own. */
 function fromProfile(contact: Contact): Contact {
-  const { Marketing_Consent__c: _consent, Other_Additional_Information__c: _other, ...rest } = contact;
+  const { Marketing_Consent__c: _consent, ...rest } = contact;
   return rest;
 }
 

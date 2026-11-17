@@ -18,7 +18,7 @@
  *                pasted into the query.
  *        submit  the website's exact body (field order, FormID, form_key, page_key, pageURL with
  *                the query, queryString, userAgentString, PageName) to the website's endpoint;
- *                typed values win over ODP's; consent and the free text never from a profile;
+ *                typed values win over ODP's; consent never from a profile;
  *                still missing → 422 and nothing sent; a filled honeypot → 201 and nothing sent;
  *                the endpoint failing → 502; CTA_FORM_SUBMIT_URL off function.zaius.app → 503
  *                and nothing sent; the 21st lookup a minute from one address → 429.
@@ -44,6 +44,7 @@ import {
   trackingOf,
 } from '../src/lib/cta-form';
 import { CLOSE_TYPENAME } from '../src/lib/offer-signup';
+import { optionLabel } from '../src/lib/contact-form-options';
 import ctaFormHandler from '../api/cta-form';
 import { forgetCtaPages, submitUrl, WEBSITE_SUBMIT_URL } from '../api/_lib/cta-form';
 import { forgetSignupForms, withOfferSignup } from '../api/_lib/offer-signup';
@@ -90,8 +91,8 @@ const VUID_KNOWN = '0123456789abcdef0123456789abcdef';
 const VUID_PARTIAL = 'fedcba9876543210fedcba9876543210';
 const VUID_UNKNOWN = '00000000000000000000000000000000';
 type Customer = Record<string, string | null>;
-const PAT: Customer = { email: 'pat@acme.com', first_name: 'Pat', last_name: 'Lee', company_name: 'Acme', job_title: 'CMO', phone: '+1 555 0100', country: 'United States', state: 'New York' };
-const SAM: Customer = { email: 'sam@acme.com', first_name: 'Sam', last_name: 'Ray', company_name: 'Acme', job_title: null, phone: null, country: 'Narnia', state: null };
+const PAT: Customer = { email: 'pat@acme.com', first_name: 'Pat', last_name: 'Lee', company_name: 'Acme', job_title: 'CMO', country: 'United States', state: 'New York' };
+const SAM: Customer = { email: 'sam@acme.com', first_name: 'Sam', last_name: 'Ray', company_name: 'Acme', job_title: null, country: 'Narnia', state: null };
 const byVuid: Record<string, Customer> = { [VUID_KNOWN]: PAT, [VUID_PARTIAL]: SAM };
 const byEmail: Record<string, Customer> = { 'pat@acme.com': PAT, 'sam@acme.com': SAM };
 
@@ -204,7 +205,8 @@ async function main(): Promise<void> {
   console.log('\na. The rules');
   check('a company address passes the website\'s rule', emailProblem('pat@acme.com') === null);
   check('gmail, outlook and proton are refused as not work email', ['a@gmail.com', 'a@outlook.com', 'a@proton.me'].every((e) => emailProblem(e) === 'workEmail'));
-  check('"mailchimp.com" is not "mail.com"', emailProblem('a@mailchimp.com') === null);
+  check('"mailchimp.com" passes', emailProblem('a@mailchimp.com') === null);
+  check('form 1002\'s rule, not 1054\'s: "mail.com" passes, a domain ending over 7 letters is refused', emailProblem('a@mail.com') === null && emailProblem('a@acme.consulting') === 'workEmail');
   check('no @ is invalid, empty is required', emailProblem('nope') === 'invalidEmail' && emailProblem('  ') === 'required');
   const cleaned = cleanContact({
     firstName: '  Pat  ',
@@ -222,12 +224,14 @@ async function main(): Promise<void> {
   );
   check('cleanContact: a country off the list is a problem', cleanContact({ country: 'Narnia' }).problems.country === 'pickOne');
   check('cleanContact: a Canadian province kept for Canada', cleanContact({ country: 'Canada', state: 'Ontario' }).values.state === 'Ontario');
+  check('cleanContact: Québec as form 1002 submits it ("Quebec"), 1054\'s spelling taken too; shown as "Québec"', cleanContact({ country: 'Canada', state: 'Québec' }).values.state === 'Quebec' && cleanContact({ country: 'Canada', state: 'Quebec' }).values.state === 'Quebec' && optionLabel('Quebec') === 'Québec' && optionLabel('Ontario') === 'Ontario');
+  check('no phone and no free-text question on form 1002: dropped if sent', JSON.stringify(cleanContact({ phone: '+1 555', Other_Additional_Information__c: 'hi', firstName: 'Pat' }).values) === JSON.stringify({ firstName: 'Pat' }));
   check('cleanContact: a control character refuses the value', cleanContact({ firstName: 'Pat\u0000' }).problems.firstName === 'required');
-  check('missingOf: in the form\'s order', JSON.stringify(missingOf({ email: 'pat@acme.com', firstName: 'Pat' })) === JSON.stringify(['lastName', 'company', 'title', 'phone', 'country']));
-  const tracking = trackingOf('?utm_source=linkedin&gclid=g1', 'utm_source=cookie; utm_medium=email; _ga=GA1.2.3; optimizelyEndUserId=oeu1');
+  check('missingOf: in the form\'s order', JSON.stringify(missingOf({ email: 'pat@acme.com', firstName: 'Pat' })) === JSON.stringify(['lastName', 'company', 'title', 'country']));
+  const tracking = trackingOf('?utm_source=linkedin&gclid=g1', 'utm_source=cookie; utm_medium=email; _ga=GA1.2.3; optimizelyEndUserId=oeu1; _mkto_trk=id:947-RKE-048&token:_mch-optimizely.com-1-2');
   check(
-    'trackingOf: the query first, then the cookie, under the website\'s field names',
-    tracking.utm_source === 'linkedin' && tracking.utm_medium === 'email' && tracking.gAID === 'GA1.2.3' && tracking.optimizelyenduserid === 'oeu1' && tracking.Google_Click_ID__c === 'g1',
+    'trackingOf: the query first, then the cookie, under the website\'s field names (Marketo\'s own cookie too)',
+    tracking.utm_source === 'linkedin' && tracking.utm_medium === 'email' && tracking.gAID === 'GA1.2.3' && tracking.optimizelyenduserid === 'oeu1' && tracking.Google_Click_ID__c === 'g1' && tracking._mkto_trk === 'id:947-RKE-048&token:_mch-optimizely.com-1-2',
     tracking,
   );
   check('cleanTracking: unknown keys and long values dropped', JSON.stringify(cleanTracking({ utm_source: 'x', evil: 'y', msclkid: 'z'.repeat(201) })) === JSON.stringify({ utm_source: 'x' }));
@@ -237,7 +241,7 @@ async function main(): Promise<void> {
     ctaStep({ submitted: false, status: known, alwaysShow: false, preview: false }) === 'submit-through' &&
       ctaStep({ submitted: false, status: known, alwaysShow: true, preview: false }) === 'panel' &&
       ctaStep({ submitted: false, status: { known: false, missing: [...REQUIRED] }, alwaysShow: false, preview: false }) === 'panel' &&
-      ctaStep({ submitted: false, status: { known: true, missing: ['phone'] }, alwaysShow: false, preview: false }) === 'panel' &&
+      ctaStep({ submitted: false, status: { known: true, missing: ['title'] }, alwaysShow: false, preview: false }) === 'panel' &&
       ctaStep({ submitted: false, status: null, alwaysShow: false, preview: false }) === 'panel' &&
       ctaStep({ submitted: true, status: null, alwaysShow: false, preview: false }) === 'through' &&
       ctaStep({ submitted: false, status: null, alwaysShow: false, preview: true }) === 'through',
@@ -293,7 +297,7 @@ async function main(): Promise<void> {
   answer = await post({ step: 'status', route: '/vb/workshop-acme', vuid: VUID_KNOWN });
   check('status: a known, complete visitor → known, nothing missing, NO values', answer.body.known === true && (answer.body.missing as string[]).length === 0 && !('prefill' in answer.body) && !JSON.stringify(answer.body).includes('Pat'), answer);
   answer = await post({ step: 'status', route: '/vb/workshop-acme', vuid: VUID_PARTIAL });
-  check('status: known but incomplete → names the fields (a country off the list counts as missing), no values', JSON.stringify(answer.body.missing) === JSON.stringify(['title', 'phone', 'country']) && !JSON.stringify(answer.body).includes('Sam'), answer);
+  check('status: known but incomplete → names the fields (a country off the list counts as missing), no values', JSON.stringify(answer.body.missing) === JSON.stringify(['title', 'country']) && !JSON.stringify(answer.body).includes('Sam'), answer);
   ctaChoice = { on: true, alwaysShow: true };
   reset();
   answer = await post({ step: 'status', route: '/vb/workshop-acme', vuid: VUID_KNOWN });
@@ -308,7 +312,7 @@ async function main(): Promise<void> {
   reset();
   answer = await post({ step: 'lookup', route: '/vb/workshop-acme', email: 'Sam@Acme.com', vuid: VUID_UNKNOWN });
   const gql = toOdp().find((c) => c.url.endsWith('/graphql'))?.body as { query: string; variables: { v: string } };
-  check('lookup: a known email → field names only, never a value', answer.status === 200 && JSON.stringify(answer.body) === JSON.stringify({ missing: ['title', 'phone', 'country'] }), answer);
+  check('lookup: a known email → field names only, never a value', answer.status === 200 && JSON.stringify(answer.body) === JSON.stringify({ missing: ['title', 'country'] }), answer);
   check('…ODP asked with a variable, the email never in the query text', gql?.variables.v === 'sam@acme.com' && !gql.query.includes('sam@acme.com'), gql);
   const tie = toOdp().find((c) => c.url.endsWith('/profiles'));
   check('…the browser\'s ODP id tied to the email', JSON.stringify(tie?.body) === JSON.stringify({ attributes: { vuid: VUID_UNKNOWN, email: 'sam@acme.com' } }) && tie?.headers['x-api-key'] === 'odp-key', tie);
@@ -317,7 +321,7 @@ async function main(): Promise<void> {
 
   // submit
   reset();
-  answer = await post({ step: 'submit', route: '/vb/workshop-acme', query: '?utm_source=linkedin', vuid: VUID_KNOWN, fields: {}, tracking: { utm_source: 'linkedin', gAID: 'GA1.2.3', evil: 'x' } });
+  answer = await post({ step: 'submit', route: '/vb/workshop-acme', query: '?utm_source=linkedin', vuid: VUID_KNOWN, fields: {}, tracking: { utm_source: 'linkedin', gAID: 'GA1.2.3', _mkto_trk: 'id:947-RKE-048&token:_mch-optimizely.com-1-2', evil: 'x' } });
   const sent = toForm()[0];
   const expected = {
     firstName: 'Pat',
@@ -325,12 +329,12 @@ async function main(): Promise<void> {
     email: 'pat@acme.com',
     company: 'Acme',
     title: 'CMO',
-    phone: '+1 555 0100',
     country: 'United States',
     state: 'New York',
+    _mkto_trk: 'id:947-RKE-048&token:_mch-optimizely.com-1-2',
     gAID: 'GA1.2.3',
     utm_source: 'linkedin',
-    FormID: '1054',
+    FormID: '1002',
     pageURL: 'https://showcase.optimizely.com/vb/workshop-acme?utm_source=linkedin',
     queryString: '?utm_source=linkedin',
     userAgentString: 'Mozilla/5.0 (check)',
@@ -346,7 +350,7 @@ async function main(): Promise<void> {
     step: 'submit',
     route: '/vb/workshop-acme',
     email: 'sam@acme.com',
-    fields: { title: 'VP Marketing', phone: '+44 20 0000', country: 'United Kingdom', firstName: 'Samuel', Marketing_Consent__c: 'yes' },
+    fields: { title: 'VP Marketing', country: 'United Kingdom', firstName: 'Samuel', Marketing_Consent__c: 'yes' },
     tracking: {},
   });
   const merged = toForm()[0]?.body as Record<string, string>;
@@ -357,7 +361,7 @@ async function main(): Promise<void> {
   );
   reset();
   answer = await post({ step: 'submit', route: '/vb/workshop-acme', email: 'sam@acme.com', fields: { title: 'VP' }, tracking: {} });
-  check('submit still missing something: 422 naming it, nothing sent', answer.status === 422 && JSON.stringify(answer.body.missing) === JSON.stringify(['phone', 'country']) && toForm().length === 0, answer);
+  check('submit still missing something: 422 naming it, nothing sent', answer.status === 422 && JSON.stringify(answer.body.missing) === JSON.stringify(['country']) && toForm().length === 0, answer);
   answer = await post({ step: 'submit', route: '/vb/workshop-acme', email: 'sam@gmail.com', fields: {}, tracking: {} });
   check('submit with a free mail address: 422, nothing sent', answer.status === 422 && toForm().length === 0, answer);
   reset();

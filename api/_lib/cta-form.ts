@@ -1,15 +1,16 @@
 /**
  * The server half of the form on an offer page's CTA (src/lib/cta-form.ts): which page and offer
  * a request names, what ODP knows about a visitor, tying the browser's ODP id to an email, and
- * the submission itself, posted where optimizely.com posts its contact form.
+ * the submission itself, posted where optimizely.com posts its lead form (1002).
  *
  * Server-only. ODP is asked through odp-events.ts's odpPoster, so the account key is read in that
  * one file. Nothing here logs an email or a profile value, and nothing ODP holds reaches a browser
  * except as api/cta-form.ts allows.
  *
- * Where the submission goes: the website's form (CMS "[General] 1054 Contact Form") posts to its
+ * Where the submission goes: the website's form (CMS "[General] 1002 Resources form") posts to its
  * SubmitUrl, the `optisaasformproxy` OCP function, which hands each submission to ODP and Marketo
- * (Marketo syncs Salesforce). The website's server does it with a plain JSON POST and no key
+ * (Marketo syncs Salesforce). Every form on the website posts to this same URL; the FormID field
+ * says which Marketo form it is. The website's server does it with a plain JSON POST and no key
  * (OptimizelyHeadless app/actions/form-submission.ts), and so does this. CTA_FORM_SUBMIT_URL may
  * point it elsewhere (a test endpoint), but only to an https URL on function.zaius.app, so a bad
  * setting can't send people's details anywhere else.
@@ -19,7 +20,7 @@ import { type Contact, cleanContact, FORM_ID, FORM_KEY, type Tracking } from '..
 import { odpPoster } from './odp-events.js';
 import { offerIdOf } from './offer-pages.js';
 
-/** The website's form's SubmitUrl (CMS form 863c05ac…, live version 99984, 17 Nov 2026). Public: it is in the website's page data. */
+/** The website's forms' SubmitUrl (CMS form 8df6340c…, version 99580, and 1054's, 17 Nov 2026). Public: it is in the website's page data. */
 export const WEBSITE_SUBMIT_URL = 'https://function.zaius.app/optisaasformproxy/forms_odp_webhook/b8a55a4a-6585-4639-8068-5c43b12facf8';
 const SUBMIT_HOST = 'function.zaius.app';
 const SUBMIT_TIMEOUT_MS = 8000;
@@ -81,8 +82,8 @@ export async function offerPageAt(segment: string, authKey: string): Promise<Off
 /** What ODP holds for a person, as the form's fields (only values the form would accept), and their email. */
 export type Profile = { email: string | null; contact: Contact };
 
-const PROFILE_FIELDS = 'email first_name last_name company_name job_title phone country state';
-type OdpCustomer = Partial<Record<'email' | 'first_name' | 'last_name' | 'company_name' | 'job_title' | 'phone' | 'country' | 'state', string | null>>;
+const PROFILE_FIELDS = 'email first_name last_name company_name job_title country state';
+type OdpCustomer = Partial<Record<'email' | 'first_name' | 'last_name' | 'company_name' | 'job_title' | 'country' | 'state', string | null>>;
 
 /** ODP's profile as the form's fields, through the form's own rules (a country not on the list, or a state not of its country, is left out). */
 export function contactOfProfile(c: OdpCustomer | null | undefined): Profile {
@@ -93,7 +94,6 @@ export function contactOfProfile(c: OdpCustomer | null | undefined): Profile {
     lastName: c.last_name ?? '',
     company: c.company_name ?? '',
     title: c.job_title ?? '',
-    phone: c.phone ?? '',
     country: c.country ?? '',
     state: c.state ?? '',
   });
@@ -144,7 +144,7 @@ export function odp(): Odp | null {
 /* ---------- The submission ---------- */
 
 /**
- * The body the website's server posts for form 1054 (form-submission.ts): the visible fields
+ * The body the website's server posts for form 1002 (form-submission.ts): the visible fields
  * that have a value, the hidden ones that have one, then FormID, pageURL, queryString,
  * userAgentString, page_key, form_key and PageName. Empty fields are left out, as the website's
  * validation leaves them out.
@@ -159,7 +159,7 @@ export function websiteBody(input: {
   pageName: string | null;
 }): Record<string, string | null> {
   const body: Record<string, string | null> = {};
-  const order = ['firstName', 'lastName', 'email', 'company', 'title', 'phone', 'country', 'state', 'Other_Additional_Information__c', 'Marketing_Consent__c'] as const;
+  const order = ['firstName', 'lastName', 'email', 'company', 'title', 'country', 'state', 'Marketing_Consent__c'] as const;
   for (const key of order) if (input.contact[key]) body[key] = input.contact[key] as string;
   for (const [key, value] of Object.entries(input.tracking)) if (value) body[key] = value;
   body.FormID = FORM_ID;

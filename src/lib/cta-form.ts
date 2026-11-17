@@ -1,6 +1,7 @@
 /**
- * The form on an offer page's CTA: optimizely.com's contact form (Marketo form 1054), asked only
- * for what Optimizely doesn't already know about the visitor. Each offer turns it on in Limitless
+ * The form on an offer page's CTA: optimizely.com's lead form (Marketo form 1002, the "Global Lead
+ * Form" the website's resource, webinar and event pages use, CMS "[General] 1002 Resources form"),
+ * asked only for what Optimizely doesn't already know about the visitor. Each offer turns it on in Limitless
  * (aldus-ui lib/offers/cta-form.ts, "Form on CTA"), with a second switch, "Always show form".
  *
  * With it on, a click on the page's call to action (the hero's main button, the sticky bar, the
@@ -16,7 +17,8 @@
  *
  * The server (api/cta-form.ts) posts the submission where optimizely.com's own forms post it (the
  * form's SubmitUrl, the `optisaasformproxy` OCP function), in the website's exact shape, so ODP,
- * Marketo and Salesforce receive it as a /contact submission, with no new wiring anywhere.
+ * Marketo and Salesforce receive it as a website form 1002 submission from the offer page's URL,
+ * with no new wiring anywhere.
  *
  * Privacy: profile values only ever leave the server for the visitor's OWN browser id, and only
  * on an offer that chose "Always show form" (to fill the form in). An email typed into the panel
@@ -31,8 +33,8 @@ import { COUNTRIES, PROVINCES, US_STATES, WORK_EMAIL_PATTERN } from './contact-f
 export const CTA_FORM_ENDPOINT = '/api/cta-form'
 
 /** The website's form: its Marketo id (the FormID hidden field) and its CMS key (form_key). */
-export const FORM_ID = '1054'
-export const FORM_KEY = '863c05ace0a34a839b8fb430d28cd4be'
+export const FORM_ID = '1002'
+export const FORM_KEY = '8df6340c6cdd4e19a40a82103f1a96a5'
 
 /** The form's fields the visitor can see, by the name each is submitted as. */
 export type FieldKey =
@@ -41,18 +43,16 @@ export type FieldKey =
   | 'email'
   | 'company'
   | 'title'
-  | 'phone'
   | 'country'
   | 'state'
-  | 'Other_Additional_Information__c'
   | 'Marketing_Consent__c'
 
 export type Contact = Partial<Record<FieldKey, string>>
 
 /** Required on the website's form, in its order. */
-export const REQUIRED: readonly FieldKey[] = ['firstName', 'lastName', 'email', 'company', 'title', 'phone', 'country']
+export const REQUIRED: readonly FieldKey[] = ['firstName', 'lastName', 'email', 'company', 'title', 'country']
 /** Every visible field, in the website's order. */
-export const ALL_FIELDS: readonly FieldKey[] = [...REQUIRED, 'state', 'Other_Additional_Information__c', 'Marketing_Consent__c']
+export const ALL_FIELDS: readonly FieldKey[] = [...REQUIRED, 'state', 'Marketing_Consent__c']
 
 /** The website's labels. `state` is "US state" for the United States and "Province" for Canada. */
 export const FIELD_LABELS: Record<Exclude<FieldKey, 'state' | 'Marketing_Consent__c'>, string> = {
@@ -61,9 +61,7 @@ export const FIELD_LABELS: Record<Exclude<FieldKey, 'state' | 'Marketing_Consent
   email: 'Work email',
   company: 'Company',
   title: 'Job title',
-  phone: 'Phone',
   country: 'Country',
-  Other_Additional_Information__c: 'What challenges can we help you with?',
 }
 export const STATE_LABELS = { 'United States': 'US state', Canada: 'Province' } as const
 /** The browser's autofill hint per field, as the website sets it. */
@@ -73,7 +71,6 @@ export const AUTOCOMPLETE: Partial<Record<FieldKey, string>> = {
   email: 'email',
   company: 'organization',
   title: 'organization-title',
-  phone: 'tel',
   country: 'country-name',
 }
 
@@ -98,7 +95,6 @@ export const CTA_FORM_WORDS = {
   workEmail: 'Enter your work email.',
   pickOne: 'Choose one.',
   error: "That didn't go through. Try again.",
-  phonePlaceholder: '+1 234 567 8901',
   privacy: 'Optimizely will store and process your personal data as described in our',
   privacyLink: 'Privacy Notice',
   privacyTail: '. Refer to the Privacy Notice for opt out.',
@@ -109,7 +105,6 @@ export const PRIVACY_URL = 'https://www.optimizely.com/legal/privacy-notice/'
 /* ---------- The fields' rules (the server applies them; the panel shows the same answers) ---------- */
 
 const MAX_TEXT = 255
-const MAX_LONG = 2000
 const MAX_EMAIL = 254
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const WORK_EMAIL = new RegExp(WORK_EMAIL_PATTERN, 'i')
@@ -157,7 +152,7 @@ export function cleanContact(raw: unknown): { values: Contact; problems: Partial
   const values: Contact = {}
   const problems: Partial<Record<FieldKey, FieldProblem>> = {}
   const present = (key: string) => typeof given[key] === 'string' && (given[key] as string).trim() !== ''
-  for (const key of ['firstName', 'lastName', 'company', 'title', 'phone'] as const) {
+  for (const key of ['firstName', 'lastName', 'company', 'title'] as const) {
     const value = line(given[key])
     if (value) values[key] = value
     else if (present(key)) problems[key] = 'required'
@@ -170,10 +165,9 @@ export function cleanContact(raw: unknown): { values: Contact; problems: Partial
   const country = line(given.country)
   if (country && COUNTRY_SET.has(country)) values.country = country
   else if (present('country')) problems.country = 'pickOne'
-  const state = line(given.state)
+  // "Québec" is how form 1054 (and so some ODP profiles) spell it; form 1002 submits "Quebec".
+  const state = line(given.state) === 'Québec' ? 'Quebec' : line(given.state)
   if (state && values.country && STATE_SETS[values.country]?.has(state)) values.state = state
-  const other = line(given.Other_Additional_Information__c, MAX_LONG)
-  if (other) values.Other_Additional_Information__c = other
   if (given.Marketing_Consent__c === 'yes') values.Marketing_Consent__c = 'yes'
   return { values, problems }
 }
@@ -187,9 +181,12 @@ export function missingOf(values: Contact): FieldKey[] {
 
 /**
  * The website's tracking fields (OptiFormsHiddenValueElement), each read from the query string
- * first and then a cookie of the source name, as the website reads them.
+ * first and then a cookie of the source name, as the website reads them. `_mkto_trk` is Marketo's
+ * own cookie (Munchkin, set on .optimizely.com): sent along, Marketo ties the lead to the visitor's
+ * earlier web activity.
  */
 export const TRACKING_SOURCES = {
+  _mkto_trk: '_mkto_trk',
   gAID: '_ga',
   optimizelyenduserid: 'optimizelyEndUserId',
   utm_medium: 'utm_medium',
