@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { personNameProblem, looksLikePersonName } from '../src/lib/person-name.js';
+import { personNameProblem, looksLikePersonName, nameFromEmail, personNameOf } from '../src/lib/person-name.js';
 import { buildHoldsAddress, type BuildRecord, type MarkExecution } from '../src/lib/page-builds.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -171,6 +171,27 @@ check('the search text "IKEA" is not carried into the name field', !looksLikePer
 check('the search text "Cecilia Jeppsson" is', looksLikePersonName('Cecilia Jeppsson'));
 check('a website answer says website', /website/i.test(personNameProblem('www.ikea.com', 'IKEA') ?? ''));
 check('the company answer names the company', /IKEA/.test(personNameProblem('IKEA', 'IKEA') ?? ''));
+
+// 19 Nov: a rep asked for "jyoti.radhu@kraftheinz.com" and Mark refused it as a website.
+const emails: [string, string | null][] = [
+  ['jyoti.radhu@kraftheinz.com', 'Jyoti Radhu'],
+  ['  Jyoti.Radhu@KraftHeinz.com ', 'Jyoti Radhu'],
+  ['cecilia_jeppsson@ikea.com', 'Cecilia Jeppsson'],
+  ['ben-yu+events@logitech.com', 'Ben Yu'],
+  ['john.f.kennedy2@example.org', 'John Kennedy'],
+  ['jradhu@kraftheinz.com', null],
+  ['j.radhu@kraftheinz.com', null],
+  ['info@kraftheinz.com', null],
+  ['Jyoti Radhu', null],
+  ['kraftheinz.com', null],
+];
+for (const [value, name] of emails) {
+  check(`the name in "${value}" is ${name ?? 'none'}`, nameFromEmail(value) === name, String(nameFromEmail(value)));
+}
+check('an email address with a name in it is accepted as that person', personNameProblem('jyoti.radhu@kraftheinz.com', 'Kraft Heinz') === null);
+check('…and sent as the name', personNameOf('jyoti.radhu@kraftheinz.com') === 'Jyoti Radhu' && personNameOf(' Cecilia Jeppsson ') === 'Cecilia Jeppsson');
+check('an email address with no name in it is refused, saying email', /email/i.test(personNameProblem('jradhu@kraftheinz.com', 'Kraft Heinz') ?? ''));
+check('the search text "jyoti.radhu@kraftheinz.com" is carried into the name field', looksLikePersonName('jyoti.radhu@kraftheinz.com'));
 
 process.env.DEV_AUTH_EMAIL = 'rep@example.com';
 process.env.KV_REST_API_URL = 'https://kv.example';
@@ -324,8 +345,11 @@ const ssr = read('server/ssr-handler.tsx');
 check('the server render asks buildHoldsAddress before it puts the build view in front of the page', /buildHoldsAddress\(build\) && url\.searchParams\.get\('view'\) !== 'page'/.test(ssr));
 check("…and no longer stands any unfinished build there (status !== 'done')", !/if \(build\.status !== 'done' && url\.searchParams/.test(ssr));
 const hook = read('src/hooks/usePageRequest.tsx');
-check('the search bar carries the search text into the name only when it reads as a person', /setPerson\(nextKind === 'person' && looksLikePersonName\(q\) && !findCompany\(q\) \? q : ''\)/.test(hook));
+check('the search bar carries the search text into the name only when it reads as a person', /setPerson\(nextKind === 'person' && looksLikePersonName\(q\) && !findCompany\(q\) \? personNameOf\(q\) : ''\)/.test(hook));
 check('…checks the name before sending, and shows a 400\'s reason', /personNameProblem\(who,/.test(hook) && /r\.status === 400/.test(hook));
+check('…and sends the name in an email address, not the address', /const who = personNameOf\(person\)/.test(hook));
+const builds = read('api/page-builds/index.ts');
+check('POST /api/page-builds turns an email address into the name before it checks or builds', /const personName = personNameOf\(person\.value\)/.test(builds) && !/personName: person\.value|personNameProblem\(person\.value/.test(builds));
 const vercel = JSON.parse(read('vercel.json')) as { crons?: { path: string; schedule: string }[] };
 check('the sweep is a Vercel Cron every 10 minutes', !!vercel.crons?.some((c) => c.path === '/api/page-builds/sweep' && c.schedule === '*/10 * * * *'));
 

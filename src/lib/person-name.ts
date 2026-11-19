@@ -37,12 +37,43 @@ export function foldName(value: string): string {
 }
 
 /**
+ * The name in a work email address: "jyoti.radhu@kraftheinz.com" is "Jyoti Radhu". Null when
+ * the value is no email address, or its first part does not split into a first and a last
+ * name ("jradhu@"). Initials and digits are dropped: "john.f.kennedy2@" is "John Kennedy".
+ *
+ * Why: on 19 Nov a rep asked for "jyoti.radhu@kraftheinz.com". The name check let it through
+ * (four words once folded) and Mark refused it as a website, so the rep got no page.
+ */
+export function nameFromEmail(value: string): string | null {
+  const v = value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v)) return null;
+  const local = v.split('@')[0].split('+')[0];
+  const parts = local
+    .split(/[._-]+/)
+    .map((p) => p.replace(/\d+/g, ''))
+    .filter((p) => /^\p{L}{2,}$/u.test(p));
+  if (parts.length < 2) return null;
+  return parts.map((p) => p[0].toUpperCase() + p.slice(1).toLowerCase()).join(' ');
+}
+
+/** The person to send Mark: the name in an email address, else what was typed. */
+export function personNameOf(value: string): string {
+  return nameFromEmail(value) ?? value.trim();
+}
+
+/**
  * Why `name` is not a person's name, in a sentence the rep reads, or null when it is one.
  * `company` is the company the page is for, when known (its name, website or address).
+ * An email address stands for the name in it (nameFromEmail).
  */
 export function personNameProblem(name: string, company?: string | null): string | null {
   const value = name.trim();
   if (!value) return "Enter the person's name.";
+  if (value.includes('@')) {
+    const fromEmail = nameFromEmail(value);
+    if (!fromEmail) return "That's an email address. Enter the person's full name, e.g. Jane Smith.";
+    return personNameProblem(fromEmail, company);
+  }
   if (/:\/\/|^www\./i.test(value) || looksLikeWebsite(value)) {
     return "That's a website. Enter the person's full name, e.g. Jane Smith.";
   }
