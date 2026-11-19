@@ -7,7 +7,7 @@ import { buildForSite, buildStore, buildsForRep } from '../_lib/page-builds-stor
 import { startAccountBuild, startPersonBuild, summarize, summaryOf } from '../_lib/page-builds.js';
 import { validateCompanyName, validateCompanyWebsite, validateText, websiteDomain } from '../_lib/validate-input.js';
 import { nameFromWebsite } from '../../src/lib/page-builds.js';
-import { personNameProblem } from '../../src/lib/person-name.js';
+import { personNameOf, personNameProblem } from '../../src/lib/person-name.js';
 import { alertBuildFailed } from '../_lib/build-alerts.js';
 
 /**
@@ -85,13 +85,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.kind === 'person') {
       const person = validateText(body.personName, 'personName', 120, { requireLetter: true });
       if (!person.ok) return res.status(400).json({ error: person.error });
+      // An email address is the name in it ("jyoti.radhu@…" is Jyoti Radhu): Mark refuses an address.
+      const personName = personNameOf(person.value);
       const title = typeof body.personTitle === 'string' && body.personTitle.trim() ? validateText(body.personTitle, 'personTitle', 160) : null;
       if (title && !title.ok) return res.status(400).json({ error: title.error });
       const company = (body.company ?? {}) as Record<string, unknown>;
       // A company or a website as the person is refused here, not built: Mark would build
       // every stakeholder on the company page instead, or nothing (src/lib/person-name.ts).
       const companyText = [company.name, company.website, company.route].find((v): v is string => typeof v === 'string' && v.trim() !== '');
-      const notAPerson = personNameProblem(person.value, companyText);
+      const notAPerson = personNameProblem(personName, companyText);
       if (notAPerson) return res.status(400).json({ error: 'not_a_person', message: notAPerson });
 
       // The company has a page: build the person under it.
@@ -99,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const companyName = validateCompanyName(company.name);
         if (!companyName.ok) return res.status(400).json({ error: companyName.error });
         const build = await startPersonBuild(store, {
-          personName: person.value,
+          personName,
           personTitle: title?.ok ? title.value : undefined,
           companyName: companyName.value,
           companyRoute: company.route,
@@ -112,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (company.lookup !== undefined) {
         const account = await pickedAccount(store, company.lookup, company.key, identity.email);
         if (!account) return res.status(410).json({ error: 'lookup_expired', message: LOOKUP_EXPIRED });
-        const personInput = { personName: person.value, personTitle: title?.ok ? title.value : undefined, email: identity.email };
+        const personInput = { personName, personTitle: title?.ok ? title.value : undefined, email: identity.email };
         if (account.page) {
           const build = await startPersonBuild(store, { ...personInput, companyName: account.name, companyRoute: account.page.route });
           return res.status(200).json({ build: summarize(build, null) });
@@ -143,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const underway = await buildForSite(store, domain);
       if (underway?.status === 'done') {
         const build = await startPersonBuild(store, {
-          personName: person.value,
+          personName,
           personTitle: title?.ok ? title.value : undefined,
           companyName: underway.companyName ?? underway.name,
           companyRoute: underway.finalRoute ?? underway.route,
@@ -164,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       const build = await startPersonBuild(store, {
-        personName: person.value,
+        personName,
         personTitle: title?.ok ? title.value : undefined,
         companyName: companyBuild.name,
         companyRoute: companyBuild.route,

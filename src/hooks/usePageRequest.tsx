@@ -4,7 +4,7 @@ import { domainOf, type AccountChoice, type AccountMatch } from '../lib/account-
 import { askAnswerOf, askNote } from '../lib/offer-from-search';
 import type { FromSearch } from '../lib/offer-looks';
 import type { BuildSummary } from '../lib/page-builds';
-import { looksLikePersonName, personNameProblem } from '../lib/person-name';
+import { looksLikePersonName, personNameOf, personNameProblem } from '../lib/person-name';
 import { looksLikeWebsite } from '../lib/search-entries';
 import { useBadgeCard } from './useBadgeCard';
 
@@ -152,7 +152,7 @@ export function usePageRequest({
       setCompany(nextKind === 'account' ? q : nextKind === 'offer' ? (looksLikeWebsite(q) ? q : known) : '');
       // The search text is the person only when it reads as a name and is no company the
       // index knows: carrying "IKEA" into the name field is how IKEA became a person.
-      setPerson(nextKind === 'person' && looksLikePersonName(q) && !findCompany(q) ? q : '');
+      setPerson(nextKind === 'person' && looksLikePersonName(q) && !findCompany(q) ? personNameOf(q) : '');
       setOfferRef(nextKind === 'offer' ? (offer ?? null) : null);
       setCompanyRef(null);
       setMatches(null);
@@ -322,7 +322,8 @@ export function usePageRequest({
     }
 
     if (phase === 'person' && companyRef) {
-      const who = person.trim();
+      // An email address is sent as the name in it: Mark refuses an address as a person.
+      const who = personNameOf(person);
       const problem = personNameProblem(who, 'website' in companyRef ? companyRef.website : companyRef.name);
       if (problem) return setError(problem);
       return send({ kind: 'person', personName: who, company: companyRef }, personNote);
