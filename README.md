@@ -9,7 +9,7 @@ tags: [web-app, writing, logitech, input-device, aldus, showcase]
 related:
   - "[[_MOCs/Web Apps]]"
   - "[[_MOCs/Aldus Suite]]"
-updated: 2026-11-17
+updated: 2026-11-19
 ---
 
 # vs-writer-logitech
